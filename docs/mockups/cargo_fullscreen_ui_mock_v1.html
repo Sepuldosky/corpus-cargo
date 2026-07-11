@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cargo — Fullscreen UI Mock v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0c0a;--panel:#14150f;--panel2:#191a13;--slot:#0f100b;
+  --line:#2b2d22;--line2:#3a3d2e;--txt:#b9bcab;--txt-dim:#6e7263;--txt-faint:#484c3e;
+  --ok:#9dc04b;--ok-dim:#5c7030;--amber:#d9a13b;--red:#c7503a;--blue:#5b8fa8;--money:#ded8c2;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#000}
+body{font-family:'Barlow Condensed',sans-serif;color:var(--txt)}
+
+.viewport{position:fixed;inset:0;overflow:hidden;background:#000}
+.stage{width:1920px;height:1080px;position:absolute;top:0;left:0;transform-origin:top left;overflow:hidden}
+
+.world{position:absolute;inset:0;
+  background:linear-gradient(180deg,#3d5a72 0%,#5d7d93 46%,#6b7a5e 46.5%,#4a5540 70%,#33392c 100%);
+  filter:blur(2px) saturate(.55) brightness(.8)}
+.world .blk{position:absolute;background:#3c4148;box-shadow:inset -14px 0 22px rgba(0,0,0,.4)}
+.scrim{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(4,5,3,.62) 0%,rgba(3,4,2,.88) 78%,rgba(0,0,0,.95) 100%)}
+
+.chrome{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:50;
+  display:flex;gap:8px;align-items:center;padding:7px 14px;border:1px dashed #4a4d3a;
+  background:rgba(10,11,7,.85);font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt-dim)}
+.chrome b{color:var(--txt);font-weight:600}
+.chrome button{font:600 14px 'Barlow Condensed';letter-spacing:.1em;text-transform:uppercase;
+  color:var(--txt-dim);background:transparent;border:1px solid var(--line);padding:5px 14px;cursor:pointer}
+.chrome button:hover{color:var(--txt);border-color:var(--line2)}
+.chrome button.on{color:var(--ok);border-color:var(--ok-dim)}
+.chrome button:focus-visible{outline:1px solid var(--ok)}
+
+.ui{position:absolute;inset:0;display:grid;grid-template-columns:580px 420px 660px;
+  gap:30px;padding:64px 90px 48px;align-items:stretch}
+
+.panel{background:
+    repeating-linear-gradient(45deg,rgba(255,255,255,.012) 0 2px,transparent 2px 5px),
+    linear-gradient(180deg,var(--panel2),var(--panel));
+  border:1px solid var(--line);box-shadow:0 0 0 1px #000,0 14px 40px rgba(0,0,0,.6);
+  display:flex;flex-direction:column;min-height:0}
+
+/* headers */
+.hdr{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.25)}
+.hdr .pic{width:58px;height:58px;flex:none;border:1px solid var(--line2);background:var(--slot);display:grid;place-items:center}
+.hdr .pic svg{width:70%;height:70%;fill:var(--txt-dim)}
+.hdr .who{flex:1;min-width:0}
+.hdr .who .nm{font-size:24px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#d6d9c8;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr .who .fx{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr .cash{text-align:right;white-space:nowrap}
+.hdr .cash .v{font:600 22px 'IBM Plex Mono';color:var(--money)}
+.hdr .cash .c{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--txt-faint)}
+.moneybtn{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid var(--line2);
+  background:radial-gradient(circle at 35% 30%,#26281d,#0e0f0a);display:grid;place-items:center;cursor:pointer;position:relative}
+.moneybtn:hover{border-color:var(--amber)}
+.moneybtn span{font:600 17px 'IBM Plex Mono';color:var(--amber)}
+.moneybtn svg{position:absolute;width:15px;height:15px;right:-3px;bottom:-3px;fill:var(--amber);background:var(--panel);border-radius:50%;padding:1px}
+
+/* trade strips */
+.strip{display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.35)}
+.strip .lb{font-size:16px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+.strip.buy .lb{color:var(--amber)} .strip.sell .lb{color:var(--ok)}
+.strip .tt{margin-left:auto;font:600 16px 'IBM Plex Mono';color:var(--money)}
+.strip .tt i{font:400 12px 'IBM Plex Mono';color:var(--txt-faint);font-style:normal;margin-right:8px}
+
+/* filter tabs */
+.tabs{display:flex;flex-wrap:wrap;gap:2px;padding:9px 12px;border-bottom:1px solid var(--line)}
+.tabs span{font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-dim);
+  padding:3px 10px;border:1px solid transparent;cursor:pointer}
+.tabs span:hover{color:var(--txt)}
+.tabs span.on{color:var(--ok);border-color:var(--ok-dim);background:rgba(157,192,75,.06)}
+
+/* grid */
+.gridwrap{flex:1;overflow:auto;padding:14px;position:relative;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 46px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 1px,transparent 1px 46px)}
+.grid{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start;align-content:flex-start}
+.tile{position:relative;background:linear-gradient(160deg,#1b1d14,#101208);border:1px solid #23251b;
+  display:grid;place-items:center;cursor:pointer;flex:none}
+.tile:hover{border-color:var(--ok-dim);background:linear-gradient(160deg,#22251a,#14160c)}
+.tile.pend{border-color:var(--amber);box-shadow:0 0 0 1px rgba(217,161,59,.3),inset 0 0 14px rgba(217,161,59,.09)}
+.tile svg.g{width:82%;height:66%;fill:#83886f;pointer-events:none}
+.tile .cnt{position:absolute;top:2px;right:4px;font:600 11px 'IBM Plex Mono';color:#cdd1bd}
+.tile .cond{position:absolute;bottom:4px;right:4px;font:600 10px 'IBM Plex Mono';color:var(--ok)}
+.tile .cond.low{color:var(--amber)}
+.tile .cbar{position:absolute;left:0;bottom:0;height:2px;width:100%;background:rgba(0,0,0,.5)}
+.tile .cbar b{display:block;height:100%;background:var(--ok)} .tile .cbar b.low{background:var(--amber)}
+.tile .cal{position:absolute;bottom:3px;left:4px;font:400 9px 'IBM Plex Mono';color:var(--txt-dim)}
+.tile .grp{position:absolute;top:2px;left:4px;font:600 10px 'IBM Plex Mono';color:var(--amber)}
+.tile .price{position:absolute;bottom:3px;left:4px;font:600 10px 'IBM Plex Mono';color:var(--amber)}
+
+/* footer / weight */
+.foot{border-top:1px solid var(--line);padding:10px 16px;display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.3)}
+.foot .bar{flex:1;min-width:40px;height:8px;background:#0a0b07;border:1px solid var(--line)}
+.foot .bar b{display:block;height:100%;background:var(--amber)}
+.foot .wt{font:600 15px 'IBM Plex Mono';color:var(--money);white-space:nowrap}
+.foot .wt i{font-style:normal;color:var(--txt-dim);font-weight:400;font-size:12px}
+.foot button{font:700 15px 'Barlow Condensed';letter-spacing:.16em;text-transform:uppercase;color:#0c0d09;
+  background:linear-gradient(180deg,#a8ab97,#7e816d);border:1px solid #55584a;padding:7px 20px;cursor:pointer}
+.foot button:hover{filter:brightness(1.12)}
+.foot button.ghost{background:transparent;color:var(--txt-dim);border:1px solid var(--line2)}
+.foot button.ghost:hover{color:var(--txt)}
+
+/* equipment column */
+.equip{display:flex;flex-direction:column;gap:10px;padding:14px}
+.eqgrid{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:8px}
+.slot{position:relative;background:var(--slot);border:1px solid var(--line);display:flex;flex-direction:column;padding:6px 8px}
+.slot .lb{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--txt-faint)}
+.slot .body{flex:1;display:grid;place-items:center;min-height:0}
+.slot .body svg{max-width:80%;max-height:74%;fill:#8b9074}
+.slot .nm{font-size:13px;letter-spacing:.05em;color:var(--txt-dim);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .seg{height:5px;margin-top:5px;background:#0a0b07;border:1px solid #1d1f16;position:relative}
+.slot .seg b{position:absolute;inset:0;background:repeating-linear-gradient(90deg,var(--ok) 0 4px,transparent 4px 7px)}
+.slot .grp{position:absolute;top:5px;right:7px;font:600 11px 'IBM Plex Mono';color:var(--amber)}
+.slot.empty .body::after{content:'—';color:var(--txt-faint);font-size:20px}
+.slot.h110{height:106px}.slot.h250{height:226px}.slot.h120{height:108px}
+
+.qrow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.qslot{height:64px;background:var(--slot);border:1px solid var(--line);position:relative;display:grid;place-items:center}
+.qslot svg{max-width:60%;max-height:56%;fill:#8b9074}
+.qslot .k{position:absolute;bottom:3px;right:6px;font:600 11px 'IBM Plex Mono';color:var(--txt-faint)}
+.qslot .cnt{position:absolute;top:2px;right:5px;font:600 10px 'IBM Plex Mono';color:#cdd1bd}
+
+.tools{display:flex;align-items:center;gap:14px;justify-content:center;padding:2px 0}
+.tools .t{width:50px;height:50px;border-radius:50%;border:1px solid var(--line2);background:radial-gradient(circle at 35% 30%,#20221a,#0e0f0a);display:grid;place-items:center;cursor:pointer}
+.tools .t svg{width:56%;height:56%;fill:#9aa083}
+.tools .t:hover{border-color:var(--ok-dim)}
+.tools .hide{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-faint);cursor:pointer;margin-left:6px}
+.tools .hide:hover{color:var(--txt-dim)}
+
+.beltwrap .cap{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt-faint);margin-bottom:6px;display:flex;justify-content:space-between}
+.belt{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.bslot{height:52px;background:var(--slot);border:1px solid var(--line);position:relative;display:grid;place-items:center}
+.bslot svg{max-width:72%;max-height:56%;fill:#8b9074}
+.bslot .cnt{position:absolute;top:2px;right:4px;font:600 10px 'IBM Plex Mono';color:#cdd1bd}
+.bslot .cal{position:absolute;bottom:3px;left:4px;font:400 9px 'IBM Plex Mono';color:var(--txt-dim)}
+.bslot .grp{position:absolute;top:2px;left:4px;font:600 10px 'IBM Plex Mono';color:var(--amber)}
+
+.status{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:9px}
+.status .cap{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt-faint);display:flex;justify-content:space-between}
+.srow{display:flex;align-items:center;gap:10px}
+.srow svg{width:18px;height:18px;flex:none;fill:var(--txt-dim)}
+.srow .sbar{flex:1;height:9px;background:#0a0b07;border:1px solid #1d1f16;position:relative}
+.srow .sbar b{position:absolute;top:0;bottom:0;left:0;background:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 8px)}
+.srow.hp{color:var(--red)} .srow.ar{color:var(--blue)} .srow.dim{opacity:.32}
+.srow .tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-faint)}
+
+/* left context column */
+.left{display:flex;flex-direction:column;min-height:0}
+.boxhdr{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.25)}
+.boxhdr svg{width:40px;height:40px;fill:var(--txt-dim)}
+.boxhdr .nm{font-size:22px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d6d9c8}
+.boxhdr .sub{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-faint)}
+
+/* docked inspection card (inv view) */
+.inspwrap{flex:1;display:flex;flex-direction:column;justify-content:center;padding:22px}
+.insp{background:linear-gradient(180deg,#181a12,#111308);border:1px solid var(--line2);box-shadow:0 18px 50px rgba(0,0,0,.6);padding:18px 20px;position:relative}
+.insp .tag{position:absolute;top:-11px;left:16px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt-faint);background:var(--panel);padding:0 8px}
+.insp h3{font-size:26px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#dde0cf}
+.insp .meta{display:flex;gap:16px;margin:6px 0 12px;font:400 13px 'IBM Plex Mono';color:var(--txt-dim);flex-wrap:wrap}
+.insp .meta b{color:var(--ok);font-weight:600}
+.insp .stat{display:grid;grid-template-columns:96px 1fr 48px;align-items:center;gap:10px;margin:6px 0;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-dim)}
+.insp .stat .b{height:7px;background:#0a0b07;border:1px solid #1d1f16;position:relative}
+.insp .stat .b i{position:absolute;top:0;bottom:0;left:0;background:#7d8368}
+.insp .stat .b em{position:absolute;top:0;bottom:0;background:var(--ok)}
+.insp .stat .b em.neg{background:var(--red)}
+.insp .stat .d{font:600 12px 'IBM Plex Mono';text-align:right}
+.insp .stat .d.up{color:var(--ok)} .insp .stat .d.dn{color:var(--red)}
+.insp .ammo{margin-top:12px;font:400 12px 'IBM Plex Mono';color:var(--txt-dim)}
+.insp .ammo b{color:var(--amber);font-weight:600}
+.insp .trivia{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-family:'Barlow Condensed';font-size:14px;letter-spacing:.03em;color:var(--txt-dim);line-height:1.45}
+
+/* view switching */
+[data-view="inv"] .trade-only,[data-view="inv"] .box-only,[data-view="inv"] .left .gridwrap,[data-view="inv"] .left .foot{display:none!important}
+[data-view="box"] .trade-only,[data-view="box"] .inv-only{display:none!important}
+[data-view="trade"] .box-only,[data-view="trade"] .inv-only{display:none!important}
+</style>
+</head>
+<body data-view="inv">
+<div class="viewport"><div class="stage" id="stage">
+
+  <div class="world">
+    <div class="blk" style="left:6%;top:30%;width:10%;height:17%"></div>
+    <div class="blk" style="left:80%;top:28%;width:12%;height:19%"></div>
+    <div class="blk" style="left:88%;top:33%;width:7%;height:14%"></div>
+  </div>
+  <div class="scrim"></div>
+
+  <div class="chrome">
+    <b>Cargo · Fullscreen mock v1</b>
+    <button data-v="inv" class="on">Inventory (1)</button>
+    <button data-v="box">Container (2)</button>
+    <button data-v="trade">Trade (3)</button>
+  </div>
+
+  <div class="ui">
+
+    <!-- ============ LEFT: context ============ -->
+    <div class="panel left">
+
+      <!-- inv view: docked inspection card -->
+      <div class="inspwrap inv-only">
+        <div class="insp">
+          <span class="tag">Inspection · on hover</span>
+          <h3>AKM</h3>
+          <div class="meta"><span>3.6 kg</span><span>Condition <b>87%</b></span><span>ARC9</span></div>
+          <div class="stat"><span>Damage</span><div class="b"><i style="width:58%"></i><em style="left:58%;width:8%"></em></div><span class="d up">+8%</span></div>
+          <div class="stat"><span>Handling</span><div class="b"><i style="width:46%"></i><em class="neg" style="left:40%;width:6%"></em></div><span class="d dn">−6%</span></div>
+          <div class="stat"><span>Accuracy</span><div class="b"><i style="width:52%"></i></div><span class="d">—</span></div>
+          <div class="stat"><span>Fire rate</span><div class="b"><i style="width:60%"></i></div><span class="d">—</span></div>
+          <div class="ammo">7.62×39 · bound group <b>A</b> · mag 30/30</div>
+          <div class="trivia">Stamped-receiver evolution of the AK-47. Stats read from ARC9 GetProcessedValue; non-ARC9 weapons fall back to display_stats.</div>
+        </div>
+      </div>
+
+      <!-- container header -->
+      <div class="boxhdr box-only">
+        <svg viewBox="0 0 60 60"><path d="M6 22 30 10l24 12v6L30 40 6 28zm0 12 24 12 24-12v14L30 58 6 48z"/></svg>
+        <div><div class="nm">Field crate</div><div class="sub">Container · finite capacity</div></div>
+      </div>
+
+      <!-- trader header -->
+      <div class="hdr trade-only">
+        <div class="pic"><svg viewBox="0 0 60 60"><path d="M30 8a11 11 0 0 1 11 11c0 5-3 9-7 11h-8c-4-2-7-6-7-11A11 11 0 0 1 30 8zM12 52c1-10 8-16 18-16s17 6 18 16z"/></svg></div>
+        <div class="who"><div class="nm">Ivan "Ledger"</div><div class="fx">Loner · Trader</div></div>
+        <div class="cash"><div class="v">$8,450</div><div class="c">USD / provider</div></div>
+      </div>
+      <div class="strip buy trade-only"><span class="lb">Buy</span><span class="tt"><i>total</i>$175</span></div>
+
+      <div class="gridwrap"><div class="grid" id="grid-left"></div></div>
+
+      <div class="foot box-only"><span class="wt">12.4 kg</span><div class="bar"><b style="width:30%"></b></div><button>Take all</button></div>
+      <div class="foot trade-only"><span class="wt"><i>net</i> −$130</span><div style="flex:1"></div><button class="ghost">Cancel</button><button>Confirm</button></div>
+    </div>
+
+    <!-- ============ CENTER: equipment ============ -->
+    <div class="panel equip">
+      <div class="eqgrid">
+        <div class="slot h110 empty"><span class="lb">Accessory 1</span><div class="body"></div></div>
+        <div class="slot h110"><span class="lb">Head</span>
+          <div class="body"><svg viewBox="0 0 120 60"><use href="#g-helm"/></svg></div>
+          <div class="nm">Sphere-08</div><div class="seg"><b style="width:100%"></b></div></div>
+        <div class="slot h110 empty"><span class="lb">Accessory 2</span><div class="body"></div></div>
+
+        <div class="slot h250 empty"><span class="lb">Secondary</span><div class="body"></div><div class="seg"><b style="width:0%"></b></div></div>
+        <div class="slot h250"><span class="lb">Body</span>
+          <div class="body"><svg viewBox="0 0 120 60" style="max-height:60%"><use href="#g-vest"/></svg></div>
+          <div class="nm">CS-3a Vest</div><div class="seg"><b style="width:100%"></b></div></div>
+        <div class="slot h250"><span class="lb">Primary</span><span class="grp">A</span>
+          <div class="body"><svg viewBox="0 0 120 60" style="transform:rotate(-70deg) scale(1.5)"><use href="#g-rifle"/></svg></div>
+          <div class="nm">AKM</div><div class="seg"><b style="width:87%"></b></div></div>
+
+        <div class="slot h120"><span class="lb">Sidearm</span><span class="grp">B</span>
+          <div class="body"><svg viewBox="0 0 120 60"><use href="#g-pistol"/></svg></div>
+          <div class="nm">PM</div><div class="seg"><b style="width:92%"></b></div></div>
+        <div class="slot h120"><span class="lb">Back</span>
+          <div class="body"><svg viewBox="0 0 120 60"><use href="#g-pack"/></svg></div>
+          <div class="nm">Tri-Zip</div><div class="seg"><b style="width:100%"></b></div></div>
+        <div class="slot h120"><span class="lb">Melee</span>
+          <div class="body"><svg viewBox="0 0 120 60"><use href="#g-knife"/></svg></div>
+          <div class="nm">Crowbar</div><div class="seg"><b style="width:100%"></b></div></div>
+      </div>
+
+      <div class="qrow">
+        <div class="qslot"><svg viewBox="0 0 120 60"><use href="#g-band"/></svg><span class="cnt">x5</span><span class="k">F1</span></div>
+        <div class="qslot"><span class="k">F2</span></div>
+        <div class="qslot"><span class="k">F3</span></div>
+        <div class="qslot"><span class="k">F4</span></div>
+      </div>
+
+      <div class="tools">
+        <div class="t" title="Physgun"><svg viewBox="0 0 60 60"><path d="M8 26h22v8H8zm22-4 8-6 3 4-7 6zm0 16 8 6 3-4-7-6zm12-10h6v4h-6zM50 27a4 4 0 1 1 0 6 4 4 0 0 1 0-6zM14 34l-3 16h8l3-16z"/></svg></div>
+        <div class="t" title="Toolgun"><svg viewBox="0 0 60 60"><path d="M6 24h30v10H6zm30-6h12v6H36zm0 16h8l4 8h-8zM40 24h14v10H40zM12 34l-2 16h8l2-16z"/></svg></div>
+        <div class="t" title="Camera"><svg viewBox="0 0 60 60"><path d="M8 18h14l4-6h8l4 6h14v30H8zM30 24a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg></div>
+        <span class="hide">hide</span>
+      </div>
+
+      <div class="beltwrap">
+        <div class="cap"><span>Ammo belt</span><span>feeds active weapon</span></div>
+        <div class="belt">
+          <div class="bslot"><svg viewBox="0 0 120 60"><use href="#g-ammo"/></svg><span class="grp">A</span><span class="cnt">x120</span><span class="cal">7.62x39</span></div>
+          <div class="bslot"><svg viewBox="0 0 120 60"><use href="#g-ammo"/></svg><span class="grp">B</span><span class="cnt">x64</span><span class="cal">9x18</span></div>
+          <div class="bslot"></div><div class="bslot"></div><div class="bslot"></div><div class="bslot"></div>
+        </div>
+      </div>
+
+      <div class="status">
+        <div class="cap"><span>Status</span><span>registrable stat-bars</span></div>
+        <div class="srow hp"><svg viewBox="0 0 60 60"><path d="M30 52 10 32c-8-8-2-22 8-22 5 0 9 3 12 7 3-4 7-7 12-7 10 0 16 14 8 22z"/></svg><div class="sbar"><b style="width:72%"></b></div></div>
+        <div class="srow ar"><svg viewBox="0 0 60 60"><path d="M30 6l20 8v14c0 12-8 22-20 26C18 50 10 40 10 28V14z"/></svg><div class="sbar"><b style="width:15%"></b></div></div>
+        <div class="srow dim"><svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="20"/></svg><div class="sbar"></div><span class="tag">Coagulant</span></div>
+        <div class="srow dim"><svg viewBox="0 0 60 60"><path d="M30 6c10 14 16 22 16 32a16 16 0 0 1-32 0C14 28 20 20 30 6z"/></svg><div class="sbar"></div><span class="tag">Craving</span></div>
+      </div>
+    </div>
+
+    <!-- ============ RIGHT: player ============ -->
+    <div class="panel right">
+      <div class="hdr">
+        <div class="pic"><svg viewBox="0 0 60 60"><path d="M30 8a11 11 0 0 1 11 11c0 5-3 9-7 11h-8c-4-2-7-6-7-11A11 11 0 0 1 30 8zM12 52c1-10 8-16 18-16s17 6 18 16z"/></svg></div>
+        <div class="who"><div class="nm">Sepuldosky</div><div class="fx">Loner — faction provider</div></div>
+        <div class="cash"><div class="v">$11,000</div><div class="c">USD / provider</div></div>
+        <div class="moneybtn" title="Solo: drop money · Trade: offer money to basket"><span>$</span>
+          <svg viewBox="0 0 24 24"><path d="M12 3v14m0 0-5-5m5 5 5-5M4 21h16"/></svg></div>
+      </div>
+      <div class="strip sell trade-only"><span class="lb">Sell</span><span class="tt"><i>total</i>$45</span></div>
+      <div class="tabs">
+        <span class="on">All</span><span>Weapons</span><span>Ammo</span><span>Medical</span><span>Food</span>
+        <span>Attachments</span><span>Optics</span><span>Plates</span><span>Accessories</span>
+      </div>
+      <div class="gridwrap"><div class="grid" id="grid-player"></div></div>
+      <div class="foot">
+        <div class="bar"><b style="width:61%"></b></div>
+        <span class="wt">44.2 / 72.0 kg <i>· base 54 + back 18</i></span>
+        <button class="box-only">Move all</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- glyph library (placeholder silhouettes — real icons come from the item-image system, roadmap #5) -->
+  <svg width="0" height="0" style="position:absolute">
+    <symbol id="g-rifle" viewBox="0 0 120 60"><path d="M2 30 16 22l3 7 26-2v-5h10v5l58-2v7l-40 2-4 10h-8l3-10-12 1-4 12h-8l4-12-21 1z"/><rect x="98" y="26" width="18" height="4"/></symbol>
+    <symbol id="g-smg" viewBox="0 0 120 60"><path d="M10 26h70v10H26l-3 14h-9l3-14h-7zM80 28h26v6H80zM40 36l-2 16h8l2-16z"/></symbol>
+    <symbol id="g-shotgun" viewBox="0 0 120 60"><path d="M2 34 22 24l4 8 92-4v6L28 38l-6 10h-8l5-10z"/></symbol>
+    <symbol id="g-pistol" viewBox="0 0 120 60"><path d="M20 18h80v14H52l-6 24H26l8-24h-14z"/></symbol>
+    <symbol id="g-knife" viewBox="0 0 120 60"><path d="M4 34 70 22c4 0 8 2 8 6l-70 12zM80 24h32v10H80z"/></symbol>
+    <symbol id="g-ammo" viewBox="0 0 120 60"><rect x="14" y="18" width="92" height="30" rx="2"/><path d="M24 12h8v6h-8zm18 0h8v6h-8zm18 0h8v6h-8zm18 0h8v6h-8z"/></symbol>
+    <symbol id="g-pills" viewBox="0 0 120 60"><rect x="14" y="14" width="92" height="34" rx="4"/><circle cx="34" cy="26" r="5" fill="#1a1c12"/><circle cx="56" cy="26" r="5" fill="#1a1c12"/><circle cx="78" cy="26" r="5" fill="#1a1c12"/><circle cx="45" cy="40" r="5" fill="#1a1c12"/><circle cx="67" cy="40" r="5" fill="#1a1c12"/><circle cx="89" cy="40" r="5" fill="#1a1c12"/></symbol>
+    <symbol id="g-syr" viewBox="0 0 60 120"><path d="M26 6h8v14h6v8h-6v60h-8V28h-6v-8h6zM24 88h12l-6 26z"/></symbol>
+    <symbol id="g-band" viewBox="0 0 120 60"><circle cx="40" cy="30" r="20"/><circle cx="40" cy="30" r="9" fill="#1a1c12"/><path d="M58 22h50v16H58z"/></symbol>
+    <symbol id="g-med" viewBox="0 0 120 60"><rect x="20" y="10" width="80" height="44" rx="4"/><path d="M54 20h12v10h10v12H66v10H54V42H44V30h10z" fill="#1a1c12"/></symbol>
+    <symbol id="g-can" viewBox="0 0 120 60"><rect x="34" y="10" width="52" height="44" rx="6"/><ellipse cx="60" cy="12" rx="26" ry="5" fill="#565b46"/></symbol>
+    <symbol id="g-bottle" viewBox="0 0 60 120"><path d="M24 6h12v16c8 6 12 12 12 22v64a6 6 0 0 1-6 6H18a6 6 0 0 1-6-6V44c0-10 4-16 12-22z"/></symbol>
+    <symbol id="g-vest" viewBox="0 0 120 60"><path d="M36 6h48l8 14v34H28V20zM52 6c0 8 4 12 8 12s8-4 8-12z" fill-rule="evenodd"/><rect x="42" y="26" width="36" height="8" fill="#1a1c12"/></symbol>
+    <symbol id="g-helm" viewBox="0 0 120 60"><path d="M60 8c22 0 34 14 34 30v10H26V38C26 22 38 8 60 8z"/><rect x="34" y="36" width="52" height="8" fill="#1a1c12"/></symbol>
+    <symbol id="g-pack" viewBox="0 0 120 60"><rect x="30" y="8" width="60" height="46" rx="10"/><rect x="42" y="34" width="36" height="14" rx="3" fill="#1a1c12"/><path d="M40 8c4-6 36-6 40 0l-6 6H46z" fill="#565b46"/></symbol>
+    <symbol id="g-plate" viewBox="0 0 60 120"><path d="M10 14C22 6 38 6 50 14v84c-12 8-28 8-40 0z"/></symbol>
+    <symbol id="g-scope" viewBox="0 0 120 60"><rect x="10" y="24" width="100" height="14" rx="7"/><rect x="26" y="18" width="8" height="26"/><rect x="86" y="18" width="8" height="26"/></symbol>
+    <symbol id="g-supp" viewBox="0 0 120 60"><rect x="12" y="24" width="96" height="14" rx="7"/><rect x="12" y="24" width="10" height="14" fill="#565b46"/></symbol>
+    <symbol id="g-batt" viewBox="0 0 60 120"><rect x="14" y="20" width="32" height="90" rx="4"/><rect x="24" y="10" width="12" height="10"/></symbol>
+    <symbol id="g-tool" viewBox="0 0 120 60"><rect x="14" y="16" width="92" height="34" rx="4"/><path d="M14 30h92v4H14z" fill="#1a1c12"/><rect x="50" y="10" width="20" height="8"/></symbol>
+  </svg>
+
+</div></div>
+
+<script>
+const stage=document.getElementById('stage');
+const vp=document.querySelector('.viewport');
+function fit(){
+  const w=vp.clientWidth,h=vp.clientHeight;
+  const s=Math.min(w/1920,h/1080)*0.985;
+  stage.style.transform=`translate(${(w-1920*s)/2}px,${(h-1080*s)/2}px) scale(${s})`;
+}
+new ResizeObserver(fit).observe(vp);
+addEventListener('load',fit);fit();
+
+document.querySelectorAll('.chrome button').forEach(b=>{
+  b.onclick=()=>{document.body.dataset.view=b.dataset.v;
+    document.querySelectorAll('.chrome button').forEach(x=>x.classList.toggle('on',x===b));
+    renderAll();};
+});
+addEventListener('keydown',e=>{const m={'1':'inv','2':'box','3':'trade'}[e.key];
+  if(m)document.querySelector(`.chrome button[data-v="${m}"]`).click();});
+
+const U=42,G=4,px=n=>n*U+(n-1)*G,V='0 0 60 120';
+function tile(it){
+  const cond=it.cond!=null?`<span class="cond ${it.cond<50?'low':''}">${it.cond}%</span><i class="cbar"><b class="${it.cond<50?'low':''}" style="width:${it.cond}%"></b></i>`:'';
+  return `<div class="tile ${it.pend?'pend':''}" style="width:${px(it.w)}px;height:${px(it.h)}px" title="${it.t||''}">
+    <svg class="g" viewBox="${it.vb||'0 0 120 60'}"><use href="#${it.g}"/></svg>
+    ${it.n?`<span class="cnt">x${it.n}</span>`:''}${it.grp?`<span class="grp">${it.grp}</span>`:''}${cond}
+    ${it.cal?`<span class="cal">${it.cal}</span>`:''}${it.price!=null?`<span class="price">$${it.price}</span>`:''}</div>`;
+}
+const player=[
+ {g:'g-rifle',w:6,h:2,cond:87,grp:'A',t:'AKM',sell:310},
+ {g:'g-shotgun',w:6,h:2,cond:64,t:'TOZ-34',sell:120},
+ {g:'g-pistol',w:3,h:2,cond:92,grp:'B',t:'PM',sell:70},
+ {g:'g-knife',w:3,h:1,t:'Knife',sell:15},
+ {g:'g-ammo',w:2,h:1,n:18,cal:'12x70',t:'Slug',sell:8},
+ {g:'g-scope',w:3,h:1,n:1,t:'ACOG 3.5',sell:140},
+ {g:'g-supp',w:3,h:1,n:2,t:'Suppressor',sell:90},
+ {g:'g-plate',w:2,h:3,vb:V,cond:100,t:'Ceramic plate',sell:130},
+ {g:'g-plate',w:2,h:3,vb:V,cond:41,t:'Steel plate',sell:45,pendTrade:true},
+ {g:'g-med',w:2,h:2,n:2,t:'Medkit',sell:55},
+ {g:'g-band',w:2,h:1,n:5,t:'Bandage',sell:5},
+ {g:'g-pills',w:2,h:1,n:2,t:'Painkillers',sell:8},
+ {g:'g-syr',w:1,h:2,vb:V,n:3,t:'Stim',sell:20},
+ {g:'g-can',w:2,h:2,n:4,t:'Canned meat',sell:8},
+ {g:'g-bottle',w:1,h:2,vb:V,n:2,t:'Water',sell:4},
+ {g:'g-batt',w:1,h:2,vb:V,n:6,t:'Battery',sell:3},
+ {g:'g-tool',w:3,h:2,cond:71,t:'Toolkit',sell:60},
+];
+const crate=[
+ {g:'g-smg',w:5,h:2,cond:55,t:'MP5'},
+ {g:'g-ammo',w:2,h:1,n:36,cal:'12x70',t:'Buckshot'},
+ {g:'g-plate',w:2,h:3,vb:V,cond:88,t:'Ceramic plate'},
+ {g:'g-band',w:2,h:1,n:3,t:'Bandage'},
+ {g:'g-can',w:2,h:2,n:2,t:'Canned meat'},
+ {g:'g-batt',w:1,h:2,vb:V,n:4,t:'Battery'},
+];
+const trader=[
+ {g:'g-smg',w:5,h:2,cond:100,price:760,t:'MP5'},
+ {g:'g-rifle',w:6,h:2,cond:100,price:980,t:'AKS-74'},
+ {g:'g-pistol',w:3,h:2,cond:100,price:210,t:'PM'},
+ {g:'g-helm',w:2,h:2,cond:100,price:340,t:'Helmet'},
+ {g:'g-vest',w:4,h:3,cond:100,price:1150,t:'Vest'},
+ {g:'g-pack',w:3,h:3,cond:100,price:480,t:'Backpack'},
+ {g:'g-scope',w:3,h:1,price:390,t:'ACOG 3.5'},
+ {g:'g-ammo',w:2,h:1,n:60,cal:'7.62x39',price:45,t:'FMJ'},
+ {g:'g-ammo',w:2,h:1,n:64,cal:'9x19',price:30,t:'FMJ'},
+ {g:'g-med',w:2,h:2,price:160,t:'Medkit',pend:true},
+ {g:'g-band',w:2,h:1,price:15,t:'Bandage',pend:true},
+ {g:'g-can',w:2,h:2,price:25,t:'Canned meat'},
+];
+function renderAll(){
+  const v=document.body.dataset.view;
+  document.getElementById('grid-left').innerHTML=(v==='trade'?trader:v==='box'?crate:[]).map(tile).join('');
+  document.getElementById('grid-player').innerHTML=player.map(it=>
+    v==='trade'?tile({...it,price:it.sell,pend:it.pendTrade}):tile({...it,price:undefined,pend:false})
+  ).join('');
+}
+renderAll();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 > **Uso de este documento:** Referencia autocontenida para sesiones futuras de planificación (Claude Opus) e implementación (Claude Code). No se requiere el chat de diseño original.
 >
-> **Estado:** Block 1 de Cargo (ver §13). Cubre el inventario de jugador: contrato de ítems, slots y sub-slots, peso, providers de dinero/facción, grid de UI, contenedores en mundo, inspección y stat-bars. El banco de trabajo (crafteo, reparación, desarme, upgrades) es un subsistema propio, documentado aparte en [`Workbench_Arquitectura.md`](Workbench_Arquitectura.md) — mismo patrón de desprendimiento que ya usó Caliber con Scavenger.
+> **Estado:** Block 1 de Cargo (ver §13). Cubre el inventario de jugador: contrato de ítems, slots y sub-slots, peso, providers de dinero/facción, grid de UI, contenedores en mundo, inspección y stat-bars. El banco de trabajo (crafteo, reparación, desarme, upgrades) es un subsistema propio, documentado aparte en [`Workbench_Arquitectura.md`](Workbench_Arquitectura.md) — mismo patrón de desprendimiento que ya usó Caliber con Scavenger. El comercio (trueque, basket, dinero, trader) es otro subsistema desprendido — [`Cargo_Trade_Arquitectura.md`](Cargo_Trade_Arquitectura.md) — porque trae el primitivo de inventario-en-entidad, reusado para lootear cadáveres.
 >
 > **Dependencia dura:** Corpus. **Dependencias soft declaradas en este documento:** Cortex (facción/rango), Coagulant (drenaje de stamina por sobrepeso, vitales del panel de estado), Craving (hambre/sed del panel de estado), Caliber (protección de armadura, escudos de jugador — ambos en Block 3 de Caliber, aún no existe).
 
@@ -24,6 +24,7 @@
 12. [Persistencia](#12-persistencia)
 13. [Fronteras y pendientes declarados](#13-fronteras-y-pendientes-declarados)
 14. [Estado de este documento](#14-estado-de-este-documento)
+15. [UI fullscreen (rediseño de forma)](#15-ui-fullscreen-rediseño-de-forma)
 
 ---
 
@@ -159,6 +160,22 @@ Mismo patrón en ambos casos — Cargo (o el módulo dueño del dato) define una
 - **Filtro por categoría**: fila de tabs sobre el grid (todo, armas, munición, médico, comida, misc...).
 - **Footer de peso**: barra + valor actual/máximo + desglose base/mochila.
 
+> **Enmienda 2026-07-11 (bloque UI fullscreen).** La **forma** de la UI cambia a
+> pantalla completa estilo STALKER/GAMMA — ver §15. La **funcionalidad y la
+> disposición de las partes** de §7 se conservan 1:1 (grid con overlays por esquina,
+> header de perfil con providers, tabs de categoría, footer de peso con desglose). Dos
+> cambios de fondo:
+>
+> - El grid deja de ser **uniforme** (1 celda = 1 ítem) y pasa a **gradas**: cada ítem
+>   ocupa `w × h` celdas según su **footprint** (definido en
+>   `Cargo_ItemImages_Arquitectura.md` §5). El **modelo de datos no cambia** — sigue
+>   siendo ítems sin gestión espacial, sin rotación, auto-sort por categoría; el
+>   footprint es solo **render**, gobierna cuántas celdas pinta el ítem, no cómo se
+>   guarda ni cuánto pesa. El costo de cargar sigue siendo peso, no espacio.
+> - **Prerequisito duro:** las gradas dependen del sistema de imágenes
+>   (`Cargo_ItemImages_Arquitectura.md`). Con el fallback de letra, un footprint 6×2 se
+>   ve peor que el grid uniforme. Ese bloque se implementa **antes o junto** con este.
+
 ---
 
 ## 8. Contenedores en mundo
@@ -274,6 +291,110 @@ Bloque de diseño de Cargo (inventario) cerrado y validado en sesión de diseño
 |---|---|
 | Contrato de ítems, slots/sub-slots, peso, providers, grid, contenedores, tooltip, stat-bars | **Cerrado — este documento** |
 | Attachments de armas (UX + puente ARC9) | **Cerrado en diseño** — API exacta de ARC9 pendiente de verificación contra código |
+| UI fullscreen (forma) | **Cerrado — §15**; VGUI es bloque de implementación aparte; depende de Cargo_ItemImages |
 | Workbench (craft/reparación/desarme, upgrades pendiente) | Cerrado en su mayoría — ver documento aparte |
 | Efectos de armadura y escudos de jugador | Pendiente — Caliber Block 3 |
 | Crafting profundo (recetas de materiales, categorías) | Pendiente — diseño posterior |
+
+---
+
+## 15. UI fullscreen (rediseño de forma)
+
+### 15.0 Alcance
+
+Cambia la **forma**, no la funcionalidad. Todo lo de Block 1 (slots, sub-slots,
+quick slots, peso, providers, stat-bars registrables, tabs, footer, contenedores)
+se conserva; se reordena al layout STALKER/GAMMA a pantalla completa. Solo se agregan
+elementos de **forma** nuevos: cinturón de munición (15.2), círculos de herramienta
+sandbox (15.2) y botón de dinero en el header (15.3). El comercio fullscreen es un
+subsistema aparte — `Cargo_Trade_Arquitectura.md`.
+
+**Fuente de verdad de layout:** el mockup iterado en la sesión de diseño
+(`mockups/cargo_fullscreen_ui_mock_v1.html`), mismo estatus que los mocks de §2 — manda
+hasta que exista VGUI real; en divergencia, el código manda.
+
+### 15.1 Layout: tres columnas, tres estados
+
+Patrón GAMMA exacto. **Una sola implementación VGUI** de tres columnas; lo que cambia
+entre estados es qué muestra la **columna izquierda** (contextual):
+
+```
+┌────────────────┬──────────────┬────────────────┐
+│  IZQUIERDA      │   CENTRO     │   DERECHA       │
+│  (contextual)   │  equipamiento│  inventario     │
+│                 │  del jugador │  propio         │
+│  · solo:  vacía │  (siempre)   │  (siempre)      │
+│  · loot:  cont. │              │                 │
+│  · trade: stock │              │                 │
+└────────────────┴──────────────┴────────────────┘
+```
+
+| Estado | Trigger | Columna izquierda | Refs |
+|---|---|---|---|
+| **Solo** | tecla de inventario | vacía (mundo visible detrás) | §15 |
+| **Loot** | usar contenedor en mundo | inventario del contenedor + Take all | §8 |
+| **Trade** | interactuar con trader (NPC o jugador) | stock del trader / inventario del otro jugador + strips Buy/Sell | `Cargo_Trade_Arquitectura.md` |
+
+- **Centro (equipamiento)** y **derecha (inventario propio)** son idénticos en los
+  tres estados. La columna izquierda se muestra/oculta y cambia de contenido — no hay
+  tres pantallas, hay una con un panel contextual.
+- El grid de las columnas izquierda y derecha es el mismo componente de gradas
+  (§7 enmendado + `Cargo_ItemImages` §5).
+
+### 15.2 Columna de equipamiento (orden STALKER)
+
+Reordena los slots de §4 a la disposición GAMMA. De arriba a abajo:
+
+1. **Fila de accesorios y cabeza:** `Accessory 1 · Head · Accessory 2`.
+2. **Fila alta (columnas verticales):** `Secondary · Body · Primary`. Body al centro
+   (el más grande), armas a los lados. Badge de **grupo de munición A/B** (§3, §4) en
+   la esquina del slot de arma. Barra segmentada de **condición** bajo cada slot.
+3. **Fila baja:** `Sidearm · Back · Melee`.
+4. **Quick slots F1–F4** (§4) — fila de cuatro. Disponibilidad condicional al traje
+   equipado se conserva (candado).
+5. **Círculos de herramienta sandbox** *(nuevo — roadmap #21)*: tres botones
+   **circulares** (solo el símbolo: physgun, toolgun, camera; sin texto) entre los
+   quick slots y el cinturón. Son herramientas muy usadas del sandbox; tenerlas a la
+   vista evita buscarlas en el grid. **Toggle "hide"** al lado los oculta para quien no
+   las quiera. Son atajos de equipar/seleccionar, no slots de almacenamiento.
+6. **Cinturón de munición** *(nuevo — forma de roadmap #19, ver abajo)*.
+7. **Panel de estado** (§11, stat-bars registrables) — al fondo de la columna.
+
+#### Cinturón de munición (solo la FORMA)
+
+Fila de **6 slots cuadrados** (tipo cinturón — la munición no es lo bastante grande
+para justificar más espacio). Los ítems de munición del inventario se **mueven acá**
+para **alimentar al arma activa**: la munición cargada deja de estar suelta en el grid
+y pasa al equipo. En el mock, los stacks bindeados a los grupos A/B de las armas
+equipadas viven en el cinturón, no en el grid.
+
+> **Frontera dura (se cierra en su bloque, no acá):** este bloque cierra únicamente la
+> **forma** del cinturón (la fila de slots y que la munición se mueva ahí). La
+> **semántica** — cómo alimenta al arma (¿solo desde el cinturón?, ¿cinturón primero?),
+> sistema de cargadores con toggle, munición custom de ARC9 vs HL2, persistencia del
+> cargador — es **roadmap #19**, dueño a decidir con Caliber (Cargo transporta el estado
+> de munición en el blob del ítem, §3; el dueño interpreta). El cinturón es el **punto de
+> anclaje visual** que #19 va a llenar de comportamiento.
+
+### 15.3 Botón de dinero en el header
+
+*(Nuevo — decisión del autor 2026-07-11.)* Botón **circular** junto al valor de dinero
+en el header de perfil (§7). Su comportamiento depende del estado (15.1):
+
+- **Solo:** prompt de monto → resta del wallet (provider, §6) → **suelta una entidad de
+  dinero** en el mundo (ver `Cargo_Trade_Arquitectura.md` §7). "Botar dinero".
+- **Trade:** agrega el monto a **tu lado del basket** como línea de solo-dinero → sirve
+  para entregar dinero directo sin ningún otro objeto, o para cuadrar un trueque
+  desigual.
+
+Detalle en `Cargo_Trade_Arquitectura.md` §7 — el botón es el disparador, la mecánica de
+la entidad-dinero y el traspaso P2P viven allá porque son parte del subsistema de
+comercio.
+
+### 15.4 Qué NO entra en este bloque
+
+- **Orden/holster de armas (roadmap #22):** es **comportamiento** (reordenar teclas
+  1–7, re-apretar para enfundar, matar notificaciones de GMod), no forma. Solo se
+  refleja en este bloque como el **orden visual** de los slots de equipamiento (15.2).
+- **Semántica de munición (roadmap #19):** solo la forma del cinturón entra (15.2).
+- **Comportamiento de pickup/drop (roadmap #16–18, #20):** ajenos a la forma de la UI.

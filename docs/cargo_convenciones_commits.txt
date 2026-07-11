@@ -106,6 +106,12 @@ Para corpus-cargo/ (el módulo), los alcances definidos son:
     principal, panel de transferencia, tab del menú Q
     (lua/corpus_cargo/client/*).
 
+  icons:
+    Sistema de imágenes de ítems: pipeline de render desde el modelo 3D,
+    caché en data/, encuadre, footprint, editor dev y el registro de
+    overrides server-side (corpus_cargo_icons.lua en client y server,
+    corpus_cargo_iconeditor.lua). Ver Cargo_ItemImages_Arquitectura.md.
+
   dev:
     Selftest, kit de ítems demo y comandos de verificación
     (corpus_cargo_dev.lua).
