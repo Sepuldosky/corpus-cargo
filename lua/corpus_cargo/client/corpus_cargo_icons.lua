@@ -43,6 +43,34 @@ local LEN_WEIGHT     = 0.18 -- score weight per cell of long-side mismatch
 local RECIPE_VERSION = "r2"
 
 -- ------------------------------------------------------------------
+-- Model to RENDER for the icon. Diverges on purpose from
+-- CARGO.Items.ResolveModel (which the DROP entity uses for a physics prop):
+-- ARC9 weapons with MirrorVMWM set their WorldModel to a cheap CSS/HL2
+-- COLLISION placeholder — verified against the ARC9 base: the WorldModel
+-- comment recommends "Css/hl2 weapon worldmodels ... like w_rif_m4a1.mdl"
+-- (shared.lua) and DrawWorldModel draws the viewmodel on top when
+-- MirrorVMWM (cl_wm.lua). So the WorldModel is the WRONG picture (the AK-ish
+-- CSS model in the icon). For the icon we want the real geometry:
+-- WorldModelMirror or the ViewModel. Drops keep the WorldModel (they need a
+-- collision prop; ARC9's own dropped entity has the same placeholder shadow).
+function Icons.ModelFor(def)
+    if not istable(def) then return nil end
+    -- explicit escape hatch, always wins (for when even the viewmodel is off)
+    if isstring(def.icon_model) and def.icon_model ~= "" then return def.icon_model end
+    if isstring(def.model) and def.model ~= "" then return def.model end
+
+    if isstring(def.weapon_class) then
+        local stored = weapons.GetStored(def.weapon_class)
+        if istable(stored) and stored.ARC9 and stored.MirrorVMWM then
+            local vm = stored.WorldModelMirror
+            if not (isstring(vm) and vm ~= "") then vm = stored.ViewModel end
+            if isstring(vm) and vm ~= "" then return vm end
+        end
+    end
+    return CARGO.Items.ResolveModel(def)
+end
+
+-- ------------------------------------------------------------------
 -- Pure logic (offline-harness covered — no engine calls beyond stubs)
 -- ------------------------------------------------------------------
 
@@ -53,7 +81,7 @@ function Icons.ResolveIconSource(def)
     if def.icon ~= nil and (not isstring(def.icon) or def.icon ~= "") then
         return "icon"
     end
-    if CARGO.Items.ResolveModel(def) ~= nil then return "render" end
+    if Icons.ModelFor(def) ~= nil then return "render" end
     return "letter"
 end
 
@@ -105,7 +133,7 @@ end
 -- cam + effective footprint)>.png — change any input and the name changes,
 -- forcing a re-render (Material() caches by path, never reuse a name).
 function Icons.IconCacheKey(def)
-    local model = CARGO.Items.ResolveModel(def) or "none"
+    local model = Icons.ModelFor(def) or "none"
     local fp = Icons.GetFootprint(def)
     local input = RECIPE_VERSION .. "|" .. model .. "|" .. CamKeyString(def)
         .. "|" .. fp.w .. "x" .. fp.h
@@ -163,7 +191,7 @@ function Icons.GetFootprint(defidOrDef)
     if cached ~= nil then return cached end
 
     local fp = { w = 1, h = 1 }
-    local model = CARGO.Items.ResolveModel(def)
+    local model = Icons.ModelFor(def)
     if isstring(model) and util.IsValidModel(model) then
         local ent = ClientsideModel(model, RENDERGROUP_OTHER)
         if IsValid(ent) then
@@ -269,7 +297,7 @@ local function Enqueue(defid, key)
 end
 
 local function RenderIconToFile(def)
-    local model = CARGO.Items.ResolveModel(def)
+    local model = Icons.ModelFor(def)
     if not isstring(model) or not util.IsValidModel(model) then return false end
 
     local key = Icons.IconCacheKey(def)

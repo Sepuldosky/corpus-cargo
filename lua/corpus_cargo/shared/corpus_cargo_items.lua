@@ -89,6 +89,9 @@ end
 --   material       display label for plate-like items (e.g. "Cerámica IV")
 --
 -- Icon system fields (Cargo_ItemImages §4/§5 — consumed client-side):
+--   icon_model     optional model path to render for the icon, overriding
+--                  the resolved one — escape hatch for weapons whose auto
+--                  model (e.g. an ARC9 viewmodel) still frames badly
 --   icon_cam       { pos = {x,y,z}, ang = {p,y,r}, fov = n } code-level
 --                  camera override for the generated icon
 --   size           { w, h } explicit cell footprint (allowed set, §5)

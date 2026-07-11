@@ -42,7 +42,9 @@ local function OpenEditor(defid)
         Corpus.Log("cargo", "icon_edit: def desconocida '" .. tostring(defid) .. "'")
         return
     end
-    local model = CARGO.Items.ResolveModel(def)
+    -- same model source the icon uses (viewmodel for ARC9), so the preview
+    -- matches the generated PNG
+    local model = CARGO.Icons.ModelFor(def)
     if not isstring(model) or not util.IsValidModel(model) then
         Corpus.Log("cargo", "icon_edit: '" .. defid .. "' no tiene modelo resoluble (fuente: "
             .. CARGO.Icons.ResolveIconSource(def) .. ")")
