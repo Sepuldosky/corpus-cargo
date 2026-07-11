@@ -48,9 +48,9 @@
 
 ## Próximo paso
 
-1. **Re-verificación en juego del CHANGELOG #3** → `[APLICADO]` y refrescar acá.
-2. **Primer commit del repo** (cuando el autor lo pida).
-3. Después: [`cargo_roadmap.txt`](cargo_roadmap.txt) — sesión de diseño de UI
+1. **Re-verificación en juego del CHANGELOG #4** (feed de pickup + baja del mod L4D,
+   ver "Pendiente de verificar") → `[APLICADO]` y refrescar acá.
+2. Después: [`cargo_roadmap.txt`](cargo_roadmap.txt) — sesión de diseño de UI
    fullscreen, manos default (Apex Hands), sistema de imágenes, Workbench.
 
 ---
