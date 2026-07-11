@@ -101,8 +101,17 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
                 CARGO.Inventory.NotifyPickup(owner, id, 1)
             end
             -- over the hard weight cap the give fails: the weapon is still
-            -- stripped (start-unarmed rule); the class is gone, not floating
+            -- removed (start-unarmed rule); the class is gone, not floating
         end
-        if owner:HasWeapon(class) then owner:StripWeapon(class) end
+        -- Remove ONLY the entity the engine just gave, never StripWeapon(class):
+        -- that strips every weapon of the class, and on spawn the sandbox
+        -- loadout re-gives gmod_tool/physgun/camera whose class may ALSO be
+        -- equipped in Cargo — a class strip nuked the equipped one, leaving it
+        -- inert in its slot after a reload (in-game report 2026-07-11). The
+        -- equip-give carries the flag and never schedules this timer, so `wep`
+        -- here is always the loadout/pickup duplicate, safe to remove alone.
+        -- If `wep` is already invalid the duplicate is gone anyway — do
+        -- nothing, so an equipped weapon of the same class is never touched.
+        if IsValid(wep) then wep:Remove() end
     end)
 end)
