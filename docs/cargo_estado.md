@@ -14,8 +14,8 @@
 - **Block 1 (inventario) verificado en juego en tres pasadas** (#1 el slice
   completo, #2 fixes de UI/inglés/slots/ARC9, #3 bind fiable + captura post-equip
   + drops con modelo real). 23 archivos Lua; mapa → [`../CLAUDE.md`](../CLAUDE.md).
-- **Primer commit del repo hecho (2026-07-11):** el módulo entero (código + docs,
-  incluidos el batch #4 y estos docs) versionado en `main`. Sin push (contrato del repo).
+- **Módulo publicado en GitHub (2026-07-11):** el módulo entero (código + docs,
+  incluidos el batch #4 y estos docs) commiteado y pusheado a `main`.
 - **Batch #4 (incluido en ese commit, pendiente de re-verificar en juego):**
   **feed de pickup** en pantalla (`corpus_cargo_pickup.lua` — señala el ítem
   recogido, convar `cargo_pickup_feed`) y **baja del mod "L4D Item Pickup System"**
