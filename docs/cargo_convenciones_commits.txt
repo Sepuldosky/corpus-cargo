@@ -1,0 +1,157 @@
+CARGO — CONVENCIONES DE GIT COMMITS (repo: corpus-cargo/, el módulo de inventario)
+Guía de estandarización para el historial de cambios de este repositorio
+=====================================================
+Documento vivo — actualizaciones según evolución del flujo.
+Basado en las convenciones de KONTROL, portadas vía ADS 2.0 y Corpus, adaptado al
+stack GLua / Garry's Mod y al alcance de Cargo como módulo de inventario.
+
+Este doc cubre SOLO el repo corpus-cargo/. La estructura (secciones 0, 1, 2, 4, 5)
+es idéntica a corpus/docs/corpus_convenciones_commits.txt; solo la sección 3
+(alcances) cambia porque depende del mapa de archivos de este repo.
+=====================================================
+
+
+0. PROPÓSITO Y AUDIENCIA
+--------------------------
+
+Este documento establece las reglas y la estructura obligatoria para la redacción de
+mensajes de commit en el repositorio de CARGO (módulo). Su objetivo es mantener un
+historial limpio, legible y automatizable.
+
+Aplica de forma estricta a todo commit confirmado en este repositorio,
+independientemente de quién o qué lo origine.
+
+
+1. ESTRUCTURA OBLIGATORIA DEL MENSAJE
+---------------------------------------
+
+Todo commit DEBE seguir el estándar de Conventional Commits adaptado al proyecto:
+
+  <tipo>(<alcance>): <descripción corta>
+
+Los tipos van en inglés (ver sección 2). La descripción y el cuerpo opcional del
+commit van en español.
+
+Reglas críticas de formato:
+- NUNCA empezar la descripción con mayúscula.
+- NUNCA incluir un punto (.) al final de la descripción.
+- Usar el tiempo presente imperativo (ej: "añade" en lugar de "añadido",
+  "aplica" en lugar de "aplicando").
+
+
+2. TIPOS DE COMMIT PERMITIDOS (<tipo>)
+----------------------------------------
+
+Se prohíben términos genéricos como "cambios", "fix" a secas o "tarea". Los tipos
+válidos son:
+
+  feat:
+    Una nueva funcionalidad para el módulo (nuevo subsistema, nueva mecánica de
+    dominio, nueva superficie pública consumible por otros módulos).
+
+  fix:
+    Corrección de un error o bug activo en el código Lua o en el esquema de datos
+    persistidos.
+
+  refactor:
+    Modificaciones en el código Lua que no añaden funcionalidades ni corrigen
+    errores.
+
+  docs:
+    Cambios exclusivos en archivos de documentación (.txt, .md, CLAUDE.md). No debe
+    tocar código.
+
+  chore:
+    Tareas de mantenimiento rutinario que no afectan la lógica del módulo ni la
+    documentación (ej: .gitignore, estructura de carpetas, assets, addon.json,
+    sonidos).
+
+  test:
+    Añadir, modificar o corregir bloques de auto-test o comandos de validación en
+    consola (cargo_selftest, kit dev).
+
+
+3. ALCANCES ESPECÍFICOS DE CARGO (<alcance>)
+-----------------------------------------------
+
+El alcance identifica el subsistema o área afectada. Debe ir siempre entre paréntesis.
+Para corpus-cargo/ (el módulo), los alcances definidos son:
+
+  items:
+    Contrato de ítems, categorías, filtro de categorías y el primitivo de
+    sub-slots (corpus_cargo_items.lua, corpus_cargo_slots.lua).
+
+  inventory:
+    Inventario por jugador: stacks, equip, quick slots, instancias/blobs,
+    persistencia y sus net handlers (corpus_cargo_inventory.lua,
+    corpus_cargo_instances.lua).
+
+  weight:
+    Curva peso→velocidad y su aplicación al movimiento
+    (corpus_cargo_weight.lua, corpus_cargo_movement.lua).
+
+  money:
+    Interfaz de providers de dinero y el provider nativo USD
+    (corpus_cargo_money.lua).
+
+  containers:
+    Contenedores en mundo, transferencias y las entidades de mundo
+    (corpus_cargo_containers.lua, corpus_cargo_crate.lua, corpus_cargo_item.lua).
+
+  arc9:
+    Puente de attachments/stats con ARC9 (corpus_cargo_arc9.lua).
+
+  ui:
+    Todo el cliente visual: theme, grid, tooltip, panel de estado, frame
+    principal, panel de transferencia, tab del menú Q
+    (lua/corpus_cargo/client/*).
+
+  dev:
+    Selftest, kit de ítems demo y comandos de verificación
+    (corpus_cargo_dev.lua).
+
+  init:
+    Entry point, manifest de carga y bloque CONTRACT (corpus_cargo_init.lua).
+
+  docs:
+    Cambios a la arquitectura, estado, roadmap o convenciones cuando el commit es
+    puramente documental y no encaja en ninguno de los alcances de arriba.
+
+  workbench:
+    (Reservado para el bloque futuro del banco de trabajo — craft, reparación,
+    desarme, upgrades. No usar hasta que ese bloque abra.)
+
+
+4. EJEMPLOS PRÁCTICOS DE APLICACIÓN
+-------------------------------------
+
+  4.1 Código:
+    - feat(items): añade max_stack opcional al contrato de ítems
+    - fix(inventory): re-normaliza claves de quick slots tras el round-trip JSON
+    - feat(arc9): registra los attachments del pack EFT como ítems al OnReady
+    - refactor(ui): extrae el pintado de overlays de celda a corpus_cargo_theme
+
+  4.2 Estructura y docs:
+    - chore(containers): añade sonidos de apertura de mochila
+    - test(dev): añade checks de eyección obligatoria al cargo_selftest
+    - docs(docs): marca [APLICADO] el Block 1 tras la verificación en juego
+
+
+5. AUTOMATIZACIÓN EN VSCODE
+-----------------------------
+
+Para garantizar que el flujo sea ágil y no requiera construcción manual en cada
+commit, se recomienda el uso de herramientas integradas en VSCode:
+
+  Extensión Conventional Commits:
+    Instalar la extensión "Conventional Commits" de Vivian De Smedt. Ofrece un menú
+    desplegable interactivo en la barra de Git para estructurar el tipo, alcance y
+    descripción de forma automática.
+
+=====================================================
+Documentos complementarios:
+  docs/Cargo_Architecture.md               → arquitectura del módulo (Block 1: inventario)
+  docs/Workbench_Arquitectura.md           → subsistema del banco (bloque futuro)
+  CLAUDE.md                                → guía operativa para asistencia con Claude Code
+  ../corpus/docs/corpus_flujo_trabajo.txt  → metodología compartida del ecosistema
+=====================================================

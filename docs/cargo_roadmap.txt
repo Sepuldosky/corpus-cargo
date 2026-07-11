@@ -1,0 +1,83 @@
+CARGO — ROADMAP
+Qué sigue y en qué orden. Dónde estamos dentro de esto → cargo_estado.md.
+=====================================================
+Documento vivo. El detalle de diseño de cada punto vive en
+Cargo_Architecture.md / Workbench_Arquitectura.md; acá solo el orden.
+=====================================================
+
+
+AHORA (cierre del Block 1)
+---------------------------
+1. Block 1 verificado en juego (2026-07-10). Re-verificar el batch de fixes
+   de esa pasada + captura de armas (CHANGELOG #2 [PENDIENTE] -> [APLICADO];
+   checklist en cargo_estado.md).
+2. Primer commit del repo cuando el autor lo pida.
+
+
+SIGUIENTES BLOQUES
+-------------------
+3. UI FULLSCREEN ESTILO STALKER (sesión de diseño Opus + Claude Design en
+   Desktop — decisión del autor 2026-07-11). La FUNCIONALIDAD y la
+   disposición de las partes del inventario están perfectas; lo que cambia
+   es la FORMA: inventario a pantalla completa como la UI de STALKER, y la
+   pantalla de traslado de ítems / trueque también fullscreen. Solo mockups
+   y spec en esa sesión; la implementación VGUI es un bloque aparte.
+4. MANOS DEFAULT (estado desarmado). Con la captura de armas activa el
+   jugador spawnea desarmado; hoy queda el viewmodel vacío del engine.
+   Decisión del autor (2026-07-11): reciclar "Apex Legends: Holster/Melee
+   SWEP" (Twilight Sparkle + Buu342, Workshop 2792160770) como manos
+   default de Corpus, con rename + créditos completos + política de retirar
+   assets si el autor original lo pide (riesgo de licencia silenciosa
+   asumido; ARC9 MW2019 de la misma autora NO se toca). Al reciclar:
+   arreglar el bug de brazos oscuros (repro: se oscurece mirando al
+   horizonte, recupera mirando arriba/abajo o flotando -> apunta al
+   lighting origin del viewmodel muestreando el suelo), remitir el fix a
+   Twilight, y meter su clase en CARGO.Capture.Ignore. Ver
+   ../../dev/mods_workshop_mapa.md §2.
+5. SISTEMA DE IMÁGENES DE ÍTEMS (pendiente declarado 2026-07-11). Hoy las
+   celdas caen a la inicial del nombre si el def no trae icon. Referencia
+   del autor: mod de inventario de Resident Evil que GENERA imágenes de
+   los ítems y permite ajustarlas para que calcen en la celda. Camino
+   probable en GMod: render del modelo a RT (estilo spawnicon/ModelImage)
+   + campos de encuadre por def. Diseñar cuando abra su bloque.
+6. WORKBENCH (doc particular ya cerrado: Workbench_Arquitectura.md).
+   Craft + Reparación por zona + Desarme con herencia de condición +
+   economía de toolkits. Reutiliza el contrato de ítems, la clase única
+   con blob y el sistema de placas de este Block 1. Upgrades queda
+   pendiente dentro del propio doc (canal ARC9 identificado).
+
+
+CRUCES CON OTROS MÓDULOS (cada uno espera el Block del dueño)
+--------------------------------------------------------------
+7. Caliber Block 3: mitigación real por Body (el ítem-armadura ya existe,
+   pesa, se equipa y persiste condición por zona — falta el efecto),
+   escudos de jugador vía sub-slot exo/escudo (punto de acoplamiento ya
+   definido), barra de protección en el panel de estado.
+8. Coagulant: drenaje de stamina por sobrepeso (contrato congelado
+   esperado: coagulant.OnEncumbrance(ply, fraction), ya invocado con
+   lazy-check desde corpus_cargo_movement.lua), ítems médicos reales,
+   barras vital/sangre.
+9. Craving: consumibles reales (comida/agua) + barras hambre/hidratación.
+10. Cortex: provider de facción/rango real (contrato congelado esperado:
+    cortex.GetFactionInfo(ply) -> {faction, rank}) + disguise leyendo el
+    hook Corpus_Cargo_BodyChanged / GetEquipped(ply, "body").
+
+
+INTEGRACIONES / DEUDA PROPIA
+-----------------------------
+11. Mapear mods concretos de NVG/ópticas contra el sub-slot Head
+    (dev/mods_workshop_mapa.md; COMPAT-RUNTIME).
+12. Permisos de admin para comandos dev y acciones sensibles — espera la
+    primitiva de Corpus (sesión de diseño aparte, TODO ya dejado en código).
+13. Corpus.Data.Delete como primitiva del framework (hoy file.Delete
+    directo en Instances.Delete, deuda declarada).
+14. addon.json + empaquetado Workshop (deuda compartida del ecosistema).
+15. Loot on death / GC de instancias huérfanas — diseño posterior; incluye
+    la segunda arma de mundo de una clase ya poseída (hoy la captura la
+    absorbe, dedup v1).
+
+=====================================================
+Diseño de referencia: Cargo_Architecture.md (inventario, Block 1) y
+Workbench_Arquitectura.md (banco, bloque futuro).
+Metodología: ../../corpus/docs/corpus_flujo_trabajo.txt.
+=====================================================
