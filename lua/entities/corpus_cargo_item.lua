@@ -14,47 +14,14 @@ ENT.Spawnable = false
 
 if SERVER then
 
-    -- engine (HL2/base gmod) weapons are not scripted SWEPs, so their world
-    -- model can't be looked up — small known map so drops look like the gun
-    local ENGINE_WMODELS = {
-        weapon_pistol     = "models/weapons/w_pistol.mdl",
-        weapon_357        = "models/weapons/w_357.mdl",
-        weapon_smg1       = "models/weapons/w_smg1.mdl",
-        weapon_ar2        = "models/weapons/w_irifle.mdl",
-        weapon_shotgun    = "models/weapons/w_shotgun.mdl",
-        weapon_crossbow   = "models/weapons/w_crossbow.mdl",
-        weapon_frag       = "models/weapons/w_grenade.mdl",
-        weapon_rpg        = "models/weapons/w_rocket_launcher.mdl",
-        weapon_crowbar    = "models/weapons/w_crowbar.mdl",
-        weapon_stunstick  = "models/weapons/w_stunbaton.mdl",
-        weapon_physcannon = "models/weapons/w_physics.mdl",
-        weapon_physgun    = "models/weapons/w_physics.mdl",
-        weapon_slam       = "models/weapons/w_slam.mdl",
-        gmod_tool         = "models/weapons/w_toolgun.mdl",
-        gmod_camera       = "models/maxofs2d/camera.mdl",
-    }
-
-    -- def.model wins; then the scripted SWEP's WorldModel; then the engine
-    -- map; the cardboard box is the last resort only
-    local function ResolveModel(def)
-        if not istable(def) then return nil end
-        if isstring(def.model) and def.model ~= "" then return def.model end
-        if isstring(def.weapon_class) then
-            local stored = weapons.GetStored(def.weapon_class)
-            if stored and isstring(stored.WorldModel) and stored.WorldModel ~= "" then
-                return stored.WorldModel
-            end
-            return ENGINE_WMODELS[def.weapon_class]
-        end
-        return nil
-    end
-
     function ENT:Initialize()
         local model = "models/props_junk/cardboard_box004a.mdl"
         local CARGO = Corpus and Corpus.GetModule and Corpus.GetModule("cargo")
         if CARGO and istable(self.CargoEntry) then
             local def = CARGO.Items.Get(self.CargoEntry.id)
-            local resolved = ResolveModel(def)
+            -- shared chain (CARGO.Items.ResolveModel, CHANGELOG #3): def.model
+            -- -> SWEP WorldModel -> engine map; cardboard box is last resort
+            local resolved = CARGO.Items.ResolveModel(def)
             if isstring(resolved) and util.IsValidModel(resolved) then
                 model = resolved
             end

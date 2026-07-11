@@ -87,6 +87,15 @@ end
 --   effect_icon    small overlay tag drawn bottom-left ("hemostatic",
 --                  "radiation", "battery" — free string, UI maps known ones)
 --   material       display label for plate-like items (e.g. "Cerámica IV")
+--
+-- Icon system fields (Cargo_ItemImages §4/§5 — consumed client-side):
+--   icon_cam       { pos = {x,y,z}, ang = {p,y,r}, fov = n } code-level
+--                  camera override for the generated icon
+--   size           { w, h } explicit cell footprint (allowed set, §5)
+--   icon_override  runtime data override { cam = {...}, size = {w,h} },
+--                  written by the dev editor (§8), persisted server-side
+--                  and synced with the def snapshot (§10). Beats icon_cam
+--                  and size: it exists to fix autogen defs with no code.
 -- ------------------------------------------------------------------
 
 local ITEM_CLASSES = { stackable = true, unique = true }
@@ -119,12 +128,94 @@ function CARGO.Items.Register(def)
         -- expected on lua refresh; replace so the newest table wins
         Corpus.Log("cargo", "Items.Register: '" .. def.id .. "' re-registered; replacing previous def")
     end
+
+    -- persisted icon overrides re-attach on (re-)register: autogen defs are
+    -- rebuilt every session, but their editor adjustments must survive
+    -- (Cargo_ItemImages §4.3). Server-only: clients receive the field with
+    -- the def snapshot (§10).
+    if SERVER and istable(CARGO.Items._iconOverrides)
+        and CARGO.Items._iconOverrides[def.id] ~= nil then
+        def.icon_override = CARGO.Items._iconOverrides[def.id]
+    end
+
     CARGO.Items._defs[def.id] = def
     return def
 end
 
 function CARGO.Items.Get(id)
     return CARGO.Items._defs[id]
+end
+
+-- ------------------------------------------------------------------
+-- Model resolution chain (CHANGELOG #3). Started life inside the drop
+-- entity (corpus_cargo_item.lua); extracted here SHARED because the icon
+-- system (Cargo_ItemImages §3) reuses the exact same chain client-side.
+-- Returns a candidate model path or nil — the CALLER validates it against
+-- the engine (util.IsValidModel) because validity is realm/content-bound.
+-- ------------------------------------------------------------------
+
+-- engine (HL2/base gmod) weapons are not scripted SWEPs, so their world
+-- model can't be looked up — small known map so drops/icons look like the gun
+local ENGINE_WMODELS = {
+    weapon_pistol     = "models/weapons/w_pistol.mdl",
+    weapon_357        = "models/weapons/w_357.mdl",
+    weapon_smg1       = "models/weapons/w_smg1.mdl",
+    weapon_ar2        = "models/weapons/w_irifle.mdl",
+    weapon_shotgun    = "models/weapons/w_shotgun.mdl",
+    weapon_crossbow   = "models/weapons/w_crossbow.mdl",
+    weapon_frag       = "models/weapons/w_grenade.mdl",
+    weapon_rpg        = "models/weapons/w_rocket_launcher.mdl",
+    weapon_crowbar    = "models/weapons/w_crowbar.mdl",
+    weapon_stunstick  = "models/weapons/w_stunbaton.mdl",
+    weapon_physcannon = "models/weapons/w_physics.mdl",
+    weapon_physgun    = "models/weapons/w_physics.mdl",
+    weapon_slam       = "models/weapons/w_slam.mdl",
+    gmod_tool         = "models/weapons/w_toolgun.mdl",
+    gmod_camera       = "models/maxofs2d/camera.mdl",
+}
+
+-- def.model wins; then the scripted SWEP's WorldModel; then the engine map
+function CARGO.Items.ResolveModel(def)
+    if not istable(def) then return nil end
+    if isstring(def.model) and def.model ~= "" then return def.model end
+    if isstring(def.weapon_class) then
+        local stored = weapons.GetStored(def.weapon_class)
+        if stored and isstring(stored.WorldModel) and stored.WorldModel ~= "" then
+            return stored.WorldModel
+        end
+        return ENGINE_WMODELS[def.weapon_class]
+    end
+    return nil
+end
+
+-- ------------------------------------------------------------------
+-- Icon footprint data (Cargo_ItemImages §5). The footprint LOGIC lives in
+-- the icon system (client); the allowed set and per-category ceilings live
+-- here SHARED because the server validates editor overrides against them
+-- (they are def-level data, synced like any def field — §10). Values are
+-- the starting candidates from the spec; calibrated empirically in game.
+-- ------------------------------------------------------------------
+
+CARGO.Items.ICON_FOOTPRINTS = {
+    { 1, 1 }, { 2, 1 }, { 1, 2 }, { 2, 2 }, { 3, 1 }, { 3, 2 },
+    { 2, 3 }, { 5, 2 }, { 6, 2 }, { 3, 3 }, { 4, 3 },
+}
+
+-- per-category footprint ceiling {maxW, maxH}: keeps a badly scaled model
+-- from inflating its cell. Categories not listed use "default".
+CARGO.Items.ICON_CATEGORY_CAPS = {
+    ammo    = { 2, 1 },
+    medical = { 2, 2 },
+    weapons = { 6, 2 },
+    default = { 3, 3 },
+}
+
+function CARGO.Items.IsAllowedFootprint(w, h)
+    if not isnumber(w) or not isnumber(h) then return false end
+    for _, fp in ipairs(CARGO.Items.ICON_FOOTPRINTS) do
+        if fp[1] == w and fp[2] == h then return true end
+    end
+    return false
 end
 
 -- ------------------------------------------------------------------

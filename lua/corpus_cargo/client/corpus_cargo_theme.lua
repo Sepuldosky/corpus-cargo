@@ -64,6 +64,19 @@ function T.PaintPanel(w, h, bgCol, borderCol)
     surface.DrawOutlinedRect(0, 0, w, h, 1)
 end
 
+-- aspect-fit draw of an item icon inside a box — never stretched (the icon
+-- PNGs carry the footprint aspect, Cargo_ItemImages §6). Shared by grid
+-- cells, equipment/quick slots and the tooltip zoom.
+function T.DrawIconFit(mat, x, y, w, h)
+    local mw, mh = mat:Width(), mat:Height()
+    if mw <= 0 or mh <= 0 then mw, mh = 1, 1 end
+    local scale = math.min(w / mw, h / mh)
+    local dw, dh = mw * scale, mh * scale
+    surface.SetDrawColor(255, 255, 255)
+    surface.SetMaterial(mat)
+    surface.DrawTexturedRect(x + (w - dw) / 2, y + (h - dh) / 2, dw, dh)
+end
+
 -- effect overlay tags (§7 bottom-left corner): known ids get a color; an
 -- unknown tag still renders, just neutral — Cargo does not interpret it
 local EFFECT_COLORS = {

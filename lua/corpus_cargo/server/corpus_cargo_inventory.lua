@@ -316,17 +316,19 @@ function CARGO.Inventory.BuildSnapshot(ply)
     end
 
     -- defs auto-generated server-side (captured engine weapons) don't exist
-    -- on the client until it sees them here and registers them
+    -- on the client until it sees them here and registers them. Defs with an
+    -- icon override ride the same channel (Cargo_ItemImages §10): the
+    -- override is def-level data, the client merges it and re-renders local
     for _, entry in ipairs(snap.items) do
         local def = CARGO.Items.Get(entry.id)
-        if def and def.autogen then
+        if def and (def.autogen or def.icon_override ~= nil) then
             snap.defs = snap.defs or {}
             snap.defs[def.id] = def
         end
     end
     for _, slotEntry in pairs(snap.equip) do
         local def = CARGO.Items.Get(slotEntry.id)
-        if def and def.autogen then
+        if def and (def.autogen or def.icon_override ~= nil) then
             snap.defs = snap.defs or {}
             snap.defs[def.id] = def
         end

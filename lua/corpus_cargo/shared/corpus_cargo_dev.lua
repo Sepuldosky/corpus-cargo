@@ -307,6 +307,36 @@ function CARGO._SelfTest()
         check("fallback usd restaurado", CARGO.Money._providers[CARGO.Money._active] ~= nil)
     end
 
+    -- icon system, pure surface only (CLIENT realm — Cargo_ItemImages §2/§5/§7);
+    -- the render pipeline and the editor are in-game verification
+    if CARGO.Icons ~= nil then
+        local fp = CARGO.Icons.QuantizeFootprint(44, 10, "weapons")
+        check("icons: rifle largo cuantiza a 6x2", fp.w == 6 and fp.h == 2)
+        fp = CARGO.Icons.QuantizeFootprint(40, 10, "ammo")
+        check("icons: techo de ammo respeta 2x1", fp.w <= 2 and fp.h <= 1)
+        fp = CARGO.Icons.QuantizeFootprint(10, 14, "plates")
+        check("icons: placa vertical cae a 2x3", fp.w == 2 and fp.h == 3)
+
+        local src = CARGO.Icons.ResolveIconSource
+        check("icons: icon explícito gana", src({ icon = "x", model = "models/y.mdl" }) == "icon")
+        check("icons: modelo resoluble renderea", src({ model = "models/y.mdl" }) == "render")
+        check("icons: sin icon ni modelo cae a letra", src({}) == "letter")
+
+        local defA = { id = "st_icons", model = "models/a.mdl", size = { 2, 1 } }
+        local k1 = CARGO.Icons.IconCacheKey(defA)
+        check("icons: clave estable con misma entrada", CARGO.Icons.IconCacheKey(defA) == k1)
+        check("icons: cam distinta cambia la clave", CARGO.Icons.IconCacheKey({
+            id = "st_icons", model = "models/a.mdl", size = { 2, 1 },
+            icon_cam = { pos = { x = 1, y = 2, z = 3 }, ang = { p = 0, y = 0, r = 0 }, fov = 30 },
+        }) ~= k1)
+        check("icons: footprint distinto cambia la clave", CARGO.Icons.IconCacheKey({
+            id = "st_icons", model = "models/a.mdl", size = { 3, 2 },
+        }) ~= k1)
+        check("icons: modelo distinto cambia la clave", CARGO.Icons.IconCacheKey({
+            id = "st_icons", model = "models/b.mdl", size = { 2, 1 },
+        }) ~= k1)
+    end
+
     Corpus.Log("cargo", string.format("selftest %s: %d OK, %d fallas (realm %s)",
         fail == 0 and "PASÓ" or "FALLÓ", pass, fail, SERVER and "server" or "client"))
     return fail == 0

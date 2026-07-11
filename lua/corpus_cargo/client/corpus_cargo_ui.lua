@@ -275,13 +275,24 @@ local function MakeSlotCell(parent, slot, big)
                 T.Colors.amber, TEXT_ALIGN_RIGHT)
         end
 
-        local font = big and "CargoSmall" or "CargoText"
-        name = T.FitText(name, font, w - 12)
-        draw.SimpleText(name, font,
-            big and w / 2 or 6, h / 2 + (big and 2 or 1),
-            T.Colors.text, big and TEXT_ALIGN_CENTER or TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-
         local cond = T.ConditionOf(entry)
+
+        -- item icon (Cargo_ItemImages §10): aspect-fit between the label row
+        -- and the condition bar; the name only paints while there is no icon
+        -- (queued placeholder / no-model error signal) or the cell is too
+        -- short to show one legibly (smallest accessory rows)
+        local availH = h - 16 - (cond ~= nil and 16 or 6)
+        local icon = availH >= 20 and CARGO.Icons.Get(entry.id) or nil
+        if icon ~= nil then
+            T.DrawIconFit(icon, 6, 16, w - 12, availH)
+        else
+            local font = big and "CargoSmall" or "CargoText"
+            name = T.FitText(name, font, w - 12)
+            draw.SimpleText(name, font,
+                big and w / 2 or 6, h / 2 + (big and 2 or 1),
+                T.Colors.text, big and TEXT_ALIGN_CENTER or TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        end
+
         if cond ~= nil then
             T.DrawBar(6, h - 12, w - 12 - 34, 5, cond / 100, T.ConditionColor(cond))
             draw.SimpleText(math.Round(cond) .. "%", "CargoTiny", w - 6, h - 16,
@@ -377,8 +388,14 @@ local function MakeQuickCell(parent, n)
         end
 
         if def then
-            draw.SimpleText(string.upper(def.name:sub(1, 1)), "CargoHeading",
-                w / 2, h / 2 - 6, T.Colors.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            -- icon with letter fallback (Cargo_ItemImages §10), F label spared
+            local icon = CARGO.Icons.Get(def.id)
+            if icon ~= nil then
+                T.DrawIconFit(icon, 4, 3, w - 8, h - 18)
+            else
+                draw.SimpleText(string.upper(def.name:sub(1, 1)), "CargoHeading",
+                    w / 2, h / 2 - 6, T.Colors.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            end
             local count = QuickCount(itemId)
             draw.SimpleText("x" .. count, "CargoTiny", w - 4, 3,
                 count > 0 and T.Colors.text or T.Colors.red, TEXT_ALIGN_RIGHT)
@@ -661,11 +678,22 @@ net.Receive(NET_SYNC, function()
     -- server-side auto-generated defs (captured engine weapons) arrive with
     -- the snapshot; engine names come as localization tokens ("#HL2_Pistol")
     for id, def in pairs(snap.defs or {}) do
-        if CARGO.Items.Get(id) == nil then
+        local known = CARGO.Items.Get(id)
+        if known == nil then
             if isstring(def.name) and def.name:sub(1, 1) == "#" then
                 def.name = language.GetPhrase(def.name:sub(2))
             end
             CARGO.Items.Register(def)
+        elseif known ~= def then
+            -- def-level icon override data rides this same channel
+            -- (Cargo_ItemImages §10): merge in place (by-ref invariant) and
+            -- drop that def's icon caches only if it actually changed
+            local before = known.icon_override and util.TableToJSON(known.icon_override) or ""
+            local after = def.icon_override and util.TableToJSON(def.icon_override) or ""
+            if before ~= after then
+                known.icon_override = def.icon_override
+                CARGO.Icons.Invalidate(id)
+            end
         end
     end
 

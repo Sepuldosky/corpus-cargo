@@ -164,6 +164,22 @@ function CARGO.Tooltip.Show(cell, entry)
     local y = 10
     y = y + AddTitle(tip, def, T.ConditionOf(entry))
 
+    -- icon zoom (Cargo_ItemImages §6/§10): the 64 px/cell renders hold up at
+    -- tooltip size; painted from Icons.Get each frame so it hot-swaps in
+    -- when the queued render lands. No letter here — no icon, no row.
+    do
+        local icon = CARGO.Icons.Get(entry.id)
+        if icon ~= nil then
+            local mw, mh = icon:Width(), icon:Height()
+            if mw <= 0 or mh <= 0 then mw, mh = 1, 1 end
+            local boxH = math.min(140, math.ceil((WIDTH - PAD * 2) * mh / mw))
+            y = y + AddRow(tip, boxH, function(_, w)
+                local mat = CARGO.Icons.Get(entry.id)
+                if mat ~= nil then T.DrawIconFit(mat, 0, 0, w, boxH) end
+            end)
+        end
+    end
+
     if isstring(def.trivia) and def.trivia ~= "" then
         y = y + AddParagraph(tip, def.trivia)
     end

@@ -187,3 +187,102 @@ ambos realms.
 el feed listando el loadout capturado; recoger un arma de mundo (toolgun,
 spawnmenu) por contacto ahora que nada bloquea `AllowPlayerPickup`; recoger un
 drop con E y ver la línea del feed; `cargo_pickup_feed 0` lo apaga.
+
+---
+
+## 5. Sistema de imágenes de ítems (`Cargo_ItemImages`, roadmap #5) `[PENDIENTE]`
+
+Baja a código `Cargo_ItemImages_Arquitectura.md` completo (client-side puro,
+cero net salvo el snapshot de defs que ya existía). Prerequisito del bloque de
+UI fullscreen (§15) — acá el grid sigue uniforme, las gradas son el bloque #3:
+
+1. **Pipeline de íconos (`corpus_cargo_icons.lua`, CLIENT):** jerarquía de
+   fuente estricta `def.icon` → render desde modelo → letra (§2; la letra pasa
+   a ser placeholder de cola y señal de error). Render: `ClientsideModel` →
+   RT reutilizable 512 (uno solo) → cámara resuelta → `render.Model` +
+   `SetModelLighting` (receta del ícono de dupes del sandbox, la única que
+   probó dibujar dentro de `PostRender`: los trucos de `DrawModel` de contexto
+   de panel capturaban el fondo sin el modelo — 1.ª pasada del gate,
+   2026-07-11) → captura PNG →
+   `file.Write("data/corpus/cargo/icons/<defid>_<hash>.png")` →
+   `Material("data/…", "smooth")`. Al aspect del footprint, 64 px/celda (§6).
+   Generación lazy en `PostRender` con presupuesto por frame (convar
+   `cargo_icon_budget`, default 2); sesiones siguientes cargan del disco sin
+   re-render. Nombre de archivo = clave de invalidación:
+   `hash(model + cam_efectiva + footprint)` (§7) — cambiar cualquier entrada
+   re-renderiza solo ese ícono.
+2. **Gate de transparencia (§9), decidido por convar:** Plan A (alpha real:
+   RT transparente + `SetWriteDepthToDestAlpha` durante el pase — la silueta
+   escribe el canal alpha — + captura `alpha=true`) vs Plan B (fondo del color
+   de celda horneado). Switch: `cargo_icon_bake_bg` (0 = A default, 1 = B); al
+   cambiarlo se regenera toda la caché sola. **Gate resuelto en juego
+   (2026-07-11): Plan A funciona** — PNG transparentes limpios con la receta
+   final; Plan B queda como fallback operativo del switch.
+3. **Cadena de modelo compartida:** la resolución de los drops (entry #3) se
+   extrajo de la entidad a `CARGO.Items.ResolveModel` (SHARED) — def.model →
+   `WorldModel` del SWEP → mapa de armas de engine; la entidad y los íconos
+   consumen la misma función (cero duplicación).
+4. **Encuadre de 3 niveles (§4):** override de data (JSON) → `def.icon_cam` →
+   auto con `PositionSpawnIcon` (firma verificada contra el engine:
+   entidad + pos + noAngles → view table). `ResolveCam(def, ent)`.
+5. **Footprint (§5):** `def.size` explícito o auto por OBB proyectado en la
+   cámara efectiva, **cuantizado al set cerrado** (1×1…6×2, 11 formas) con
+   techo por categoría (ammo≤2×1, medical≤2×2, weapons≤6×2, resto ≤3×3);
+   set y techos SHARED en `Items` (el server valida overrides contra ellos).
+   `Cargo.Icons.GetFootprint(defid)` expuesto en el CONTRACT — el layout en
+   gradas NO se implementa acá (bloque #3).
+6. **Consumidores (§10):** grid (aspect-fit en la celda cuadrada, interim),
+   slots de equipamiento, quick slots y zoom del tooltip pintan vía
+   `Cargo.Icons.Get`; helper único `Theme.DrawIconFit`. Refresh en caliente
+   gratis: los `Paint` re-piden el material cada frame.
+7. **Sync de overrides (§10):** registro server-side
+   (`server/corpus_cargo_icons.lua`) persistido en
+   `Corpus.Data("cargo", "icon_overrides")`, re-adjuntado a las defs al
+   registrarse (las autogen se rearman cada sesión) y viajando en el snapshot
+   de defs existente (ahora incluye defs con override además de autogen); el
+   cliente mergea en sitio e invalida esa def. Los PNG nunca se sincronizan.
+   Net nuevo: `corpus_cargo_icon_override` (editor→server, validado).
+8. **Editor dev (§8, `corpus_cargo_iconeditor.lua`):** `cargo_icon_edit
+   <defid>` (autocompletado solo de defs con modelo resoluble) — preview vivo
+   (DModelPanel) sobre **fondo del color de celda con guía de footprint**
+   (caja al aspect + cruz de centrado; pedido del autor en el gate), controles
+   orbit/zoom/pan por mouse + **sliders finos de pitch/yaw/distancia/FOV**
+   sincronizados en dos vías, botones "Auto frame (Cargo)" / "Engine
+   isometric", footprint manual del set permitido, **Save** (persiste
+   override, invalida hash, re-renderiza), **Print Lua** (imprime
+   `icon_cam`/`size` para canonizar al def) y **Clear**.
+   `cargo_icon_regen_all` invalida y borra la caché entera (re-render lazy
+   respetando presupuesto). Ambos con el TODO estándar de gate de admin
+   (roadmap #12). **Browser en el tab Q** (Utilities → Corpus → Cargo,
+   pedido del autor): buscador + lista de defs editables (con modelo
+   resoluble) que abre el editor al click y se refresca sola cuando se
+   capturan armas nuevas — sin tipear defids en consola.
+9. **Encuadre auto de perfil para `weapons`/`melee`** *(pedido del autor en el
+   gate: los íconos de la referencia STALKER son perfiles paralelos, no el
+   isométrico del engine)*: cámara lateral (+Y, yaw 270) fiteada al OBB del
+   modelo; el resto de categorías mantiene `PositionSpawnIcon`. La clave de
+   caché ahora incluye una **versión de receta** (`r2`): cambiar la receta o
+   el auto en código invalida los íconos viejos por sí solo, sin
+   `cargo_icon_regen_all` manual.
+
+**Verificación previa (2026-07-11):** sintaxis 12/12 tocados + harness offline
+(LuaJIT + framework real de `corpus/`, stubs de `file`/`render`/`weapons`):
+selftest 26/29 (server/client; el client suma 10 checks nuevos de íconos) +
+26 checks puros del harness (cuantización con techos, estabilidad y divergencia
+de `IconCacheKey`, `ResolveIconSource`, precedencia de footprint, `Get` con
+IMaterial/letra/cola) + snapshot de defs llevando `icon_override` — todo verde,
+ambos realms.
+
+**Confirmado in-game por el autor (2026-07-11, primera pasada):** gate de
+transparencia → **Plan A OK** (PNG transparentes); íconos reemplazando letras
+en grid/slots/tooltip; armas capturadas (`wpn_*`) resolviendo modelo; editor
+funcionando (override de cam guardado y aplicado en vivo). Feedback aplicado
+en caliente: receta de render corregida a `render.Model` (la two-pass de
+contexto de panel no dibujaba en `PostRender`), autocompletado filtrado a defs
+renderizables, sliders finos + fondo/guía en el editor, y auto de perfil para
+armas (puntos 1, 8 y 9).
+
+**Pendiente para `[APLICADO]` (segunda pasada del autor):** auto de perfil
+viéndose bien en armas dev y capturadas sin override; override de
+cam+footprint persistiendo entre sesiones (recargar mapa y verificar);
+`cargo_icon_regen_all` sin hitch con inventario grande.

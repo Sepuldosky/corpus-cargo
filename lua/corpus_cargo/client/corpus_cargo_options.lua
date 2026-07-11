@@ -33,6 +33,10 @@ local function BuildCargoTab(p)
     p:Help("Server (replicated convars; changing them needs server rights)")
     p:Help("cargo_capacity_base — base carry capacity in kg (54). cargo_quick_base — quick slots with no suit (2). cargo_arc9_bridge — ARC9 attachment bridge (1). cargo_capture_weapons — engine-given weapons go to the inventory (1).")
 
+    p:Help("Icon editor (dev) — pick an item to frame its icon and footprint")
+    p:AddItem(CARGO.IconEditor.BuildBrowser(p))
+    p:Help("Console: cargo_icon_edit <defid> · cargo_icon_regen_all — rebuild the whole icon cache")
+
     p:Help("Verification")
     p:Help("cargo_selftest — primitives self-test in this realm. cargo_dev_give — test item kit (server). cargo_dev_money — +$1000 (server). cargo_dev_atts [n] [filter] — bridged ARC9 attachments (server).")
 end

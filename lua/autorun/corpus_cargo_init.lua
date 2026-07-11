@@ -26,6 +26,10 @@
 --   CARGO.Money.Get/Add/Take/Format           -- delegate to the active provider
 --   CARGO.Containers.Attach(ent, opts)        -- turn any entity into a container
 --   CARGO.StatusPanel.RegisterBar(module, spec)  -- CLIENT: status panel bars
+--   CARGO.Icons.Get(defid) -> IMaterial | nil -- CLIENT: item icon (nil =>
+--                                                letter placeholder/error)
+--   CARGO.Icons.GetFootprint(defid) -> {w,h}  -- CLIENT: cell footprint
+--                                                (Cargo_ItemImages §5)
 -- ============================================================
 
 -- ============================================================
@@ -49,9 +53,12 @@ local SERVER_FILES = {
     "server/corpus_cargo_movement.lua",   -- weight -> walk/run speed application
     "server/corpus_cargo_containers.lua", -- world containers + transfer net
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)
+    "server/corpus_cargo_icons.lua",      -- icon cam/footprint override registry (ItemImages §4.3/§10)
 }
 local CLIENT_FILES = {
     "client/corpus_cargo_theme.lua",       -- palette, fonts, shared paint helpers
+    "client/corpus_cargo_icons.lua",       -- item icon pipeline (Cargo_ItemImages §2-§7)
+    "client/corpus_cargo_iconeditor.lua",  -- dev icon cam/footprint editor (ItemImages §8)
     "client/corpus_cargo_statuspanel.lua", -- StatusPanel.RegisterBar + render
     "client/corpus_cargo_pickup.lua",      -- on-screen pickup feed (HUDPaint)
     "client/corpus_cargo_tooltip.lua",     -- inspection tooltip (§9)

@@ -29,13 +29,14 @@ local function PaintCell(self, w, h)
     local def = self.cargoDef
     if def == nil then return end
 
-    -- icon: material path, IMaterial (ARC9 atts) or first-letter fallback
-    local icon = def.icon
-    if isstring(icon) and icon ~= "" then icon = Material(icon) end
-    if icon ~= nil and not istable(icon) and not isstring(icon) and not icon:IsError() then
-        surface.SetDrawColor(255, 255, 255)
-        surface.SetMaterial(icon)
-        surface.DrawTexturedRect(w / 2 - 20, h / 2 - 20, 40, 40)
+    -- icon via the icon system (Cargo_ItemImages §2/§10): def.icon, generated
+    -- render or nil. INTERIM (§1.9 of the images block): the grid is still
+    -- uniform, so the icon aspect-fits inside the square cell — the tiered
+    -- footprint layout is the fullscreen-UI block, not this one. The letter
+    -- stays as the queued placeholder and as the no-model error signal.
+    local icon = CARGO.Icons.Get(def.id)
+    if icon ~= nil then
+        T.DrawIconFit(icon, 3, 3, w - 6, h - 6)
     else
         draw.SimpleText(string.upper(def.name:sub(1, 1)), "CargoTitle",
             w / 2, h / 2, T.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
