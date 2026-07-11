@@ -264,25 +264,68 @@ UI fullscreen (§15) — acá el grid sigue uniforme, las gradas son el bloque #
    caché ahora incluye una **versión de receta** (`r2`): cambiar la receta o
    el auto en código invalida los íconos viejos por sí solo, sin
    `cargo_icon_regen_all` manual.
+10. **Modelo correcto para armas ARC9** *(reporte in-game 2026-07-11: los
+    íconos ARC9 salían con un modelo CSS con culata de madera)*. Causa raíz
+    verificada contra la base ARC9 (`dev/other/`): las armas con
+    `MirrorVMWM = true` ponen su `WorldModel` como **placeholder de colisión
+    CSS/HL2** (comentario textual en `shared.lua`) y dibujan el viewmodel
+    encima (`DrawWorldModel`, `cl_wm.lua`) — el `WorldModel` es la imagen
+    equivocada. Resolver icon-específico `Icons.ModelFor(def)`: para armas
+    ARC9 con MirrorVMWM usa `WorldModelMirror or ViewModel`; el resto y los
+    **drops** siguen con `Items.ResolveModel` (necesitan un prop con
+    colisión). Escape hatch `def.icon_model` para casos borde. Como cambia el
+    modelo de entrada, la clave de caché de esas armas cambia sola → re-render
+    automático, sin regen manual.
 
-**Verificación previa (2026-07-11):** sintaxis 12/12 tocados + harness offline
+**Verificación previa (2026-07-11):** sintaxis 13/13 tocados + harness offline
 (LuaJIT + framework real de `corpus/`, stubs de `file`/`render`/`weapons`):
 selftest 26/29 (server/client; el client suma 10 checks nuevos de íconos) +
-26 checks puros del harness (cuantización con techos, estabilidad y divergencia
+checks puros del harness (cuantización con techos, estabilidad y divergencia
 de `IconCacheKey`, `ResolveIconSource`, precedencia de footprint, `Get` con
-IMaterial/letra/cola) + snapshot de defs llevando `icon_override` — todo verde,
-ambos realms.
+IMaterial/letra/cola, `ModelFor` con stub de SWEP ARC9) + snapshot de defs
+llevando `icon_override` — todo verde, ambos realms.
 
-**Confirmado in-game por el autor (2026-07-11, primera pasada):** gate de
-transparencia → **Plan A OK** (PNG transparentes); íconos reemplazando letras
-en grid/slots/tooltip; armas capturadas (`wpn_*`) resolviendo modelo; editor
-funcionando (override de cam guardado y aplicado en vivo). Feedback aplicado
-en caliente: receta de render corregida a `render.Model` (la two-pass de
-contexto de panel no dibujaba en `PostRender`), autocompletado filtrado a defs
-renderizables, sliders finos + fondo/guía en el editor, y auto de perfil para
-armas (puntos 1, 8 y 9).
+**Confirmado in-game por el autor (2026-07-11):** gate de transparencia →
+**Plan A OK** (PNG transparentes); íconos reemplazando letras en
+grid/slots/tooltip; armas capturadas (`wpn_*`) resolviendo modelo; editor
+funcionando (cam+footprint guardado, persistido entre sesiones y aplicado en
+vivo); `cargo_icon_regen_all` sin hitch; auto de perfil correcto; browser del
+tab Q. Feedback aplicado en caliente: receta de render a `render.Model` (la
+two-pass de contexto de panel no dibujaba en `PostRender`), autocompletado
+filtrado, sliders finos + fondo/guía, auto de perfil, y el modelo ARC9
+(puntos 1, 8, 9 y 10).
 
-**Pendiente para `[APLICADO]` (segunda pasada del autor):** auto de perfil
-viéndose bien en armas dev y capturadas sin override; override de
-cam+footprint persistiendo entre sesiones (recargar mapa y verificar);
-`cargo_icon_regen_all` sin hitch con inventario grande.
+**Pendiente para `[APLICADO]` (última verificación del autor):** que los
+íconos de armas ARC9 muestren ahora el arma real (viewmodel) en vez del modelo
+CSS placeholder, en grid/slots/tooltip y en el preview del editor.
+
+---
+
+## 6. Fix: arma equipada de clase de loadout sobrevive al respawn `[PENDIENTE]`
+
+Salido de la verificación in-game (2026-07-11): un toolgun equipado en Primary
+quedaba **inerte** tras recargar mapa/reconectar — el slot lo mostraba, pero el
+jugador no tenía el arma (no se podía seleccionar).
+
+Causa raíz en `corpus_cargo_capture.lua`: al respawnear, el loadout de sandbox
+re-da su propio `gmod_tool`/`weapon_physgun`/`gmod_camera`. La captura lo detecta
+como duplicado (ya es ítem de inventario) y hacía `StripWeapon(class)` — que
+quita **todas** las armas de esa clase por nombre, incluida la que el hook
+`PlayerLoadout` re-dio para el slot equipado. El re-give funcionaba; el strip
+por clase lo mataba un tick después.
+
+Fix: remover **solo la entidad específica** que el engine acaba de dar
+(`wep:Remove()`), nunca `StripWeapon(class)`. El equip-give lleva el flag
+`CargoEquipGive` y nunca agenda el timer de captura, así que el `wep` del timer
+es siempre el duplicado del loadout/pickup — se remueve solo, y el arma equipada
+(otra entidad de la misma clase) queda en la mano. Si `wep` ya es inválido no se
+hace nada (el duplicado ya no está; jamás se toca la equipada).
+
+**Verificación previa (2026-07-11):** sintaxis + harness en verde (la lógica de
+render/ModelFor no regresó; el fix es de comportamiento de spawn/loadout, se
+verifica in-game).
+
+**Pendiente para `[APLICADO]` (verificación del autor):** equipar un toolgun (u
+otra arma de clase de loadout: physgun, cámara) en un slot, recargar mapa/
+reconectar, y confirmar que sigue equipada y **seleccionable/funcional**; que el
+spawn desarmado y la captura del loadout normal no se rompieron.
