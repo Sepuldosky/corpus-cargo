@@ -22,6 +22,9 @@ SIGUIENTES BLOQUES
    es la FORMA: inventario a pantalla completa como la UI de STALKER, y la
    pantalla de traslado de ítems / trueque también fullscreen. Solo mockups
    y spec en esa sesión; la implementación VGUI es un bloque aparte.
+   Nota: los hallazgos de manejo de armas §16-22 tocan esta UI (quickslots
+   de sandbox, orden STALKER, munición cargada al equipo) — diseñar en
+   coordinación con este bloque.
 4. MANOS DEFAULT (estado desarmado). Con la captura de armas activa el
    jugador spawnea desarmado; hoy queda el viewmodel vacío del engine.
    Decisión del autor (2026-07-11): reciclar "Apex Legends: Holster/Melee
@@ -75,6 +78,73 @@ INTEGRACIONES / DEUDA PROPIA
 15. Loot on death / GC de instancias huérfanas — diseño posterior; incluye
     la segunda arma de mundo de una clase ya poseída (hoy la captura la
     absorbe, dedup v1).
+
+
+BLOQUE DE MANEJO / INTERACCIÓN DE ARMAS (hallazgos in-game 2026-07-11 — SIN diseñar)
+-------------------------------------------------------------------------------------
+Hallazgos del autor probando en juego, tras la baja del mod "L4D Item Pickup"
+(CHANGELOG #4). NO son diseño cerrado: son el MATERIAL DE ENTRADA para la sesión
+de diseño del bloque de mejoras de UI/manejo de armas. La FRONTERA de dueño
+(Cargo = pickup/drop/equip/UI/quickslots; Caliber = semántica del arma: munición,
+cargador, condición→traba) se resuelve AL diseñar el bloque, no acá — regla del
+flujo (dueño se decide en diseño). Varios tocan la UI fullscreen (§3), así que se
+diseñan junto o en secuencia con ella. Espejado como cross-ref en caliber_roadmap.txt
+§2[5] (sin duplicar el detalle: vive acá).
+
+16. PICKUP POR MIRAR + USE, no por contacto [Cargo]. Hoy, sin el mod L4D, un arma
+    generada por toolgun se recoge SOLA al pasarle por encima (AllowPlayerPickup
+    quedó abierto). Objetivo: que NO se recoja por contacto; recogerla requiere
+    MIRARLA + USE. Ideal del autor: recoger arma/objeto = combinación walk + use
+    (walk para no autorecoger al pasar por encima; use para tomarla como cualquier
+    prop) — algo que gmod/hl2 no permiten nativo → plus. Toca corpus_cargo_capture.
+
+17. BOTAR ARMA CON TECLA, conservando funciones de Corpus [Cargo + Caliber]. Falta
+    una tecla que bote directamente el arma en mano, y que el arma botada NO sea un
+    SWEP nuevo del engine: debe conservar sus funciones de Corpus (seguir siendo la
+    instancia-ítem de Cargo con su blob, no un arma fresca). Referencia: mod "Drop
+    Weapon" (YuRaNnNzZZ, 946373028, dev/other/ — mapa §2/§4: suelta arma conservando
+    munición del cargador; licencia silenciosa → integrar en runtime o reciclar con
+    permiso). Debe conservar el punto 18 (persistencia de munición).
+
+18. PERSISTENCIA DE MUNICIÓN DEL CARGADOR [Caliber semántica + Cargo blob]. Si el
+    cargador es 30 y se disparan 15, el arma debe quedar con 15 (hoy no persiste al
+    capturar/botar/reequipar). El estado de munición viaja en el blob del ítem (Cargo
+    transporta, el dueño interpreta — contrato §3). Prerequisito de 17.
+
+19. SISTEMA DE MUNICIÓN / CARGADORES [Caliber semántica + Cargo UI/inventario].
+    Posible sistema de cargadores que se llenan con munición, con TOGGLE (no a todos
+    les gusta llenar cargadores realistas). ARC9 EFT trae municiones custom propias
+    (ej. FMJ 9mm del menú en algunas armas) que se alimentan de munición HL2: abre la
+    posibilidad de "simular" que la munición custom de ARC9 es distinta a la de HL2
+    (plus gigante para ARC9). Necesita UI: llevar la munición cargada al EQUIPO (pasar
+    del inventario al equipo). Referencia del autor: STALKER Anomaly / Misery tienen
+    algo parecido. Toca el puente ARC9 (corpus_cargo_arc9) + la UI de equipamiento.
+
+20. CONDICIÓN / MANTENIMIENTO DEL ARMA [Caliber semántica + Cargo condición-blob].
+    ARC9 EFT ya traba armas por calor / muchos disparos (sistema propio de ARC9 EFT):
+    nuestro sistema puede AUMENTAR la probabilidad de fallo apoyándose en él. Para
+    armas ARC9 no-EFT u otras SIN animación/sistema de traba: que la condición eche a
+    perder el arma y la deshabilite (no dispara). Lo más cercano a "trabar" sin anim:
+    bloquear el disparo como si no tuviera munición. Enlaza con la condición-por-zona
+    que Cargo ya guarda en el blob y con el Workbench (reparación); el "qué hace la
+    condición" es del dueño del arma (Caliber).
+
+21. QUICKSLOTS DE SANDBOX EN EQUIP: PHYSGUN / TOOLGUN / CAMERA [Cargo UI]. 3 UI
+    circulares (solo el símbolo — toolgun, cámara, physgun — sin texto) entre los
+    quickslots y los accesorios del equipamiento, por ser herramientas muy necesarias
+    del sandbox. Toggleable con "hide" en el inventario. Parte del rediseño de UI (§3).
+
+22. ORDEN DE ARMAS ESTILO STALKER + HOLSTER + matar notificaciones de GMod
+    [Cargo UI/quickslots + compat HUD]. Reordenar las armas de GMod (toggleable):
+    1=melee, 2=sidearm, 3=primary, 4=secondary, 5/6/7=physgun/toolgun/camera (el autor
+    vio que se puede un 7º slot; verificar compat con el HUD objetivo). Holster
+    ("hands"): re-apretar el número del arma actual la enfunda (ej. crowbar en 1 →
+    apretar 1 de nuevo vuelve a manos). Referencia: Simple Holster (Chen, 2546335680,
+    mapa §2). HAY QUE DESACTIVAR las notificaciones de obtención de armas de GMod
+    (ensucian y molestan) — encaja con el feed de pickup propio que ya existe
+    (corpus_cargo_pickup). Compat objetivo del autor: "D/GL4 Holographic HUD" (DyaMetR,
+    3459525275, GPL-3.0, COMPAT-RUNTIME — mapa §2); verificar que el 7º slot no rompa
+    ese HUD.
 
 =====================================================
 Diseño de referencia: Cargo_Architecture.md (inventario, Block 1) y

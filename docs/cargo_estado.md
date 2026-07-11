@@ -37,7 +37,10 @@
 - **Pendientes de diseño (sesión Opus + Claude Design):** UI fullscreen estilo
   STALKER (funcionalidad y disposición quedan; cambia la forma — incluye la
   pantalla de traslado/trueque) y **sistema de imágenes de ítems** (generación
-  estilo mod de inventario RE). Roadmap #3 y #5.
+  estilo mod de inventario RE). Roadmap #3 y #5. **+ Hallazgos in-game de manejo
+  de armas** (pickup por mirar+use, botar con tecla, munición/cargadores, condición,
+  quickslots de sandbox, orden STALKER + matar notificaciones GMod) → Roadmap #16-22,
+  sin diseñar; frontera Cargo/Caliber se decide al diseñar el bloque.
 - **Manos default:** reciclaje de Apex Hands **aprobado por el autor** (créditos
   + takedown-on-request; arreglar bug de brazos oscuros — repro: se oscurece
   mirando al horizonte — y remitir fix a Twilight). Roadmap #4 y mapa de mods.
