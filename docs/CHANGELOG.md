@@ -765,7 +765,7 @@ boot del server y el ícono re-keya solo. Entry cerrado.
 
 ---
 
-## 9. Orden de armas estilo STALKER + holster + manos default (roadmap #22 parcial + #4) `[PENDIENTE]`
+## 9. Orden de armas estilo STALKER + holster + manos default (roadmap #22 parcial + #4) `[APLICADO 2026-07-12]`
 
 Baja a código el pedido del autor (2026-07-12): teclas 1-7 mapeadas a los
 slots de equipamiento, re-apretar la tecla del arma en mano la **enfunda**, y
@@ -796,7 +796,7 @@ compat del 7.º slot con el HUD D/GL4) queda para otra tanda.
      del viewmodel al jugador (`vm:SetLightingOriginEntity(owner)`, la
      técnica de ARC9 en `sh_deploy.lua:88`). El engine siguió iluminando el
      viewmodel desde el illumposition malo — no bastó, revertido.
-   - **2.º intento (implementado, pendiente de verificar):** tomar el control
+   - **2.º intento (CONFIRMADO in-game 2026-07-12):** tomar el control
      del lighting del viewmodel a mano en vez de anclarlo. `PreDrawViewModel`/
      `PreDrawPlayerHands` hacen `render.SuppressEngineLighting(true)` + una
      caja de luz propia (`render.ResetModelLighting` ambiente + `SetModelLighting`
@@ -806,8 +806,9 @@ compat del 7.º slot con el HUD D/GL4) queda para otra tanda.
      el piso con el ángulo de vista) con un **piso** por canal (0.16) para que
      los brazos nunca queden negros, más un realce cenital para conservar
      volumen. Así reaccionan al ambiente (sótano oscuro vs. exterior) pero
-     ignoran el glitch del horizonte. Si confirma, **remitir el fix a
-     Twilight** (TODO del roadmap #4).
+     ignoran el glitch del horizonte. **El autor confirmó que funciona,
+     aplicando el archivo en vivo sin reiniciar.** Queda pendiente **remitir
+     el fix a Twilight** (acción del autor, TODO del roadmap #4).
 3. **Orden de armas 1-7** (`CARGO.Slots.Hotkeys`, data SHARED en
    `corpus_cargo_slots.lua`): 1=melee, 2=sidearm, 3=primary, 4=secondary,
    5=physgun, 6=toolgun, 7=camera. El cliente
@@ -846,18 +847,14 @@ ambas clases de manos, matriz de `Decide` intacta y `SlotKey` robusto
 (slot vacío / holster directo / fuera de rango). Selftest suma 2 checks
 (mapa de hotkeys + melee dev equipable en su slot).
 
-**1.ª pasada en juego (2026-07-12, feedback del autor):** el mecanismo
-funciona ("está bien"). El **1.er intento** del fix de brazos oscuros NO
-resolvió el problema → se implementó el **2.º intento** (control manual del
-lighting del viewmodel, punto 2), pendiente de verificar en la próxima pasada.
+**Confirmado in-game por el autor (2026-07-12, cierre del entry):** el
+mecanismo funciona ("está bien" en la 1.ª pasada), y el **fix de brazos
+oscuros** quedó resuelto en el 2.º intento (control manual del lighting del
+viewmodel, punto 2) — el autor lo confirmó aplicando el archivo **en vivo,
+sin reiniciar**. El 1.er intento (`SetLightingOriginEntity`) había fallado y
+se revirtió. Entry cerrado.
 
-**Pendiente para `[APLICADO]` (resto del checklist, sin verificar aún):**
-spawn con las manos afuera (y con `cargo_holster_hands 0`, sin arma); 1-7
-seleccionan lo equipado en cada slot (crowbar capturado en Melee incluido) y
-la tecla del arma activa enfunda; puños/anims/hitmarker del SWEP; toggles del
-tab Q (`cargo_weapon_slots` 0 devuelve los buckets stock; el checkbox de
-Hands cambia el estilo de enfunde en vivo); regresión: physgun/toolgun/
-camera siguen seleccionables vía 5/6/7 y la rueda del mouse sigue stock.
-**+ brazos oscuros (2.º intento):** confirmar que ya NO se oscurecen mirando
-al horizonte y que reaccionan al ambiente sin quedar negros ni fullbright
-plano; si pasa, remitir el fix a Twilight.
+**Acción pendiente del autor (no bloquea el cierre):** remitir el fix de
+brazos oscuros a Twilight Sparkle (mod original Workshop 2792160770). Del
+roadmap #22 queda, para otra tanda, matar las notificaciones de obtención de
+armas de GMod y verificar el 7.º slot contra el HUD D/GL4.

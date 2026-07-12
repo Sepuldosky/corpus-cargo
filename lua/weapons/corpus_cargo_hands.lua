@@ -29,7 +29,8 @@
 --     with view angle) with a floor so the arms are never pitch black, plus
 --     a top-down key so they keep some volume. Result: arms react to the
 --     room (dark cellar, bright outside) but never to the horizon glitch.
---     If confirmed in-game, remit the fix upstream to Twilight Sparkle.
+--     CONFIRMED in-game 2026-07-12 (applied live, no restart). TODO: remit
+--     the fix upstream to Twilight Sparkle (mod 2792160770).
 --   * melee_swing sound.Add: the original declared the `sound` key twice
 --     (left hook overwritten by right hook — Lua keeps the last); both sets
 --     are merged here, which is what the code visibly intended.

@@ -32,8 +32,9 @@ SIGUIENTES BLOQUES
    PREREQUISITO DURO: #5 (imágenes) — las gradas no valen con fallback de letra.
    La implementación VGUI es un bloque aparte, DESPUÉS de #5.
 
-4. MANOS DEFAULT (estado desarmado).  [IMPLEMENTADO v1 2026-07-12,
-   CHANGELOG #9 [PENDIENTE] verif. in-game]  Con la captura de armas activa
+4. MANOS DEFAULT (estado desarmado).  [APLICADO 2026-07-12, CHANGELOG #9 —
+   confirmado in-game; solo queda remitir el fix de lighting a Twilight]
+   Con la captura de armas activa
    el jugador spawnea desarmado; hoy queda el viewmodel vacío del engine.
    Decisión del autor (2026-07-11): reciclar "Apex Legends: Holster/Melee
    SWEP" (Twilight Sparkle + Buu342, Workshop 2792160770) como manos
@@ -48,10 +49,10 @@ SIGUIENTES BLOQUES
    -> Hecho como SWEP corpus_cargo_hands ("Hands"), clase (+apexswep) en
    Capture.Ignore, elección Hands/nada en el tab Q (cargo_holster_hands).
    Fix de brazos oscuros: 1.er intento (SetLightingOriginEntity -> jugador)
-   NO sirvió in-game (1.ª pasada 2026-07-12); 2.º intento implementado
-   (SuppressEngineLighting + caja de luz propia muestreada en EyePos con
-   piso, en PreDrawViewModel/PreDrawPlayerHands), pendiente de verificar.
-   No remitir nada a Twilight hasta confirmarlo in-game.
+   NO sirvió; 2.º intento (SuppressEngineLighting + caja de luz propia
+   muestreada en EyePos con piso, en PreDrawViewModel/PreDrawPlayerHands)
+   CONFIRMADO in-game (2026-07-12, aplicó en vivo sin reiniciar). PENDIENTE:
+   remitir el fix a Twilight (acción del autor).
 
 5. SISTEMA DE IMÁGENES DE ÍTEMS  [DISEÑO CERRADO 2026-07-11]
    -> Cargo_ItemImages_Arquitectura.md (doc propio). Render del modelo a RT
