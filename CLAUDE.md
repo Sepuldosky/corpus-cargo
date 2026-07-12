@@ -45,13 +45,13 @@ Un **manifest de carga explícito** (`corpus_cargo_init.lua`, único archivo en 
 | [`lua/autorun/corpus_cargo_init.lua`](lua/autorun/corpus_cargo_init.lua) | shared | Entry + registro (`cargo`) + **bloque CONTRACT** + manifest |
 | [`lua/corpus_cargo/shared/corpus_cargo_util.lua`](lua/corpus_cargo/shared/corpus_cargo_util.lua) | shared | Blobs de net (JSON comprimido) + re-normalización de claves numéricas |
 | [`lua/corpus_cargo/shared/corpus_cargo_items.lua`](lua/corpus_cargo/shared/corpus_cargo_items.lua) | shared | **Contrato de ítems** (§3): `Items.Register`, categorías, filtro único, **sub-slots** (`DeclareSubSlot`, §4) |
-| [`lua/corpus_cargo/shared/corpus_cargo_slots.lua`](lua/corpus_cargo/shared/corpus_cargo_slots.lua) | shared | Slots de equipamiento (data, incl. Accessory 1/2 genéricos) + quick F1–F4 (disponibilidad por traje) |
+| [`lua/corpus_cargo/shared/corpus_cargo_slots.lua`](lua/corpus_cargo/shared/corpus_cargo_slots.lua) | shared | Slots de equipamiento (data, incl. Accessory 1/2 genéricos y los 3 de herramienta sandbox con clase exacta) + quick F1–F4 (disponibilidad por traje) + cinturón (`BELT_COUNT`) |
 | [`lua/corpus_cargo/shared/corpus_cargo_weight.lua`](lua/corpus_cargo/shared/corpus_cargo_weight.lua) | shared | Curva pura peso→velocidad (§5) + capacidad base+mochila |
 | [`lua/corpus_cargo/shared/corpus_cargo_arc9.lua`](lua/corpus_cargo/shared/corpus_cargo_arc9.lua) | shared | **Puente ARC9** (§10): hooks de inventario verificados + helpers de attach/detach/stats |
 | [`lua/corpus_cargo/shared/corpus_cargo_dev.lua`](lua/corpus_cargo/shared/corpus_cargo_dev.lua) | shared | `cargo_selftest` + kit de ítems demo (`cargo_dev_give`) + barras demo |
 | [`lua/corpus_cargo/server/corpus_cargo_instances.lua`](lua/corpus_cargo/server/corpus_cargo_instances.lua) | server | Blobs de instancia únicos, uid, un archivo por instancia (§12) |
 | [`lua/corpus_cargo/server/corpus_cargo_money.lua`](lua/corpus_cargo/server/corpus_cargo_money.lua) | server | Interfaz de dinero + provider nativo USD (§6) |
-| [`lua/corpus_cargo/server/corpus_cargo_inventory.lua`](lua/corpus_cargo/server/corpus_cargo_inventory.lua) | server | Inventario por SteamID64: stacks, equip, quick, eyección obligatoria, net |
+| [`lua/corpus_cargo/server/corpus_cargo_inventory.lua`](lua/corpus_cargo/server/corpus_cargo_inventory.lua) | server | Inventario por SteamID64: stacks, equip, quick, cinturón (§15.2, solo forma), eyección obligatoria, net |
 | [`lua/corpus_cargo/server/corpus_cargo_movement.lua`](lua/corpus_cargo/server/corpus_cargo_movement.lua) | server | Aplica la curva a walk/run + lazy-check Coagulant |
 | [`lua/corpus_cargo/server/corpus_cargo_containers.lua`](lua/corpus_cargo/server/corpus_cargo_containers.lua) | server | Contenedores en mundo, transferencias, Take/Move all (§8) |
 | [`lua/corpus_cargo/server/corpus_cargo_capture.lua`](lua/corpus_cargo/server/corpus_cargo_capture.lua) | server | Captura de armas del engine → ítems (spawn desarmado). **Post-equip vía `WeaponEquip`, nunca vetando `PlayerCanPickupWeapon`** — compat con mods de pickup (lección L4D IPS, ver header del archivo). Defs `autogen` + `Capture.Ignore` para SWEPs de manos |
@@ -59,9 +59,9 @@ Un **manifest de carga explícito** (`corpus_cargo_init.lua`, único archivo en 
 | [`lua/corpus_cargo/client/corpus_cargo_statuspanel.lua`](lua/corpus_cargo/client/corpus_cargo_statuspanel.lua) | client | `StatusPanel.RegisterBar` + render (§11) |
 | [`lua/corpus_cargo/client/corpus_cargo_pickup.lua`](lua/corpus_cargo/client/corpus_cargo_pickup.lua) | client | Feed de pickup en pantalla (`cargo_pickup_feed`) — señala el ítem recogido |
 | [`lua/corpus_cargo/client/corpus_cargo_tooltip.lua`](lua/corpus_cargo/client/corpus_cargo_tooltip.lua) | client | Tooltip de inspección (§9): stats ARC9/manual, zonas, sub-slots |
-| [`lua/corpus_cargo/client/corpus_cargo_grid.lua`](lua/corpus_cargo/client/corpus_cargo_grid.lua) | client | Grid reutilizable + overlays por esquina (PaintOver, no CSS) |
-| [`lua/corpus_cargo/client/corpus_cargo_ui.lua`](lua/corpus_cargo/client/corpus_cargo_ui.lua) | client | Frame principal (equip/quick/estado/header/tabs/footer) + binds |
-| [`lua/corpus_cargo/client/corpus_cargo_transfer.lua`](lua/corpus_cargo/client/corpus_cargo_transfer.lua) | client | Panel de transferencia lado a lado (§8) |
+| [`lua/corpus_cargo/client/corpus_cargo_grid.lua`](lua/corpus_cargo/client/corpus_cargo_grid.lua) | client | Grid por **gradas** (footprint `w×h`, §7 enmendado) + overlays por esquina (PaintOver, no CSS) |
+| [`lua/corpus_cargo/client/corpus_cargo_ui.lua`](lua/corpus_cargo/client/corpus_cargo_ui.lua) | client | Frame **fullscreen 3 columnas / 3 estados** (§15: Solo/Loot/Trade-reservado; equip STALKER, quick, cinturón, círculos sandbox, botón $, tabs, footer) + binds |
+| [`lua/corpus_cargo/client/corpus_cargo_transfer.lua`](lua/corpus_cargo/client/corpus_cargo_transfer.lua) | client | Estado/wire de contenedores (§8): net + intents; el frame Loot vive en `corpus_cargo_ui.lua` |
 | [`lua/corpus_cargo/client/corpus_cargo_options.lua`](lua/corpus_cargo/client/corpus_cargo_options.lua) | client | Tab único `Corpus.UI.RegisterTab("cargo", …)` |
 | [`lua/entities/corpus_cargo_crate.lua`](lua/entities/corpus_cargo_crate.lua) | shared | Caja de prueba spawnable (E → panel de transferencia) |
 | [`lua/entities/corpus_cargo_item.lua`](lua/entities/corpus_cargo_item.lua) | shared | Ítem dropeado en mundo (E → recoger) |

@@ -461,7 +461,7 @@ confirmado en las pasadas previas.
 
 ---
 
-## 6. Fix: armas equipadas sobreviven al respawn/reinicio (persistencia completa) `[PENDIENTE]`
+## 6. Fix: armas equipadas sobreviven al respawn/reinicio (persistencia completa) `[APLICADO 2026-07-11]`
 
 Salido de la verificación in-game (2026-07-11): un arma equipada en un slot
 (toolgun, physgun, 9A-91) quedaba **inerte** tras recargar mapa/reconectar —
@@ -531,16 +531,13 @@ captura siguiente + dedup del arma re-capturada).
 equipado sobrevivió al respawn y era usable — las partes 1-3 funcionan para
 clases de loadout.
 
-**Pendiente para `[APLICADO]` (verificación del autor):** (a) los "bloques"
-del grid vuelven a ser armas con nombre tras recargar (heal); (b) equipar
-toolgun + physgun + el 9A-91 en slots, recargar mapa Y reiniciar/reconectar,
-confirmar que las tres siguen equipadas y **seleccionables/funcionales** sin
-re-equipar; (c) el spawn desarmado normal sigue (el loadout no-equipado va a
-inventario, sin duplicados en el grid).
+**Confirmado por el autor (2026-07-11, cierre del entry):** persistencia de
+equipadas verificada — el heal de blobs huérfanos, el reconcile diferido y la
+supervivencia al reinicio/reconexión completa funcionan. Entry cerrado.
 
 ---
 
-## 7. Armas de mundo: sin auto-pickup, WALK+USE toma, USE agarra; drops = SWEP real `[PENDIENTE]`
+## 7. Armas de mundo: sin auto-pickup, WALK+USE toma, USE agarra; drops = SWEP real `[APLICADO 2026-07-11]`
 
 Baja a código el **roadmap #16** (pedido del autor, 3.ª pasada 2026-07-11:
 "que al tomar las armas se deba hacer walk + use; use sirve para tomar el
@@ -598,8 +595,116 @@ sin auto-pickup, WALK+USE toma (el autor usa F como +use), USE agarra, el
 drop se ve como el arma real. Único faltante reportado: soltar el arma
 agarrada re-apretando USE → implementado arriba (punto 3, marca de carry).
 
-**Pendiente para `[APLICADO]` (verificación del autor):** re-apretar USE
-suelta el arma agarrada (y un tercer USE la re-agarra); tomar con WALK+USE
-un arma dropeada recupera sus attachments/condición (tooltip); el loadout
-del spawn sigue capturándose como siempre. `cargo_weapon_world_pickup 0`
-restaura el comportamiento anterior completo.
+**Confirmado por el autor (2026-07-11, cierre del entry):** armas de mundo
+verificadas completas — gate sin auto-pickup, WALK+USE toma, USE agarra/
+suelta (marca de carry), drops con el SWEP real y take-back con la misma
+instancia. Entry cerrado.
+
+---
+
+## 8. UI fullscreen: 3 columnas / 3 estados, gradas, cinturón y círculos sandbox (§15) `[PENDIENTE]`
+
+Baja a código el **bloque UI fullscreen** (`Cargo_Architecture.md` §15,
+roadmap #3 del módulo): cambia la **forma**, no la funcionalidad — todo lo
+de Block 1 (slots, sub-slots, quick, peso, providers, stat-bars, tabs,
+footer, contenedores, menús contextuales, ARC9) se conserva reordenado al
+layout STALKER/GAMMA del mock congelado
+(`docs/mockups/cargo_fullscreen_ui_mock_v1.html` + los 3 PNG). Decisiones
+del autor en la sesión: el **tooltip sigue flotante** en todos los estados
+(manda la tabla de §15.1 — la columna izquierda en Solo queda ausente, mundo
+visible detrás; la tarjeta dockeada del mock NO se implementa), el botón $
+queda como gancho con aviso, el cinturón acepta **solo** `category "ammo"`,
+y **ESC cierra el inventario** (no apila el menú del juego encima).
+
+1. **Grid a gradas** (`corpus_cargo_grid.lua`): cada ítem pinta `w×h`
+   celdas según `CARGO.Icons.GetFootprint` (§7 enmendado; unidad 42 px @1080,
+   escalada). El modelo de datos NO cambia (sin gestión espacial ni
+   rotación; el costo de cargar sigue siendo peso). `DIconLayout` en flow
+   con wrap — la trampa `Dock(TOP)` + `InvalidateLayout(true)` se conserva.
+   Overlays nuevos: badge de grupo A/B (armas, arriba-izq) y barra de
+   condición al borde inferior; retícula sutil de fondo.
+2. **Frame fullscreen, una implementación / tres estados**
+   (`corpus_cargo_ui.lua`): scrim traslúcido sobre el mundo, tres columnas
+   del mock (580/420/660 @1080, escaladas y clampeadas a 4:3). Columna
+   izquierda **contextual**: ausente en Solo, contenedor en Loot, reservada
+   para Trade (`Cargo_Trade`). Centro (orden §15.2 exacto): Accessory1 ·
+   Head · Accessory2 / Secondary · Body · Primary (verticales, icono de
+   arma rotado 90°, badge A/B + calibre, barra segmentada de condición) /
+   Sidearm · Back · Melee / quick F1–F4 (candado intacto) / círculos
+   sandbox / cinturón / panel de estado al fondo. Derecha: header de perfil
+   (avatar, facción provider, dinero + botón $) → tabs → grid → footer de
+   peso. Paleta oliva del mock ahora en `corpus_cargo_theme.lua` (única
+   fuente de estilo — re-skinnea tooltip/feed/transfer coherente).
+3. **Estado Loot absorbe el panel de transferencia**
+   (`corpus_cargo_transfer.lua`): el frame lado-a-lado desaparece; usar un
+   contenedor abre el frame único en Loot (columna izquierda = contenedor +
+   Take all; Move all en el footer propio). El archivo queda como dueño del
+   wire (`container_open/sync/close`, `transfer`, `takeall`) y de los
+   intents; la UI vive entera en `corpus_cargo_ui.lua`. Drag en ambos
+   sentidos y click-para-transferir se conservan 1:1.
+4. **Cinturón de munición — solo la FORMA (#19 queda para su bloque)**:
+   `rec.belt[1..6]` en el server (`corpus_cargo_inventory.lua`), net
+   `belt_set`/`belt_clear` namespaced. Solo stacks `category "ammo"`; el
+   stack se mueve ENTERO (deja el grid); merge solo con condición idéntica
+   (regla anti-lavado); ocupante distinto vuelve al grid (swap, nunca se
+   pierde); el peso lo sigue contando `TotalWeight`; persiste en el record
+   (claves numéricas re-normalizadas como quick). Badge A/B **derivado**
+   client-side (calibre vs arma equipada) — display only, nada alimenta
+   del cinturón todavía.
+5. **Círculos de herramienta sandbox (#21)**: physgun/toolgun/camera como
+   atajos circulares — en mano → `input.SelectWeapon`; como ítem capturado
+   en el grid → equip al primer slot que acepte (vacío primero). Toggle
+   hide/show (`cargo_ui_tools`, archive). No son slots de almacenamiento.
+6. **Botón de dinero (§15.3) — el gancho**: circular junto al valor del
+   header. Delegará en `CARGO.Trade.MoneyButton(estado)` cuando el bloque
+   de comercio exista; hoy responde honesto en chat. La entidad-dinero y el
+   basket viven en `Cargo_Trade_Arquitectura.md` §7.
+
+**Verificación previa (2026-07-12):** sintaxis 6/6 (luaparser) + harness
+offline (lupa/LuaJIT, ambos realms): selftest 26/29 OK; reglas del cinturón
+completas en server (gate ammo, stack entero, merge, swap sin pérdida,
+fuera de rango, peso, persistencia con claves numéricas, snapshot); en
+client, snapshot inyectado por el receiver real de sync (NumberKeys de
+quick y belt), frame Loot y Solo construidos (51/42 paneles), barrido de
+TODOS los Paint/PaintOver/Think limpio en ambos estados, 18 DoClick limpios
+y cierre del Loot notificando `container_close`. **Pendiente: pasada en
+juego del autor** (checklist §15 + regresión Block 1).
+
+**Ajustes de la 1.ª pasada en juego (2026-07-12, feedback del autor —
+confirmados en esa pasada: cinturón, botón $, peso y traspaso
+crate↔inventario):**
+
+1. **Retícula alineada:** la dibuja el propio `DIconLayout` (mismo origen
+   que las celdas y scrollea con el contenido), no el scroll de fondo.
+2. **Footprints calibrados** (la calibración empírica que
+   `Cargo_ItemImages` §5 dejaba pendiente): **piso por categoría**
+   `ICON_CATEGORY_MINS` (weapons ≥3×2) aplicado en la cuantización y como
+   clamp aspect-aware sobre metas persistidas (`ClampFootprintMin`: un meta
+   3×1 de rifle ARC9 cae en 6×2, uno 2×1 de pistola en 4×2); **sizes
+   explícitos** en el kit dev (casco 3×3, chaleco 3×4, mochila 3×3, placa
+   2×3, SMG 4×2, pistola 3×2, melee 3×1…) y **tabla de clases engine** en
+   la captura (physgun 4×2, toolgun 3×2, cámara 2×1, AR2/escopeta 5×2,
+   RPG 6×2…). El set permitido suma 4×2 y 3×4; techo de armor 4×4.
+3. **Círculos sandbox = slots dedicados REALES** (`tool_physgun` /
+   `tool_toolgun` / `tool_camera` en `Slots.List`, campo `classes` en
+   `CanEquip`: aceptan exactamente su clase — un rifle jamás cae ahí y la
+   herramienta no compite por Primary/Secondary). Click coloca la
+   herramienta desde el grid en su slot (el server entrega el SWEP; vivir
+   en `rec.equip` compra gratis el keep-equipped de la captura y el re-give
+   del reconcile de spawn) o la selecciona si ya está puesta; drag en ambos
+   sentidos; **hover muestra el tooltip real del ítem** (pedido del autor);
+   fila centrada y **sin toggle hide** (ocultarlas será del futuro
+   sub-bloque admin).
+4. **Tabs con wrap** en filas (la fila única recortaba "Backpacks").
+5. **Strings sobrantes fuera:** "feeds active weapon" (el cinturón se
+   explica solo) y "registrable stat-bars".
+6. **Transferencia por cantidad:** "Take/Move amount..." con prompt
+   (`Derma_StringRequest`) además de 1/stack entero.
+
+**Verificación previa de los ajustes (2026-07-12):** sintaxis 9/9 + harness
+ambos realms: selftest sube a 29/36 OK (casos nuevos: piso en cuantización,
+clamps 3×1→6×2 y 2×1→4×2, piso no toca otras categorías, tool slot acepta
+su clase / rechaza otra / physgun sigue equipable en slots de arma), equip
+server-side a `tool_physgun` con rechazo de clase equivocada y unequip
+devolviendo al grid, frames Loot/Solo construidos y barrido de paints/clicks
+limpio. **Pendiente: 2.ª pasada en juego.**
