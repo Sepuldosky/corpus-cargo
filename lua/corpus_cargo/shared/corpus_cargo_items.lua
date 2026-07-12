@@ -201,7 +201,7 @@ end
 
 CARGO.Items.ICON_FOOTPRINTS = {
     { 1, 1 }, { 2, 1 }, { 1, 2 }, { 2, 2 }, { 3, 1 }, { 3, 2 },
-    { 2, 3 }, { 5, 2 }, { 6, 2 }, { 3, 3 }, { 4, 3 },
+    { 2, 3 }, { 4, 2 }, { 5, 2 }, { 6, 2 }, { 3, 3 }, { 4, 3 }, { 3, 4 },
 }
 
 -- per-category footprint ceiling {maxW, maxH}: keeps a badly scaled model
@@ -210,7 +210,17 @@ CARGO.Items.ICON_CATEGORY_CAPS = {
     ammo    = { 2, 1 },
     medical = { 2, 2 },
     weapons = { 6, 2 },
+    armor   = { 4, 4 },
     default = { 3, 3 },
+}
+
+-- per-category footprint FLOOR {minW, minH} (author calibration, first
+-- fullscreen in-game pass 2026-07-12): flat weapon tiles (ARC9 crops
+-- measured down to 3x1) read wrong in the tiered grid — a weapon occupies
+-- at least a pistol's volume. Enforced in quantization and over persisted
+-- footprint metas; explicit def.size / editor overrides stay authoritative.
+CARGO.Items.ICON_CATEGORY_MINS = {
+    weapons = { 3, 2 },
 }
 
 function CARGO.Items.IsAllowedFootprint(w, h)

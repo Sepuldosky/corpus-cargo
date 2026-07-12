@@ -7,8 +7,8 @@ local CARGO = Corpus.GetModule("cargo")
 
 CARGO.Slots = CARGO.Slots or {}
 
--- Order here is the render order of the equipment panel (mockup
--- InventarioCargo.png): Head/Body/Back row, weapon rows, accessory row.
+-- The row order in the fullscreen equipment column is hand-laid in
+-- corpus_cargo_ui.lua (§15.2); this list is the slot DATA.
 CARGO.Slots.List = {
     { id = "head",      label = "Head",      filter = "category:helmets" },
     { id = "body",      label = "Body",      filter = "category:armor" },
@@ -21,6 +21,24 @@ CARGO.Slots.List = {
     -- setting-agnostic (author call, first in-game pass 2026-07-10)
     { id = "accessory1", label = "Accessory 1", filter = "category:accessories" },
     { id = "accessory2", label = "Accessory 2", filter = "category:accessories" },
+    -- sandbox tool slots (§15.2 #21, author calibration 2026-07-12): the
+    -- circles in the equipment column are REAL slots — each accepts exactly
+    -- its SWEP class, so a rifle never lands here and the tool never
+    -- competes for a weapon slot. Living in rec.equip buys the capture's
+    -- keep-equipped rule and the spawn reconcile re-give for free.
+    { id = "tool_physgun", label = "Physgun", filter = "category:weapons",
+        classes = { weapon_physgun = true } },
+    { id = "tool_toolgun", label = "Toolgun", filter = "category:weapons",
+        classes = { gmod_tool = true } },
+    { id = "tool_camera",  label = "Camera",  filter = "category:weapons",
+        classes = { gmod_camera = true } },
+}
+
+-- the three tool slots, in circle render order
+CARGO.Slots.Tools = {
+    { slotId = "tool_physgun", class = "weapon_physgun" },
+    { slotId = "tool_toolgun", class = "gmod_tool" },
+    { slotId = "tool_camera",  class = "gmod_camera" },
 }
 
 CARGO.Slots.ById = {}
@@ -32,6 +50,10 @@ end
 -- like the reference STALKER artifact belt. With no suit equipped, the
 -- convar base applies; a suit's def.quick_slots overrides it.
 CARGO.Slots.QUICK_COUNT = 4
+
+-- Ammo belt (§15.2): fixed row of stack slots for ammunition. FORM only —
+-- feeding semantics is roadmap #19.
+CARGO.Slots.BELT_COUNT = 6
 
 local cvQuickBase = CreateConVar("cargo_quick_base", "2",
     bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED),
@@ -54,6 +76,13 @@ function CARGO.Slots.CanEquip(def, slotId)
     if slot == nil or not istable(def) then return false end
     if def.class ~= "unique" then return false end
     if not CARGO.Items.MatchesFilter(def, slot.filter) then return false end
+
+    -- class-restricted slots (sandbox tool circles): exact SWEP class only
+    if istable(slot.classes) then
+        if not isstring(def.weapon_class) or not slot.classes[def.weapon_class] then
+            return false
+        end
+    end
 
     if istable(def.equip_slots) then
         for _, allowed in ipairs(def.equip_slots) do
