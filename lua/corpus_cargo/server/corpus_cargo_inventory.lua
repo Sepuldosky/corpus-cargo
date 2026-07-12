@@ -9,6 +9,9 @@
 --            unique entry: { id, uid } — blob lives in CARGO.Instances
 --   equip  : { [slotId] = uid }
 --   quick  : { [1..4] = itemId } (bindings; JSON round-trip re-normalized)
+--   belt   : { [1..6] = stack entry } — ammo belt (§15.2, FORM only:
+--            stacks stored here left the grid; feeding semantics is
+--            roadmap #19). Numeric keys re-normalized like quick.
 --   wallet : native money provider storage
 --
 -- The server owns the inventory; the client only renders snapshots and
@@ -35,6 +38,8 @@ local NET_QUICKUSE  = Corpus.Net.Register("cargo", "quickuse")
 local NET_AMMOGROUP = Corpus.Net.Register("cargo", "ammogroup")
 local NET_SUB_ATT   = Corpus.Net.Register("cargo", "subslot_attach")
 local NET_SUB_DET   = Corpus.Net.Register("cargo", "subslot_detach")
+local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
+local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
 
 -- ------------------------------------------------------------------
 -- Records: load / save / normalize
@@ -52,13 +57,15 @@ function CARGO.Inventory.GetRecord(ply)
 
     rec = Corpus.Data.Load("cargo", "inv_" .. sid)
     if rec == nil then
-        rec = { items = {}, equip = {}, quick = {}, wallet = {} }
+        rec = { items = {}, equip = {}, quick = {}, belt = {}, wallet = {} }
     else
         -- Corpus.Data does not guarantee key types on the JSON round-trip:
-        -- re-normalize the numeric quick-slot keys (contract in its header).
+        -- re-normalize the numeric quick/belt-slot keys (contract in its
+        -- header).
         rec.items = istable(rec.items) and rec.items or {}
         rec.equip = istable(rec.equip) and rec.equip or {}
         rec.quick = CARGO.Util.NumberKeys(rec.quick)
+        rec.belt = CARGO.Util.NumberKeys(rec.belt)
         rec.wallet = istable(rec.wallet) and rec.wallet or {}
         -- legacy slot ids from the first dev pass (pda/detector became the
         -- generic accessory slots) — remap so nothing equipped is orphaned
@@ -99,6 +106,11 @@ function CARGO.Inventory.TotalWeight(ply)
     end
     for _, uid in pairs(rec.equip) do
         total = total + CARGO.Instances.WeightOf(uid)
+    end
+    -- belt stacks left the grid but not the player (§15.2: carry cost is
+    -- weight, wherever the stack lives)
+    for _, entry in pairs(rec.belt or {}) do
+        total = total + EntryWeight(entry)
     end
     return total
 end
@@ -305,7 +317,7 @@ end
 
 function CARGO.Inventory.BuildSnapshot(ply)
     local rec = CARGO.Inventory.GetRecord(ply)
-    local snap = { items = {}, equip = {}, quick = rec.quick }
+    local snap = { items = {}, equip = {}, quick = rec.quick, belt = rec.belt }
 
     for _, entry in ipairs(rec.items) do
         snap.items[#snap.items + 1] = EntrySnapshot(entry)
@@ -328,6 +340,13 @@ function CARGO.Inventory.BuildSnapshot(ply)
     end
     for _, slotEntry in pairs(snap.equip) do
         local def = CARGO.Items.Get(slotEntry.id)
+        if def and (def.autogen or def.icon_override ~= nil) then
+            snap.defs = snap.defs or {}
+            snap.defs[def.id] = def
+        end
+    end
+    for _, entry in pairs(rec.belt or {}) do
+        local def = CARGO.Items.Get(entry.id)
         if def and (def.autogen or def.icon_override ~= nil) then
             snap.defs = snap.defs or {}
             snap.defs[def.id] = def
@@ -570,6 +589,53 @@ function CARGO.Inventory.QuickUse(ply, slotN)
 end
 
 -- ------------------------------------------------------------------
+-- Ammo belt (§15.2, FORM only): ammo stacks move between the grid and
+-- the belt slots. How the belt feeds the weapon is roadmap #19 — the
+-- belt stores, nothing interprets it yet.
+-- ------------------------------------------------------------------
+
+function CARGO.Inventory.BeltSet(ply, slotN, ref)
+    if slotN < 1 or slotN > CARGO.Slots.BELT_COUNT then return end
+    local rec = CARGO.Inventory.GetRecord(ply)
+
+    local idx, entry = FindEntry(rec, ref)
+    if entry == nil or entry.uid ~= nil then return end
+
+    local def = CARGO.Items.Get(entry.id)
+    if not istable(def) or def.category ~= "ammo" then
+        CARGO.Inventory.Notice(ply, "Only ammunition goes on the belt.")
+        return
+    end
+
+    -- the whole stack moves; equal id+condition merges (anti-laundering
+    -- rule holds), a different occupant returns to the grid first — a
+    -- swap never silently loses a stack. No weight gate: the stack stays
+    -- on the same player either way.
+    local occ = rec.belt[slotN]
+    if occ ~= nil and occ.id == entry.id and occ.condition == entry.condition then
+        occ.count = (occ.count or 1) + (entry.count or 1)
+    else
+        if occ ~= nil then
+            AddStack(rec, occ.id, occ.count or 1, occ.condition)
+        end
+        rec.belt[slotN] = {
+            id = entry.id, count = entry.count or 1, condition = entry.condition,
+        }
+    end
+    table.remove(rec.items, idx)
+    CARGO.Inventory.Touch(ply)
+end
+
+function CARGO.Inventory.BeltClear(ply, slotN)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    local entry = rec.belt[slotN]
+    if entry == nil then return end
+    rec.belt[slotN] = nil
+    AddStack(rec, entry.id, entry.count or 1, entry.condition)
+    CARGO.Inventory.Touch(ply)
+end
+
+-- ------------------------------------------------------------------
 -- Ammo group A/B (generic blob field on weapons, §3)
 -- ------------------------------------------------------------------
 
@@ -705,6 +771,16 @@ end)
 
 net.Receive(NET_QUICKUSE, function(_, ply)
     CARGO.Inventory.QuickUse(ply, net.ReadUInt(4))
+end)
+
+net.Receive(NET_BELT_SET, function(_, ply)
+    local slotN = net.ReadUInt(4)
+    local ref = CARGO.Util.ReadBlob()
+    if ref then CARGO.Inventory.BeltSet(ply, slotN, ref) end
+end)
+
+net.Receive(NET_BELT_CLR, function(_, ply)
+    CARGO.Inventory.BeltClear(ply, net.ReadUInt(4))
 end)
 
 net.Receive(NET_AMMOGROUP, function(_, ply)

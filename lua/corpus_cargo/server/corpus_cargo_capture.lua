@@ -42,6 +42,31 @@ CARGO.Capture.Ignore = {
     ["weapon_fists"] = true,
 }
 
+-- Known engine/sandbox silhouettes: footprint {w, h} declared at the def
+-- (explicit size beats auto quantization, Cargo_ItemImages §5). Author
+-- calibration, first fullscreen in-game pass 2026-07-12: physgun reads as
+-- a rifle, toolgun as a pistol, the camera is small. Classes not listed
+-- fall to the auto path (now floored by ICON_CATEGORY_MINS).
+local AUTOGEN_SIZES = {
+    weapon_physgun    = { 4, 2 },
+    weapon_physcannon = { 4, 2 },
+    gmod_tool         = { 3, 2 },
+    gmod_camera       = { 2, 1 },
+    weapon_pistol     = { 3, 2 },
+    weapon_357        = { 3, 2 },
+    weapon_smg1       = { 4, 2 },
+    weapon_ar2        = { 5, 2 },
+    weapon_shotgun    = { 5, 2 },
+    weapon_crossbow   = { 5, 2 },
+    weapon_rpg        = { 6, 2 },
+    weapon_annabelle  = { 5, 2 },
+    weapon_frag       = { 1, 1 },
+    weapon_slam       = { 2, 1 },
+    weapon_bugbait    = { 2, 2 },
+    weapon_crowbar    = { 3, 1 },
+    weapon_stunstick  = { 3, 1 },
+}
+
 local function RegisterAutogen(class, name)
     CARGO.Items.Register({
         id = "wpn_" .. class,
@@ -50,6 +75,7 @@ local function RegisterAutogen(class, name)
         class = "unique",
         category = "weapons",
         weapon_class = class,
+        size = AUTOGEN_SIZES[class],
         autogen = true,
         trivia = "Auto-captured weapon (" .. class .. ").",
     })
