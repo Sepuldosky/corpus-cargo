@@ -40,7 +40,26 @@ local LEN_WEIGHT     = 0.18 -- score weight per cell of long-side mismatch
 -- Bump when the render recipe or the auto framing changes: the version is
 -- part of the cache key, so every stale icon orphans and re-renders lazily —
 -- no manual regen_all needed after a global style change shipped in code.
-local RECIPE_VERSION = "r2"
+local RECIPE_VERSION = "r5"
+
+-- Read a SWEP field climbing the Base chain via GetStored. weapons.GetStored
+-- returns the RAW registered table WITHOUT inherited base fields (verified in
+-- garrysmod weapons.lua: only weapons.Get merges the base) — and ARC9 /
+-- MirrorVMWM live on `arc9_base`, so a leaf weapon's GetStored table doesn't
+-- carry them. We climb `.Base` ourselves (cheaper than weapons.Get, which
+-- deep-copies the whole SWEP incl. its attachment tables just to read a flag).
+local function SwepField(class, field, depth)
+    local s = weapons.GetStored(class)
+    if not istable(s) then return nil end
+    if s[field] ~= nil then return s[field] end
+    local base = s.Base
+    if isstring(base) and base ~= class and (depth or 0) < 10 then
+        return SwepField(base, field, (depth or 0) + 1)
+    end
+    return nil
+end
+
+local modelForCache = {} -- defid -> resolved model | false (nil sentinel)
 
 -- ------------------------------------------------------------------
 -- Model to RENDER for the icon. Diverges on purpose from
@@ -53,21 +72,179 @@ local RECIPE_VERSION = "r2"
 -- CSS model in the icon). For the icon we want the real geometry:
 -- WorldModelMirror or the ViewModel. Drops keep the WorldModel (they need a
 -- collision prop; ARC9's own dropped entity has the same placeholder shadow).
+-- Memoized per defid: the base-chain walk runs at most once per weapon.
 function Icons.ModelFor(def)
     if not istable(def) then return nil end
     -- explicit escape hatch, always wins (for when even the viewmodel is off)
     if isstring(def.icon_model) and def.icon_model ~= "" then return def.icon_model end
     if isstring(def.model) and def.model ~= "" then return def.model end
 
-    if isstring(def.weapon_class) then
-        local stored = weapons.GetStored(def.weapon_class)
-        if istable(stored) and stored.ARC9 and stored.MirrorVMWM then
-            local vm = stored.WorldModelMirror
-            if not (isstring(vm) and vm ~= "") then vm = stored.ViewModel end
-            if isstring(vm) and vm ~= "" then return vm end
+    local defid = def.id
+    if defid ~= nil and modelForCache[defid] ~= nil then
+        return modelForCache[defid] or nil
+    end
+
+    local result
+    if isstring(def.weapon_class) and def.weapon_class ~= "" then
+        -- MirrorVMWM (climbed from the base) means the WorldModel is a
+        -- collision placeholder and the real picture is the viewmodel
+        if SwepField(def.weapon_class, "MirrorVMWM") then
+            local vm = SwepField(def.weapon_class, "WorldModelMirror")
+            if not (isstring(vm) and vm ~= "") then
+                vm = SwepField(def.weapon_class, "ViewModel")
+            end
+            if isstring(vm) and vm ~= "" then result = vm end
         end
     end
-    return CARGO.Items.ResolveModel(def)
+    if result == nil then result = CARGO.Items.ResolveModel(def) end
+
+    if defid ~= nil then modelForCache[defid] = result or false end
+    return result
+end
+
+-- ARC9 re-applies DefaultSkin + DefaultBodygroups on every model rebuild
+-- (arc9_base sh_bodygroups.lua DoBodygroups) — a bare ClientsideModel keeps
+-- the .mdl defaults instead, so packs that pick their variant through
+-- bodygroups render the wrong gun. Fields climbed from the base like the
+-- rest of the SWEP appearance data. Public: the drop entity dresses its
+-- visual override model with it too.
+function Icons.ApplyDefaultAppearance(ent, class)
+    if not isstring(class) or class == "" then return end
+    local skin = SwepField(class, "DefaultSkin")
+    if isnumber(skin) then ent:SetSkin(skin) end
+    local bg = SwepField(class, "DefaultBodygroups")
+    if isstring(bg) and bg ~= "" then ent:SetBodyGroups(bg) end
+end
+
+-- ------------------------------------------------------------------
+-- Tight LOCAL bounds for a model. Viewmodels animate around the camera and
+-- their render/sequence bounds span the whole swing (±60+ units), not the
+-- gun (~30): framing with GetRenderBounds put the camera so far back that
+-- every EFT icon came out uniformly tiny (in-game report 2026-07-11).
+-- Chain: real mesh (util.GetModelMeshes — heavy, so computed once per model
+-- path EVER: persisted to disk; walking a big EFT viewmodel caused a
+-- visible hitch) -> static model hull (GetModelBounds — honest for props
+-- and attachment models, and unlike the mesh it never fails to read) ->
+-- render bounds as the last resort.
+-- ------------------------------------------------------------------
+
+local MESH_CACHE = DIR .. "/mesh_bounds.json"
+-- model path -> {mnx,mny,mnz,mxx,mxy,mxz} | false (mesh unreadable)
+local meshBounds = util.JSONToTable(file.Read(MESH_CACHE, "DATA") or "") or {}
+
+local function SaveMeshCache()
+    file.CreateDir(DIR)
+    file.Write(MESH_CACHE, util.TableToJSON(meshBounds))
+end
+
+-- static hull, cheap and never sequence-inflated
+local function StaticBounds(ent)
+    if isfunction(ent.GetModelBounds) then
+        local mn, mx = ent:GetModelBounds()
+        if mn ~= nil and mx ~= nil then return mn, mx end
+    end
+    return ent:GetRenderBounds()
+end
+
+local function TightModelBounds(ent)
+    local model = ent.GetModel and ent:GetModel() or nil
+    local hit = model and meshBounds[model] or nil
+    if istable(hit) then
+        return Vector(hit[1], hit[2], hit[3]), Vector(hit[4], hit[5], hit[6])
+    end
+    if hit == false or model == nil then return StaticBounds(ent) end
+
+    local mn, mx
+    local ok, meshes = pcall(util.GetModelMeshes, model)
+    if ok and istable(meshes) then
+        for _, mesh in ipairs(meshes) do
+            for _, vert in ipairs(mesh.triangles or {}) do
+                local p = vert.pos
+                if p ~= nil then
+                    if mn == nil then
+                        mn = Vector(p.x, p.y, p.z)
+                        mx = Vector(p.x, p.y, p.z)
+                    else
+                        mn.x = math.min(mn.x, p.x)
+                        mn.y = math.min(mn.y, p.y)
+                        mn.z = math.min(mn.z, p.z)
+                        mx.x = math.max(mx.x, p.x)
+                        mx.y = math.max(mx.y, p.y)
+                        mx.z = math.max(mx.z, p.z)
+                    end
+                end
+            end
+        end
+    end
+    if mn == nil then
+        meshBounds[model] = false
+        SaveMeshCache()
+        return StaticBounds(ent)
+    end
+    meshBounds[model] = { mn.x, mn.y, mn.z, mx.x, mx.y, mx.z }
+    SaveMeshCache()
+    return mn, mx
+end
+
+-- ------------------------------------------------------------------
+-- Icon meta (persisted next to the PNGs). The ASSEMBLED capture (below)
+-- measures a different footprint than the bare viewmodel, and the footprint
+-- is part of the cache filename — without persisting it, the next session
+-- would recompute the bare one and orphan the assembled PNG. `assembled`
+-- marks defs whose icon already shows the full gun, ending the upgrade
+-- probes. defid -> { w, h, assembled }.
+-- ------------------------------------------------------------------
+
+local META = DIR .. "/icons_meta.json"
+-- bump when the measured meaning changes (v2: mesh bounds replaced render
+-- bounds; v3: assembled captures re-arm — pre-v3 ones could be partial,
+-- taken from a holstered gun; v4: ARC9 preset framing + static-hull
+-- fallback) — stale entries would pin bad state forever
+local META_VERSION = 4
+local iconMeta = util.JSONToTable(file.Read(META, "DATA") or "") or {}
+if iconMeta._v ~= META_VERSION then iconMeta = { _v = META_VERSION } end
+
+local function SaveMeta()
+    file.CreateDir(DIR)
+    file.Write(META, util.TableToJSON(iconMeta))
+end
+
+-- The weapon entity in the local player's hands, if it is one of ARC9's
+-- MirrorVMWM guns — the only case where the assembled capture applies and
+-- the only moment it is possible (ARC9 builds display models per-SWEP).
+--
+-- DEPLOYED AND SETTLED only: ARC9 fills its attachment state over the first
+-- moments of a deploy, and a merely-carried (holstered) gun never builds it
+-- — capturing there produced PARTIAL or empty assemblies (in-game report
+-- 2026-07-11; ARC9's own HUD select icons suffer the same race and heal on
+-- a later regenerate). Two-step: the first sight of the gun ACTIVE arms a
+-- settle window; the capture only runs once the window passed with the gun
+-- still out. Until then the bare render stands in and the probe retries.
+local liveReadyAt = {} -- weapon_class -> CurTime() when the deploy settled
+
+local function LiveArc9Weapon(def)
+    if not istable(def) then return nil end
+    local class = def.weapon_class
+    if not isstring(class) or class == "" then return nil end
+    if not SwepField(class, "MirrorVMWM") then return nil end
+    local lp = LocalPlayer()
+    if not IsValid(lp) then return nil end
+    local wep = lp:GetWeapon(class)
+    if not IsValid(wep) or not wep.ARC9 then return nil end
+    if not isfunction(wep.SetupModel) or not isfunction(wep.DrawCustomModel)
+        or not isfunction(wep.KillModel) then return nil end
+
+    if lp:GetActiveWeapon() ~= wep then
+        liveReadyAt[class] = nil
+        return nil
+    end
+    local ready = liveReadyAt[class]
+    if ready == nil then
+        liveReadyAt[class] = CurTime() + 1
+        return nil
+    end
+    if CurTime() < ready then return nil end
+    return wep
 end
 
 -- ------------------------------------------------------------------
@@ -152,7 +329,7 @@ local fpCache = {}
 -- OBB corners projected on the camera's right/up axes -> width/height in
 -- world units as the icon camera actually sees the model
 local function ProjectedExtents(ent, view)
-    local mn, mx = ent:GetRenderBounds()
+    local mn, mx = TightModelBounds(ent)
     local right, up = view.angles:Right(), view.angles:Up()
     local minR, maxR, minU, maxU
     for i = 0, 7 do
@@ -190,12 +367,22 @@ function Icons.GetFootprint(defidOrDef)
     local cached = def.id and fpCache[def.id] or nil
     if cached ~= nil then return cached end
 
+    -- a previous ASSEMBLED capture persisted its measured footprint — reuse
+    -- it so the cache filename stays stable across sessions
+    local m = def.id and iconMeta[def.id] or nil
+    if istable(m) and isnumber(m.w) and isnumber(m.h) then
+        local fp = { w = m.w, h = m.h }
+        fpCache[def.id] = fp
+        return fp
+    end
+
     local fp = { w = 1, h = 1 }
     local model = Icons.ModelFor(def)
     if isstring(model) and util.IsValidModel(model) then
         local ent = ClientsideModel(model, RENDERGROUP_OTHER)
         if IsValid(ent) then
             ent:SetNoDraw(true)
+            Icons.ApplyDefaultAppearance(ent, def.weapon_class)
             local view = Icons.ResolveCam(def, ent)
             local pw, ph = ProjectedExtents(ent, view)
             ent:Remove()
@@ -235,7 +422,7 @@ end
 local SIDE_VIEW_CATS = { weapons = true, melee = true }
 
 local function SideProfileView(ent)
-    local mn, mx = ent:GetRenderBounds()
+    local mn, mx = TightModelBounds(ent)
     local center = (mn + mx) * 0.5
     local len = math.max(mx.x - mn.x, 1)
     local tall = math.max(mx.z - mn.z, 1)
@@ -283,6 +470,7 @@ local matCache = {}   -- defid -> { key = filename, mat = IMaterial | false | ni
                       -- mat nil   = queued, waiting for its render
 local queue, queued = {}, {}
 local qHead, qTail = 1, 0
+local liveNext = {} -- defid -> next CurTime() an upgrade probe is allowed
 
 local workRT -- lazy: only allocated if something actually renders
 
@@ -296,33 +484,39 @@ local function Enqueue(defid, key)
     queue[qTail] = defid
 end
 
-local function RenderIconToFile(def)
-    local model = Icons.ModelFor(def)
-    if not isstring(model) or not util.IsValidModel(model) then return false end
+-- A bare-viewmodel PNG of a modular ARC9 gun upgrades to the assembled
+-- capture the moment the player actually holds the weapon. Probed from
+-- Get() (throttled — it runs inside Paint) and queued WITHOUT the Enqueue
+-- placeholder, so the cell keeps the provisional icon until the better
+-- render lands instead of flashing back to the letter.
+local function MaybeQueueUpgrade(def)
+    local defid = def.id
+    if defid == nil or queued[defid] then return end
+    local m = iconMeta[defid]
+    if istable(m) and m.assembled then return end
+    if CurTime() < (liveNext[defid] or 0) then return end
+    liveNext[defid] = CurTime() + 3
+    if LiveArc9Weapon(def) == nil then return end
+    queued[defid] = true
+    qTail = qTail + 1
+    queue[qTail] = defid
+end
 
-    local key = Icons.IconCacheKey(def)
-    local fp = Icons.GetFootprint(def)
-    -- render at the footprint's aspect, 64 px per cell (§6); caps keep both
-    -- dimensions <= 384, inside the 512 work RT
-    local w = math.min(fp.w * CELL_PX, RT_SIZE)
-    local h = math.min(fp.h * CELL_PX, RT_SIZE)
-
-    local ent = ClientsideModel(model, RENDERGROUP_OTHER)
-    if not IsValid(ent) then return false end
-    ent:SetNoDraw(true)
-
-    local view = Icons.ResolveCam(def, ent)
+-- Shared RT recipe for both render paths: single normal pass with
+-- SetModelLighting — the sandbox duplicator-icon recipe, the one PROVEN
+-- inside PostRender (first in-game gate 2026-07-11: the two-pass DrawModel
+-- trick from panel-context addons drew nothing here — background captured,
+-- model absent). Plan A alpha comes from depth-to-dest-alpha during the
+-- pass: opaque pixels write depth, depth writes the destination alpha, the
+-- silhouette is the mask.
+-- crop (optional {x,y,w,h}) captures a sub-rect of the viewport — the ARC9
+-- preset framing renders 16:9 like ARC9 does and cuts the icon out of it
+local function CaptureToPng(w, h, view, drawFn, crop)
     local bake = cvBakeBg:GetBool()
     local bg = CARGO.Theme.Colors.cell
 
     workRT = workRT or GetRenderTarget("corpus_cargo_icons_rt", RT_SIZE, RT_SIZE)
 
-    -- Single normal pass with render.Model + SetModelLighting — the sandbox
-    -- duplicator-icon recipe, the one PROVEN inside PostRender (first in-game
-    -- gate 2026-07-11: the two-pass DrawModel trick from panel-context addons
-    -- drew nothing here — background captured, model absent). Plan A alpha
-    -- comes from depth-to-dest-alpha during the pass: opaque pixels write
-    -- depth, depth writes the destination alpha, the silhouette is the mask.
     render.PushRenderTarget(workRT)
         render.SuppressEngineLighting(true)
         -- neutral boxed lighting (duplicator recipe, toned down)
@@ -346,11 +540,7 @@ local function RenderIconToFile(def)
         render.SetBlend(1)
 
         cam.Start3D(view.origin, view.angles, view.fov, 0, 0, w, h, view.znear, view.zfar)
-            render.Model({
-                model = model,
-                pos = ent:GetPos(),
-                angle = ent:GetAngles(),
-            }, ent)
+            drawFn()
         cam.End3D()
 
         render.SetWriteDepthToDestAlpha(false)
@@ -358,12 +548,17 @@ local function RenderIconToFile(def)
         render.SuppressEngineLighting(false)
 
         local png = render.Capture({
-            format = "png", x = 0, y = 0, w = w, h = h, alpha = not bake,
+            format = "png",
+            x = crop and crop.x or 0, y = crop and crop.y or 0,
+            w = crop and crop.w or w, h = crop and crop.h or h,
+            alpha = not bake,
         })
     render.PopRenderTarget()
 
-    ent:Remove() -- clean the ClientsideModel after capturing (§3)
+    return png
+end
 
+local function CommitPng(def, key, png)
     if not isstring(png) or png == "" then return false end
     file.CreateDir(DIR)
     file.Write(DIR .. "/" .. key, png)
@@ -372,6 +567,212 @@ local function RenderIconToFile(def)
     if mat:IsError() then return false end
     matCache[def.id] = { key = key, mat = mat }
     return true
+end
+
+-- ------------------------------------------------------------------
+-- ARC9 assembled capture. MirrorVMWM guns are MODULAR: the stock, the
+-- handguard, the mag — even on the "bare" gun — are attachment MODELS
+-- mounted on the viewmodel, so a lone ClientsideModel render shows a
+-- stripped receiver (in-game report 2026-07-11, same failure the HUD-icon
+-- mods hit). Rebuilding that assembly from the def would mean
+-- reimplementing ARC9's SetupModel; instead we borrow ARC9's own display
+-- build on the LIVE weapon — SetupModel(true, 0, true) -> CModel +
+-- DrawCustomModel(true, pos, ang), the exact DoPresetCapture recipe
+-- (arc9_base cl_presets.lua) — and photograph it with OUR camera, lighting
+-- and alpha so it still looks like a Cargo icon, not an ARC9 preset.
+-- ------------------------------------------------------------------
+
+-- gun pose straight from ARC9's preset-capture math: CustomizePos/Ang is
+-- per-gun data that orients every weapon side-on for its customize view —
+-- exactly the profile an icon wants
+local function AssembledPose(wep)
+    local custpos = wep:GetProcessedValue("CustomizePos", true)
+        + (wep.CustomizeSnapshotPos or Vector(0, 0, 0))
+    local custang = wep:GetProcessedValue("CustomizeAng", true)
+        + (wep.CustomizeSnapshotAng or Angle(0, 0, 0))
+    local camang = Angle(0, 0, 0)
+    local pos = Vector(0, 0, 1)
+        + camang:Right() * custpos[1]
+        + camang:Forward() * custpos[2]
+        + camang:Up() * custpos[3]
+    local ang = Angle(0, 0, 0)
+    ang:RotateAroundAxis(camang:Up(), custang[1])
+    ang:RotateAroundAxis(camang:Right(), custang[2])
+    ang:RotateAroundAxis(camang:Forward(), custang[3])
+    return pos, ang
+end
+
+-- merged world AABB over the placed parts (skipping ARC9's helper entries).
+-- Only the BASE viewmodel needs the mesh walk (its hull lies in animation
+-- space); attachment models are static props whose authored hull is honest
+-- and free — keeps the one-per-model hitch down to a single mesh
+local function AssembledBounds(parts)
+    local mn, mx
+    for _, part in ipairs(parts) do
+        if IsValid(part) and not part.hidden and not part.IsAnimationProxy then
+            local pmn, pmx
+            if istable(part.slottbl) and part.slottbl.WMBase then
+                pmn, pmx = TightModelBounds(part)
+            else
+                pmn, pmx = StaticBounds(part)
+            end
+            for i = 0, 7 do
+                local corner = part:LocalToWorld(Vector(
+                    bit.band(i, 1) == 0 and pmn.x or pmx.x,
+                    bit.band(i, 2) == 0 and pmn.y or pmx.y,
+                    bit.band(i, 4) == 0 and pmn.z or pmx.z))
+                if mn == nil then
+                    mn = Vector(corner.x, corner.y, corner.z)
+                    mx = Vector(corner.x, corner.y, corner.z)
+                else
+                    mn.x = math.min(mn.x, corner.x)
+                    mn.y = math.min(mn.y, corner.y)
+                    mn.z = math.min(mn.z, corner.z)
+                    mx.x = math.max(mx.x, corner.x)
+                    mx.y = math.max(mx.y, corner.y)
+                    mx.z = math.max(mx.z, corner.z)
+                end
+            end
+        end
+    end
+    return mn, mx
+end
+
+-- the CModel is built and torn down here; the render body runs under pcall
+-- so ARC9.PresetCam and the clientside models never leak on an error
+local function DrawAssembled(def, wep, pos, ang)
+    -- settle pass: DrawCustomModel positions every part as a side effect of
+    -- drawing — camera and viewport are irrelevant, only the transforms are
+    workRT = workRT or GetRenderTarget("corpus_cargo_icons_rt", RT_SIZE, RT_SIZE)
+    render.PushRenderTarget(workRT)
+        cam.Start3D(Vector(0, 0, -200), Angle(0, 0, 0), 45, 0, 0, 8, 8, 1, 4096)
+            wep:DrawCustomModel(true, pos, ang)
+        cam.End3D()
+    render.PopRenderTarget()
+
+    local mn, mx = AssembledBounds(wep.CModel or {})
+    if mn == nil then return false end
+
+    -- footprint from the ASSEMBLED silhouette (the bare one under-measured —
+    -- that 1x2 9A-91) — persisted so next session's cache key matches
+    local spanX, spanY, spanZ = mx.x - mn.x, mx.y - mn.y, mx.z - mn.z
+    local autoFp = Icons.QuantizeFootprint(spanY, spanZ, def.category)
+    fpCache[def.id] = autoFp
+
+    local fp = Icons.GetFootprint(def)
+    local key = Icons.IconCacheKey(def)
+    local draw = function() wep:DrawCustomModel(true, pos, ang) end
+
+    -- Camera: a data/code cam override still wins (§4). Otherwise use ARC9's
+    -- OWN preset framing (author request, 7.ª pasada 2026-07-11: "el menú de
+    -- ARC9 se ve justo como debería"): the gun is already posed by the
+    -- per-gun CustomizePos/Ang data, and CustomizeSnapshotFOV is the camera
+    -- the pack author tuned to match — same origin/angles/16:9 viewport as
+    -- DoPresetCapture, no bounds measurement to get wrong. We capture the
+    -- center square like ARC9 and cut it down to the footprint aspect.
+    local png
+    local ovrcam = (istable(def.icon_override) and def.icon_override.cam)
+        or (istable(def.icon_cam) and def.icon_cam) or nil
+    if istable(ovrcam) then
+        local view = ViewFromCamTable(ovrcam, wep.CModel[1])
+        view.zfar = view.zfar + spanX + spanY + spanZ -- parts extend past the base
+        local w = math.min(fp.w * CELL_PX, RT_SIZE)
+        local h = math.min(fp.h * CELL_PX, RT_SIZE)
+        png = CaptureToPng(w, h, view, draw)
+    else
+        local fov = tonumber(wep.GetProcessedValue
+            and wep:GetProcessedValue("CustomizeSnapshotFOV")) or 90
+        local vpW = RT_SIZE
+        local vpH = math.floor(RT_SIZE * 9 / 16) -- 16:9, like ARC9's snapshot
+        local side = vpH                          -- ARC9 keeps the center square
+        local cw, ch
+        if fp.w >= fp.h then
+            cw = side
+            ch = math.max(1, math.floor(side * fp.h / fp.w))
+        else
+            ch = side
+            cw = math.max(1, math.floor(side * fp.w / fp.h))
+        end
+        local crop = {
+            x = math.floor((vpW - cw) / 2),
+            y = math.floor((vpH - ch) / 2),
+            w = cw, h = ch,
+        }
+        local view = {
+            origin = Vector(0, 0, 0), angles = Angle(0, 0, 0),
+            fov = fov, znear = 1, zfar = 1024, -- DoPresetCapture's planes
+        }
+        png = CaptureToPng(vpW, vpH, view, draw, crop)
+    end
+    if not CommitPng(def, key, png) then return false end
+
+    -- only now is the def marked assembled: a failed capture keeps probing
+    iconMeta[def.id] = { w = autoFp.w, h = autoFp.h, assembled = true }
+    SaveMeta()
+    return true
+end
+
+local function RenderAssembledToFile(def, wep)
+    if not istable(ARC9) then return false end
+    local pos, ang = AssembledPose(wep)
+
+    -- PresetCam mode: ARC9 skips its scope-RT paths and draws translucent
+    -- parts (sight glass) in the normal pass (cl_drawmodel.lua). Restored
+    -- even on error; same for the CModel teardown.
+    local prevPresetCam = ARC9.PresetCam
+    ARC9.PresetCam = true
+    wep:SetupModel(true, 0, true) -- base + every attachment, at our disposal
+
+    local ok, done = pcall(DrawAssembled, def, wep, pos, ang)
+
+    wep:KillModel(true) -- CModel only; the in-hands models are untouched
+    ARC9.PresetCam = prevPresetCam
+
+    if not ok then error(done, 0) end
+    return done
+end
+
+local function RenderIconToFile(def)
+    -- assembled capture first: only possible with the gun in hand, and only
+    -- needed for the modular MirrorVMWM guns
+    local wep = LiveArc9Weapon(def)
+    if wep ~= nil then
+        local ok, done = pcall(RenderAssembledToFile, def, wep)
+        if ok and done == true then return true end
+        if not ok then
+            Corpus.Log("cargo", "icons: captura ensamblada falló para '"
+                .. tostring(def.id) .. "': " .. tostring(done))
+        end
+        -- fall through: the bare viewmodel is still better than a letter
+    end
+
+    local model = Icons.ModelFor(def)
+    if not isstring(model) or not util.IsValidModel(model) then return false end
+
+    local key = Icons.IconCacheKey(def)
+    local fp = Icons.GetFootprint(def)
+    -- render at the footprint's aspect, 64 px per cell (§6); caps keep both
+    -- dimensions <= 384, inside the 512 work RT
+    local w = math.min(fp.w * CELL_PX, RT_SIZE)
+    local h = math.min(fp.h * CELL_PX, RT_SIZE)
+
+    local ent = ClientsideModel(model, RENDERGROUP_OTHER)
+    if not IsValid(ent) then return false end
+    ent:SetNoDraw(true)
+    Icons.ApplyDefaultAppearance(ent, def.weapon_class)
+
+    local view = Icons.ResolveCam(def, ent)
+    local png = CaptureToPng(w, h, view, function()
+        render.Model({
+            model = model,
+            pos = ent:GetPos(),
+            angle = ent:GetAngles(),
+        }, ent)
+    end)
+
+    ent:Remove() -- clean the ClientsideModel after capturing (§3)
+
+    return CommitPng(def, key, png)
 end
 
 -- Lazy generation with a per-frame budget (§3): never render a whole
@@ -432,7 +833,10 @@ function Icons.Get(defid)
     local key = Icons.IconCacheKey(def)
     local hit = matCache[defid]
     if hit and hit.key == key then
-        if hit.mat ~= nil then return hit.mat or nil end
+        if hit.mat ~= nil then
+            MaybeQueueUpgrade(def)
+            return hit.mat or nil
+        end
         return nil -- queued: letter placeholder until its render lands
     end
 
@@ -441,6 +845,7 @@ function Icons.Get(defid)
     if file.Exists(path, "DATA") then
         local mat = Material("data/" .. path, "smooth")
         matCache[defid] = { key = key, mat = not mat:IsError() and mat or false }
+        MaybeQueueUpgrade(def)
         return matCache[defid].mat or nil
     end
 
@@ -452,6 +857,14 @@ end
 function Icons.Invalidate(defid)
     matCache[defid] = nil
     fpCache[defid] = nil
+    modelForCache[defid] = nil
+    liveNext[defid] = nil
+    -- the assembled marker falls too: fresh inputs, fresh capture (and the
+    -- upgrade probe re-arms if the weapon is not in hand right now)
+    if iconMeta[defid] ~= nil then
+        iconMeta[defid] = nil
+        SaveMeta()
+    end
     -- if it sits in the queue it renders with fresh inputs anyway
 end
 
@@ -463,7 +876,11 @@ function Icons.RegenAll()
     for _, f in ipairs(files) do
         file.Delete(DIR .. "/" .. f)
     end
-    matCache, fpCache, queue, queued = {}, {}, {}, {}
+    matCache, fpCache, queue, queued, liveNext = {}, {}, {}, {}, {}
+    for k in pairs(modelForCache) do modelForCache[k] = nil end
+    for k in pairs(iconMeta) do iconMeta[k] = nil end
+    iconMeta._v = META_VERSION
+    SaveMeta()
     qHead, qTail = 1, 0
     Corpus.Log("cargo", "icons: caché invalidada (" .. #files
         .. " png borrados); re-render lazy con presupuesto " .. cvBudget:GetInt() .. "/frame")

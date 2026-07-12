@@ -29,6 +29,9 @@ if SERVER then
                 self:SetNWString("cargo_label",
                     def.name .. ((self.CargoEntry.count or 1) > 1
                         and (" x" .. self.CargoEntry.count) or ""))
+                -- the client resolves its own visual override from the def
+                -- (icon model vs collision placeholder — see Draw below)
+                self:SetNWString("cargo_defid", def.id)
             end
         end
 
@@ -58,9 +61,60 @@ if SERVER then
 
 else
 
+    -- Visual override (in-game report 2026-07-11: a dropped 9A-91 showed the
+    -- CSS AK). MirrorVMWM ARC9 guns use their WorldModel as a collision
+    -- placeholder and the real gun is the viewmodel — ARC9 itself draws the
+    -- mirror OVER the placeholder even on the ground (MirrorVMWMHeldOnly is
+    -- false by default). Same trick here: physics keeps the placeholder
+    -- (viewmodels have no collision mesh), rendering swaps in the model the
+    -- icon pipeline resolved (Icons.ModelFor). Decided once per entity; when
+    -- there is nothing to override, Draw stays the stock DrawModel.
+    local function VisualModel(self)
+        if self.CargoVisualChecked then return self.CargoVisualModel end
+        local CARGO = Corpus and Corpus.GetModule and Corpus.GetModule("cargo")
+        if CARGO == nil then return nil end
+        local defid = self:GetNWString("cargo_defid", "")
+        if defid == "" then return nil end
+        local def = CARGO.Items.Get(defid)
+        if def == nil then return nil end -- def snapshot not here yet: retry
+
+        self.CargoVisualChecked = true
+        local model = CARGO.Icons and CARGO.Icons.ModelFor
+            and CARGO.Icons.ModelFor(def) or nil
+        if not isstring(model) or model == self:GetModel()
+            or not util.IsValidModel(model) then
+            return nil
+        end
+
+        local cs = ClientsideModel(model, RENDERGROUP_OPAQUE)
+        if not IsValid(cs) then return nil end
+        cs:SetNoDraw(true)
+        if isfunction(CARGO.Icons.ApplyDefaultAppearance) then
+            CARGO.Icons.ApplyDefaultAppearance(cs, def.weapon_class)
+        end
+        self.CargoVisualModel = cs
+        self:DrawShadow(false) -- the placeholder's shadow would give it away
+        return cs
+    end
+
     -- floating label so drops are findable without a HUD of their own
     function ENT:Draw()
-        self:DrawModel()
+        local vis = VisualModel(self)
+        if IsValid(vis) then
+            -- center the override's render bounds on the physics OBB center:
+            -- viewmodels are authored around the camera, their origin is far
+            -- from the mesh — drawn raw they would float beside the prop
+            local ang = self:GetAngles()
+            vis:SetAngles(ang)
+            vis:SetPos(vector_origin)
+            local mn, mx = vis:GetRenderBounds()
+            local centerOffset = vis:LocalToWorld((mn + mx) * 0.5)
+            vis:SetPos(self:LocalToWorld(self:OBBCenter()) - centerOffset)
+            vis:SetupBones()
+            vis:DrawModel()
+        else
+            self:DrawModel()
+        end
 
         local label = self:GetNWString("cargo_label", "")
         if label == "" then return end
@@ -74,6 +128,10 @@ else
                 Color(224, 224, 224), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM,
                 1, Color(0, 0, 0, 200))
         cam.End3D2D()
+    end
+
+    function ENT:OnRemove()
+        if IsValid(self.CargoVisualModel) then self.CargoVisualModel:Remove() end
     end
 
 end
