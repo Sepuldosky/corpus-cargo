@@ -38,16 +38,19 @@ local cvBakeBg = CreateClientConVar("cargo_icon_bake_bg", "0", true, false,
     "0 = real alpha capture (Plan A), 1 = bake the slot color into the PNG (Plan B)")
 
 local DIR = "corpus/cargo/icons" -- data/ root; inside the Corpus.Data namespace
-local CELL_PX = 128              -- render resolution per grid cell (§6; 64
-                                 -- upscaled ugly on big cells/tooltip zoom —
-                                 -- in-game report 2026-07-11, 8.ª pasada)
-local RT_SIZE = 1024             -- one reusable work RT, cropped on capture
+local CELL_PX = 256              -- render resolution per grid cell (§6; 64→128
+                                 -- →256: still upscaled soft in the tooltip
+                                 -- zoom — author, 2nd fullscreen pass
+                                 -- 2026-07-12). ARC9 re-crops are source-
+                                 -- limited (256² PNG): a bigger cell just
+                                 -- enlarges the same photo, no quality change.
+local RT_SIZE = 2048             -- one reusable work RT, cropped on capture
                                  -- (§6; must fit the widest footprint at
-                                 -- CELL_PX: 6 cells * 128 = 768)
+                                 -- CELL_PX: 6 cells * 256 = 1536)
 
 -- GetRenderTarget caches by NAME for the whole engine session (survives lua
--- refresh): the size goes in the name so an old 512 RT never serves the
--- 1024 recipe after a refresh mid-session
+-- refresh): the size goes in the name so an old 1024 RT never serves the
+-- 2048 recipe after a refresh mid-session
 local RT_NAME = "corpus_cargo_icons_rt_" .. RT_SIZE
 
 -- footprint auto-quantization tuning (§5: "se afinan empíricamente")
@@ -57,7 +60,7 @@ local LEN_WEIGHT     = 0.18 -- score weight per cell of long-side mismatch
 -- Bump when the render recipe or the auto framing changes: the version is
 -- part of the cache key, so every stale icon orphans and re-renders lazily —
 -- no manual regen_all needed after a global style change shipped in code.
-local RECIPE_VERSION = "r6"
+local RECIPE_VERSION = "r7"
 
 -- Read a SWEP field climbing the Base chain via GetStored. weapons.GetStored
 -- returns the RAW registered table WITHOUT inherited base fields (verified in
@@ -546,7 +549,7 @@ function Icons.ResolveCam(def, ent)
 end
 
 -- ------------------------------------------------------------------
--- Render pipeline (§3): ClientsideModel -> reusable 512 RT -> PNG in
+-- Render pipeline (§3): ClientsideModel -> reusable 2048 RT -> PNG in
 -- data/corpus/cargo/icons/ -> Material("data/...", "smooth").
 --
 -- TRANSPARENCY GATE (§9): Plan A captures real alpha (transparent RT +
@@ -820,8 +823,8 @@ local function RenderIconToFile(def)
 
     local key = Icons.IconCacheKey(def)
     local fp = Icons.GetFootprint(def)
-    -- render at the footprint's aspect, 64 px per cell (§6); caps keep both
-    -- dimensions <= 384, inside the 512 work RT
+    -- render at the footprint's aspect, CELL_PX per cell (§6); caps keep both
+    -- dimensions within the work RT (widest 6 cells * 256 = 1536 <= 2048)
     local w = math.min(fp.w * CELL_PX, RT_SIZE)
     local h = math.min(fp.h * CELL_PX, RT_SIZE)
 
