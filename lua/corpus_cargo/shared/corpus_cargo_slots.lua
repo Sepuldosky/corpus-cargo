@@ -41,6 +41,20 @@ CARGO.Slots.Tools = {
     { slotId = "tool_camera",  class = "gmod_camera" },
 }
 
+-- STALKER weapon order (roadmap #22): number key -> equipment slot. The
+-- client intercepts slot1-slot7 (corpus_cargo_hotkeys.lua) and the server
+-- resolves the intent (corpus_cargo_holster.lua); keys 8/9/0 keep stock
+-- GMod behavior.
+CARGO.Slots.Hotkeys = {
+    [1] = "melee",
+    [2] = "sidearm",
+    [3] = "primary",
+    [4] = "secondary",
+    [5] = "tool_physgun",
+    [6] = "tool_toolgun",
+    [7] = "tool_camera",
+}
+
 CARGO.Slots.ById = {}
 for _, slot in ipairs(CARGO.Slots.List) do
     CARGO.Slots.ById[slot.id] = slot

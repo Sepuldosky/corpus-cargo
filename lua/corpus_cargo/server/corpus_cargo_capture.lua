@@ -51,10 +51,13 @@ function CARGO.Capture.WorldGunsEnabled()
 end
 
 -- Classes the capture must leave alone. Hands/fists-style SWEPs belong here:
--- they ARE the unarmed state, not gear (the default-hands sub-block — Apex
--- Hands recycle — will extend this when it lands).
+-- they ARE the unarmed state, not gear.
 CARGO.Capture.Ignore = {
     ["weapon_fists"] = true,
+    -- Corpus default hands (recycled Apex Hands, roadmap #4) and the
+    -- original mod, in case it is mounted alongside
+    ["corpus_cargo_hands"] = true,
+    ["apexswep"] = true,
 }
 
 -- Known engine/sandbox silhouettes: footprint {w, h} declared at the def
@@ -82,13 +85,21 @@ local AUTOGEN_SIZES = {
     weapon_stunstick  = { 3, 1 },
 }
 
+-- Engine melee classes: their autogen def lands in the "melee" category so
+-- the captured item equips into the Melee slot (STALKER key 1, roadmap
+-- #22). Everything else stays generic "weapons" (primary/secondary/sidearm).
+local AUTOGEN_MELEE = {
+    weapon_crowbar   = true,
+    weapon_stunstick = true,
+}
+
 local function RegisterAutogen(class, name)
     CARGO.Items.Register({
         id = "wpn_" .. class,
         name = name,
         weight = 2.5, -- nominal: engine weapons declare no mass
         class = "unique",
-        category = "weapons",
+        category = AUTOGEN_MELEE[class] and "melee" or "weapons",
         weapon_class = class,
         size = AUTOGEN_SIZES[class],
         autogen = true,

@@ -27,6 +27,9 @@ local function BuildCargoTab(p)
     p:Help("Console alternative: bind <key> cargo_inventory")
 
     p:CheckBox("Quick slots on F1-F4 (intercepts gm_showhelp/showteam/spare1/spare2)", "cargo_quick_f")
+    p:CheckBox("STALKER weapon keys (1 melee, 2 sidearm, 3 primary, 4 secondary, 5-7 tools)", "cargo_weapon_slots")
+    p:Help("Pressing the key of the weapon you are holding holsters it. Console: cargo_holster.")
+    p:CheckBox("Holster to Hands (uncheck to holster to nothing at all)", "cargo_holster_hands")
     p:CheckBox("On-screen pickup feed (what you just picked up)", "cargo_pickup_feed")
     p:CheckBox("Demo bars (health/HL2 armor) on the status panel", "cargo_dev_bars")
 

@@ -53,6 +53,7 @@ local SERVER_FILES = {
     "server/corpus_cargo_movement.lua",   -- weight -> walk/run speed application
     "server/corpus_cargo_containers.lua", -- world containers + transfer net
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)
+    "server/corpus_cargo_holster.lua",    -- STALKER weapon order + holster + default hands (#22/#4)
     "server/corpus_cargo_icons.lua",      -- icon cam/footprint override registry (ItemImages §4.3/§10)
 }
 local CLIENT_FILES = {
@@ -65,6 +66,7 @@ local CLIENT_FILES = {
     "client/corpus_cargo_grid.lua",        -- reusable grid + cell overlays (§7)
     "client/corpus_cargo_ui.lua",          -- main inventory frame + binds
     "client/corpus_cargo_transfer.lua",    -- container transfer panel (§8)
+    "client/corpus_cargo_hotkeys.lua",     -- STALKER weapon keys 1-7 (#22)
     "client/corpus_cargo_options.lua",     -- Corpus.UI.RegisterTab entry
 }
 

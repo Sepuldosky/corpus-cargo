@@ -1,0 +1,650 @@
+-- corpus_cargo_hands.lua — "Hands": the Corpus default unarmed state (SWEP)
+--
+-- RECYCLED from "Apex Legends: Holster/Melee SWEP" (Steam Workshop 2792160770)
+-- by Twilight Sparkle & Buu342, with credits to Internet Overdoser, V92 and
+-- WebKnight; animations by Respawn Entertainment (Apex Legends/Titanfall).
+-- Recycle approved by the project author (2026-07-11, dev/mods_workshop_mapa.md
+-- §2): full credits kept, assets removed on request of the original authors.
+-- The mod has been unmaintained for ~4 years; this port renames the class to
+-- the module namespace so both addons can coexist mounted.
+--
+-- Changes against the original (everything else is a faithful port):
+--   * Class/print name: apexswep -> corpus_cargo_hands / "Hands".
+--   * Sound scripts, net message, convars and icon materials renamed to the
+--     corpus_cargo/cargo_hands namespace (no collision if the original mod is
+--     mounted alongside).
+--   * GLua C-style operators (&&/||/!=///) rewritten as standard Lua, matching
+--     the repo style and the offline syntax harness.
+--   * DARK ARMS (attempted fix — did NOT work in-game, still open): the
+--     original viewmodel goes dark looking at the horizon and recovers
+--     looking up/down or floating (author repro 2026-07-11). Attempt below:
+--     pin the viewmodel's lighting origin to the player while these hands
+--     are deployed (the technique ARC9 uses for its c_hands,
+--     sh_deploy.lua:88), released on holster. 1st in-game pass 2026-07-12:
+--     the darkening persists — SetLightingOriginEntity was not enough. Next
+--     approach to try: render.SetModelLighting / SuppressEngineLighting in
+--     PreDrawViewModel, or forcing the arm material fullbright. Do NOT remit
+--     upstream to Twilight until a real fix lands. See CHANGELOG #9.
+--   * melee_swing sound.Add: the original declared the `sound` key twice
+--     (left hook overwritten by right hook — Lua keeps the last); both sets
+--     are merged here, which is what the code visibly intended.
+
+AddCSLuaFile()
+
+if CLIENT then
+    killicon.Add("corpus_cargo_hands", "vgui/corpus_cargo_hands_killicon", Color(251, 85, 25, 255))
+    SWEP.WepSelectIcon = surface.GetTextureID("vgui/corpus_cargo_hands")
+end
+
+SWEP.PrintName      = "Hands"
+SWEP.Category       = "Corpus"
+SWEP.Author         = "WebKnight/Twilight Sparkle/Internet Overdoser/Buu342 (Corpus recycle)"
+SWEP.Instructions   = "Unarmed hands. Punch with both mouse buttons, R to inspect."
+
+SWEP.Spawnable      = true
+SWEP.UseHands       = true
+
+SWEP.ViewModel      = Model("models/weapons/c_arms_apex.mdl")
+SWEP.WorldModel     = ""
+
+SWEP.ViewModelFOV   = 64
+SWEP.BobScale       = 1.3
+SWEP.SwayScale      = 1.3
+
+SWEP.Primary.ClipSize     = -1
+SWEP.Primary.DefaultClip  = -1
+SWEP.Primary.Automatic    = true
+SWEP.Primary.Ammo         = "none"
+
+SWEP.Secondary.ClipSize    = -1
+SWEP.Secondary.DefaultClip = -1
+SWEP.Secondary.Automatic   = true
+SWEP.Secondary.Ammo        = "none"
+
+SWEP.ViewModelFlip  = false
+
+-- the holster flow (corpus_cargo_holster.lua) always selects explicitly;
+-- engine auto-switch would only add nondeterminism (original had true)
+SWEP.AutoSwitchTo   = false
+SWEP.AutoSwitchFrom = true
+
+SWEP.Slot           = 0
+SWEP.SlotPos        = 0
+
+SWEP.DrawAmmo         = false
+SWEP.DrawCrosshair    = false
+
+SWEP.DisableDuplicator  = true
+SWEP.BounceWeaponIcon   = false
+SWEP.m_bPlayPickupSound = false
+
+SWEP.HitDistance = 60
+
+-- Animation/hitmarker toggles (renamed from cl_apexmelee_*). Created in
+-- shared scope like the original settings file: SWEP:Think runs on both
+-- realms and reads them through these same handles.
+local cvAnimWalk       = CreateClientConVar("cargo_hands_animwalk", "1", true, false, "Hands: walk animation")
+local cvAnimSprint     = CreateClientConVar("cargo_hands_animsprint", "1", true, false, "Hands: sprint animation")
+local cvAnimCrouch     = CreateClientConVar("cargo_hands_animcrouch", "1", true, false, "Hands: crouch animation")
+local cvAnimJump       = CreateClientConVar("cargo_hands_animjump", "1", true, false, "Hands: jump animation")
+local cvAnimJumpSprint = CreateClientConVar("cargo_hands_animjumpsprint", "1", true, false, "Hands: sprinting jump animation")
+local cvHitmarker      = CreateClientConVar("cargo_hands_hitmarker", "1", true, false, "Hands: melee hitmarker")
+
+-- registered by corpus_cargo_holster.lua via Corpus.Net.Register("cargo",
+-- "hands_hitmarker"); the SWEP only uses the resulting literal (weapon
+-- scripts cannot touch the module table in file scope)
+local NET_HITMARKER = "corpus_cargo_hands_hitmarker"
+
+local function genOrderedTbl(str, min, max)
+    if not min then min = 1 end
+    if not max then
+        max = min
+        min = 1
+    end
+    local tbl = {}
+    for i = min, max do
+        table.insert(tbl, str:format(i))
+    end
+    return tbl
+end
+
+sound.Add({
+    name = "corpus_hands.deploy",
+    channel = CHAN_AUTO,
+    level = 65,
+    volume = 1,
+    pitch = {80, 110},
+    sound = genOrderedTbl("weapons/Pilot_Mvmt_Foley_FistRise_1ch_v1_%i.wav", 3),
+})
+
+sound.Add({
+    name = "corpus_hands.inspect",
+    channel = CHAN_AUTO,
+    level = 65,
+    volume = 1,
+    pitch = {80, 110},
+    sound = "weapons/Mvmt_Generic_KnuckleCrack_v1_01.wav",
+})
+
+local swingSounds = genOrderedTbl("weapons/Pilot_Mvmt_Melee_LeftHook_1P_2ch_v1_%i.wav", 3)
+for _, s in ipairs(genOrderedTbl("weapons/Pilot_Mvmt_Melee_RightHook_1P_2ch_v1_%i.wav", 3)) do
+    table.insert(swingSounds, s)
+end
+
+sound.Add({
+    name = "corpus_hands.melee_swing",
+    channel = CHAN_AUTO,
+    level = 65,
+    volume = 1,
+    pitch = {90, 110},
+    sound = swingSounds,
+})
+
+sound.Add({
+    name = "corpus_hands.melee_punch",
+    channel = CHAN_AUTO,
+    level = 65,
+    volume = 1,
+    pitch = {90, 110},
+    sound = genOrderedTbl("weapons/Pilot_Mvmt_Melee_Elbow_1P_2ch_v1_%i.wav", 3),
+})
+
+sound.Add({
+    name = "corpus_hands.uppercut_swing",
+    channel = CHAN_AUTO,
+    level = 65,
+    volume = 1,
+    pitch = {90, 110},
+    sound = genOrderedTbl("weapons/Pilot_Mvmt_Melee_Uppercut_1P_2ch_v1_%i.wav", 3),
+})
+
+sound.Add({
+    name = "corpus_hands.melee_hit",
+    channel = CHAN_AUTO,
+    level = 65,
+    volume = 1,
+    pitch = {90, 115},
+    sound = genOrderedTbl("weapons/Pilot_Mvmt_Melee_Hit_Flesh_1P_2ch_v1_%i.wav", 6),
+})
+
+sound.Add({
+    name = "corpus_hands.melee_hit_world",
+    channel = CHAN_AUTO,
+    level = 75,
+    volume = 1,
+    pitch = {90, 115},
+    sound = genOrderedTbl("weapons/Imp_Player_MeleePunch_Default_1ch_v1_%i.wav", 4),
+})
+
+sound.Add({
+    name = "corpus_hands.melee_hit_concrete",
+    channel = CHAN_AUTO,
+    level = 75,
+    volume = 1,
+    pitch = {90, 115},
+    sound = genOrderedTbl("weapons/Imp_Player_MeleePunch_Concrete_1ch_v1_%i.wav", 4),
+})
+
+sound.Add({
+    name = "corpus_hands.melee_hit_water",
+    channel = CHAN_AUTO,
+    level = 75,
+    volume = 1,
+    pitch = {90, 115},
+    sound = genOrderedTbl("weapons/Imp_Player_MeleePunch_Water_1ch_v1_%i.wav", 4),
+})
+
+sound.Add({
+    name = "corpus_hands.melee_hit_metal",
+    channel = CHAN_AUTO,
+    level = 75,
+    volume = 1,
+    pitch = {90, 115},
+    sound = genOrderedTbl("weapons/Imp_Player_MeleePunch_Metal_1ch_v1_%i.wav", 4),
+})
+
+sound.Add({
+    name = "corpus_hands.kick_swing",
+    channel = CHAN_AUTO,
+    level = 65,
+    volume = 1,
+    pitch = {80, 115},
+    sound = genOrderedTbl("weapons/Pilot_Mvmt_Melee_WallKick_1P_2ch_v1_%i.wav", 3),
+})
+
+util.PrecacheSound("corpus_hands.deploy")
+util.PrecacheSound("corpus_hands.inspect")
+util.PrecacheSound("corpus_hands.melee_swing")
+util.PrecacheSound("corpus_hands.uppercut_swing")
+util.PrecacheSound("corpus_hands.melee_punch")
+util.PrecacheSound("corpus_hands.melee_hit")
+util.PrecacheSound("corpus_hands.melee_hit_world")
+util.PrecacheSound("corpus_hands.melee_hit_water")
+util.PrecacheSound("corpus_hands.melee_hit_metal")
+util.PrecacheSound("corpus_hands.melee_hit_concrete")
+util.PrecacheSound("corpus_hands.kick_swing")
+
+local SwingSound      = Sound("corpus_hands.melee_swing")
+local SwingSound2     = Sound("corpus_hands.melee_punch")
+local UppercutSound   = Sound("corpus_hands.uppercut_swing")
+
+local DeploySound     = Sound("corpus_hands.deploy")
+local HitSound        = Sound("corpus_hands.melee_hit")
+local WorldHitSound   = Sound("corpus_hands.melee_hit_world")
+local WaterHitSound   = Sound("corpus_hands.melee_hit_water")
+local MetalHitSound   = Sound("corpus_hands.melee_hit_metal")
+local ConcreteHitSound = Sound("corpus_hands.melee_hit_concrete")
+local InspectSound    = Sound("corpus_hands.inspect")
+
+function SWEP:SetupDataTables()
+    self:NetworkVar("Float", 0, "AnimationTime")
+    self:NetworkVar("Float", 1, "NextMeleeAttack")
+    self:NetworkVar("Int", 0, "Combo")
+    self:NetworkVar("Int", 1, "AnimPriority")
+    self:NetworkVar("String", 0, "CurrentAnim")
+    self:NetworkVar("Bool", 0, "LastGroundState")
+end
+
+function SWEP:Initialize()
+    self:SetHoldType("fist")
+end
+
+function SWEP:SetAnim(anim, forceplay, animpriority)
+    if forceplay == nil then forceplay = false end
+    if animpriority == nil then animpriority = 0 end
+
+    -- if idle, or forced with enough priority, play the given animation
+    if self:IsIdle() or (forceplay and self:GetAnimPriority() <= animpriority) then
+        local vm = self.Owner:GetViewModel()
+        self:SetCurrentAnim(anim)
+        vm:SendViewModelMatchingSequence(vm:LookupSequence(anim))
+        self:SetAnimationTime(CurTime() + vm:SequenceDuration() / vm:GetPlaybackRate())
+        self:SetAnimPriority(animpriority)
+    end
+end
+
+function SWEP:IsIdle()
+    return self:GetCurrentAnim() == "idle1" or self:GetAnimationTime() < CurTime()
+end
+
+function SWEP:HandleAnimations()
+    if self:GetAnimationTime() ~= 0 and self:GetAnimationTime() < CurTime() then
+        self:SetAnimationTime(0)
+        self:SetAnimPriority(0)
+    end
+end
+
+function SWEP:Deploy()
+    if not IsValid(self.Owner) then return true end
+
+    local speed = GetConVarNumber("sv_defaultdeployspeed")
+    local vm = self.Owner:GetViewModel()
+    if not IsValid(vm) then return true end
+
+    self:EmitSound(DeploySound)
+    self:SetHoldType("fist")
+    vm:SetWeaponModel("models/weapons/c_arms_apex.mdl", self)
+    vm:SetPlaybackRate(speed)
+
+    -- dark-arms fix (see header): sample lighting where the player model
+    -- does, instead of the ported model's broken $illumposition
+    if isfunction(vm.SetLightingOriginEntity) then
+        vm:SetLightingOriginEntity(self.Owner)
+    end
+
+    self:SetNextPrimaryFire(CurTime() + vm:SequenceDuration() / speed)
+    self:SetNextSecondaryFire(CurTime() + vm:SequenceDuration() / speed)
+    self:SetAnim("deploy", true, 1)
+
+    if SERVER then
+        self:SetCombo(0)
+    end
+
+    return true
+end
+
+-- release the lighting-origin pin so the next weapon's viewmodel keeps
+-- stock engine lighting (the property lives on the vm entity, not on us)
+local function ReleaseLightingPin(owner)
+    if not IsValid(owner) or not isfunction(owner.GetViewModel) then return end
+    local vm = owner:GetViewModel()
+    if IsValid(vm) and isfunction(vm.SetLightingOriginEntity) then
+        vm:SetLightingOriginEntity(NULL)
+    end
+end
+
+function SWEP:Holster()
+    ReleaseLightingPin(self.Owner)
+    return true
+end
+
+function SWEP:OnRemove()
+    ReleaseLightingPin(self.Owner)
+end
+
+function SWEP:OnDrop()
+    self:Remove() -- you can't drop fists
+end
+
+function SWEP:PrimaryAttack(right)
+    self:SetHoldType("fist")
+    self.Owner:SetAnimation(PLAYER_ATTACK1)
+
+    local anim = "fists_left"
+    if right then
+        anim = "fists_right"
+    end
+
+    timer.Simple(0.1, function()
+        if not IsValid(self) then return end
+        self.Owner:ViewPunch(Angle(-1.5, -8, 0))
+    end)
+
+    if self:GetCombo() >= 2 then
+        anim = "fists_uppercut"
+        self:EmitSound(SwingSound2)
+    end
+    self:SetAnim(anim, true, 3)
+
+    self:EmitSound(SwingSound)
+
+    self:SetNextMeleeAttack(CurTime() + 0.2)
+
+    self:SetNextPrimaryFire(CurTime() + 0.9)
+    self:SetNextSecondaryFire(CurTime() + 0.9)
+
+    if self.Owner:Crouching() then
+        self:SetAnim("fists_uppercut2", true, 3)
+        self:EmitSound(UppercutSound)
+        timer.Simple(0.2, function()
+            if not IsValid(self) then return end
+            self.Owner:ViewPunch(Angle(-7.5, -7, 0))
+        end)
+    end
+end
+
+local phys_pushscale = GetConVar("phys_pushscale")
+function SWEP:DealDamage()
+    local anim = self:GetSequenceName(self.Owner:GetViewModel():GetSequence())
+
+    self.Owner:LagCompensation(true)
+
+    local tr = util.TraceLine({
+        start = self.Owner:GetShootPos(),
+        endpos = self.Owner:GetShootPos() + self.Owner:GetAimVector() * self.HitDistance,
+        filter = self.Owner,
+        mask = MASK_SHOT_HULL,
+    })
+
+    if not IsValid(tr.Entity) then
+        tr = util.TraceHull({
+            start = self.Owner:GetShootPos(),
+            endpos = self.Owner:GetShootPos() + self.Owner:GetAimVector() * self.HitDistance,
+            filter = self.Owner,
+            mins = Vector(-10, -10, -8),
+            maxs = Vector(10, 10, 8),
+            mask = MASK_SHOT_HULL,
+        })
+    end
+
+    -- the second clause matters in single player: SWEP:Think runs shared there
+    if tr.Hit and (SERVER or not (game.SinglePlayer() and CLIENT)) then
+        if tr.HitWorld then
+            self:EmitSound(WorldHitSound)
+        elseif tr.MatType == MAT_CONCRETE then
+            self:EmitSound(ConcreteHitSound)
+        elseif tr.MatType == MAT_WOOD then
+            self:EmitSound(WorldHitSound)
+        elseif tr.MatType == MAT_METAL then
+            self:EmitSound(MetalHitSound)
+        elseif tr.MatType == MAT_FLESH then
+            self:EmitSound(HitSound)
+        else
+            self:EmitSound(WorldHitSound)
+        end
+    end
+
+    local hit = false
+    local scale = phys_pushscale:GetFloat()
+
+    if SERVER and IsValid(tr.Entity) and (tr.Entity:IsNPC() or tr.Entity:IsPlayer() or tr.Entity:Health() > 0) then
+        local dmginfo = DamageInfo()
+
+        local attacker = self.Owner
+        if not IsValid(attacker) then attacker = self end
+        dmginfo:SetAttacker(attacker)
+
+        dmginfo:SetInflictor(self)
+        dmginfo:SetDamage(math.random(37, 47))
+
+        -- "yes we need those specific numbers" (original comment) — punch
+        -- knockback forces tuned by the original authors, kept verbatim
+        if anim == "fists_left" then
+            dmginfo:SetDamageForce(self.Owner:GetRight() * 5912 * scale + self.Owner:GetForward() * 12998 * scale)
+        elseif anim == "fists_right" then
+            dmginfo:SetDamageForce(self.Owner:GetRight() * -5912 * scale + self.Owner:GetForward() * 12989 * scale)
+        elseif anim == "fists_uppercut" then
+            dmginfo:SetDamageForce(self.Owner:GetUp() * 3158 * scale + self.Owner:GetForward() * 15012 * scale)
+            dmginfo:SetDamage(math.random(55, 65))
+        elseif anim == "fists_uppercut2" then
+            dmginfo:SetDamageForce(self.Owner:GetUp() * 25158 * scale + self.Owner:GetForward() * 15012 * scale + self.Owner:GetRight() * 8912 * scale)
+            dmginfo:SetDamage(math.random(65, 115))
+        elseif anim == "fists_uppercut2_alt" then
+            dmginfo:SetDamageForce(self.Owner:GetUp() * 25158 * scale + self.Owner:GetForward() * 15012 * scale + self.Owner:GetRight() * -8912 * scale)
+            dmginfo:SetDamage(math.random(65, 115))
+        elseif anim == "fists_elbowstrike" then
+            dmginfo:SetDamageForce(self.Owner:GetUp() * 3158 * scale + self.Owner:GetForward() * 11012 * scale)
+            dmginfo:SetDamage(math.random(55, 65))
+        end
+
+        SuppressHostEvents(NULL) -- let breakable gibs spawn client-side in multiplayer
+        tr.Entity:TakeDamageInfo(dmginfo)
+        SuppressHostEvents(self.Owner)
+
+        hit = true
+        if (tr.Entity:IsPlayer() or tr.Entity:IsNPC())
+            and util.NetworkStringToID(NET_HITMARKER) ~= 0 then
+            net.Start(NET_HITMARKER)
+            net.WriteEntity(tr.Entity)
+            net.Send(self.Owner)
+        end
+    end
+
+    if IsValid(tr.Entity) then
+        local phys = tr.Entity:GetPhysicsObject()
+        if IsValid(phys) then
+            phys:ApplyForceOffset(self.Owner:GetAimVector() * 180 * phys:GetMass() * scale, tr.HitPos)
+        end
+    end
+
+    if SERVER then
+        if hit and anim ~= "fists_uppercut" then
+            self:SetCombo(self:GetCombo() + 1)
+        else
+            self:SetCombo(0)
+        end
+    end
+
+    self.Owner:LagCompensation(false)
+end
+
+function SWEP:SecondaryAttack()
+    self:SetHoldType("fist")
+    self.Owner:SetAnimation(PLAYER_ATTACK1)
+
+    local anim = "fists_right"
+    if self:GetCombo() >= 2 then
+        anim = "fists_elbowstrike"
+    end
+
+    self:SetAnim(anim, true, 3)
+
+    timer.Simple(0.1, function()
+        if not IsValid(self) then return end
+        self.Owner:ViewPunch(Angle(-1.5, 8, 0))
+    end)
+
+    self:EmitSound(SwingSound)
+
+    self:SetNextMeleeAttack(CurTime() + 0.2)
+
+    self:SetNextPrimaryFire(CurTime() + 0.9)
+    self:SetNextSecondaryFire(CurTime() + 0.9)
+
+    if self.Owner:Crouching() then
+        self:SetAnim("fists_uppercut2_alt", true, 3)
+        self:EmitSound(UppercutSound)
+        timer.Simple(0.2, function()
+            if not IsValid(self) then return end
+            self.Owner:ViewPunch(Angle(-7.5, 7, 0))
+        end)
+    end
+end
+
+local inspectanims = { "inspect", "inspect2" }
+function SWEP:Reload()
+    if self:GetNextPrimaryFire() > CurTime() then return end
+    if self:GetCurrentAnim() ~= inspectanims[1] and self:GetCurrentAnim() ~= inspectanims[2] then
+        self:SetAnim(table.Random(inspectanims), true, 2)
+        self:EmitSound(InspectSound)
+    end
+end
+
+function SWEP:IsMoving()
+    return self.Owner:KeyDown(IN_FORWARD) or self.Owner:KeyDown(IN_BACK)
+        or self.Owner:KeyDown(IN_MOVELEFT) or self.Owner:KeyDown(IN_MOVERIGHT)
+end
+
+function SWEP:Think()
+    local plyvel = Vector(self.Owner:GetVelocity().x, self.Owner:GetVelocity().y, 0):Length()
+
+    self:HandleAnimations()
+
+    local meleetime = self:GetNextMeleeAttack()
+    if meleetime > 0 and CurTime() > meleetime then
+        self:DealDamage()
+        self:SetNextMeleeAttack(0)
+    end
+
+    if SERVER and CurTime() > self:GetNextPrimaryFire() + 0.1 then
+        self:SetCombo(0)
+    end
+    if SERVER and CurTime() > self:GetNextPrimaryFire() then
+        self:SetHoldType("normal")
+    end
+
+    -- jumping animations
+    if self.Owner:KeyPressed(IN_JUMP) and self:GetLastGroundState() == true and not self.Owner:OnGround() then
+        if plyvel > self.Owner:GetRunSpeed() * 0.9 then
+            if cvAnimJumpSprint:GetBool() then
+                self:SetAnim("jumprun", true, 1)
+            end
+        else
+            if cvAnimJump:GetBool() then
+                self:SetAnim("jumpstand", true, 1)
+            end
+        end
+    end
+
+    -- movement animations
+    if self:IsMoving() and self.Owner:OnGround() and not self.Owner:Crouching()
+        and self.Owner:WaterLevel() < 2 and plyvel > self.Owner:GetRunSpeed() * 0.9 then
+        if self:GetCurrentAnim() ~= "sprint" then
+            if cvAnimSprint:GetBool() then
+                self:SetAnim("sprint", true)
+            else
+                self:SetAnim("idle1", true)
+            end
+        end
+    elseif self:IsMoving() and self.Owner:OnGround() and self.Owner:WaterLevel() < 2
+        and (plyvel > self.Owner:GetWalkSpeed() * 0.9
+            or (self.Owner:Crouching() and plyvel > self.Owner:GetCrouchedWalkSpeed() * 0.9)) then
+        if self.Owner:Crouching() and self:GetCurrentAnim() ~= "crouch_walk" then
+            if cvAnimCrouch:GetBool() then
+                self:SetAnim("crouch_walk", true)
+            end
+        elseif not self.Owner:Crouching() and self:GetCurrentAnim() ~= "walk" then
+            if cvAnimWalk:GetBool() then
+                self:SetAnim("walk", true)
+            else
+                self:SetAnim("idle1", true)
+            end
+        end
+    else
+        local force = false
+
+        -- force if we were previously walking
+        if self:GetCurrentAnim() == "sprint" or self:GetCurrentAnim() == "crouch_walk"
+            or self:GetCurrentAnim() == "walk" then
+            force = true
+        end
+
+        -- force if we switched crouching
+        if self:GetCurrentAnim() == "crouch" and self.Owner:OnGround() and not self.Owner:Crouching() then
+            force = true
+        elseif self:GetCurrentAnim() == "idle1" and self.Owner:OnGround() and self.Owner:Crouching() then
+            force = true
+        end
+
+        if self.Owner:Crouching() and self.Owner:OnGround() then
+            if self:GetCurrentAnim() ~= "crouch" then
+                if cvAnimCrouch:GetBool() then
+                    self:SetAnim("crouch", force)
+                end
+            end
+        elseif self:GetCurrentAnim() ~= "idle1" then
+            self:SetAnim("idle1", force)
+        end
+    end
+    self:SetLastGroundState(self.Owner:OnGround())
+end
+
+function SWEP:PrintWeaponInfo()
+    return false
+end
+
+if CLIENT then
+    net.Receive(NET_HITMARKER, function()
+        if not cvHitmarker:GetBool() then return end
+        if IsValid(LocalPlayer():GetActiveWeapon()) then
+            LocalPlayer():GetActiveWeapon().HitMarkerEnt = net.ReadEntity()
+        end
+    end)
+
+    local hitmarkeralpha = 0
+    local hitmarkersize = 0
+    local hitmarkerholdtime = 0
+    local hitmarkercolor = Color(255, 255, 255)
+    local hitmarkermat = Material("corpus_cargo/hands_hitmarker.png")
+    function SWEP:DrawHUD()
+        -- arm the marker when we hit something
+        if LocalPlayer():GetActiveWeapon().HitMarkerEnt ~= nil then
+            hitmarkeralpha = 255
+            hitmarkersize = 128
+            hitmarkerholdtime = CurTime() + 0.5
+            if not IsValid(LocalPlayer():GetActiveWeapon().HitMarkerEnt)
+                or LocalPlayer():GetActiveWeapon().HitMarkerEnt:Health() > 0 then
+                hitmarkercolor = Color(255, 255, 255)
+            else
+                hitmarkercolor = Color(255, 0, 0)
+            end
+
+            LocalPlayer():GetActiveWeapon().HitMarkerEnt = nil
+        end
+
+        -- draw it on screen
+        if hitmarkerholdtime > CurTime() then
+            local resw = ScrW() / 1600
+            local resh = ScrH() / 900
+            local hitw = hitmarkersize * resw
+            local hith = hitmarkersize * resh
+
+            hitmarkersize = Lerp(1 * FrameTime(), hitmarkersize, 0)
+            hitmarkeralpha = Lerp(3 * FrameTime(), hitmarkeralpha, 0)
+
+            surface.SetDrawColor(hitmarkercolor.r, hitmarkercolor.g, hitmarkercolor.b, hitmarkeralpha)
+            surface.SetMaterial(hitmarkermat)
+            surface.DrawTexturedRect(ScrW() / 2 - hitw / 2, ScrH() / 2 - hith / 2, hitw, hith)
+        end
+    end
+end

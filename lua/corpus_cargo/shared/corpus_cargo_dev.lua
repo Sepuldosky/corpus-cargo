@@ -282,6 +282,17 @@ function CARGO._SelfTest()
     check("la physgun sigue equipable en slots de arma",
         CARGO.Slots.CanEquip(pgDef, "secondary"))
 
+    -- STALKER weapon order (roadmap #22): keys 1-7, each naming a real slot
+    local hkCount, hkOk = 0, true
+    for n, slotId in pairs(CARGO.Slots.Hotkeys) do
+        hkCount = hkCount + 1
+        if not isnumber(n) or n < 1 or n > 7
+            or CARGO.Slots.ById[slotId] == nil then hkOk = false end
+    end
+    check("hotkeys 1-7 mapean a slots reales", hkOk and hkCount == 7)
+    local melee = CARGO.Items.Get("cargo_dev_melee")
+    check("melee dev entra en el slot melee", CARGO.Slots.CanEquip(melee, "melee"))
+
     -- weight curve: anchors + monotonicity
     local mult = CARGO.Weight.SpeedMultiplier
     check("curva: sin carga = 1", mult(0, 54) == 1)
