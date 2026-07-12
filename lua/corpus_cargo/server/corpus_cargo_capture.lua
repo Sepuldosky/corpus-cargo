@@ -5,16 +5,22 @@
 -- inventory instead of the weapon bar. The player starts unarmed and arms
 -- himself through the Primary/Secondary/Sidearm/Melee slots.
 --
--- WHY WeaponEquip AND NOT PlayerCanPickupWeapon (compat lesson, verified
--- against the live code of "Left 4 Dead | Item Pickup System" 3744343101
--- on 2026-07-11): in hook.Call the FIRST non-nil return wins. Pickup mods
--- like L4D IPS never Give — they pre-authorize their own touch-pickup by
--- returning true from PlayerCanPickupWeapon; and a Give denied with false
--- leaves the weapon as a loose world entity. Our old unconditional false
--- both broke their flow and littered floating physguns. Capturing AFTER
--- the successful equip sidesteps every ordering conflict: the engine has
--- already consumed the world entity, every pickup mod saw its flow
--- complete, and we just convert + strip one tick later.
+-- WHY the capture rides WeaponEquip and not PlayerCanPickupWeapon (compat
+-- lesson, verified against the live code of "Left 4 Dead | Item Pickup
+-- System" 3744343101 on 2026-07-11): in hook.Call the FIRST non-nil return
+-- wins. Pickup mods like L4D IPS never Give — they pre-authorize their own
+-- touch-pickup by returning true from PlayerCanPickupWeapon; and a Give
+-- denied with false leaves the weapon as a loose world entity. Our old
+-- unconditional false both broke their flow and littered floating physguns.
+-- Capturing AFTER the successful equip sidesteps every ordering conflict.
+--
+-- The WORLD GATE below (roadmap #16, author request 2026-07-11) DOES veto
+-- PlayerCanPickupWeapon — but only for weapons RESTING in the world (entity
+-- older than an instant): no touch-hoovering; WALK+USE takes, USE carries
+-- like an HL2 prop. The lesson above still holds: every give flow (gamemode
+-- loadout, our equip/reconcile) creates the entity and hands it over in the
+-- same breath and passes untouched, and a denial never strands a floating
+-- entity — the weapon was already lying on the ground on purpose.
 
 local CARGO = Corpus.GetModule("cargo")
 
@@ -22,6 +28,12 @@ CARGO.Capture = CARGO.Capture or {}
 
 local cvCapture = CreateConVar("cargo_capture_weapons", "1", FCVAR_ARCHIVE,
     "Send every weapon the engine gives the player to the Cargo inventory (start unarmed)")
+local cvWorldGuns = CreateConVar("cargo_weapon_world_pickup", "1", FCVAR_ARCHIVE,
+    "World weapons: no touch pickup — WALK+USE takes them, USE carries them; weapon drops spawn the real gun")
+
+function CARGO.Capture.WorldGunsEnabled()
+    return cvWorldGuns:GetBool()
+end
 
 -- Classes the capture must leave alone. Hands/fists-style SWEPs belong here:
 -- they ARE the unarmed state, not gear (the default-hands sub-block — Apex
@@ -30,9 +42,40 @@ CARGO.Capture.Ignore = {
     ["weapon_fists"] = true,
 }
 
+local function RegisterAutogen(class, name)
+    CARGO.Items.Register({
+        id = "wpn_" .. class,
+        name = name,
+        weight = 2.5, -- nominal: engine weapons declare no mass
+        class = "unique",
+        category = "weapons",
+        weapon_class = class,
+        autogen = true,
+        trivia = "Auto-captured weapon (" .. class .. ").",
+    })
+end
+
+-- Autogen defs must survive restarts (CHANGELOG #6): they are born at
+-- runtime (EnsureDef, when the engine hands over the weapon), so without a
+-- registry of their own an equipped non-loadout weapon deserializes into a
+-- blob whose id no longer resolves — PlayerLoadout skips its re-give and
+-- the slot shows a weapon the player does not have. id -> { name,
+-- weapon_class }, re-registered at boot, saved on every new registration.
+local autogenDefs = Corpus.Data.Load("cargo", "autogen_defs") or {}
+
+for id, meta in pairs(autogenDefs) do
+    -- engine names are localization tokens ("#HL2_Pistol") stored raw — the
+    -- client resolves them when the def snapshot arrives, same as first time
+    if istable(meta) and isstring(meta.weapon_class) and meta.weapon_class ~= ""
+        and CARGO.Items.Get(id) == nil then
+        local name = isstring(meta.name) and meta.name ~= "" and meta.name
+            or meta.weapon_class
+        RegisterAutogen(meta.weapon_class, name)
+    end
+end
+
 local function EnsureDef(class, wep)
     local id = "wpn_" .. class
-    if CARGO.Items.Get(id) ~= nil then return id end
 
     local name = class
     -- engine weapons report a localization token ("#HL2_Pistol"); the client
@@ -42,18 +85,51 @@ local function EnsureDef(class, wep)
         if ok and isstring(printName) and printName ~= "" then name = printName end
     end
 
-    CARGO.Items.Register({
-        id = id,
-        name = name,
-        weight = 2.5, -- nominal: engine weapons declare no mass
-        class = "unique",
-        category = "weapons",
-        weapon_class = class,
-        autogen = true,
-        trivia = "Auto-captured weapon (" .. class .. ").",
-    })
+    local existing = CARGO.Items.Get(id)
+    if existing ~= nil then
+        -- a def resurrected from a bare blob id (heal below) carries the
+        -- class as placeholder name — upgrade it now that the real weapon
+        -- handed over its print name
+        if existing.autogen and existing.name == class and name ~= class then
+            existing.name = name -- by-ref: the next snapshot carries it
+            autogenDefs[id] = { name = name, weapon_class = class }
+            Corpus.Data.Save("cargo", "autogen_defs", autogenDefs)
+        end
+        return id
+    end
+
+    RegisterAutogen(class, name)
+    autogenDefs[id] = { name = name, weapon_class = class }
+    Corpus.Data.Save("cargo", "autogen_defs", autogenDefs)
     return id
 end
+
+-- Blobs saved BEFORE the autogen registry existed reference defs that died
+-- with their session — they render as blank/letter cells with no name
+-- (in-game report 2026-07-11). The blob id itself encodes the class
+-- (wpn_<class>): resurrect a minimal def when the record enters memory, so
+-- those items resolve again; the placeholder name upgrades on the next real
+-- capture of that class (EnsureDef above).
+local function HealOrphanDefs(ply)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    local healed = false
+    local function heal(uid)
+        local blob = CARGO.Instances.Get(uid)
+        if blob == nil or CARGO.Items.Get(blob.id or "") ~= nil then return end
+        local class = string.match(blob.id or "", "^wpn_(.+)$")
+        if class == nil then return end
+        RegisterAutogen(class, class)
+        autogenDefs[blob.id] = { name = class, weapon_class = class }
+        healed = true
+    end
+    for _, entry in ipairs(rec.items) do
+        if entry.uid then heal(entry.uid) end
+    end
+    for _, uid in pairs(rec.equip) do heal(uid) end
+    if healed then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs) end
+end
+
+hook.Add("PlayerInitialSpawn", "corpus_cargo_capture_heal", HealOrphanDefs)
 
 -- dedup: one item per weapon class per player, counting grid AND equipped
 local function HasWeaponItem(ply, class)
@@ -72,6 +148,108 @@ local function HasWeaponItem(ply, class)
     return false
 end
 
+-- instances of `class` sitting in equip slots (the grid does not count:
+-- only an EQUIPPED class claims the engine weapon as its own)
+local function EquippedClassCount(ply, class)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    local n = 0
+    for _, uid in pairs(rec.equip) do
+        local blob = CARGO.Instances.Get(uid)
+        local def = blob and CARGO.Items.Get(blob.id) or nil
+        if def ~= nil and def.weapon_class == class then n = n + 1 end
+    end
+    return n
+end
+
+-- Pure decision (offline-harness covered): what to do with a weapon the
+-- engine just handed the player. An EQUIPPED class is NEVER touched — the
+-- engine allows one entity per class, so that entity IS the equipped
+-- weapon, whether the gamemode loadout, our loadout re-give or a pickup
+-- mod spawned it. This replaces the CargoEquipGive-flag protection as the
+-- correctness mechanism: the flag is set/cleared synchronously around
+-- ply:Give, but on spawn WeaponEquip can fire DEFERRED and miss it
+-- (CHANGELOG #6) — the flag below survives only as a fast-path skip.
+function CARGO.Capture.Decide(equippedCount, hasItem)
+    if (tonumber(equippedCount) or 0) > 0 then return "keep" end
+    if hasItem then return "remove" end
+    return "capture"
+end
+
+-- ------------------------------------------------------------------
+-- World weapons (roadmap #16 + #17 parcial, author request 2026-07-11).
+-- A weapon on the ground is the REAL SWEP entity: it renders itself (an
+-- ARC9 gun draws its own assembled mirror + attachments — no prop stand-in
+-- can match it, in-game report with the EFT pack), it keeps physics, and
+-- nobody hoovers it by touch. Interactions: USE carries it like a light
+-- HL2 prop (move it, throw it); WALK+USE takes it through the normal
+-- engine pickup -> capture -> inventory.
+-- ------------------------------------------------------------------
+
+-- Spawn a weapon as a world entity: the drop of a weapon item, or a
+-- deliberate take that did not fit going back to the ground. `uid` tags the
+-- entity with the Cargo instance it embodies — the capture restores that
+-- exact blob (attachments/condition) instead of minting a fresh item
+-- (roadmap #17: a dropped gun keeps being ITS item).
+function CARGO.Capture.SpawnWorldWeapon(class, pos, uid)
+    if not isstring(class) or class == "" then return nil end
+    local wep = ents.Create(class)
+    if not IsValid(wep) then return nil end
+    wep:SetPos(pos)
+    wep.CargoInstanceUid = isstring(uid) and uid or nil
+    wep.CargoWorldSpawned = true -- our drops are NEVER taken by touch
+    wep:Spawn()
+    return wep
+end
+
+-- The world gate. Deny order matters: the WALK+USE grant wins, our own
+-- world spawns always deny, give flows (entity born an instant ago) pass,
+-- and anything that has been RESTING in the world is denied.
+hook.Add("PlayerCanPickupWeapon", "corpus_cargo_world_gate", function(ply, wep)
+    if not cvWorldGuns:GetBool() then return end
+    if ply.CargoEquipGive then return end        -- our equip give: engine decides
+    if wep.CargoUseTaken then return true end    -- WALK+USE grant (PlayerUse below)
+    if wep.CargoWorldSpawned then return false end
+    if CurTime() - wep:GetCreationTime() < 0.5 then return end -- a give, not a pickup
+    return false
+end)
+
+-- Look at a world weapon and press USE (PlayerUse repeats every tick while
+-- +USE is held: debounced per player). Plain USE = HL2 carry; WALK+USE =
+-- one-shot grant + engine pickup (the capture hook converts it).
+hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
+    if not cvWorldGuns:GetBool() then return end
+    if not IsValid(ent) or not ent:IsWeapon() then return end
+    if IsValid(ent:GetOwner()) then return end   -- someone is holding it
+
+    if (ply.CargoNextWorldUse or 0) > CurTime() then return false end
+    ply.CargoNextWorldUse = CurTime() + 0.4
+
+    -- USE again while carrying LETS GO, like HL2 props (in-game report
+    -- 2026-07-11: the engine releases on the same press BEFORE this hook
+    -- runs, and we were re-grabbing it right back — so the press that
+    -- grabbed marks the entity, and a marked press only releases)
+    if ply.CargoCarryEnt == ent then
+        ply.CargoCarryEnt = nil
+        if isfunction(ent.IsPlayerHolding) and ent:IsPlayerHolding()
+            and isfunction(ply.DropObject) then
+            ply:DropObject()
+        end
+        return false
+    end
+
+    if ply:KeyDown(IN_WALK) then
+        ent.CargoUseTaken = true -- grant for the gate + "deliberate" marker
+        if not ply:PickupWeapon(ent) then
+            ent.CargoUseTaken = nil
+            CARGO.Inventory.Notice(ply, "You can't take that right now.")
+        end
+    else
+        ply.CargoCarryEnt = ent
+        ply:PickupObject(ent) -- HL2 prop carry: move it, throw it
+    end
+    return false -- the interaction is ours either way
+end)
+
 hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
     if not cvCapture:GetBool() then return end
     if not IsValid(wep) then return end
@@ -86,6 +264,12 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
     -- def cached while the entity is alive; the strip below invalidates it
     local id = EnsureDef(class, wep)
 
+    -- world-drop context, read NOW: by the time the timer runs the entity
+    -- is the held weapon (or gone) and these fields are the only trace
+    local dropUid = isstring(wep.CargoInstanceUid) and wep.CargoInstanceUid or nil
+    local deliberate = wep.CargoUseTaken == true
+    local dropPos = wep:GetPos()
+
     -- one tick later: the equip has fully settled (stripping mid-equip is
     -- crash-prone) and GetOwner is reliable on every engine branch
     timer.Simple(0, function()
@@ -96,22 +280,43 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
         if not IsValid(owner) or not owner:IsPlayer() then return end
         if owner.CargoEquipGive then return end
 
-        if not HasWeaponItem(owner, class) then
-            if CARGO.Inventory.GiveItem(owner, id) then
-                CARGO.Inventory.NotifyPickup(owner, id, 1)
-            end
-            -- over the hard weight cap the give fails: the weapon is still
-            -- removed (start-unarmed rule); the class is gone, not floating
+        -- a dropped Cargo instance always comes back AS ITSELF: it is not a
+        -- duplicate to dedup, it is a concrete item with its own blob
+        local blob = dropUid and CARGO.Instances.Get(dropUid) or nil
+        local action
+        if blob ~= nil then
+            action = "capture"
+        else
+            action = CARGO.Capture.Decide(
+                EquippedClassCount(owner, class), HasWeaponItem(owner, class))
         end
-        -- Remove ONLY the entity the engine just gave, never StripWeapon(class):
-        -- that strips every weapon of the class, and on spawn the sandbox
-        -- loadout re-gives gmod_tool/physgun/camera whose class may ALSO be
-        -- equipped in Cargo — a class strip nuked the equipped one, leaving it
-        -- inert in its slot after a reload (in-game report 2026-07-11). The
-        -- equip-give carries the flag and never schedules this timer, so `wep`
-        -- here is always the loadout/pickup duplicate, safe to remove alone.
-        -- If `wep` is already invalid the duplicate is gone anyway — do
-        -- nothing, so an equipped weapon of the same class is never touched.
+
+        -- "keep": this entity IS the equipped weapon (one per class) — hands
+        -- off, no matter which give spawned it or whether the flag was seen
+        if action == "keep" then return end
+
+        if action == "capture" then
+            local ok
+            if blob ~= nil then
+                ok = CARGO.Inventory.GiveEntry(owner, { id = blob.id, uid = dropUid })
+            else
+                ok = CARGO.Inventory.GiveItem(owner, id)
+            end
+            if ok then
+                CARGO.Inventory.NotifyPickup(owner, blob ~= nil and blob.id or id, 1)
+            elseif blob ~= nil or deliberate then
+                -- a DELIBERATE take (walk+use / a Cargo instance) that does
+                -- not fit goes back to the ground — only the anonymous
+                -- engine handout keeps the old start-unarmed rule (removed
+                -- even when the give fails)
+                CARGO.Capture.SpawnWorldWeapon(class, dropPos, dropUid)
+                CARGO.Inventory.Notice(owner, "You can't carry that.")
+            end
+        end
+        -- capture/remove: take out ONLY the entity the engine just gave,
+        -- never StripWeapon(class) — that strips every weapon of the class
+        -- (in-game report 2026-07-11: it nuked equipped physgun/toolgun on
+        -- reload). If `wep` is already invalid the duplicate is gone anyway.
         if IsValid(wep) then wep:Remove() end
     end)
 end)

@@ -498,11 +498,29 @@ function CARGO.Inventory.DropEntry(ply, ref, count)
         dropped = { id = entry.id, count = count, condition = entry.condition }
     end
 
-    local ent = ents.Create("corpus_cargo_item")
-    if IsValid(ent) then
-        ent.CargoEntry = dropped
-        ent:SetPos(ply:EyePos() + ply:GetAimVector() * 32)
-        ent:Spawn()
+    -- weapons drop as the REAL gun (roadmap #16/#17): the SWEP entity
+    -- renders itself (an ARC9 gun draws its assembled mirror on the ground
+    -- — no prop stand-in matches it) and carries the instance uid, so
+    -- taking it back (walk+use) restores this same blob. The world gate in
+    -- capture.lua keeps it from being hoovered by touch.
+    local spawned
+    local def = CARGO.Items.Get(dropped.id)
+    if dropped.uid ~= nil and istable(def)
+        and isstring(def.weapon_class) and def.weapon_class ~= ""
+        and istable(CARGO.Capture)
+        and isfunction(CARGO.Capture.WorldGunsEnabled)
+        and CARGO.Capture.WorldGunsEnabled() then
+        spawned = CARGO.Capture.SpawnWorldWeapon(def.weapon_class,
+            ply:EyePos() + ply:GetAimVector() * 32, dropped.uid)
+    end
+
+    if spawned == nil then
+        local ent = ents.Create("corpus_cargo_item")
+        if IsValid(ent) then
+            ent.CargoEntry = dropped
+            ent:SetPos(ply:EyePos() + ply:GetAimVector() * 32)
+            ent:Spawn()
+        end
     end
     CARGO.Inventory.Touch(ply)
     return true
@@ -726,6 +744,26 @@ hook.Add("PlayerLoadout", "corpus_cargo_inv_loadout", function(ply)
         local def = blob and CARGO.Items.Get(blob.id) or nil
         if def then GiveEquipWeapon(ply, def) end
     end
+
+    -- Deferred reconcile (CHANGELOG #6): on spawn the gamemode loadout and
+    -- the capture timers land AFTER this hook, and their give/remove churn
+    -- can eat the gives above (WeaponEquip may fire deferred, past the
+    -- CargoEquipGive window). One tick after the dust settles, re-give
+    -- whatever equipped class the player still lacks — the capture keeps
+    -- equipped classes now (Capture.Decide), so these gives survive
+    -- flag-free.
+    timer.Simple(0.1, function()
+        if not IsValid(ply) then return end
+        local rec2 = CARGO.Inventory.GetRecord(ply)
+        for _, uid in pairs(rec2.equip) do
+            local blob = CARGO.Instances.Get(uid)
+            local def = blob and CARGO.Items.Get(blob.id) or nil
+            if def and isstring(def.weapon_class) and def.weapon_class ~= ""
+                and not ply:HasWeapon(def.weapon_class) then
+                GiveEquipWeapon(ply, def)
+            end
+        end
+    end)
 end)
 
 hook.Add("PlayerDisconnected", "corpus_cargo_inv_save", function(ply)
