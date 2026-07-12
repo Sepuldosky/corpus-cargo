@@ -276,6 +276,93 @@ UI fullscreen (§15) — acá el grid sigue uniforme, las gradas son el bloque #
     colisión). Escape hatch `def.icon_model` para casos borde. Como cambia el
     modelo de entrada, la clave de caché de esas armas cambia sola → re-render
     automático, sin regen manual.
+11. **Captura ensamblada para armas ARC9 modulares** *(2.º reporte in-game
+    2026-07-11: con el punto 10 el 9A-91 ya resolvía su viewmodel real
+    (`c_vsk94.mdl`) pero el ícono mostraba solo una parte del arma — mismo
+    síntoma que los mods de íconos de HUD con ARC9 EFT)*. Causa verificada
+    contra la base: en las armas MirrorVMWM la culata/handguard/cargador son
+    **modelos de attachment** montados sobre el viewmodel (no bodygroups) —
+    un `ClientsideModel` pelado siempre va a mostrar el receiver desnudo.
+    Reconstruir ese ensamblado desde la def sería reimplementar `SetupModel`
+    de ARC9; en cambio, cuando el jugador local **tiene el arma en mano**, se
+    toma prestado el build de display de ARC9 (`SetupModel(true,0,true)` →
+    `CModel` + `DrawCustomModel`, la receta exacta de su `DoPresetCapture`,
+    `cl_presets.lua`) y se fotografía con NUESTRA cámara/luz/alpha: pose por
+    `CustomizePos/Ang` (dato por-arma del pack, orienta de perfil), encuadre
+    fiteado al AABB combinado de todas las partes, footprint re-cuantizado de
+    la silueta completa. Mientras el arma no esté en mano, el viewmodel
+    pelado queda como **provisional**: una sonda throttled en `Icons.Get`
+    re-captura sola en cuanto se empuña. El footprint medido y el flag
+    `assembled` persisten en `data/corpus/cargo/icons/icons_meta.json`
+    (clave de caché estable entre sesiones; `Invalidate`/regen los limpian).
+    Además el render pelado ahora aplica `DefaultSkin`/`DefaultBodygroups`
+    (trepados por `.Base`, como hace `DoBodygroups` de ARC9) — no-op en EFT
+    (todo ceros) pero corrige packs que eligen variante por bodygroup.
+    Versión de receta → `r3` (los íconos viejos se invalidan solos).
+12. **Drops con el modelo real también para armas ARC9** *(3.ª pasada in-game
+    2026-07-11: un 9A-91 dropeado mostraba el AK de CSS)*. El drop usa el
+    `WorldModel` para la física (los viewmodels no tienen malla de colisión) y
+    en las MirrorVMWM ese modelo es el placeholder. Verificado contra el SWEP
+    real (`dev/other/Arc9 EFT Assault Rifles/`, alta en el mapa de mods) y
+    contra la base: ARC9 mismo dibuja el espejo ENCIMA del placeholder incluso
+    en el suelo (`MirrorVMWMHeldOnly` default false). Mismo truco en
+    `corpus_cargo_item`: la física conserva el placeholder, el render dibuja
+    un `ClientsideModel` del modelo que resuelve el pipeline de íconos
+    (`Icons.ModelFor`, vía `cargo_defid` networkeado), centrado sobre el OBB
+    físico (los viewmodels se modelan alrededor de la cámara: dibujados crudos
+    flotan lejos del prop), vestido con `Icons.ApplyDefaultAppearance` (ahora
+    público) y con la sombra del placeholder apagada. Ítems sin divergencia de
+    modelo siguen con el `DrawModel` de siempre.
+13. **Encuadre por bounds de MALLA** *(5.ª pasada in-game 2026-07-11: los
+    íconos EFT ensamblados se generaban, pero chiquitos y todos igual de
+    chicos)*. Causa: el CModel base reproduce la secuencia idle del
+    viewmodel, y los render/sequence bounds de un viewmodel abarcan el
+    barrido completo de la animación alrededor de la cámara (±60+ unidades),
+    no el arma (~30) — la cámara fiteaba ese AABB inflado y el arma quedaba
+    diminuta, uniformemente en todos los packs. Ahora el hull se mide sobre
+    la **malla real** (`util.GetModelMeshes`, una vez por ruta de modelo,
+    cacheado; fallback a render bounds si la malla no es legible) — en el
+    ensamblado, en el perfil pelado y en el footprint. Receta → `r4` y meta
+    versionada (`_v`: al cambiar la semántica de medición la meta vieja se
+    descarta sola) — todo el caché regenera lazy sin intervención.
+14. **Captura ensamblada solo con el arma DESPLEGADA y asentada** *(6.ª
+    pasada in-game 2026-07-11: la primera generación con el arma en mano
+    salía completa, pero un regen con otra arma activa dejaba ensamblados
+    parciales o vacíos — mismo síntoma intermitente que los íconos de HUD
+    autogenerados del propio ARC9, que "se completan" al regenerar después,
+    como el AVT-40 del reporte)*. Causa: ARC9 llena su estado de attachments
+    durante los primeros instantes del deploy; un arma solo portada
+    (enfundada) nunca lo construye, y `LiveArc9Weapon` aceptaba cualquier
+    arma portada (`GetWeapon`). Ahora exige `GetActiveWeapon() == wep` y una
+    ventana de asentamiento (primer avistamiento activa arma +1 s; la
+    captura corre recién en la sonda siguiente con el arma aún afuera).
+    Mientras tanto queda el render provisional y la sonda reintenta. Meta →
+    `_v = 3`: los ensamblados pre-fix (posiblemente parciales) se descartan
+    y re-capturan solos.
+15. **Cámara del ensamblado = encuadre de preset de ARC9 + bounds robustos**
+    *(7.ª pasada in-game 2026-07-11: una generó perfecta (AEK-971), otras
+    salieron transparentes; el AF-53 "lejos del origen" y en 1x2; y la
+    primera generación al equipar lagueaba ~1 s. Propuesta del autor: "¿no
+    es posible generar la imagen tomando en cuenta el menú de ARC9?")*.
+    Tres causas, tres fixes:
+    - **La cámara ya no se mide: se usa la de ARC9.** Para modelos EFT
+      pesados `util.GetModelMeshes` falla y el fallback (render bounds
+      inflados) desencuadraba TODO — cámara lejos del arma, crop donde el
+      arma no está (PNG transparente), footprint 1x2. Ahora el ensamblado
+      replica la foto de preset de ARC9: el arma ya está poseada por
+      `CustomizePos/Ang` (dato por-arma) y la cámara es
+      `CustomizeSnapshotFOV` en origen con viewport 16:9 — cero medición
+      que pueda salir mal; se captura el cuadrado central como ARC9 y se
+      recorta al aspect del footprint. El override de cámara del editor
+      sigue ganando.
+    - **Cadena de bounds con hull estático:** malla → `GetModelBounds`
+      (hull autorado, nunca falla ni se infla por secuencia) → render
+      bounds. Los bounds quedan SOLO para el footprint.
+    - **El lag de ~1 s era el mesh-walk del viewmodel EFT:** ahora el
+      resultado se persiste en `data/corpus/cargo/icons/mesh_bounds.json`
+      (una vez por modelo PARA SIEMPRE) y en el ensamblado solo se
+      mesh-walkea el viewmodel base (los attachments usan su hull estático
+      gratis). Receta → `r5`, meta → `_v = 4` (regenera todo solo).
 
 **Verificación previa (2026-07-11):** sintaxis 13/13 tocados + harness offline
 (LuaJIT + framework real de `corpus/`, stubs de `file`/`render`/`weapons`):
@@ -295,37 +382,174 @@ two-pass de contexto de panel no dibujaba en `PostRender`), autocompletado
 filtrado, sliders finos + fondo/guía, auto de perfil, y el modelo ARC9
 (puntos 1, 8, 9 y 10).
 
-**Pendiente para `[APLICADO]` (última verificación del autor):** que los
-íconos de armas ARC9 muestren ahora el arma real (viewmodel) en vez del modelo
-CSS placeholder, en grid/slots/tooltip y en el preview del editor.
+**Verificación previa del punto 11 (2026-07-11):** harness re-corrido con los
+checks nuevos (footprint persistido en `icons_meta.json` con precedencia
+override > meta, `Invalidate` limpiando la entrada, `ModelFor` por cadena
+`.Base`, clave de caché estable): selftest 26/29 + checks en verde, ambos
+realms. La captura ensamblada en sí es render puro — solo verificable in-game.
+
+**Pendiente para `[APLICADO]` (última verificación del autor):** con el arma
+ARC9 **en la mano** (equipada/deployada), abrir el inventario o regenerar
+(`cargo_icon_regen_all`) y confirmar que el ícono del 9A-91 muestra el arma
+completa (culata/handguard/mira incluidos); recargar mapa y confirmar que el
+ícono ensamblado persiste sin re-empuñar; grid/slots/tooltip y preview del
+editor consistentes. **Nota 3.ª pasada (2026-07-11):** el autor confirmó que
+el ícono se genera y se ve en inventario/editor (captura ensamblada
+funcionando). El drop del punto 12 quedó **superado por el entry 7** en armas:
+los drops de armas ahora spawnean el SWEP real (el override visual del punto
+12 queda para ítems no-arma y drops legacy). **Nota 5.ª pasada:** íconos
+generando pero diminutos → punto 13. **Nota 6.ª pasada:** encuadre confirmado
+más cerca; ensamblados parciales/vacíos intermitentes tras regen → punto 14
+(solo captura con el arma desplegada + asentada). **Nota 7.ª pasada:** AEK-971
+perfecta; transparentes/desencuadres residuales (AF-53) + lag de primera
+generación → punto 15 (encuadre de ARC9 + hull estático + caché de malla en
+disco). Verificación final: con el arma ACTIVA en mano ≥ unos segundos y el
+inventario abierto, el ícono debe completarse solo (sonda cada 3 s) con el
+encuadre del menú de ARC9; armas enfundadas quedan provisionales hasta
+desplegarlas; sin lag al equipar (salvo la primera vez que se ve un modelo
+nuevo, una sola vez por instalación).
 
 ---
 
-## 6. Fix: arma equipada de clase de loadout sobrevive al respawn `[PENDIENTE]`
+## 6. Fix: armas equipadas sobreviven al respawn/reinicio (persistencia completa) `[PENDIENTE]`
 
-Salido de la verificación in-game (2026-07-11): un toolgun equipado en Primary
-quedaba **inerte** tras recargar mapa/reconectar — el slot lo mostraba, pero el
-jugador no tenía el arma (no se podía seleccionar).
+Salido de la verificación in-game (2026-07-11): un arma equipada en un slot
+(toolgun, physgun, 9A-91) quedaba **inerte** tras recargar mapa/reconectar —
+el slot la mostraba, pero el jugador no tenía el arma (no se podía
+seleccionar). Había que mandarla al inventario y re-equiparla.
 
-Causa raíz en `corpus_cargo_capture.lua`: al respawnear, el loadout de sandbox
-re-da su propio `gmod_tool`/`weapon_physgun`/`gmod_camera`. La captura lo detecta
-como duplicado (ya es ítem de inventario) y hacía `StripWeapon(class)` — que
-quita **todas** las armas de esa clase por nombre, incluida la que el hook
-`PlayerLoadout` re-dio para el slot equipado. El re-give funcionaba; el strip
-por clase lo mataba un tick después.
+**Primer patch (insuficiente):** remover solo la entidad específica que el
+engine acaba de dar (`wep:Remove()`) en vez de `StripWeapon(class)` — que
+quitaba **todas** las armas de la clase, incluida la re-dada por
+`PlayerLoadout`. Correcto (se conserva absorbido abajo), pero el diagnóstico
+de fondo era doble:
 
-Fix: remover **solo la entidad específica** que el engine acaba de dar
-(`wep:Remove()`), nunca `StripWeapon(class)`. El equip-give lleva el flag
-`CargoEquipGive` y nunca agenda el timer de captura, así que el `wep` del timer
-es siempre el duplicado del loadout/pickup — se remueve solo, y el arma equipada
-(otra entidad de la misma clase) queda en la mano. Si `wep` ya es inválido no se
-hace nada (el duplicado ya no está; jamás se toca la equipada).
+1. **Las defs autogen no se persistían.** Nacen en runtime (`EnsureDef`,
+   cuando el engine entrega el arma) y se re-creaban solo al capturar. Tras
+   un reinicio, un arma equipada **que no está en el loadout** (el 9A-91)
+   deserializa a un blob cuyo id ya no resuelve → `PlayerLoadout` se saltea
+   su re-give y el slot muestra un arma que el jugador no tiene.
+2. **Colisión captura ↔ arma equipada de clase de loadout, con timing
+   frágil.** El re-give de physgun/toolgun se protegía SOLO con el flag
+   `CargoEquipGive`, seteado/limpiado sincrónico alrededor de `ply:Give` —
+   pero en el spawn `WeaponEquip` puede disparar **diferido** y perder la
+   ventana del flag: la captura veía el arma re-dada como duplicado y la
+   removía.
 
-**Verificación previa (2026-07-11):** sintaxis + harness en verde (la lógica de
-render/ModelFor no regresó; el fix es de comportamiento de spawn/loadout, se
-verifica in-game).
+**Fix de 3 partes** (`corpus_cargo_capture.lua` + `corpus_cargo_inventory.lua`):
 
-**Pendiente para `[APLICADO]` (verificación del autor):** equipar un toolgun (u
-otra arma de clase de loadout: physgun, cámara) en un slot, recargar mapa/
-reconectar, y confirmar que sigue equipada y **seleccionable/funcional**; que el
-spawn desarmado y la captura del loadout normal no se rompieron.
+1. **Registro persistido de defs autogen:** `data/corpus/cargo/
+   autogen_defs.json` (id → {name, weapon_class}), guardado en cada
+   `EnsureDef` nuevo y **re-registrado en el boot del server** — las defs
+   existen siempre tras reinicio (los `name` de armas de engine son tokens
+   `#HL2_*` crudos; el cliente ya los resolvía al llegar el snapshot).
+2. **La captura CONSERVA las clases equipadas:** decisión pura
+   `CARGO.Capture.Decide(equippedCount, hasItem)` → `keep`/`remove`/
+   `capture`. Si la clase del arma está equipada en un slot, la entidad **ES**
+   el arma equipada (el engine permite una por clase): la captura no la toca,
+   venga del loadout, de nuestro reconcile o de un mod de pickup. Esto
+   **elimina la dependencia del flag/timing** como mecanismo de corrección
+   (el flag queda solo como fast-path); el `wep:Remove()` del primer patch
+   queda absorbido en las ramas `remove`/`capture`.
+3. **Reconcile diferido en `PlayerLoadout`:** `timer.Simple(0.1)` que, tras
+   asentarse el loadout y los timers de captura, re-da las armas equipadas
+   que el jugador **todavía no tiene** (`not ply:HasWeapon`) — típicamente
+   las que no están en el loadout (9A-91). Como la captura ahora conserva
+   las clases equipadas (parte 2), estos re-gives sobreviven sin flag.
+4. **Heal de blobs huérfanos** *(3.ª pasada in-game 2026-07-11: "bloques"
+   sin nombre ni ícono en el grid — ítems capturados en sesiones ANTERIORES
+   al registro persistido, cuyas defs murieron con su sesión)*. El id del
+   blob codifica la clase (`wpn_<clase>`): al cargar el record
+   (`PlayerInitialSpawn`) se resucita una def mínima para todo blob `wpn_*`
+   sin def (nombre placeholder = la clase) y se persiste en el registro;
+   en la siguiente captura real de esa clase, `EnsureDef` reemplaza el
+   placeholder por el print name verdadero (la def es by-ref: el snapshot
+   siguiente lo lleva). Los "bloques" vuelven a ser armas con nombre,
+   equipables y re-dables.
+
+**Verificación previa (2026-07-11):** sintaxis 4/4 tocados + harness offline
+(framework real + módulo real, ambos realms): selftest 26/29 en verde, y
+checks nuevos — def autogen re-registrada en boot desde `autogen_defs.json`
+sembrado, matriz completa de `Decide`, flujo de captura real vía
+`hook.Run("WeaponEquip")` + timers (arma suelta capturada y removida, def
+persistida, instancia en el grid), clase equipada intocada (`keep`), reconcile
+diferido re-dando la clase equipada faltante, y el heal completo (def
+resucitada desde el blob + persistida + upgrade del nombre placeholder en la
+captura siguiente + dedup del arma re-capturada).
+
+**Confirmación parcial del autor (3.ª pasada, 2026-07-11):** el toolgun
+equipado sobrevivió al respawn y era usable — las partes 1-3 funcionan para
+clases de loadout.
+
+**Pendiente para `[APLICADO]` (verificación del autor):** (a) los "bloques"
+del grid vuelven a ser armas con nombre tras recargar (heal); (b) equipar
+toolgun + physgun + el 9A-91 en slots, recargar mapa Y reiniciar/reconectar,
+confirmar que las tres siguen equipadas y **seleccionables/funcionales** sin
+re-equipar; (c) el spawn desarmado normal sigue (el loadout no-equipado va a
+inventario, sin duplicados en el grid).
+
+---
+
+## 7. Armas de mundo: sin auto-pickup, WALK+USE toma, USE agarra; drops = SWEP real `[PENDIENTE]`
+
+Baja a código el **roadmap #16** (pedido del autor, 3.ª pasada 2026-07-11:
+"que al tomar las armas se deba hacer walk + use; use sirve para tomar el
+arma y lanzarla o moverla como los props de HL2") y la **mitad del #17** (el
+arma botada conserva su instancia de Cargo). Resuelve además la paridad
+visual del drop: un arma ARC9 dropeada se veía como viewmodel pelado (o
+nada), mientras la misma arma spawneada por toolgun se ve completa — porque
+esa la dibuja ARC9. Todo en `corpus_cargo_capture.lua` +
+`corpus_cargo_inventory.lua` (DropEntry), convar maestro
+`cargo_weapon_world_pickup` (default 1; en 0 vuelve TODO al comportamiento
+anterior):
+
+1. **Drops de armas = la entidad SWEP real.** `DropEntry` de un ítem con
+   `weapon_class` spawnea el arma misma (`CARGO.Capture.SpawnWorldWeapon`)
+   tagueada con el **uid de la instancia**: ARC9 la renderiza ensamblada en
+   el suelo (verificado: `MirrorVMWMHeldOnly` default false ⇒ dibuja el
+   espejo también sin dueño), la física es la del SWEP, y el blob
+   (attachments/condición) queda intacto en `inst_<uid>`. Ítems no-arma
+   siguen dropeando `corpus_cargo_item`.
+2. **Gate de mundo (`PlayerCanPickupWeapon`).** Nadie aspira armas por
+   contacto: se niega el pickup de armas **reposando** en el mundo (entidad
+   con edad > 0.5 s, o spawneada por nuestro drop). Los flujos de give
+   (loadout del gamemode, nuestro equip/reconcile) crean la entidad y la
+   entregan en el acto (edad ~0) y **pasan intactos** — la lección de compat
+   L4D del header se conserva: jamás se deniega un give ni queda una entidad
+   flotando (el arma ya estaba en el suelo a propósito).
+3. **USE = agarrar (carry HL2), WALK+USE = tomar.** Hook `PlayerUse`
+   (mirarla + E, con debounce): USE solo llama `PickupObject` (moverla,
+   lanzarla — el pedido "como los props ligeros de HL2"); WALK+USE marca un
+   grant de un solo uso en la entidad y llama `PickupWeapon` → el flujo
+   normal de captura la convierte en ítem. **USE de nuevo SUELTA** (5.ª
+   pasada: el engine libera el objeto en el mismo press ANTES de que corra
+   el hook, y lo re-agarrábamos al instante — el press que agarra marca la
+   entidad y un press sobre la entidad marcada solo suelta, con
+   `DropObject` de respaldo si seguía sostenida). Tras un lanzamiento con
+   physgun/click, el primer E sobre esa arma consume la marca vieja (press
+   "en vacío") y el segundo re-agarra — costo conocido de la v1.
+4. **El take-back restaura LA MISMA instancia (roadmap #17 parcial).** La
+   captura lee `CargoInstanceUid` de la entidad al momento del equip: si el
+   arma es un drop de Cargo, `GiveEntry` devuelve el blob original (no un
+   ítem nuevo, sin pasar por el dedup — una instancia concreta nunca es
+   "duplicado"). Si el give no cabe (peso), un take **deliberado** vuelve al
+   suelo (`SpawnWorldWeapon` de nuevo, con su uid) en vez de perderse — la
+   regla vieja "se remueve igual" queda solo para el handout anónimo del
+   engine.
+
+**Verificación previa (2026-07-11):** sintaxis 4/4 + harness (ambos realms,
+selftest 26/29): gate completo (mundo denegado / give fresco pasa / grant
+autoriza / equip-give intocado / drop propio denegado aun fresco), PlayerUse
+(carry con USE, debounce, grant+pickup con WALK+USE), drop ruteado al SWEP
+real con uid y entry fuera del grid, y take-back restaurando el uid idéntico.
+
+**Confirmado por el autor (5.ª pasada, 2026-07-11):** "funciona todo bien" —
+sin auto-pickup, WALK+USE toma (el autor usa F como +use), USE agarra, el
+drop se ve como el arma real. Único faltante reportado: soltar el arma
+agarrada re-apretando USE → implementado arriba (punto 3, marca de carry).
+
+**Pendiente para `[APLICADO]` (verificación del autor):** re-apretar USE
+suelta el arma agarrada (y un tercer USE la re-agarra); tomar con WALK+USE
+un arma dropeada recupera sus attachments/condición (tooltip); el loadout
+del spawn sigue capturándose como siempre. `cargo_weapon_world_pickup 0`
+restaura el comportamiento anterior completo.

@@ -108,7 +108,13 @@ Espejado como cross-ref en caliber_roadmap.txt §2[5].
 Estado de diseño de este bloque tras la sesión 2026-07-11:
   - #21 (círculos de herramienta sandbox) -> DISEÑADO dentro de §15 (Cargo_Architecture.md).
   - #19 (cinturón de munición) -> solo la FORMA diseñada en §15; la SEMÁNTICA sigue sin diseñar.
-  - #16, #17, #18, #20, #22 -> SIN diseñar.
+  - #16 -> IMPLEMENTADO v1 (CHANGELOG #7, [PENDIENTE] verif. in-game): sin pickup
+    por contacto; WALK+USE toma, USE agarra como prop; drops de armas = SWEP real.
+    Convar cargo_weapon_world_pickup.
+  - #17 -> PARCIAL (CHANGELOG #7): el arma dropeada/tomada conserva su instancia
+    de Cargo (uid en la entidad, GiveEntry al recuperarla). FALTA la tecla que
+    bote el arma en mano directamente.
+  - #18, #20, #22 -> SIN diseñar.
 
 16. PICKUP POR MIRAR + USE, no por contacto [Cargo]. Hoy, sin el mod L4D, un arma
     generada por toolgun se recoge SOLA al pasarle por encima (AllowPlayerPickup
