@@ -602,7 +602,7 @@ instancia. Entry cerrado.
 
 ---
 
-## 8. UI fullscreen: 3 columnas / 3 estados, gradas, cinturón y círculos sandbox (§15) `[PENDIENTE]`
+## 8. UI fullscreen: 3 columnas / 3 estados, gradas, cinturón y círculos sandbox (§15) `[APLICADO 2026-07-12]`
 
 Baja a código el **bloque UI fullscreen** (`Cargo_Architecture.md` §15,
 roadmap #3 del módulo): cambia la **forma**, no la funcionalidad — todo lo
@@ -708,3 +708,57 @@ su clase / rechaza otra / physgun sigue equipable en slots de arma), equip
 server-side a `tool_physgun` con rechazo de clase equivocada y unequip
 devolviendo al grid, frames Loot/Solo construidos y barrido de paints/clicks
 limpio. **Pendiente: 2.ª pasada en juego.**
+
+**Ajustes de la 2.ª pasada en juego (2026-07-12, feedback del autor):**
+
+1. **Header sin subtítulo de provider** (`corpus_cargo_ui.lua`): se quitó la
+   línea "native USD / provider" bajo el valor de dinero (ruido visual); el
+   valor queda centrado. `snap.moneyLabel` se conserva para el bloque de
+   comercio.
+2. **Toolgun a 2×3** (antes 3×2): `AUTOGEN_SIZES.gmod_tool` en
+   `corpus_cargo_capture.lua` — silueta vertical. `def.size` explícito ⇒ NO
+   pasa por el piso `ICON_CATEGORY_MINS` (Cargo_ItemImages §5), así que el
+   2 de ancho se respeta; re-key automático del ícono (footprint en la clave).
+3. **Sin bloque de celda detrás de los ítems** (`corpus_cargo_grid.lua`):
+   `PaintCell` ya no pinta el relleno oscuro por ítem — los ítems flotan
+   sobre la retícula tenue (más STALKER, menos ruido, pedido del autor); el
+   highlight de celda + borde queda **solo en hover**.
+4. **Los slots de herramienta no auto-stockean el tool del loadout**
+   (`corpus_cargo_capture.lua`): el loadout de sandbox reparte
+   physgun/toolgun/camera en cada spawn y la captura los metía al inventario
+   aunque el jugador no los quisiera. Nuevo convar
+   `cargo_capture_sandbox_tools` (`FCVAR_ARCHIVE`, default **0**): con 0, el
+   handout **anónimo** del loadout de esas tres clases se **descarta** en vez
+   de capturarse — el círculo/slot es para una herramienta que YA tenés. Una
+   toma **deliberada** (WALK+USE de un tool de mundo) o una instancia
+   dropeada de Cargo (`blob`) siguen capturando; un tool ya en inventario
+   (dedup) o equipado (`keep`) no se toca. En 1 vuelve al auto-stock anterior.
+   Los saves existentes conservan sus tools (el guard solo salta capturas
+   nuevas); un personaje realmente fresco arranca sin ellos.
+5. **Resolución de íconos de render (no-ARC9) 128→256 px/celda**
+   (`corpus_cargo_icons.lua`): `CELL_PX` 128→256, RT de trabajo 1024→2048,
+   `RECIPE_VERSION` r6→r7 (regenera solo). Íconos de modelo (armas HL2,
+   toolgun, medkits…) más nítidos, sobre todo en el zoom del tooltip. Los
+   íconos **ARC9 se dejan en su fuente 256²** (decisión del autor): la fuente
+   la hornea ARC9 según `ScrH() > 1100` (256² ≤1100px, 512² arriba) en un RT
+   de file-scope que Cargo no puede redimensionar sin forkear ARC9 —
+   COMPAT-RUNTIME. A ≥1440p ARC9 ya entrega 512 y el re-crop lo aprovecha
+   solo; la deuda de nitidez de entry 5 sigue anotada, sin regresión (un
+   `CELL_PX` mayor solo agranda el mismo re-crop, no lo degrada).
+
+**Verificación previa de la 2.ª pasada (2026-07-12):** sintaxis 4/4
+(luaparser) en los archivos tocados (`ui`/`capture`/`grid`/`icons`); harness
+completo NO recorrido en esta sesión. Lógica del guard de captura razonada
+por casos (loadout descartado / dedup / keep / walk+use / drop de Cargo /
+convar en 1).
+
+**Confirmado in-game por el autor (3.ª pasada, 2026-07-12, cierre del entry):**
+"todo good" — header sin subtítulo, grid sin bloque oscuro, physgun/toolgun/
+camera del loadout ya NO entran solos al inventario, e íconos de render
+no-ARC9 más nítidos, los cuatro OK. **Único ajuste: el toolgun salió
+invertido.** La notación del autor es **alto×ancho** (reverso del `{w,h}` del
+código): su "2x3" = 2 alto × 3 ancho = `{w=3, h=2}`, pero se había aplicado
+`{w=2, h=3}` (2 ancho × 3 alto). Corregido a `gmod_tool = { 3, 2 }` (3 ancho ×
+2 alto) — footprint de código sobre el mismo mecanismo `def.size` ya
+confirmado en el resto de las clases; el def autogen re-registra el size en el
+boot del server y el ícono re-keya solo. Entry cerrado.

@@ -5,12 +5,13 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-12 (**UI fullscreen §15 + ajustes de la
-1.ª pasada** — entry 8 `[PENDIENTE]`. 1.ª pasada confirmó cinturón, botón $,
-peso y traspasos; los ajustes aplicados: retícula alineada, footprints
-calibrados con piso 3×2 de armas, círculos sandbox = slots dedicados reales,
-tabs con wrap, transferencia por cantidad. Harness verde; **falta 2.ª
-pasada en juego**)
+**Última actualización:** 2026-07-12 (**UI fullscreen §15 CERRADA** — entry 8
+`[APLICADO]`. 3.ª pasada confirmó los 5 tweaks de la 2.ª: header sin subtítulo
+"native USD / provider", grid sin bloque oscuro por ítem (solo hover), los
+slots de herramienta ya no auto-stockean el tool del loadout
+(`cargo_capture_sandbox_tools` default 0), íconos de render no-ARC9 a 256
+px/celda, y el toolgun a **3 ancho × 2 alto** (`{3,2}`, corregido tras salir
+invertido — la notación del autor es alto×ancho). **Falta: commitear el bloque**)
 
 ---
 
@@ -23,25 +24,26 @@ pasada en juego**)
   **Armas ARC9 (MirrorVMWM): el ícono viene del select icon del PROPIO ARC9**
   (`arc9_presets/<base>_icon.arc9.png`), re-cropeado en 2D al footprint; se
   regenera abriendo el menú de customize ≥1 s (watcher,
-  `cargo_icon_arc9_menu_capture`). Resolución 128 px/celda — confirmado
-  "funciona correctamente" (deuda: la fuente ARC9 256² upscalea).
+  `cargo_icon_arc9_menu_capture`). Resolución de render **256 px/celda**
+  (subida de 128 en entry 8, confirmada); la captura ARC9 "funciona
+  correctamente" pero su fuente 256² upscalea (deuda aceptada, abajo).
 - **Persistencia de armas equipadas — entry 6 `[APLICADO 2026-07-11]`**: defs
   autogen persistidas, `Decide` conserva equipadas, reconcile diferido, heal
   de blobs huérfanos. Sobrevive reinicio/reconexión completa, confirmado.
 - **Armas de mundo — entry 7 `[APLICADO 2026-07-11]`**: drops = SWEP real,
   sin auto-pickup, USE agarra/suelta (HL2), WALK+USE toma, take-back con la
   misma instancia. Confirmado completo.
-- Todo commiteado local (`b6d31f8`…hasta el cierre de estos tres entries),
-  **sin push**.
+- **UI fullscreen §15 — entry 8 `[APLICADO 2026-07-12]`**: 3 columnas / 3
+  estados, gradas por footprint, cinturón, círculos = slots de herramienta,
+  botón $. 3 pasadas + 2 rondas de ajustes, todo confirmado. Última tanda:
+  header sin subtítulo, grid sin bloque oscuro (solo hover), loadout de
+  sandbox no auto-stockeado (`cargo_capture_sandbox_tools` 0), render no-ARC9
+  256 px/celda, toolgun `{3,2}`.
+- **Todo (entries 1-8) commiteado y pusheado a `origin/main`** (2026-07-12):
+  el remoto estaba 12 commits atrás y se puso al día; sin divergencia.
 
 ## Pendiente de verificar
 
-- **CHANGELOG #8 (UI fullscreen §15)**: 1.ª pasada hecha (belt, botón $,
-  peso y traspasos OK) y su feedback ya aplicado + verificado offline
-  (selftest 29/36). Falta la **2.ª pasada**: alineación de retícula,
-  tamaños de gradas (rifles/pistolas/armor/casco/cámara), círculos sandbox
-  como slots (colocar/seleccionar, tooltip al hover), tabs sin recorte,
-  transferencia por cantidad.
 - **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar —
   el único frente suelto de rondas anteriores.
 
@@ -51,18 +53,23 @@ pasada en juego**)
   cuando #8 cierre. La **semántica** del cinturón (alimentación, cargadores,
   munición ARC9/EFT vs HL2) es roadmap #19, dueño a decidir con Caliber.
 - **El editor de íconos NO afecta la cámara de armas ARC9** (la foto de ARC9 es
-  el encuadre; el override de tamaño sí aplica). Fuente de íconos ARC9
-  256² → deuda de nitidez si algún día molesta (nota en CHANGELOG entry 5).
-  Captura de armas de mundo aún no bajada al spec
-  (`Cargo_ItemImages_Arquitectura.md`; solo CHANGELOG entry 7).
+  el encuadre; el override de tamaño sí aplica). **Fuente de íconos ARC9
+  256² — deuda aceptada** (2.ª pasada 2026-07-12): ARC9 hornea su select icon
+  a 256² en pantallas ≤1100px y 512² arriba, en un RT de file-scope que Cargo
+  no puede redimensionar sin forkear ARC9 (COMPAT-RUNTIME). A ≥1440p sale 512
+  gratis; forzarlo en 1080p exigiría una captura ensamblada propia (camino ya
+  cerrado, no se reabre). Los íconos de render **no-ARC9** sí subieron a 256
+  px/celda (entry 8, 2.ª pasada). Captura de armas de mundo aún no bajada al
+  spec (`Cargo_ItemImages_Arquitectura.md`; solo CHANGELOG entry 7).
 - **Manejo de armas #16-22 diseño parcial** (#17 parcial implementado); manos
   default (#4, Apex Hands aprobado); `Corpus.Data` sin `Delete`; peso nominal
   attachments; instancias huérfanas sin GC; comandos dev sin gate admin; sin `addon.json`.
 
 ## Próximo paso
 
-1. **Pasada en juego del entry 8** (UI fullscreen) → si pasa, cerrar
-   `[PENDIENTE]` → `[APLICADO]` y commitear los parches del bloque.
+1. **Commitear el entry 8** (UI fullscreen §15 + ajustes 1.ª/2.ª pasada) —
+   alcances `ui`, `inventory`, `items`, `arc9`, `dev`. El autor lo pide
+   explícitamente; sin push.
 2. **Borrar el handoff** `dev/HANDOFF_cargo_iconos_persistencia.md` (los tres
    entries que cubría ya cerraron) y bajar captura de armas de mundo al spec
    de `Cargo_ItemImages_Arquitectura.md` cuando haya tiempo (no bloqueante).
