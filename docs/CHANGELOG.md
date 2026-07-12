@@ -190,7 +190,7 @@ drop con E y ver la línea del feed; `cargo_pickup_feed 0` lo apaga.
 
 ---
 
-## 5. Sistema de imágenes de ítems (`Cargo_ItemImages`, roadmap #5) `[PENDIENTE]`
+## 5. Sistema de imágenes de ítems (`Cargo_ItemImages`, roadmap #5) `[APLICADO 2026-07-11]`
 
 Baja a código `Cargo_ItemImages_Arquitectura.md` completo (client-side puro,
 cero net salvo el snapshot de defs que ya existía). Prerequisito del bloque de
@@ -363,6 +363,44 @@ UI fullscreen (§15) — acá el grid sigue uniforme, las gradas son el bloque #
       (una vez por modelo PARA SIEMPRE) y en el ensamblado solo se
       mesh-walkea el viewmodel base (los attachments usan su hull estático
       gratis). Receta → `r5`, meta → `_v = 4` (regenera todo solo).
+16. **La captura 3D ensamblada MUERE: la fuente es el PNG del propio ARC9,
+    regenerado desde su menú** *(8.ª pasada in-game 2026-07-11: el AVT-40
+    seguía generando sin barril ni culata y con piezas lejos, mientras el
+    menú de customize de ARC9 y el ícono de HUD se veían perfectos.
+    Diagnóstico del autor: "la generación de los attachments no es tan
+    rápida y la generación del png por Cargo es mucho más rápida". Idea del
+    autor implementada: plan C del handoff)*. La carrera era estructural:
+    `DrawCustomModel` posiciona las partes a lo largo de VARIOS frames
+    (huesos se asientan por frame, no por draw call) y ninguna ventana de
+    asentamiento la cerraba del todo. Pivot completo:
+    - **Fuente = `data/arc9_presets/<base>_icon.arc9.png`** (el select icon
+      que ARC9 mismo captura, 256×256 RGBA con alpha real; fallback
+      `<base>/default.arc9.png`, la misma cadena que su HUD). Cargo lo
+      **re-encuadra en 2D**: bbox de la silueta por alpha
+      (`CapturePixels`/`ReadPixel`, fallback por luminancia), crop al
+      aspect del footprint, PNG propio. Cero estado 3D que pueda correr:
+      sirve desde disco al boot, sin el arma en mano, y `regen_all` ya no
+      necesita empuñar nada. `AssembledPose`/`AssembledBounds`/
+      `DrawAssembled`/`RenderAssembledToFile`/`LiveArc9Weapon` borrados.
+    - **Regeneración deliberada = el menú de ARC9** (timer pedido por el
+      autor): watcher en `Think` — con el menú de customize abierto ≥1 s
+      (arma garantizada armada, asentada y en pantalla), dispara
+      `wep:DoIconCapture(true)` (la receta propia de ARC9, que desde ahí
+      sale siempre completa). Se rearma si ARC9 marca el ícono sucio
+      (`InvalidateSelectIcon`, cambio de attachments). Convar
+      `cargo_icon_arc9_menu_capture` (default 1). El **mtime de la fuente
+      entra en la cache key**: cada recaptura renombra el PNG de Cargo
+      (esquiva el caché by-path de `Material()`) y barre el archivo viejo;
+      mientras el re-crop está en cola la celda muestra el ícono anterior,
+      nunca la letra. El footprint se estima de la proyección del snapshot
+      (FOV/`CustomizePos` por `.Base`) y la meta lo persiste como antes.
+      El override de cámara del editor queda SIN efecto en armas ARC9 (la
+      foto de ARC9 ES el encuadre); el de tamaño sigue ganando.
+    - **Resolución del resto de los íconos** *(mismo reporte: "se generan
+      con una resolución inferior muy fea")*: `CELL_PX` 64 → **128 px por
+      celda** y RT de trabajo 512 → 1024 (el nombre del RT ahora lleva el
+      tamaño: `GetRenderTarget` cachea por nombre toda la sesión del
+      engine). Receta → `r6`, meta → `_v = 5` — todo regenera lazy solo.
 
 **Verificación previa (2026-07-11):** sintaxis 13/13 tocados + harness offline
 (LuaJIT + framework real de `corpus/`, stubs de `file`/`render`/`weapons`):
@@ -403,11 +441,23 @@ más cerca; ensamblados parciales/vacíos intermitentes tras regen → punto 14
 (solo captura con el arma desplegada + asentada). **Nota 7.ª pasada:** AEK-971
 perfecta; transparentes/desencuadres residuales (AF-53) + lag de primera
 generación → punto 15 (encuadre de ARC9 + hull estático + caché de malla en
-disco). Verificación final: con el arma ACTIVA en mano ≥ unos segundos y el
-inventario abierto, el ícono debe completarse solo (sonda cada 3 s) con el
-encuadre del menú de ARC9; armas enfundadas quedan provisionales hasta
-desplegarlas; sin lag al equipar (salvo la primera vez que se ve un modelo
-nuevo, una sola vez por instalación).
+disco). **Nota 8.ª pasada:** el AVT-40 seguía parcial y con piezas lejos →
+punto 16 (la captura 3D propia muere; fuente = PNG del propio ARC9 +
+recaptura desde su menú + re-crop 2D). **Verificación previa del punto 16
+(2026-07-11):** sintaxis + harness offline reconstruido (LuaJIT + stubs):
+clave re-keyeada por stamp de fuente nueva (con fallback `default.arc9.png`),
+`ModelFor` por `.Base`, precedencia de footprint, cuantización, watcher
+registrado y tolerante sin arma — 13/13 verde.
+
+**Confirmado in-game por el autor (2026-07-11, 9.ª pasada — cierre del entry):**
+el ícono ARC9 ahora sale COMPLETO ("funciona correctamente"); el re-crop 2D
+del select icon del propio ARC9 y la recaptura desde el menú resolvieron el
+parcial/desencuadre residual del AVT-40. Deuda anotada por el autor: la
+resolución "no es la más linda" — la fuente de ARC9 es 256×256 y el arma
+ocupa una banda horizontal, así que el re-crop upscalea; mejora futura
+posible (capturar la fuente a mayor resolución, o RT propio sobre el menú).
+Entry cerrado; el resto del sistema de imágenes (puntos 1-15) ya estaba
+confirmado en las pasadas previas.
 
 ---
 
