@@ -50,8 +50,6 @@ function CARGO.StatusPanel.Build(parent)
 
     panel.PaintOver = function(_, w)
         draw.SimpleText("Status", "CargoHeading", PAD, 8, T.Colors.textDim)
-        draw.SimpleText("registrable stat-bars", "CargoSmall", w - PAD, 12,
-            T.Colors.textDim, TEXT_ALIGN_RIGHT)
 
         local y = 36
         for _, bar in ipairs(CARGO.StatusPanel._bars) do

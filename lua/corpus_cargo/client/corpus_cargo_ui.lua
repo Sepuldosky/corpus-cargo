@@ -1,10 +1,13 @@
--- corpus_cargo_ui.lua — main inventory frame (CLIENT)
--- Layout frozen against docs/mockups/InventarioCargo.png: left column
--- (equipment slots, quick slots, status panel), right column (profile
--- header, category tabs, grid, weight footer). The mock is CSS — here it
--- is manual layout (Dock/SetPos/Paint), per the VGUI notes inherited from
--- ADS. All Paint closures read the last synced snapshot, so a new sync
--- refreshes in place without rebuilding the frame.
+-- corpus_cargo_ui.lua — fullscreen inventory frame (CLIENT)
+-- Layout frozen against docs/mockups/cargo_fullscreen_ui_mock_v1.html
+-- (Cargo_Architecture.md §15): one three-column implementation, three
+-- states. Center (equipment, STALKER order) and right (own inventory) are
+-- identical in every state; the LEFT column is contextual — absent in
+-- Solo (world visible behind the scrim), container grid in Loot, trader
+-- stock in Trade (separate block, Cargo_Trade_Arquitectura.md). The mock
+-- is CSS — here it is manual layout (Dock/SetPos/Paint), per the VGUI
+-- notes inherited from ADS. All Paint closures read the last synced
+-- snapshot, so a new sync refreshes in place without rebuilding the frame.
 
 local CARGO = Corpus.GetModule("cargo")
 
@@ -25,13 +28,15 @@ local NET_QUICKUSE  = Corpus.Net.Register("cargo", "quickuse")
 local NET_AMMOGROUP = Corpus.Net.Register("cargo", "ammogroup")
 local NET_SUB_ATT   = Corpus.Net.Register("cargo", "subslot_attach")
 local NET_SUB_DET   = Corpus.Net.Register("cargo", "subslot_detach")
+local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
+local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
 
 local cvKey = CreateClientConVar("cargo_key_inventory", tostring(KEY_I), true, false,
     "Key (KEY_* enum) that opens the Cargo inventory")
 local cvQuickF = CreateClientConVar("cargo_quick_f", "1", true, false,
     "Intercept F1-F4 as Cargo quick slots")
 
-local frame, grid, pendingOpen
+local frame, grid, lootGrid, pendingOpen
 
 local function S() return CARGO.ClientState end
 
@@ -67,6 +72,12 @@ end
 local function SendSubDetach(hostUid, subId, index)
     net.Start(NET_SUB_DET) net.WriteString(hostUid) net.WriteString(subId)
     net.WriteUInt(index, 8) net.SendToServer()
+end
+local function SendBeltSet(n, ref)
+    net.Start(NET_BELT_SET) net.WriteUInt(n, 4) CARGO.Util.WriteBlob(ref) net.SendToServer()
+end
+local function SendBeltClear(n)
+    net.Start(NET_BELT_CLR) net.WriteUInt(n, 4) net.SendToServer()
 end
 
 -- ------------------------------------------------------------------
@@ -242,8 +253,11 @@ local function SlotEntryOf(slotId)
     return snap and snap.equip and snap.equip[slotId] or nil
 end
 
--- big: Head/Body/Back (icon-style). small: weapon/accessory rows.
-local function MakeSlotCell(parent, slot, big)
+-- STALKER-order slot cell (mock §15.2): label top-left, ammo group badge
+-- top-right, icon centered, name centered above the segmented condition
+-- bar at the bottom. tall = the vertical weapon/body column (row 2): wide
+-- weapon renders (rifle 6×2) get turned upright there.
+local function MakeSlotCell(parent, slot, tall)
     local cell = vgui.Create("DButton", parent)
     cell:SetText("")
     cell.cargoSlotId = slot.id
@@ -258,7 +272,7 @@ local function MakeSlotCell(parent, slot, big)
         draw.SimpleText(slot.label, "CargoTiny", 6, 4, T.Colors.textDim)
 
         if entry == nil then
-            draw.SimpleText("—", "CargoHeading", w / 2, h / 2 + (big and 4 or 0),
+            draw.SimpleText("—", "CargoHeading", w / 2, h / 2,
                 T.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             return
         end
@@ -267,36 +281,43 @@ local function MakeSlotCell(parent, slot, big)
         local name = def and def.name or entry.id
 
         -- weapons: ammo group + caliber, top-right (mockup "A · 9mm")
-        if entry.blob and entry.blob.ammo_group and def and istable(def.ammo) then
-            draw.SimpleText(entry.blob.ammo_group .. " · " .. (def.ammo.caliber or ""),
-                "CargoTiny", w - 6, 4, T.Colors.amber, TEXT_ALIGN_RIGHT)
-        elseif entry.blob and entry.blob.ammo_group then
-            draw.SimpleText(entry.blob.ammo_group, "CargoTiny", w - 6, 4,
+        if entry.blob and entry.blob.ammo_group then
+            local tag = entry.blob.ammo_group
+            if def and istable(def.ammo) and def.ammo.caliber then
+                tag = tag .. " · " .. def.ammo.caliber
+            end
+            draw.SimpleText(tag, "CargoTiny", w - 6, 4,
                 T.Colors.amber, TEXT_ALIGN_RIGHT)
         end
 
         local cond = T.ConditionOf(entry)
 
-        -- item icon (Cargo_ItemImages §10): aspect-fit between the label row
-        -- and the condition bar; the name only paints while there is no icon
-        -- (queued placeholder / no-model error signal) or the cell is too
-        -- short to show one legibly (smallest accessory rows)
-        local availH = h - 16 - (cond ~= nil and 16 or 6)
-        local icon = availH >= 20 and CARGO.Icons.Get(entry.id) or nil
+        -- bottom-up: segmented condition bar, name row, then the icon gets
+        -- whatever is left between the label row and the name
+        local segY = cond ~= nil and (h - 10) or nil
+        local nameCY = (segY or (h - 2)) - 12
+        local iconY = 16
+        local iconH = nameCY - 10 - iconY
+
+        -- item icon (Cargo_ItemImages §10): only when the cell is tall
+        -- enough to show one legibly (smallest accessory rows are name-only)
+        local icon = iconH >= 20 and CARGO.Icons.Get(entry.id) or nil
         if icon ~= nil then
-            T.DrawIconFit(icon, 6, 16, w - 12, availH)
-        else
-            local font = big and "CargoSmall" or "CargoText"
-            name = T.FitText(name, font, w - 12)
-            draw.SimpleText(name, font,
-                big and w / 2 or 6, h / 2 + (big and 2 or 1),
-                T.Colors.text, big and TEXT_ALIGN_CENTER or TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            local fp = def and CARGO.Icons.GetFootprint(def) or nil
+            if tall and fp and fp.w > fp.h then
+                T.DrawIconFitVertical(icon, 6, iconY, w - 12, iconH)
+            else
+                T.DrawIconFit(icon, 6, iconY, w - 12, iconH)
+            end
         end
 
-        if cond ~= nil then
-            T.DrawBar(6, h - 12, w - 12 - 34, 5, cond / 100, T.ConditionColor(cond))
-            draw.SimpleText(math.Round(cond) .. "%", "CargoTiny", w - 6, h - 16,
-                T.ConditionColor(cond), TEXT_ALIGN_RIGHT)
+        -- the name always paints (mock); while there is no icon it doubles
+        -- as the queued-placeholder / no-model signal
+        draw.SimpleText(T.FitText(name, "CargoSmall", w - 12), "CargoSmall",
+            w / 2, nameCY, T.Colors.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+        if segY ~= nil then
+            T.DrawSegBar(6, segY, w - 12, 5, cond / 100, T.ConditionColor(cond))
         end
     end
 
@@ -382,8 +403,8 @@ local function MakeQuickCell(parent, n)
             for off = -h, w, 10 do
                 surface.DrawLine(off, h, off + h, 0)
             end
-            draw.SimpleText("F" .. n, "CargoTiny", w / 2, h - 12,
-                T.Colors.textDim, TEXT_ALIGN_CENTER)
+            draw.SimpleText("F" .. n, "CargoTiny", w - 6, h - 14,
+                T.Colors.textDim, TEXT_ALIGN_RIGHT)
             return
         end
 
@@ -400,8 +421,8 @@ local function MakeQuickCell(parent, n)
             draw.SimpleText("x" .. count, "CargoTiny", w - 4, 3,
                 count > 0 and T.Colors.text or T.Colors.red, TEXT_ALIGN_RIGHT)
         end
-        draw.SimpleText("F" .. n, "CargoTiny", w / 2, h - 12,
-            T.Colors.textDim, TEXT_ALIGN_CENTER)
+        draw.SimpleText("F" .. n, "CargoTiny", w - 6, h - 14,
+            T.Colors.textDim, TEXT_ALIGN_RIGHT)
     end
 
     cell.DoClick = function() SendQuickUse(n) end
@@ -421,6 +442,197 @@ local function MakeQuickCell(parent, n)
         if entry then SendQuickBind(n, entry.id) end
     end)
 
+    return cell
+end
+
+-- ------------------------------------------------------------------
+-- Ammo belt cells (§15.2, FORM only — semantics is roadmap #19)
+-- ------------------------------------------------------------------
+
+local function BeltEntryOf(n)
+    local snap = S()
+    return snap and snap.belt and snap.belt[n] or nil
+end
+
+-- group letter on a belt stack: display-only derivation — the caliber
+-- matches an equipped weapon's bound A/B group (mock badge). Nothing
+-- feeds from it yet.
+local function BeltGroupOf(def)
+    local snap = S()
+    if snap == nil or def == nil or not istable(def.ammo) then return nil end
+    for _, slotId in ipairs({ "primary", "secondary", "sidearm" }) do
+        local slotEntry = snap.equip and snap.equip[slotId]
+        if slotEntry and slotEntry.blob and slotEntry.blob.ammo_group then
+            local wDef = CARGO.Items.Get(slotEntry.id)
+            if wDef and istable(wDef.ammo) and wDef.ammo.caliber == def.ammo.caliber then
+                return slotEntry.blob.ammo_group
+            end
+        end
+    end
+    return nil
+end
+
+local function MakeBeltCell(parent, n)
+    local cell = vgui.Create("DButton", parent)
+    cell:SetText("")
+    cell.cargoBeltSlot = n
+
+    cell.Paint = function(self, w, h)
+        local entry = BeltEntryOf(n)
+        draw.RoundedBox(4, 0, 0, w, h,
+            self:IsHovered() and T.Colors.cellHover or T.Colors.cell)
+        surface.SetDrawColor(entry and T.Colors.borderHi or T.Colors.border)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+        if entry == nil then return end
+
+        local def = CARGO.Items.Get(entry.id)
+        local icon = CARGO.Icons.Get(entry.id)
+        if icon ~= nil then
+            T.DrawIconFit(icon, 4, 4, w - 8, h - 18)
+        elseif def then
+            draw.SimpleText(string.upper(def.name:sub(1, 1)), "CargoHeading",
+                w / 2, h / 2 - 4, T.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end
+
+        draw.SimpleText("x" .. (entry.count or 1), "CargoTiny", w - 4, 2,
+            T.Colors.text, TEXT_ALIGN_RIGHT)
+        local grp = BeltGroupOf(def)
+        if grp ~= nil then
+            draw.SimpleText(grp, "CargoTiny", 4, 2, T.Colors.amber)
+        end
+        if def and istable(def.ammo) and def.ammo.caliber then
+            draw.SimpleText(def.ammo.caliber, "CargoTiny", 4, h - 14, T.Colors.textDim)
+        end
+    end
+
+    cell.OnCursorEntered = function(self)
+        local entry = BeltEntryOf(n)
+        if entry then CARGO.Tooltip.Show(self, entry) end
+    end
+
+    cell.DoRightClick = function()
+        if BeltEntryOf(n) == nil then return end
+        local menu = DermaMenu()
+        menu:AddOption("Return to inventory", function() SendBeltClear(n) end)
+        menu:Open()
+    end
+
+    -- drop an ammo stack from the grid to store it here (the server
+    -- rejects anything that is not category "ammo")
+    cell:Receiver("cargo_item", function(_, panels, dropped)
+        if not dropped or not IsValid(panels[1]) then return end
+        local entry = panels[1].cargoEntry
+        if entry and entry.uid == nil then
+            SendBeltSet(n, CARGO.Grid.RefOf(entry))
+        end
+    end)
+
+    -- dragging the belt cell back onto the grid returns the stack
+    cell:Droppable("cargo_item")
+    return cell
+end
+
+-- ------------------------------------------------------------------
+-- Sandbox tool circles (§15.2, roadmap #21): the three DEDICATED tool
+-- slots (CARGO.Slots.Tools — class-restricted, so they never compete with
+-- the weapon slots) rendered as circles. Click equips the tool from the
+-- grid into its slot (the server hands out the SWEP and the capture keeps
+-- equipped classes) or selects it once equipped; drag works both ways
+-- like any other slot. Author calibration, first fullscreen pass.
+-- ------------------------------------------------------------------
+
+-- the tool as a grid item (captured weapons carry def.weapon_class)
+local function FindToolItem(class)
+    local snap = S()
+    if snap == nil then return nil end
+    for _, entry in ipairs(snap.items or {}) do
+        local def = CARGO.Items.Get(entry.id)
+        if def and def.weapon_class == class then return entry, def end
+    end
+    return nil
+end
+
+local function DrawCircleFilled(cx, cy, r, col)
+    local pts = {}
+    for i = 0, 23 do
+        local a = math.rad(i * 15)
+        pts[#pts + 1] = { x = cx + math.cos(a) * r, y = cy + math.sin(a) * r }
+    end
+    draw.NoTexture()
+    surface.SetDrawColor(col)
+    surface.DrawPoly(pts)
+end
+
+local function MakeToolCircle(parent, tool)
+    local cell = vgui.Create("DButton", parent)
+    cell:SetText("")
+    -- dragging the circle onto the grid unequips (grid receiver contract)
+    cell.cargoSlotId = tool.slotId
+
+    cell.Paint = function(self, w, h)
+        local equipped = SlotEntryOf(tool.slotId)
+        local entry = equipped or FindToolItem(tool.class)
+
+        local cx, cy, r = w / 2, h / 2, math.min(w, h) / 2 - 1
+        DrawCircleFilled(cx, cy, r,
+            self:IsHovered() and T.Colors.cellHover or T.Colors.cell)
+        local bc = equipped and T.Colors.borderHi or T.Colors.border
+        surface.DrawCircle(cx, cy, r, bc.r, bc.g, bc.b, bc.a)
+
+        if entry == nil then return end
+        -- grid-only tools paint dim; equipping lights the circle up
+        local icon = CARGO.Icons.Get(entry.id)
+        if icon ~= nil then
+            T.DrawIconFit(icon, w * 0.16, h * 0.24, w * 0.68, h * 0.52)
+        else
+            local def = CARGO.Items.Get(entry.id)
+            draw.SimpleText(def and string.upper(def.name:sub(1, 1)) or "?",
+                "CargoHeading", cx, cy,
+                equipped and T.Colors.text or T.Colors.textDim,
+                TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end
+    end
+
+    -- hover shows the tool item's real inspection tooltip (author ask)
+    cell.OnCursorEntered = function(self)
+        local entry = SlotEntryOf(tool.slotId) or FindToolItem(tool.class)
+        if entry then CARGO.Tooltip.Show(self, entry) end
+    end
+
+    cell.DoClick = function()
+        -- equipped: switch to it (the equip give put the SWEP in hands)
+        if SlotEntryOf(tool.slotId) ~= nil then
+            local ply = LocalPlayer()
+            local wep = IsValid(ply) and ply:GetWeapon(tool.class) or nil
+            if IsValid(wep) then input.SelectWeapon(wep) end
+            return
+        end
+        -- in the grid: place it into its own slot
+        local entry = FindToolItem(tool.class)
+        if entry and entry.uid then
+            SendEquip(CARGO.Grid.RefOf(entry), tool.slotId)
+        end
+    end
+
+    cell.DoRightClick = function()
+        if SlotEntryOf(tool.slotId) == nil then return end
+        local menu = DermaMenu()
+        menu:AddOption("Unequip", function() SendUnequip(tool.slotId) end)
+        menu:Open()
+    end
+
+    -- drop the matching tool item from the grid onto its circle
+    cell:Receiver("cargo_item", function(_, panels, dropped)
+        if not dropped or not IsValid(panels[1]) then return end
+        local entry = panels[1].cargoEntry
+        if entry == nil or entry.uid == nil then return end
+        local def = CARGO.Items.Get(entry.id)
+        if def and def.weapon_class == tool.class then
+            SendEquip(CARGO.Grid.RefOf(entry), tool.slotId)
+        end
+    end)
+
+    cell:Droppable("cargo_item")
     return cell
 end
 
@@ -445,123 +657,278 @@ local function BuildTabs(bar)
         if present[cat.id] then tabs[#tabs + 1] = cat end
     end
 
-    local x = 0
+    -- wrap into rows (mock .tabs flex-wraps): the category list outgrew one
+    -- row on the first in-game pass ("Backpacks" clipped). Docked width is
+    -- not laid out yet when the frame builds, so BuildFrame stamps the
+    -- usable width on the bar.
+    local barW = bar.cargoWide or bar:GetWide()
+    local x, rowY = 0, 2
     for _, cat in ipairs(tabs) do
         surface.SetFont("CargoSmall")
         local tw = surface.GetTextSize(cat.label)
+        local bw = tw + 22
+        if x > 0 and x + bw > barW then
+            x, rowY = 0, rowY + 26
+        end
         local btn = vgui.Create("DButton", bar)
         btn:SetText("")
-        btn:SetPos(x, 2)
-        btn:SetSize(tw + 22, 24)
+        btn:SetPos(x, rowY)
+        btn:SetSize(bw, 24)
+        -- mock .tabs: flat text, active gets the green tint + thin border
         btn.Paint = function(self, w, h)
             local activeTab = grid and grid.filter == cat.id
-            draw.RoundedBox(12, 0, 0, w, h,
-                activeTab and T.Colors.text or (self:IsHovered() and T.Colors.cellHover or T.Colors.panelAlt))
+            if activeTab then
+                surface.SetDrawColor(T.Colors.green.r, T.Colors.green.g,
+                    T.Colors.green.b, 16)
+                surface.DrawRect(0, 0, w, h)
+                surface.SetDrawColor(T.Colors.greenDim)
+                surface.DrawOutlinedRect(0, 0, w, h, 1)
+            end
             draw.SimpleText(cat.label, "CargoSmall", w / 2, h / 2,
-                activeTab and T.Colors.bg or T.Colors.text,
+                activeTab and T.Colors.green
+                    or (self:IsHovered() and T.Colors.text or T.Colors.textDim),
                 TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
         btn.DoClick = function()
             if grid then grid.SetFilter(cat.id) end
         end
-        x = x + tw + 28
+        x = x + bw + 6
     end
+    bar:SetTall(rowY + 26)
 end
 
 local tabsBar
 
-local function BuildFrame()
-    if IsValid(frame) then frame:Remove() end
+-- three-column geometry from the 1080p mock (580/420/660, gap 30), scaled
+-- by ScrH and clamped so narrow aspects (4:3) still fit the row
+local function ColumnRects()
+    local s = math.min(T.UIScale(), ScrW() / 1760)
+    local gap = math.Round(30 * s)
+    local colL = math.Round(580 * s)
+    local colC = math.Round(420 * s)
+    local colR = math.Round(660 * s)
+    local x0 = math.floor((ScrW() - colL - colC - colR - gap * 2) / 2)
+    local y0 = math.Round(64 * s)
+    local colH = ScrH() - y0 - math.Round(48 * s)
+    return s, x0, y0, colH, colL, colC, colR, gap
+end
 
-    local W = math.min(ScrW() - 80, 1120)
-    local H = math.min(ScrH() - 80, 640)
+-- equipment column content, top to bottom in the §15.2 order. Returns the
+-- y cursor after the quick row: the sandbox tool circles (#21) and the
+-- ammo belt (#19, form) stack there; the status panel docks to the bottom.
+local function BuildEquipColumn(parent, s)
+    local PAD = math.Round(14 * s)
+    local g8 = math.Round(8 * s)
+    local innerW = parent:GetWide() - PAD * 2
+
+    -- mock eqgrid: 1fr / 1.25fr / 1fr — the center (Body) is the widest
+    local wSide = math.Round((innerW - g8 * 2) / 3.25)
+    local wMid = innerW - g8 * 2 - wSide * 2
+    local xs = { PAD, PAD + wSide + g8, PAD + wSide + g8 + wMid + g8 }
+    local ws = { wSide, wMid, wSide }
+
+    local rows = {
+        { h = math.Round(106 * s), tall = false,
+            slots = { "accessory1", "head", "accessory2" } },
+        { h = math.Round(226 * s), tall = true,
+            slots = { "secondary", "body", "primary" } },
+        { h = math.Round(108 * s), tall = false,
+            slots = { "sidearm", "back", "melee" } },
+    }
+
+    local y = PAD
+    for _, row in ipairs(rows) do
+        for i = 1, 3 do
+            local cell = MakeSlotCell(parent, CARGO.Slots.ById[row.slots[i]], row.tall)
+            cell:SetPos(xs[i], y)
+            cell:SetSize(ws[i], row.h)
+        end
+        y = y + row.h + g8
+    end
+
+    -- quick slots F1-F4
+    local wq = math.Round((innerW - g8 * 3) / 4)
+    local hq = math.Round(64 * s)
+    for n = 1, CARGO.Slots.QUICK_COUNT do
+        local cell = MakeQuickCell(parent, n)
+        cell:SetPos(PAD + (n - 1) * (wq + g8), y)
+        cell:SetSize(wq, hq)
+    end
+    y = y + hq + math.Round(10 * s)
+
+    -- sandbox tool circles (#21): the three dedicated tool slots, centered.
+    -- No hide toggle — hiding them is an admin concern for the future admin
+    -- sub-block (author call, first fullscreen pass).
+    local ct = math.Round(50 * s)
+    local rowW = #CARGO.Slots.Tools * ct + (#CARGO.Slots.Tools - 1) * g8
+    local tx = PAD + math.floor((innerW - rowW) / 2)
+    for i, tool in ipairs(CARGO.Slots.Tools) do
+        local c = MakeToolCircle(parent, tool)
+        c:SetPos(tx + (i - 1) * (ct + g8), y)
+        c:SetSize(ct, ct)
+    end
+    y = y + ct + math.Round(10 * s)
+
+    -- ammo belt: caption row + 6 stack slots (mock .beltwrap; the right
+    -- caption died in the first pass — the belt explains itself)
+    local cap = vgui.Create("DPanel", parent)
+    cap:SetPos(PAD, y)
+    cap:SetSize(innerW, 14)
+    cap.Paint = function()
+        draw.SimpleText("Ammo belt", "CargoTiny", 0, 1, T.Colors.textDim)
+    end
+    y = y + 18
+
+    local wb = math.Round((innerW - g8 * (CARGO.Slots.BELT_COUNT - 1)) / CARGO.Slots.BELT_COUNT)
+    local hb = math.Round(52 * s)
+    for n = 1, CARGO.Slots.BELT_COUNT do
+        local cell = MakeBeltCell(parent, n)
+        cell:SetPos(PAD + (n - 1) * (wb + g8), y)
+        cell:SetSize(wb, hb)
+    end
+    y = y + hb + math.Round(10 * s)
+
+    local status = CARGO.StatusPanel.Build(parent)
+    status:Dock(BOTTOM)
+    status:DockMargin(PAD, 0, PAD, PAD)
+    status:SetTall(math.Round(150 * s))
+
+    return y, PAD, g8, innerW
+end
+
+-- state: "solo" (left column absent — world behind the scrim), "loot"
+-- (container in the left column, patch pending) or "trade" (reserved for
+-- the Cargo_Trade block). Center and right are identical in every state.
+local function BuildFrame(state)
+    if IsValid(frame) then frame:Remove() end
+    state = state or "solo"
+
+    local s, x0, y0, colH, colL, colC, colR, gap = ColumnRects()
 
     frame = vgui.Create("DFrame")
-    frame:SetSize(W, H)
-    frame:Center()
+    frame:SetSize(ScrW(), ScrH())
+    frame:SetPos(0, 0)
     frame:SetTitle("")
-    frame:SetDraggable(true)
-    frame:ShowCloseButton(true)
+    frame:SetDraggable(false)
+    frame:ShowCloseButton(false)
     frame:MakePopup()
     -- keyboard stays with the game: the inventory key toggles the frame
     -- closed and F1-F4 keep working while it is open
     frame:SetKeyboardInputEnabled(false)
+    frame.cargoState = state
     frame.Paint = function(_, w, h)
-        draw.RoundedBox(6, 0, 0, w, h, T.Colors.bg)
-        surface.SetDrawColor(T.Colors.border)
-        surface.DrawOutlinedRect(0, 0, w, h, 1)
+        -- scrim only — the world stays visible behind (mock .scrim)
+        surface.SetDrawColor(4, 5, 3, 205)
+        surface.DrawRect(0, 0, w, h)
     end
-    frame.OnClose = function()
+    -- ESC closes the inventory instead of stacking the game menu on top of
+    -- it (author call 2026-07-12); the next ESC opens the menu normally
+    frame.Think = function(self)
+        if gui.IsGameUIVisible() then
+            gui.HideGameUI()
+            self:Close()
+        end
+    end
+    frame.OnClose = function(self)
         CARGO.Tooltip.Hide()
+        if self.cargoState == "loot" then CARGO.Transfer.NotifyClosed() end
         surface.PlaySound("backpack/inv_close.wav")
     end
 
-    -- ---------------- left column ----------------
-    local left = vgui.Create("Panel", frame)
-    left:Dock(LEFT)
-    left:SetWide(286)
-    left:DockMargin(10, 28, 6, 10)
+    -- ---------------- left column: contextual (§15.1) ----------------
+    -- solo: absent (world behind the scrim). loot: container. trade: the
+    -- Cargo_Trade block builds its stock/basket here.
+    if state == "loot" then
+        local left = vgui.Create("DPanel", frame)
+        left:SetPos(x0, y0)
+        left:SetSize(colL, colH)
+        left.Paint = function(_, w, h) T.PaintPanel(w, h) end
+        left:DockPadding(8, 8, 8, 8)
 
-    local equipPanel = vgui.Create("DPanel", left)
-    equipPanel:Dock(TOP)
-    equipPanel:SetTall(312)
-    equipPanel.Paint = function(_, w, h)
-        T.PaintPanel(w, h)
-        draw.SimpleText("Equipment", "CargoHeading", 10, 8, T.Colors.textDim)
-    end
-
-    do
-        local PAD, y = 10, 30
-        local w3 = (286 - PAD * 2 - 12) / 3
-        local bigSlots = { "head", "body", "back" } -- slot ids, see corpus_cargo_slots.lua
-        for i, slotId in ipairs(bigSlots) do
-            local cell = MakeSlotCell(equipPanel, CARGO.Slots.ById[slotId], true)
-            cell:SetPos(PAD + (i - 1) * (w3 + 6), y)
-            cell:SetSize(w3, 84)
+        -- container header (mock .boxhdr): name + capacity line
+        local boxhdr = vgui.Create("DPanel", left)
+        boxhdr:Dock(TOP)
+        boxhdr:SetTall(48)
+        boxhdr.Paint = function(_, w, h)
+            T.PaintPanel(w, h)
+            local cont = CARGO.Transfer.State()
+            if cont == nil then return end
+            draw.SimpleText(cont.name or "Container", "CargoTitle", 10, 6, T.Colors.text)
+            local capText = cont.capacity == nil and "infinite capacity"
+                or ("capacity " .. T.FormatKg(cont.capacity))
+            draw.SimpleText("Container · " .. capText, "CargoSmall", 10, 28,
+                T.Colors.textDim)
         end
-        y = y + 90
 
-        local w2 = (286 - PAD * 2 - 6) / 2
-        local rows = {
-            { "primary", "secondary", 54 },
-            { "sidearm", "melee", 54 },
-            { "accessory1", "accessory2", 40 },
-        }
-        for _, row in ipairs(rows) do
-            for i = 1, 2 do
-                local cell = MakeSlotCell(equipPanel, CARGO.Slots.ById[row[i]], false)
-                cell:SetPos(PAD + (i - 1) * (w2 + 6), y)
-                cell:SetSize(w2, row[3])
+        -- container weight + Take all (mock .foot box-only)
+        local lootFoot = vgui.Create("DPanel", left)
+        lootFoot:Dock(BOTTOM)
+        lootFoot:SetTall(34)
+        lootFoot:DockMargin(0, 8, 0, 0)
+        lootFoot.Paint = function(_, w, h)
+            T.PaintPanel(w, h)
+            local cont = CARGO.Transfer.State()
+            if cont == nil then return end
+            draw.SimpleText(T.FormatKg(cont.weight or 0), "CargoHeading", 10, 8,
+                T.Colors.money)
+            if cont.capacity ~= nil and cont.capacity > 0 then
+                T.DrawBar(90, h / 2 - 4, w - 90 - 100, 8,
+                    (cont.weight or 0) / cont.capacity,
+                    T.WeightColor((cont.weight or 0) / cont.capacity))
             end
-            y = y + row[3] + 6
         end
-    end
 
-    local quickPanel = vgui.Create("DPanel", left)
-    quickPanel:Dock(TOP)
-    quickPanel:SetTall(96)
-    quickPanel:DockMargin(0, 8, 0, 0)
-    quickPanel.Paint = function(_, w, h)
-        T.PaintPanel(w, h)
-        draw.SimpleText("Quick slots", "CargoHeading", 10, 8, T.Colors.textDim)
-    end
-    do
-        local w4 = (286 - 20 - 18) / 4
-        for n = 1, CARGO.Slots.QUICK_COUNT do
-            local cell = MakeQuickCell(quickPanel, n)
-            cell:SetPos(10 + (n - 1) * (w4 + 6), 30)
-            cell:SetSize(w4, 56)
+        local takeAll = vgui.Create("DButton", lootFoot)
+        takeAll:Dock(RIGHT)
+        takeAll:SetWide(88)
+        takeAll:DockMargin(6, 5, 6, 5)
+        takeAll:SetText("")
+        takeAll.Paint = function(self, w, h)
+            draw.RoundedBox(4, 0, 0, w, h,
+                self:IsHovered() and T.Colors.cellHover or T.Colors.panelAlt)
+            surface.SetDrawColor(T.Colors.borderHi)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            draw.SimpleText("Take all", "CargoText", w / 2, h / 2,
+                T.Colors.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
+        takeAll.DoClick = function() CARGO.Transfer.TakeAll("take") end
+
+        lootGrid = CARGO.Grid.Create(left, {
+            getEntries = function()
+                local cont = CARGO.Transfer.State()
+                return cont and cont.items or {}
+            end,
+            dragSource = "cont",
+            onLeftClick = function(entry)
+                CARGO.Transfer.Send("take", CARGO.Grid.RefOf(entry), entry.count or 1)
+            end,
+            onRightClick = function(entry) CARGO.Transfer.Menu("take", entry) end,
+            -- dropping an own-inventory cell here puts it into the container
+            onReceiveDrop = function(cell)
+                if cell.cargoSource == "own" and cell.cargoEntry then
+                    CARGO.Transfer.Send("put", CARGO.Grid.RefOf(cell.cargoEntry),
+                        cell.cargoEntry.count or 1)
+                end
+            end,
+        })
+        lootGrid.panel:Dock(FILL)
+        lootGrid.panel:DockMargin(0, 8, 0, 0)
+        lootGrid.Refresh()
     end
 
-    local status = CARGO.StatusPanel.Build(left)
-    status:Dock(FILL)
-    status:DockMargin(0, 8, 0, 0)
+    -- ---------------- center column: equipment ----------------
+    local center = vgui.Create("DPanel", frame)
+    center:SetPos(x0 + colL + gap, y0)
+    center:SetSize(colC, colH)
+    center.Paint = function(_, w, h) T.PaintPanel(w, h) end
+    BuildEquipColumn(center, s)
 
-    -- ---------------- right column ----------------
-    local right = vgui.Create("Panel", frame)
-    right:Dock(FILL)
-    right:DockMargin(4, 28, 10, 10)
+    -- ---------------- right column: own inventory ----------------
+    local right = vgui.Create("DPanel", frame)
+    right:SetPos(x0 + colL + gap + colC + gap, y0)
+    right:SetSize(colR, colH)
+    right.Paint = function(_, w, h) T.PaintPanel(w, h) end
+    right:DockPadding(8, 8, 8, 8)
 
     local header = vgui.Create("DPanel", right)
     header:Dock(TOP)
@@ -588,10 +955,11 @@ local function BuildFrame()
         end
 
         if snap then
-            draw.SimpleText(snap.money or "?", "CargoTitle", w - 12, 8,
-                T.Colors.text, TEXT_ALIGN_RIGHT)
+            -- the money button docks on the right edge: text sits left of it
+            draw.SimpleText(snap.money or "?", "CargoTitle", w - 56, 8,
+                T.Colors.money, TEXT_ALIGN_RIGHT)
             draw.SimpleText((snap.moneyLabel or "") .. " / provider", "CargoSmall",
-                w - 12, 32, T.Colors.textDim, TEXT_ALIGN_RIGHT)
+                w - 56, 32, T.Colors.textDim, TEXT_ALIGN_RIGHT)
         end
     end
 
@@ -600,10 +968,39 @@ local function BuildFrame()
     avatar:SetSize(40, 40)
     avatar:SetPlayer(LocalPlayer(), 64)
 
+    -- money button (§15.3): the trigger is Cargo's; the mechanics (drop-
+    -- money entity in Solo, basket line in Trade) belong to the Cargo_Trade
+    -- block and hook in via CARGO.Trade.MoneyButton when that block lands.
+    local moneyBtn = vgui.Create("DButton", header)
+    moneyBtn:Dock(RIGHT)
+    moneyBtn:SetWide(36)
+    moneyBtn:DockMargin(0, 10, 10, 10)
+    moneyBtn:SetText("")
+    moneyBtn:SetTooltip("Solo: drop money · Trade: offer money")
+    moneyBtn.Paint = function(self, w, h)
+        local cx, cy, r = w / 2, h / 2, math.min(w, h) / 2 - 1
+        DrawCircleFilled(cx, cy, r,
+            self:IsHovered() and T.Colors.cellHover or T.Colors.cell)
+        local bc = self:IsHovered() and T.Colors.amber or T.Colors.borderHi
+        surface.DrawCircle(cx, cy, r, bc.r, bc.g, bc.b, bc.a)
+        draw.SimpleText("$", "CargoHeading", cx, cy, T.Colors.amber,
+            TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+    moneyBtn.DoClick = function()
+        if istable(CARGO.Trade) and isfunction(CARGO.Trade.MoneyButton) then
+            CARGO.Trade.MoneyButton(frame.cargoState)
+            return
+        end
+        chat.AddText(T.Colors.amber, "[Cargo] ", T.Colors.text,
+            "Money actions arrive with the trade block.")
+    end
+
     tabsBar = vgui.Create("Panel", right)
     tabsBar:Dock(TOP)
     tabsBar:SetTall(28)
     tabsBar:DockMargin(0, 8, 0, 8)
+    -- usable width for the tab wrap (dock layout hasn't run yet)
+    tabsBar.cargoWide = colR - 16
 
     local footer = vgui.Create("DPanel", right)
     footer:Dock(BOTTOM)
@@ -614,9 +1011,12 @@ local function BuildFrame()
         local snap = S()
         if snap == nil then return end
 
+        -- the Move all button docks on the right while looting
+        local rightEdge = w - (state == "loot" and 112 or 12)
+
         local frac = snap.capacity > 0 and snap.weight / snap.capacity or 0
         local col = T.WeightColor(frac)
-        T.DrawBar(10, h / 2 - 4, w * 0.5, 8, frac, col)
+        T.DrawBar(10, h / 2 - 4, w * 0.4, 8, frac, col)
 
         local txt = string.format("%.1f kg", snap.weight)
         local rest = string.format(" / %.1f kg (base %g + back %g)",
@@ -625,8 +1025,8 @@ local function BuildFrame()
         local restW = surface.GetTextSize(rest)
         surface.SetFont("CargoHeading")
         local txtW = surface.GetTextSize(txt)
-        draw.SimpleText(txt, "CargoHeading", w - 12 - restW - txtW, 8, col)
-        draw.SimpleText(rest, "CargoText", w - 12 - restW, 10, T.Colors.textDim)
+        draw.SimpleText(txt, "CargoHeading", rightEdge - restW - txtW, 8, col)
+        draw.SimpleText(rest, "CargoText", rightEdge - restW, 10, T.Colors.textDim)
     end
 
     grid = CARGO.Grid.Create(right, {
@@ -635,13 +1035,53 @@ local function BuildFrame()
             return snap and snap.items or {}
         end,
         dragSource = "own",
-        onRightClick = function(entry) OpenItemMenu(entry) end,
-        -- dropping an equipment slot cell onto the grid unequips it
+        -- while looting, clicks transfer (old side-by-side panel behavior);
+        -- solo keeps the full item context menu
+        onLeftClick = function(entry)
+            if state == "loot" then
+                CARGO.Transfer.Send("put", CARGO.Grid.RefOf(entry), entry.count or 1)
+            end
+        end,
+        onRightClick = function(entry)
+            if state == "loot" then
+                CARGO.Transfer.Menu("put", entry)
+            else
+                OpenItemMenu(entry)
+            end
+        end,
+        -- dropping an equipment slot cell here unequips it; a belt cell
+        -- returns its stack; a container cell (loot) is taken
         onReceiveDrop = function(cell)
-            if cell.cargoSlotId then SendUnequip(cell.cargoSlotId) end
+            if cell.cargoSlotId then
+                SendUnequip(cell.cargoSlotId)
+            elseif cell.cargoBeltSlot then
+                SendBeltClear(cell.cargoBeltSlot)
+            elseif state == "loot" and cell.cargoSource == "cont" and cell.cargoEntry then
+                CARGO.Transfer.Send("take", CARGO.Grid.RefOf(cell.cargoEntry),
+                    cell.cargoEntry.count or 1)
+            end
         end,
     })
     grid.panel:Dock(FILL)
+
+    -- Move all (mock .foot box-only): dump the whole inventory into the
+    -- container. Lives in the weight footer, loot state only.
+    if state == "loot" then
+        local moveAll = vgui.Create("DButton", footer)
+        moveAll:Dock(RIGHT)
+        moveAll:SetWide(88)
+        moveAll:DockMargin(6, 5, 6, 5)
+        moveAll:SetText("")
+        moveAll.Paint = function(self, w, h)
+            draw.RoundedBox(4, 0, 0, w, h,
+                self:IsHovered() and T.Colors.cellHover or T.Colors.panelAlt)
+            surface.SetDrawColor(T.Colors.borderHi)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            draw.SimpleText("Move all", "CargoText", w / 2, h / 2,
+                T.Colors.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end
+        moveAll.DoClick = function() CARGO.Transfer.TakeAll("put") end
+    end
 
     BuildTabs(tabsBar)
     grid.Refresh()
@@ -659,6 +1099,18 @@ function CARGO.UI.RefreshAll()
     -- equipment/quick/header/footer paint straight from the snapshot
 end
 
+-- container opened (corpus_cargo_transfer.lua): same frame, Loot state
+function CARGO.UI.OpenLoot()
+    BuildFrame("loot")
+end
+
+-- container snapshot changed: only the left column needs repopulating
+function CARGO.UI.RefreshLoot()
+    if IsValid(frame) and frame.cargoState == "loot" and lootGrid then
+        lootGrid.Refresh()
+    end
+end
+
 function CARGO.UI.Toggle()
     if IsValid(frame) then
         frame:Close()
@@ -672,8 +1124,10 @@ end
 net.Receive(NET_SYNC, function()
     local snap = CARGO.Util.ReadBlob()
     if snap == nil then return end
-    -- quick is a sparse numeric map: the JSON hop stringifies its keys
+    -- quick and belt are sparse numeric maps: the JSON hop stringifies
+    -- their keys
     snap.quick = CARGO.Util.NumberKeys(snap.quick)
+    snap.belt = CARGO.Util.NumberKeys(snap.belt)
 
     -- server-side auto-generated defs (captured engine weapons) arrive with
     -- the snapshot; engine names come as localization tokens ("#HL2_Pistol")
@@ -700,13 +1154,11 @@ net.Receive(NET_SYNC, function()
     CARGO.ClientState = snap
     if pendingOpen then
         pendingOpen = nil
-        BuildFrame()
+        BuildFrame("solo")
     else
+        -- also refreshes the own grid while looting — the loot column has
+        -- its own sync channel (corpus_cargo_transfer.lua)
         CARGO.UI.RefreshAll()
-    end
-    -- container panel mirrors the player half when open
-    if CARGO.Transfer and CARGO.Transfer.RefreshOwn then
-        CARGO.Transfer.RefreshOwn()
     end
 end)
 

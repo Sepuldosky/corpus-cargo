@@ -8,23 +8,27 @@ local CARGO = Corpus.GetModule("cargo")
 CARGO.Theme = CARGO.Theme or {}
 local T = CARGO.Theme
 
+-- olive/military palette lifted from the fullscreen mock
+-- (cargo_fullscreen_ui_mock_v1.html :root vars)
 T.Colors = {
-    bg        = Color(14, 14, 14, 245),
-    panel     = Color(24, 24, 24),
-    panelAlt  = Color(32, 32, 32),
-    cell      = Color(30, 30, 30),
-    cellHover = Color(42, 42, 42),
-    border    = Color(52, 52, 52),
-    borderHi  = Color(90, 90, 90),
-    text      = Color(224, 224, 224),
-    textDim   = Color(148, 148, 148),
-    green     = Color(102, 187, 106),
-    amber     = Color(255, 179, 0),
-    orange    = Color(255, 111, 0),
-    red       = Color(229, 57, 53),
-    blue      = Color(33, 118, 205),
-    blueDark  = Color(18, 52, 86),
-    barBack   = Color(50, 50, 50),
+    bg        = Color(11, 12, 10, 245),
+    panel     = Color(20, 21, 15),
+    panelAlt  = Color(25, 26, 19),
+    cell      = Color(15, 16, 11),
+    cellHover = Color(34, 37, 26),
+    border    = Color(43, 45, 34),
+    borderHi  = Color(58, 61, 46),
+    text      = Color(214, 217, 200),
+    textDim   = Color(110, 114, 99),
+    green     = Color(157, 192, 75),
+    greenDim  = Color(92, 112, 48),
+    amber     = Color(217, 161, 59),
+    orange    = Color(216, 122, 44),
+    red       = Color(199, 80, 58),
+    blue      = Color(91, 143, 168),
+    blueDark  = Color(24, 34, 40),
+    money     = Color(222, 216, 194),
+    barBack   = Color(10, 11, 7),
 }
 
 surface.CreateFont("CargoTitle",   { font = "Roboto", size = 20, weight = 700 })
@@ -32,6 +36,13 @@ surface.CreateFont("CargoHeading", { font = "Roboto", size = 16, weight = 700 })
 surface.CreateFont("CargoText",    { font = "Roboto", size = 14, weight = 500 })
 surface.CreateFont("CargoSmall",   { font = "Roboto", size = 12, weight = 500 })
 surface.CreateFont("CargoTiny",    { font = "Roboto", size = 11, weight = 700 })
+
+-- layout scale: the fullscreen mock is authored at 1080p; hand-tuned pixel
+-- dimensions multiply by this (fonts stay fixed — they read fine across the
+-- supported range, and VGUI fonts cannot be resized per-frame anyway)
+function T.UIScale()
+    return math.max(ScrH() / 1080, 0.6)
+end
 
 -- condition %: green while healthy, amber worn, red near-broken
 function T.ConditionColor(pct)
@@ -57,6 +68,19 @@ function T.DrawBar(x, y, w, h, frac, col)
     surface.DrawRect(x, y, math.Clamp(frac, 0, 1) * w, h)
 end
 
+-- segmented bar (mock's .seg under equipment slots): 4 px ticks, 3 px gaps
+function T.DrawSegBar(x, y, w, h, frac, col)
+    surface.SetDrawColor(T.Colors.barBack)
+    surface.DrawRect(x, y, w, h)
+    local fill = math.Clamp(frac, 0, 1) * w
+    surface.SetDrawColor(col)
+    local cx = x
+    while cx < x + fill do
+        surface.DrawRect(cx, y, math.min(4, x + fill - cx), h)
+        cx = cx + 7
+    end
+end
+
 -- standard panel look: flat box + hairline border
 function T.PaintPanel(w, h, bgCol, borderCol)
     draw.RoundedBox(4, 0, 0, w, h, bgCol or T.Colors.panel)
@@ -75,6 +99,19 @@ function T.DrawIconFit(mat, x, y, w, h)
     surface.SetDrawColor(255, 255, 255)
     surface.SetMaterial(mat)
     surface.DrawTexturedRect(x + (w - dw) / 2, y + (h - dh) / 2, dw, dh)
+end
+
+-- 90°-rotated aspect-fit: wide weapon icons inside the tall vertical slots
+-- of the fullscreen equipment column (mock rotates the rifle in Primary)
+function T.DrawIconFitVertical(mat, x, y, w, h)
+    local mw, mh = mat:Width(), mat:Height()
+    if mw <= 0 or mh <= 0 then mw, mh = 1, 1 end
+    -- after the 90° turn the drawn bounds are mh×mw, so fit against those
+    local scale = math.min(w / mh, h / mw)
+    surface.SetDrawColor(255, 255, 255)
+    surface.SetMaterial(mat)
+    surface.DrawTexturedRectRotated(x + w / 2, y + h / 2,
+        mw * scale, mh * scale, 90)
 end
 
 -- effect overlay tags (§7 bottom-left corner): known ids get a color; an
