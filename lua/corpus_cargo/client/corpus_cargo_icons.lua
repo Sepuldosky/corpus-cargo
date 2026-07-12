@@ -18,6 +18,14 @@
 --   alpha capture            render.SetWriteDepthToDestAlpha + capture
 --     alpha=true ("enhanced playermodel selector", dev/other/)
 --   Material("data/x.png")   ARC9 cl_presets.lua:432 (dev/other/)
+--   ARC9 select icon         SWEP:DoIconCapture(true) writes
+--     data/<PresetPath><base>_icon.<PresetIconFormat> (cl_hud.lua:763,
+--     PresetPath "arc9_presets/", format "arc9.png" — sh_common.lua:105);
+--     256x256 RGBA on <=1100px screens, x2 above (cl_presets.lua:227)
+--   customize state          wep:GetCustomize() (cl_customize_ui.lua:269)
+--   pixel readback           render.CapturePixels + render.ReadPixel
+--     inside a pushed RT (gmod wiki; alpha return needs x86-64 — the
+--     luminance fallback below covers builds where it comes back nil)
 
 local CARGO = Corpus.GetModule("cargo")
 
@@ -30,8 +38,17 @@ local cvBakeBg = CreateClientConVar("cargo_icon_bake_bg", "0", true, false,
     "0 = real alpha capture (Plan A), 1 = bake the slot color into the PNG (Plan B)")
 
 local DIR = "corpus/cargo/icons" -- data/ root; inside the Corpus.Data namespace
-local CELL_PX = 64               -- render resolution per grid cell (§6)
-local RT_SIZE = 512              -- one reusable work RT, cropped on capture (§6)
+local CELL_PX = 128              -- render resolution per grid cell (§6; 64
+                                 -- upscaled ugly on big cells/tooltip zoom —
+                                 -- in-game report 2026-07-11, 8.ª pasada)
+local RT_SIZE = 1024             -- one reusable work RT, cropped on capture
+                                 -- (§6; must fit the widest footprint at
+                                 -- CELL_PX: 6 cells * 128 = 768)
+
+-- GetRenderTarget caches by NAME for the whole engine session (survives lua
+-- refresh): the size goes in the name so an old 512 RT never serves the
+-- 1024 recipe after a refresh mid-session
+local RT_NAME = "corpus_cargo_icons_rt_" .. RT_SIZE
 
 -- footprint auto-quantization tuning (§5: "se afinan empíricamente")
 local UNITS_PER_CELL = 8    -- world units of projected OBB per grid cell
@@ -40,7 +57,7 @@ local LEN_WEIGHT     = 0.18 -- score weight per cell of long-side mismatch
 -- Bump when the render recipe or the auto framing changes: the version is
 -- part of the cache key, so every stale icon orphans and re-renders lazily —
 -- no manual regen_all needed after a global style change shipped in code.
-local RECIPE_VERSION = "r5"
+local RECIPE_VERSION = "r6"
 
 -- Read a SWEP field climbing the Base chain via GetStored. weapons.GetStored
 -- returns the RAW registered table WITHOUT inherited base fields (verified in
@@ -209,42 +226,74 @@ local function SaveMeta()
     file.Write(META, util.TableToJSON(iconMeta))
 end
 
--- The weapon entity in the local player's hands, if it is one of ARC9's
--- MirrorVMWM guns — the only case where the assembled capture applies and
--- the only moment it is possible (ARC9 builds display models per-SWEP).
---
--- DEPLOYED AND SETTLED only: ARC9 fills its attachment state over the first
--- moments of a deploy, and a merely-carried (holstered) gun never builds it
--- — capturing there produced PARTIAL or empty assemblies (in-game report
--- 2026-07-11; ARC9's own HUD select icons suffer the same race and heal on
--- a later regenerate). Two-step: the first sight of the gun ACTIVE arms a
--- settle window; the capture only runs once the window passed with the gun
--- still out. Until then the bare render stands in and the probe retries.
-local liveReadyAt = {} -- weapon_class -> CurTime() when the deploy settled
+-- ------------------------------------------------------------------
+-- ARC9 source icon. MirrorVMWM guns are MODULAR: stock, handguard, mag —
+-- even on the "bare" gun — are attachment MODELS mounted by ARC9, so a lone
+-- ClientsideModel render shows a stripped receiver. Re-photographing the
+-- assembly ourselves (SetupModel + DrawCustomModel, recipes r3-r5) kept
+-- RACING ARC9's part positioning, which settles across FRAMES, not draw
+-- calls: captures came out partial or with parts far from the gun (in-game
+-- reports 2026-07-11, up to the 8.ª pasada). Pivot (author call, plan C of
+-- the handoff): ARC9's own select-icon capture is that same photo taken by
+-- the code that owns the state — always assembled, always framed — so the
+-- icon SOURCE for these guns is ARC9's PNG on disk, re-cropped in 2D below.
+-- Fresh sources come from the customize-menu watcher at the end of file.
+-- ------------------------------------------------------------------
 
-local function LiveArc9Weapon(def)
+-- defid -> { path, stamp, nextPoll } (path nil = no source on disk yet).
+-- File stats are polled at most every 3 s — Get() runs inside Paint. The
+-- stamp folds into the cache key, so a fresh ARC9 capture RENAMES our PNG:
+-- Material() caches by path and would otherwise serve the stale pixels.
+local arc9Src = {}
+
+-- MirrorVMWM def (climbed from the base) -> its weapon class, else nil.
+-- Memoized per defid like ModelFor: this runs from IconCacheKey, i.e. every
+-- Paint frame per cell — the base-chain climb must not repeat there.
+local arc9ClassCache = {} -- defid -> class | false
+
+local function Arc9IconClass(def)
     if not istable(def) then return nil end
+    local defid = def.id
+    if defid ~= nil and arc9ClassCache[defid] ~= nil then
+        return arc9ClassCache[defid] or nil
+    end
     local class = def.weapon_class
-    if not isstring(class) or class == "" then return nil end
-    if not SwepField(class, "MirrorVMWM") then return nil end
-    local lp = LocalPlayer()
-    if not IsValid(lp) then return nil end
-    local wep = lp:GetWeapon(class)
-    if not IsValid(wep) or not wep.ARC9 then return nil end
-    if not isfunction(wep.SetupModel) or not isfunction(wep.DrawCustomModel)
-        or not isfunction(wep.KillModel) then return nil end
+    if not isstring(class) or class == ""
+        or not SwepField(class, "MirrorVMWM") then class = nil end
+    if defid ~= nil then arc9ClassCache[defid] = class or false end
+    return class
+end
 
-    if lp:GetActiveWeapon() ~= wep then
-        liveReadyAt[class] = nil
-        return nil
+-- ARC9's own fallback chain (cl_hud.lua DrawWeaponSelection): the shared
+-- auto select icon first, then the default preset's thumbnail
+local function Arc9SourceInfo(def)
+    local defid = def.id
+    local class = Arc9IconClass(def)
+    if defid == nil or class == nil then return nil end
+
+    local hit = arc9Src[defid]
+    if hit ~= nil and CurTime() < hit.nextPoll then
+        return hit.path ~= nil and hit or nil
     end
-    local ready = liveReadyAt[class]
-    if ready == nil then
-        liveReadyAt[class] = CurTime() + 1
-        return nil
+
+    local dir = istable(ARC9) and ARC9.PresetPath or "arc9_presets/"
+    local fmt = istable(ARC9) and ARC9.PresetIconFormat or "arc9.png"
+    local base = SwepField(class, "SaveBase")
+    base = isstring(base) and base or class
+
+    local path = dir .. base .. "_icon." .. fmt
+    if not file.Exists(path, "DATA") then
+        path = dir .. base .. "/default." .. fmt
+        if not file.Exists(path, "DATA") then path = nil end
     end
-    if CurTime() < ready then return nil end
-    return wep
+
+    hit = {
+        path = path,
+        stamp = path ~= nil and (file.Time(path, "DATA") or 0) or 0,
+        nextPoll = CurTime() + 3,
+    }
+    arc9Src[defid] = hit
+    return path ~= nil and hit or nil
 end
 
 -- ------------------------------------------------------------------
@@ -307,13 +356,18 @@ local function CamKeyString(def)
 end
 
 -- Filename IS the invalidation key (§7): <defid>_<hash(model + effective
--- cam + effective footprint)>.png — change any input and the name changes,
--- forcing a re-render (Material() caches by path, never reuse a name).
+-- cam + effective footprint [+ ARC9 source stamp])>.png — change any input
+-- and the name changes, forcing a re-render (Material() caches by path,
+-- never reuse a name).
 function Icons.IconCacheKey(def)
     local model = Icons.ModelFor(def) or "none"
     local fp = Icons.GetFootprint(def)
     local input = RECIPE_VERSION .. "|" .. model .. "|" .. CamKeyString(def)
         .. "|" .. fp.w .. "x" .. fp.h
+    -- ARC9-sourced icons fold the source capture's mtime in: every fresh
+    -- capture from the menu watcher re-keys the file on its own
+    local src = Arc9SourceInfo(def)
+    if src ~= nil then input = input .. "|arc9:" .. src.stamp end
     local san = string.gsub(string.lower(def.id or "unknown"), "[^%w_%-]", "_")
     return san .. "_" .. util.CRC(input) .. ".png"
 end
@@ -465,38 +519,47 @@ end
 -- gate; flipping the convar regenerates the whole cache.
 -- ------------------------------------------------------------------
 
-local matCache = {}   -- defid -> { key = filename, mat = IMaterial | false | nil }
+local matCache = {}   -- defid -> { key = filename, mat = IMaterial | false | nil,
+                      --            prev = IMaterial | nil }
                       -- mat false = resolved to letter (error signal)
-                      -- mat nil   = queued, waiting for its render
+                      -- mat nil   = queued; prev (last good render, if any)
+                      --             stands in so a re-key never letter-flashes
 local queue, queued = {}, {}
 local qHead, qTail = 1, 0
 local liveNext = {} -- defid -> next CurTime() an upgrade probe is allowed
 
 local workRT -- lazy: only allocated if something actually renders
 
-local function Enqueue(defid, key)
-    -- pending marker (letter meanwhile); refreshed even if already queued
-    -- so Get() stops probing the disk for a key that changed mid-queue
-    matCache[defid] = { key = key, mat = nil }
+local function EnsureRT()
+    workRT = workRT or GetRenderTarget(RT_NAME, RT_SIZE, RT_SIZE)
+    return workRT
+end
+
+local function Enqueue(defid, key, prev)
+    -- pending marker (prev icon or letter meanwhile); refreshed even if
+    -- already queued so Get() stops probing the disk for a key that
+    -- changed mid-queue
+    matCache[defid] = { key = key, mat = nil, prev = prev }
     if queued[defid] then return end
     queued[defid] = true
     qTail = qTail + 1
     queue[qTail] = defid
 end
 
--- A bare-viewmodel PNG of a modular ARC9 gun upgrades to the assembled
--- capture the moment the player actually holds the weapon. Probed from
--- Get() (throttled — it runs inside Paint) and queued WITHOUT the Enqueue
--- placeholder, so the cell keeps the provisional icon until the better
--- render lands instead of flashing back to the letter.
+-- A bare-viewmodel PNG of a modular ARC9 gun upgrades the moment ARC9's own
+-- select-icon capture exists on disk — or refreshes, when the menu watcher
+-- retook it. Probed from Get() (throttled — it runs inside Paint) and
+-- queued WITHOUT the Enqueue placeholder, so the cell keeps the current
+-- icon until the better render lands instead of flashing back to the letter.
 local function MaybeQueueUpgrade(def)
     local defid = def.id
     if defid == nil or queued[defid] then return end
-    local m = iconMeta[defid]
-    if istable(m) and m.assembled then return end
     if CurTime() < (liveNext[defid] or 0) then return end
     liveNext[defid] = CurTime() + 3
-    if LiveArc9Weapon(def) == nil then return end
+    local src = Arc9SourceInfo(def)
+    if src == nil then return end
+    local m = iconMeta[defid]
+    if istable(m) and m.assembled and m.src == src.stamp then return end
     queued[defid] = true
     qTail = qTail + 1
     queue[qTail] = defid
@@ -509,15 +572,11 @@ end
 -- model absent). Plan A alpha comes from depth-to-dest-alpha during the
 -- pass: opaque pixels write depth, depth writes the destination alpha, the
 -- silhouette is the mask.
--- crop (optional {x,y,w,h}) captures a sub-rect of the viewport — the ARC9
--- preset framing renders 16:9 like ARC9 does and cuts the icon out of it
-local function CaptureToPng(w, h, view, drawFn, crop)
+local function CaptureToPng(w, h, view, drawFn)
     local bake = cvBakeBg:GetBool()
     local bg = CARGO.Theme.Colors.cell
 
-    workRT = workRT or GetRenderTarget("corpus_cargo_icons_rt", RT_SIZE, RT_SIZE)
-
-    render.PushRenderTarget(workRT)
+    render.PushRenderTarget(EnsureRT())
         render.SuppressEngineLighting(true)
         -- neutral boxed lighting (duplicator recipe, toned down)
         render.SetModelLighting(0, 1.1, 1.1, 1.1) -- front
@@ -548,9 +607,7 @@ local function CaptureToPng(w, h, view, drawFn, crop)
         render.SuppressEngineLighting(false)
 
         local png = render.Capture({
-            format = "png",
-            x = crop and crop.x or 0, y = crop and crop.y or 0,
-            w = crop and crop.w or w, h = crop and crop.h or h,
+            format = "png", x = 0, y = 0, w = w, h = h,
             alpha = not bake,
         })
     render.PopRenderTarget()
@@ -570,177 +627,152 @@ local function CommitPng(def, key, png)
 end
 
 -- ------------------------------------------------------------------
--- ARC9 assembled capture. MirrorVMWM guns are MODULAR: the stock, the
--- handguard, the mag — even on the "bare" gun — are attachment MODELS
--- mounted on the viewmodel, so a lone ClientsideModel render shows a
--- stripped receiver (in-game report 2026-07-11, same failure the HUD-icon
--- mods hit). Rebuilding that assembly from the def would mean
--- reimplementing ARC9's SetupModel; instead we borrow ARC9's own display
--- build on the LIVE weapon — SetupModel(true, 0, true) -> CModel +
--- DrawCustomModel(true, pos, ang), the exact DoPresetCapture recipe
--- (arc9_base cl_presets.lua) — and photograph it with OUR camera, lighting
--- and alpha so it still looks like a Cargo icon, not an ARC9 preset.
+-- ARC9-sourced icon: 2D re-crop of ARC9's own select-icon PNG (rationale
+-- in the "ARC9 source icon" section above). The source is a 256x256 RGBA
+-- square with the gun as a horizontal band in the middle — used raw it
+-- would draw tiny inside a cell, so the silhouette's pixel bbox is scanned
+-- and re-cropped into a footprint-shaped PNG of our own. Pure 2D: no model
+-- state to race, works from disk without the gun in hand (boot, regen_all).
+-- A cam override (editor/code) is IGNORED here on purpose: the ARC9 photo
+-- IS the framing; the size override keeps working via GetFootprint.
 -- ------------------------------------------------------------------
 
--- gun pose straight from ARC9's preset-capture math: CustomizePos/Ang is
--- per-gun data that orients every weapon side-on for its customize view —
--- exactly the profile an icon wants
-local function AssembledPose(wep)
-    local custpos = wep:GetProcessedValue("CustomizePos", true)
-        + (wep.CustomizeSnapshotPos or Vector(0, 0, 0))
-    local custang = wep:GetProcessedValue("CustomizeAng", true)
-        + (wep.CustomizeSnapshotAng or Angle(0, 0, 0))
-    local camang = Angle(0, 0, 0)
-    local pos = Vector(0, 0, 1)
-        + camang:Right() * custpos[1]
-        + camang:Forward() * custpos[2]
-        + camang:Up() * custpos[3]
-    local ang = Angle(0, 0, 0)
-    ang:RotateAroundAxis(camang:Up(), custang[1])
-    ang:RotateAroundAxis(camang:Right(), custang[2])
-    ang:RotateAroundAxis(camang:Forward(), custang[3])
-    return pos, ang
-end
+-- pixel bbox of the source drawn at (0,0,sw,sh) on the work RT. Alpha is
+-- the authoritative mask; when it carries no signal (RGB source, or a
+-- ReadPixel build without the alpha return) luminance over the transparent-
+-- black clear stands in. Sampled every 2 px — bbox precision, not fidelity.
+local function SourceBBox(mat, sw, sh)
+    render.PushRenderTarget(EnsureRT())
+        render.Clear(0, 0, 0, 0, true, true)
+        render.OverrideAlphaWriteEnable(true, true)
+        cam.Start2D()
+            surface.SetDrawColor(255, 255, 255, 255)
+            surface.SetMaterial(mat)
+            surface.DrawTexturedRect(0, 0, sw, sh)
+        cam.End2D()
+        render.OverrideAlphaWriteEnable(false)
+        render.CapturePixels()
 
--- merged world AABB over the placed parts (skipping ARC9's helper entries).
--- Only the BASE viewmodel needs the mesh walk (its hull lies in animation
--- space); attachment models are static props whose authored hull is honest
--- and free — keeps the one-per-model hitch down to a single mesh
-local function AssembledBounds(parts)
-    local mn, mx
-    for _, part in ipairs(parts) do
-        if IsValid(part) and not part.hidden and not part.IsAnimationProxy then
-            local pmn, pmx
-            if istable(part.slottbl) and part.slottbl.WMBase then
-                pmn, pmx = TightModelBounds(part)
-            else
-                pmn, pmx = StaticBounds(part)
-            end
-            for i = 0, 7 do
-                local corner = part:LocalToWorld(Vector(
-                    bit.band(i, 1) == 0 and pmn.x or pmx.x,
-                    bit.band(i, 2) == 0 and pmn.y or pmx.y,
-                    bit.band(i, 4) == 0 and pmn.z or pmx.z))
-                if mn == nil then
-                    mn = Vector(corner.x, corner.y, corner.z)
-                    mx = Vector(corner.x, corner.y, corner.z)
-                else
-                    mn.x = math.min(mn.x, corner.x)
-                    mn.y = math.min(mn.y, corner.y)
-                    mn.z = math.min(mn.z, corner.z)
-                    mx.x = math.max(mx.x, corner.x)
-                    mx.y = math.max(mx.y, corner.y)
-                    mx.z = math.max(mx.z, corner.z)
+        local ax0, ay0, ax1, ay1 -- alpha bbox
+        local lx0, ly0, lx1, ly1 -- luminance bbox
+        local amin, amax = 255, 0
+        for y = 0, sh - 1, 2 do
+            for x = 0, sw - 1, 2 do
+                local r, g, b, a = render.ReadPixel(x, y)
+                a = a or 255
+                if a < amin then amin = a end
+                if a > amax then amax = a end
+                if a > 12 then
+                    if ax0 == nil or x < ax0 then ax0 = x end
+                    if ax1 == nil or x > ax1 then ax1 = x end
+                    if ay0 == nil or y < ay0 then ay0 = y end
+                    if ay1 == nil or y > ay1 then ay1 = y end
+                end
+                if r > 12 or g > 12 or b > 12 then
+                    if lx0 == nil or x < lx0 then lx0 = x end
+                    if lx1 == nil or x > lx1 then lx1 = x end
+                    if ly0 == nil or y < ly0 then ly0 = y end
+                    if ly1 == nil or y > ly1 then ly1 = y end
                 end
             end
         end
-    end
-    return mn, mx
-end
-
--- the CModel is built and torn down here; the render body runs under pcall
--- so ARC9.PresetCam and the clientside models never leak on an error
-local function DrawAssembled(def, wep, pos, ang)
-    -- settle pass: DrawCustomModel positions every part as a side effect of
-    -- drawing — camera and viewport are irrelevant, only the transforms are
-    workRT = workRT or GetRenderTarget("corpus_cargo_icons_rt", RT_SIZE, RT_SIZE)
-    render.PushRenderTarget(workRT)
-        cam.Start3D(Vector(0, 0, -200), Angle(0, 0, 0), 45, 0, 0, 8, 8, 1, 4096)
-            wep:DrawCustomModel(true, pos, ang)
-        cam.End3D()
     render.PopRenderTarget()
 
-    local mn, mx = AssembledBounds(wep.CModel or {})
-    if mn == nil then return false end
+    if amax - amin > 64 then return ax0, ay0, ax1, ay1 end
+    return lx0, ly0, lx1, ly1
+end
 
-    -- footprint from the ASSEMBLED silhouette (the bare one under-measured —
-    -- that 1x2 9A-91) — persisted so next session's cache key matches
-    local spanX, spanY, spanZ = mx.x - mn.x, mx.y - mn.y, mx.z - mn.z
-    local autoFp = Icons.QuantizeFootprint(spanY, spanZ, def.category)
+local function RenderFromArc9Icon(def, src)
+    local mat = Material("data/" .. src.path, "smooth")
+    if mat:IsError() then return false end
+    -- the material may be cached from before ARC9 rewrote the file this
+    -- session: Download() makes the texture re-read its PNG (defensive —
+    -- the re-keyed OUTPUT already guards our side)
+    local tex = mat.GetTexture and mat:GetTexture("$basetexture") or nil
+    if tex ~= nil then pcall(tex.Download, tex) end
+
+    local sw = math.min(mat:Width(), RT_SIZE)
+    local sh = math.min(mat:Height(), RT_SIZE)
+    if sw <= 1 or sh <= 1 then return false end
+
+    local bx0, by0, bx1, by1 = SourceBBox(mat, sw, sh)
+    if bx0 == nil then return false end -- empty capture: keep the bare render
+    -- margin so smooth-filtered edges survive the crop
+    bx0, by0 = math.max(0, bx0 - 2), math.max(0, by0 - 2)
+    bx1, by1 = math.min(sw, bx1 + 3), math.min(sh, by1 + 3)
+    local bw, bh = bx1 - bx0, by1 - by0
+
+    -- footprint from the silhouette. World units per source pixel come from
+    -- ARC9's snapshot projection: 16:9 viewport whose center square is the
+    -- source (cl_presets.lua), CustomizeSnapshotFOV across its width, gun at
+    -- roughly |CustomizePos| from the camera. An approximation — quantize
+    -- only needs the right bucket, and caps/override clamp the extremes.
+    local class = def.weapon_class
+    local fov = tonumber(SwepField(class, "CustomizeSnapshotFOV")) or 90
+    local cpos = SwepField(class, "CustomizePos")
+    local dist = isvector(cpos) and math.max(cpos:Length(), 8) or 24
+    local worldPerPx = 2 * dist * math.tan(math.rad(fov) * 0.5) / (sw * 16 / 9)
+    local autoFp = Icons.QuantizeFootprint(bw * worldPerPx, bh * worldPerPx, def.category)
     fpCache[def.id] = autoFp
 
     local fp = Icons.GetFootprint(def)
     local key = Icons.IconCacheKey(def)
-    local draw = function() wep:DrawCustomModel(true, pos, ang) end
 
-    -- Camera: a data/code cam override still wins (§4). Otherwise use ARC9's
-    -- OWN preset framing (author request, 7.ª pasada 2026-07-11: "el menú de
-    -- ARC9 se ve justo como debería"): the gun is already posed by the
-    -- per-gun CustomizePos/Ang data, and CustomizeSnapshotFOV is the camera
-    -- the pack author tuned to match — same origin/angles/16:9 viewport as
-    -- DoPresetCapture, no bounds measurement to get wrong. We capture the
-    -- center square like ARC9 and cut it down to the footprint aspect.
-    local png
-    local ovrcam = (istable(def.icon_override) and def.icon_override.cam)
-        or (istable(def.icon_cam) and def.icon_cam) or nil
-    if istable(ovrcam) then
-        local view = ViewFromCamTable(ovrcam, wep.CModel[1])
-        view.zfar = view.zfar + spanX + spanY + spanZ -- parts extend past the base
-        local w = math.min(fp.w * CELL_PX, RT_SIZE)
-        local h = math.min(fp.h * CELL_PX, RT_SIZE)
-        png = CaptureToPng(w, h, view, draw)
-    else
-        local fov = tonumber(wep.GetProcessedValue
-            and wep:GetProcessedValue("CustomizeSnapshotFOV")) or 90
-        local vpW = RT_SIZE
-        local vpH = math.floor(RT_SIZE * 9 / 16) -- 16:9, like ARC9's snapshot
-        local side = vpH                          -- ARC9 keeps the center square
-        local cw, ch
-        if fp.w >= fp.h then
-            cw = side
-            ch = math.max(1, math.floor(side * fp.h / fp.w))
+    local w = math.min(fp.w * CELL_PX, RT_SIZE)
+    local h = math.min(fp.h * CELL_PX, RT_SIZE)
+    -- aspect-fit the cropped silhouette inside the footprint rect (bbox
+    -- aspect never matches the quantized cells exactly)
+    local scale = math.min(w / bw, h / bh)
+    local dw, dh = bw * scale, bh * scale
+    local dx, dy = (w - dw) / 2, (h - dh) / 2
+
+    -- 2D sibling of CaptureToPng: same Plan A/B background gate (§9), no
+    -- camera or model lighting — the source pixels are already lit
+    local bake = cvBakeBg:GetBool()
+    local bg = CARGO.Theme.Colors.cell
+    render.PushRenderTarget(EnsureRT())
+        if bake then
+            render.Clear(bg.r, bg.g, bg.b, 255, true, true)
         else
-            ch = side
-            cw = math.max(1, math.floor(side * fp.w / fp.h))
+            render.Clear(0, 0, 0, 0, true, true)
         end
-        local crop = {
-            x = math.floor((vpW - cw) / 2),
-            y = math.floor((vpH - ch) / 2),
-            w = cw, h = ch,
-        }
-        local view = {
-            origin = Vector(0, 0, 0), angles = Angle(0, 0, 0),
-            fov = fov, znear = 1, zfar = 1024, -- DoPresetCapture's planes
-        }
-        png = CaptureToPng(vpW, vpH, view, draw, crop)
+        render.OverrideAlphaWriteEnable(true, true)
+        cam.Start2D()
+            surface.SetDrawColor(255, 255, 255, 255)
+            surface.SetMaterial(mat)
+            surface.DrawTexturedRectUV(dx, dy, dw, dh,
+                bx0 / sw, by0 / sh, bx1 / sw, by1 / sh)
+        cam.End2D()
+        render.OverrideAlphaWriteEnable(false)
+        local png = render.Capture({
+            format = "png", x = 0, y = 0, w = w, h = h, alpha = not bake,
+        })
+    render.PopRenderTarget()
+
+    -- the def's PREVIOUS PNG sits under a key no one will compute again
+    -- (stamps only move forward): sweep it
+    local m = iconMeta[def.id]
+    if istable(m) and isstring(m.key) and m.key ~= key then
+        file.Delete(DIR .. "/" .. m.key)
     end
     if not CommitPng(def, key, png) then return false end
 
     -- only now is the def marked assembled: a failed capture keeps probing
-    iconMeta[def.id] = { w = autoFp.w, h = autoFp.h, assembled = true }
+    iconMeta[def.id] = { w = autoFp.w, h = autoFp.h, assembled = true,
+        src = src.stamp, key = key }
     SaveMeta()
     return true
 end
 
-local function RenderAssembledToFile(def, wep)
-    if not istable(ARC9) then return false end
-    local pos, ang = AssembledPose(wep)
-
-    -- PresetCam mode: ARC9 skips its scope-RT paths and draws translucent
-    -- parts (sight glass) in the normal pass (cl_drawmodel.lua). Restored
-    -- even on error; same for the CModel teardown.
-    local prevPresetCam = ARC9.PresetCam
-    ARC9.PresetCam = true
-    wep:SetupModel(true, 0, true) -- base + every attachment, at our disposal
-
-    local ok, done = pcall(DrawAssembled, def, wep, pos, ang)
-
-    wep:KillModel(true) -- CModel only; the in-hands models are untouched
-    ARC9.PresetCam = prevPresetCam
-
-    if not ok then error(done, 0) end
-    return done
-end
-
 local function RenderIconToFile(def)
-    -- assembled capture first: only possible with the gun in hand, and only
-    -- needed for the modular MirrorVMWM guns
-    local wep = LiveArc9Weapon(def)
-    if wep ~= nil then
-        local ok, done = pcall(RenderAssembledToFile, def, wep)
+    -- ARC9's own finished capture first: the modular MirrorVMWM guns can
+    -- only be photographed assembled by ARC9 itself
+    local src = Arc9SourceInfo(def)
+    if src ~= nil then
+        local ok, done = pcall(RenderFromArc9Icon, def, src)
         if ok and done == true then return true end
         if not ok then
-            Corpus.Log("cargo", "icons: captura ensamblada falló para '"
+            Corpus.Log("cargo", "icons: re-crop del icono ARC9 falló para '"
                 .. tostring(def.id) .. "': " .. tostring(done))
         end
         -- fall through: the bare viewmodel is still better than a letter
@@ -837,7 +869,8 @@ function Icons.Get(defid)
             MaybeQueueUpgrade(def)
             return hit.mat or nil
         end
-        return nil -- queued: letter placeholder until its render lands
+        -- queued: the last good render stands in (letter only if none)
+        return hit.prev
     end
 
     -- next session (or already rendered): straight from disk, no re-render
@@ -849,8 +882,10 @@ function Icons.Get(defid)
         return matCache[defid].mat or nil
     end
 
-    Enqueue(defid, key)
-    return nil
+    -- re-key mid-session (fresh ARC9 source stamp): keep showing the old
+    -- pixels while the new render is in the queue
+    Enqueue(defid, key, hit and (hit.mat or hit.prev) or nil)
+    return matCache[defid].prev
 end
 
 -- drop caches for one def (an override arrived over the def snapshot, §10)
@@ -859,8 +894,10 @@ function Icons.Invalidate(defid)
     fpCache[defid] = nil
     modelForCache[defid] = nil
     liveNext[defid] = nil
+    arc9Src[defid] = nil
+    arc9ClassCache[defid] = nil
     -- the assembled marker falls too: fresh inputs, fresh capture (and the
-    -- upgrade probe re-arms if the weapon is not in hand right now)
+    -- upgrade probe re-crops from the ARC9 source on the next Paint)
     if iconMeta[defid] ~= nil then
         iconMeta[defid] = nil
         SaveMeta()
@@ -876,8 +913,9 @@ function Icons.RegenAll()
     for _, f in ipairs(files) do
         file.Delete(DIR .. "/" .. f)
     end
-    matCache, fpCache, queue, queued, liveNext = {}, {}, {}, {}, {}
+    matCache, fpCache, queue, queued, liveNext, arc9Src = {}, {}, {}, {}, {}, {}
     for k in pairs(modelForCache) do modelForCache[k] = nil end
+    for k in pairs(arc9ClassCache) do arc9ClassCache[k] = nil end
     for k in pairs(iconMeta) do iconMeta[k] = nil end
     iconMeta._v = META_VERSION
     SaveMeta()
@@ -891,3 +929,59 @@ end
 cvars.AddChangeCallback("cargo_icon_bake_bg", function()
     Icons.RegenAll()
 end, "corpus_cargo_icons")
+
+-- ------------------------------------------------------------------
+-- Deliberate SOURCE regeneration (author flow, 8.ª pasada 2026-07-11):
+-- ARC9's customize menu is the one moment the weapon is guaranteed
+-- assembled, settled AND on screen — after the menu sits open a full
+-- second, re-run ARC9's own select-icon capture (DoIconCapture(true)
+-- writes <base>_icon.arc9.png synchronously, cl_hud.lua:763). The upgrade
+-- probe then spots the fresh stamp and re-crops. So "regenerate an ARC9
+-- icon" = open its customize menu, wait a beat, done. Re-arms when ARC9
+-- flags the icon stale (attachment change, sh_attach.lua:140).
+-- ------------------------------------------------------------------
+
+local MENU_SETTLE = 1 -- s the menu must stay open before the recapture
+
+local cvMenuCap = CreateClientConVar("cargo_icon_arc9_menu_capture", "1", true, false,
+    "Refresh the ARC9 select icon (Cargo's icon source) after its customize menu sits open 1 s")
+
+local menuCaptureAt -- CurTime() the armed capture fires; nil = disarmed
+local menuCaptured  -- weapon already captured this menu session
+
+hook.Add("Think", "corpus_cargo_icons_arc9_menu", function()
+    if not cvMenuCap:GetBool() then return end
+    local lp = LocalPlayer()
+    if not IsValid(lp) then return end
+    local wep = lp:GetActiveWeapon()
+    if not (IsValid(wep) and wep.ARC9 and isfunction(wep.GetCustomize)
+        and wep:GetCustomize()) then
+        menuCaptureAt, menuCaptured = nil, nil
+        return
+    end
+    -- one capture per menu session — unless ARC9 marked the icon stale
+    if menuCaptured == wep and not wep.InvalidateSelectIcon then return end
+    if menuCaptureAt == nil then
+        menuCaptureAt = CurTime() + MENU_SETTLE
+        return
+    end
+    if CurTime() < menuCaptureAt then return end
+    menuCaptureAt = nil
+    menuCaptured = wep
+    if not isfunction(wep.DoIconCapture) then return end
+
+    local ok, err = pcall(wep.DoIconCapture, wep, true)
+    if not ok then
+        Corpus.Log("cargo", "icons: DoIconCapture falló para '"
+            .. wep:GetClass() .. "': " .. tostring(err))
+        return
+    end
+    -- fresh stamp on disk: poke the def (capture.lua autogen id scheme) so
+    -- the probe re-crops on the next Paint instead of in up to 3 s
+    local defid = "wpn_" .. wep:GetClass()
+    if CARGO.Items.Get(defid) ~= nil then
+        arc9Src[defid], liveNext[defid] = nil, nil
+    end
+    Corpus.Log("cargo", "icons: icono ARC9 recapturado desde el menú para '"
+        .. wep:GetClass() .. "'")
+end)
