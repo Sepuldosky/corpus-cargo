@@ -9,8 +9,9 @@
 default implementados** — entry 9 `[PENDIENTE]`, roadmap #22 parcial + #4:
 teclas 1-7 → slots (1 melee … 7 camera), re-apretar enfunda, SWEP
 `corpus_cargo_hands` "Hands" reciclado de Apex Hands con créditos, elección
-Hands/nada en el tab Q. Mecanismo confirmado en juego; **el fix de brazos
-oscuros NO sirvió, sigue pendiente**. Commit hecho, sin push)
+Hands/nada en el tab Q. Mecanismo confirmado en juego; fix de brazos oscuros
+en **2.º intento** (control manual del lighting del viewmodel) pendiente de
+verificar. Commiteado, sin push)
 
 ---
 
@@ -50,10 +51,10 @@ oscuros NO sirvió, sigue pendiente**. Commit hecho, sin push)
 ## Pendiente de verificar
 
 - **CHANGELOG #9** (holster/hotkeys/manos): el mecanismo funciona (1.ª
-  pasada 2026-07-12), pero **el fix de brazos oscuros NO sirvió** — sigue
-  pendiente (probar `render.SetModelLighting`/`SuppressEngineLighting` en
-  `PreDrawViewModel` o fullbright del material). Resto del checklist sin
-  verificar aún.
+  pasada 2026-07-12); el 1.er intento del fix de brazos oscuros falló, ya
+  está el **2.º intento** (control manual del lighting del viewmodel en
+  `PreDrawViewModel` + muestreo en `EyePos` con piso) pendiente de verificar.
+  Resto del checklist sin verificar aún.
 - **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar —
   el único frente suelto de rondas anteriores.
 

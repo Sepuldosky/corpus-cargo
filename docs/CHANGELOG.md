@@ -791,12 +791,23 @@ compat del 7.º slot con el HUD D/GL4) queda para otra tanda.
 2. **FIX de brazos oscuros** (repro refinado del autor 2026-07-11: el
    viewmodel se oscurece mirando al horizonte, recupera mirando arriba/abajo
    o flotando → el `$illumposition` horneado del modelo porteado rota con
-   los eye angles y cae BAJO el piso, muestreando lightmap negro): el Deploy
-   ancla el lighting origin del viewmodel al jugador
-   (`vm:SetLightingOriginEntity(owner)` — la misma técnica que ARC9 usa
-   para sus c_hands, `sh_deploy.lua:88`) y el Holster/OnRemove lo sueltan
-   (`NULL`) para no contaminar las demás armas. Confirmar in-game y
-   **remitir el fix a Twilight** (TODO del roadmap #4).
+   los eye angles y cae BAJO el piso, muestreando lightmap negro).
+   - **1.er intento (falló in-game 2026-07-12):** anclar el lighting origin
+     del viewmodel al jugador (`vm:SetLightingOriginEntity(owner)`, la
+     técnica de ARC9 en `sh_deploy.lua:88`). El engine siguió iluminando el
+     viewmodel desde el illumposition malo — no bastó, revertido.
+   - **2.º intento (implementado, pendiente de verificar):** tomar el control
+     del lighting del viewmodel a mano en vez de anclarlo. `PreDrawViewModel`/
+     `PreDrawPlayerHands` hacen `render.SuppressEngineLighting(true)` + una
+     caja de luz propia (`render.ResetModelLighting` ambiente + `SetModelLighting`
+     `BOX_TOP` como key cenital), restaurada en los `Post`. La caja **no es
+     fullbright plano**: muestrea la luz del mundo en `ply:EyePos()`
+     (`render.GetLightColor` — un punto que sigue la cabeza y nunca cae bajo
+     el piso con el ángulo de vista) con un **piso** por canal (0.16) para que
+     los brazos nunca queden negros, más un realce cenital para conservar
+     volumen. Así reaccionan al ambiente (sótano oscuro vs. exterior) pero
+     ignoran el glitch del horizonte. Si confirma, **remitir el fix a
+     Twilight** (TODO del roadmap #4).
 3. **Orden de armas 1-7** (`CARGO.Slots.Hotkeys`, data SHARED en
    `corpus_cargo_slots.lua`): 1=melee, 2=sidearm, 3=primary, 4=secondary,
    5=physgun, 6=toolgun, 7=camera. El cliente
@@ -836,15 +847,9 @@ ambas clases de manos, matriz de `Decide` intacta y `SlotKey` robusto
 (mapa de hotkeys + melee dev equipable en su slot).
 
 **1.ª pasada en juego (2026-07-12, feedback del autor):** el mecanismo
-funciona ("está bien"). **El fix de brazos oscuros (punto 2) NO resolvió el
-problema** — los brazos siguen oscureciéndose mirando al horizonte pese al
-anclaje del lighting origin al jugador. Queda **PENDIENTE**: el
-`SetLightingOriginEntity` no bastó (posible causa: el modelo hornea el
-oscurecimiento en su propio `$illumposition`/flags de material, o el
-lighting origin del viewmodel no se respeta como el de las manos ARC9 —
-falta otra vía: `render.SetModelLighting`/`SuppressEngineLighting` en un
-`PreDrawViewModel`, o forzar `fullbright` en el material del brazo). No se
-remite nada a Twilight hasta tener un fix real.
+funciona ("está bien"). El **1.er intento** del fix de brazos oscuros NO
+resolvió el problema → se implementó el **2.º intento** (control manual del
+lighting del viewmodel, punto 2), pendiente de verificar en la próxima pasada.
 
 **Pendiente para `[APLICADO]` (resto del checklist, sin verificar aún):**
 spawn con las manos afuera (y con `cargo_holster_hands 0`, sin arma); 1-7
@@ -853,4 +858,6 @@ la tecla del arma activa enfunda; puños/anims/hitmarker del SWEP; toggles del
 tab Q (`cargo_weapon_slots` 0 devuelve los buckets stock; el checkbox de
 Hands cambia el estilo de enfunde en vivo); regresión: physgun/toolgun/
 camera siguen seleccionables vía 5/6/7 y la rueda del mouse sigue stock.
-**+ brazos oscuros: fix pendiente (arriba).**
+**+ brazos oscuros (2.º intento):** confirmar que ya NO se oscurecen mirando
+al horizonte y que reaccionan al ambiente sin quedar negros ni fullbright
+plano; si pasa, remitir el fix a Twilight.

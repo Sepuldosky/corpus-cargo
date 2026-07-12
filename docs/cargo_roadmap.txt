@@ -47,10 +47,11 @@ SIGUIENTES BLOQUES
    ../../dev/mods_workshop_mapa.md §2.
    -> Hecho como SWEP corpus_cargo_hands ("Hands"), clase (+apexswep) en
    Capture.Ignore, elección Hands/nada en el tab Q (cargo_holster_hands).
-   El fix de brazos oscuros (SetLightingOriginEntity -> jugador) NO sirvió
-   in-game (1.ª pasada 2026-07-12); sigue PENDIENTE (probar
-   render.SetModelLighting/SuppressEngineLighting en PreDrawViewModel o
-   fullbright del material). No remitir nada a Twilight hasta tener un fix.
+   Fix de brazos oscuros: 1.er intento (SetLightingOriginEntity -> jugador)
+   NO sirvió in-game (1.ª pasada 2026-07-12); 2.º intento implementado
+   (SuppressEngineLighting + caja de luz propia muestreada en EyePos con
+   piso, en PreDrawViewModel/PreDrawPlayerHands), pendiente de verificar.
+   No remitir nada a Twilight hasta confirmarlo in-game.
 
 5. SISTEMA DE IMÁGENES DE ÍTEMS  [DISEÑO CERRADO 2026-07-11]
    -> Cargo_ItemImages_Arquitectura.md (doc propio). Render del modelo a RT
