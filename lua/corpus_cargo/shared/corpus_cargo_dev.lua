@@ -14,6 +14,7 @@ local CARGO = Corpus.GetModule("cargo")
 CARGO.Items.Register({
     id = "cargo_dev_helmet", name = "Sphere-08 Helmet (dev)",
     weight = 1.9, class = "unique", category = "helmets",
+    size = { 3, 3 },
     has_condition = true,
     trivia = "Sealed military helmet with a standard front mount. Framework test item.",
 })
@@ -24,6 +25,7 @@ CARGO.Items.DeclareSubSlot("cargo_dev_helmet", {
 CARGO.Items.Register({
     id = "cargo_dev_nvg", name = "PNV-10T NVG (dev)",
     weight = 0.6, class = "unique", category = "optics",
+    size = { 2, 1 },
     has_condition = true, effect_icon = "battery",
     trivia = "Test night vision goggles. Mount them on the helmet's optic sub-slot.",
 })
@@ -31,6 +33,7 @@ CARGO.Items.Register({
 local devVest = CARGO.Items.Register({
     id = "cargo_dev_vest", name = "CS-3a Vest (dev)",
     weight = 6.8, class = "unique", category = "armor",
+    size = { 3, 4 },
     condition_zones = { "torso", "stomach", "arms", "legs" },
     quick_slots = 3,
     trivia = "Test tactical vest with per-zone condition. Real mitigation lands with Caliber Block 3.",
@@ -47,6 +50,7 @@ CARGO.Items.DeclareSubSlot(devVest, {
 CARGO.Items.Register({
     id = "cargo_dev_backpack", name = "Tri-Zip Backpack (dev)",
     weight = 2.4, class = "unique", category = "backpacks",
+    size = { 3, 3 },
     has_condition = true, capacity_bonus = 18,
     trivia = "Three-zip assault pack, 40 L. Adds +18 kg of carry capacity while equipped on Back.",
 })
@@ -54,6 +58,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_plate", name = "Ceramic Plate IV (dev)",
     weight = 1.2, class = "stackable", category = "plates",
+    size = { 2, 3 },
     has_condition = true, material = "Ceramic IV",
     trivia = "Test ballistic plate. What a plate does is Caliber's call; Cargo only stores and shows it.",
 })
@@ -61,6 +66,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_medkit", name = "Field Medkit (dev)",
     weight = 0.4, class = "stackable", category = "medical",
+    size = { 2, 2 },
     effect_icon = "hemostatic",
     trivia = "Test consumable for the onUse flow. Real medicine is Coagulant's domain.",
     -- onUse is the OWNER-module side of the contract (CORPUS_Architecture
@@ -74,6 +80,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_food", name = "Canned Food (dev)",
     weight = 0.3, class = "stackable", category = "food",
+    size = { 2, 2 },
     trivia = "Test food. Real hunger is Craving's domain.",
     onUse = function(ply)
         local cargoMod = Corpus.GetModule("cargo")
@@ -85,6 +92,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_ammo_9mm", name = "9x19 FMJ (dev)",
     weight = 0.012, class = "stackable", category = "ammo",
+    size = { 2, 1 },
     ammo = { caliber = "9x19", types = { "FMJ", "AP", "HP" } },
     trivia = "Test ammunition for caliber overlays and large stacks.",
 })
@@ -92,6 +100,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_smg", name = "Tactical SMG (dev)",
     weight = 3.0, class = "unique", category = "weapons",
+    size = { 4, 2 },
     weapon_class = "weapon_smg1", equip_slots = { "primary", "secondary" },
     has_condition = true,
     ammo = { caliber = "4.6x30", types = { "FMJ" } },
@@ -102,6 +111,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_pistol", name = "Service Pistol (dev)",
     weight = 0.9, class = "unique", category = "weapons",
+    size = { 3, 2 },
     weapon_class = "weapon_pistol", equip_slots = { "sidearm" },
     has_condition = true,
     ammo = { caliber = "9x19", types = { "FMJ" } },
@@ -111,6 +121,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_melee", name = "Crowbar (dev)",
     weight = 2.5, class = "unique", category = "melee",
+    size = { 3, 1 },
     weapon_class = "weapon_crowbar",
     trivia = "Test melee weapon (HL2 crowbar).",
 })
@@ -120,12 +131,14 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_pda", name = "Datapad (dev)",
     weight = 0.5, class = "unique", category = "accessories",
+    size = { 2, 2 },
     trivia = "Minor test accessory for the accessory slots.",
 })
 
 CARGO.Items.Register({
     id = "cargo_dev_detector", name = "Scanner (dev)",
     weight = 0.4, class = "unique", category = "accessories",
+    size = { 2, 1 },
     has_condition = true,
     trivia = "Minor test accessory for the accessory slots.",
 })
@@ -258,6 +271,17 @@ function CARGO._SelfTest()
     check("equip_slots restringe (pistola no es primary)", not CARGO.Slots.CanEquip(pistol, "primary"))
     check("equip_slots permite (pistola es sidearm)", CARGO.Slots.CanEquip(pistol, "sidearm"))
 
+    -- tool slots (§15.2 #21): class-restricted circles
+    local pgDef = { id = "st_pg", name = "x", weight = 1, class = "unique",
+        category = "weapons", weapon_class = "weapon_physgun" }
+    check("tool slot acepta su clase exacta", CARGO.Slots.CanEquip(pgDef, "tool_physgun"))
+    check("tool slot rechaza otra arma", not CARGO.Slots.CanEquip({
+        id = "st_rifle", name = "x", weight = 1, class = "unique",
+        category = "weapons", weapon_class = "weapon_ar2",
+    }, "tool_physgun"))
+    check("la physgun sigue equipable en slots de arma",
+        CARGO.Slots.CanEquip(pgDef, "secondary"))
+
     -- weight curve: anchors + monotonicity
     local mult = CARGO.Weight.SpeedMultiplier
     check("curva: sin carga = 1", mult(0, 54) == 1)
@@ -316,6 +340,17 @@ function CARGO._SelfTest()
         check("icons: techo de ammo respeta 2x1", fp.w <= 2 and fp.h <= 1)
         fp = CARGO.Icons.QuantizeFootprint(10, 14, "plates")
         check("icons: placa vertical cae a 2x3", fp.w == 2 and fp.h == 3)
+
+        -- category floor (calibración 1.ª pasada fullscreen): nada de armas
+        -- más chatas que 3x2, ni en cuantización ni sobre metas persistidas
+        fp = CARGO.Icons.QuantizeFootprint(20, 10, "weapons")
+        check("icons: piso de weapons en cuantización", fp.w >= 3 and fp.h >= 2)
+        fp = CARGO.Icons.ClampFootprintMin({ w = 3, h = 1 }, "weapons")
+        check("icons: meta 3x1 de rifle clampea a 6x2", fp.w == 6 and fp.h == 2)
+        fp = CARGO.Icons.ClampFootprintMin({ w = 2, h = 1 }, "weapons")
+        check("icons: meta 2x1 de pistola clampea a 4x2", fp.w == 4 and fp.h == 2)
+        fp = CARGO.Icons.ClampFootprintMin({ w = 2, h = 1 }, "ammo")
+        check("icons: el piso no toca categorías sin mínimo", fp.w == 2 and fp.h == 1)
 
         local src = CARGO.Icons.ResolveIconSource
         check("icons: icon explícito gana", src({ icon = "x", model = "models/y.mdl" }) == "icon")
