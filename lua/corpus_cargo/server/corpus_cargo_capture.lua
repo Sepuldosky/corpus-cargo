@@ -30,6 +30,21 @@ local cvCapture = CreateConVar("cargo_capture_weapons", "1", FCVAR_ARCHIVE,
     "Send every weapon the engine gives the player to the Cargo inventory (start unarmed)")
 local cvWorldGuns = CreateConVar("cargo_weapon_world_pickup", "1", FCVAR_ARCHIVE,
     "World weapons: no touch pickup — WALK+USE takes them, USE carries them; weapon drops spawn the real gun")
+local cvSandboxTools = CreateConVar("cargo_capture_sandbox_tools", "0", FCVAR_ARCHIVE,
+    "Auto-capture the sandbox build tools (physgun/toolgun/camera) from the spawn loadout. 0 = drop them (the tool slots only hold one you ALREADY have — WALK+USE a world tool or a dev give)")
+
+-- The sandbox build tools: their equipment "slots" are the circles in §15.2.
+-- By default the engine loadout hands these out every spawn; auto-capturing
+-- them stocks the inventory with tools the player never asked for (author
+-- call, 2nd fullscreen pass 2026-07-12: the tool slot is for a tool you
+-- ALREADY have, not a spawn handout). Only the ANONYMOUS loadout give is
+-- dropped — a deliberate WALK+USE take or a dropped Cargo instance still
+-- captures, so you can still put one in its slot. Mirrors CARGO.Slots.Tools.
+local SANDBOX_TOOL_CLASSES = {
+    weapon_physgun = true,
+    gmod_tool      = true,
+    gmod_camera    = true,
+}
 
 function CARGO.Capture.WorldGunsEnabled()
     return cvWorldGuns:GetBool()
@@ -45,12 +60,12 @@ CARGO.Capture.Ignore = {
 -- Known engine/sandbox silhouettes: footprint {w, h} declared at the def
 -- (explicit size beats auto quantization, Cargo_ItemImages §5). Author
 -- calibration, first fullscreen in-game pass 2026-07-12: physgun reads as
--- a rifle, toolgun as a pistol, the camera is small. Classes not listed
--- fall to the auto path (now floored by ICON_CATEGORY_MINS).
+-- a rifle, the camera is small. Classes not listed fall to the auto path
+-- (now floored by ICON_CATEGORY_MINS).
 local AUTOGEN_SIZES = {
     weapon_physgun    = { 4, 2 },
     weapon_physcannon = { 4, 2 },
-    gmod_tool         = { 3, 2 },
+    gmod_tool         = { 3, 2 }, -- {w,h}; author "2x3" = his alto×ancho = 3 wide × 2 tall (3rd pass 2026-07-12)
     gmod_camera       = { 2, 1 },
     weapon_pistol     = { 3, 2 },
     weapon_357        = { 3, 2 },
@@ -320,6 +335,15 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
         -- "keep": this entity IS the equipped weapon (one per class) — hands
         -- off, no matter which give spawned it or whether the flag was seen
         if action == "keep" then return end
+
+        -- sandbox build tools handed out anonymously by the spawn loadout are
+        -- dropped, not stocked (cvSandboxTools): the tool slot only holds one
+        -- the player already has. A deliberate take (walk+use sets `deliberate`)
+        -- or a dropped Cargo instance (`blob`) still captures below.
+        if action == "capture" and blob == nil and not deliberate
+            and SANDBOX_TOOL_CLASSES[class] and not cvSandboxTools:GetBool() then
+            action = "remove"
+        end
 
         if action == "capture" then
             local ok
