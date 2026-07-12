@@ -5,13 +5,12 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-12 (**UI fullscreen §15 CERRADA** — entry 8
-`[APLICADO]`. 3.ª pasada confirmó los 5 tweaks de la 2.ª: header sin subtítulo
-"native USD / provider", grid sin bloque oscuro por ítem (solo hover), los
-slots de herramienta ya no auto-stockean el tool del loadout
-(`cargo_capture_sandbox_tools` default 0), íconos de render no-ARC9 a 256
-px/celda, y el toolgun a **3 ancho × 2 alto** (`{3,2}`, corregido tras salir
-invertido — la notación del autor es alto×ancho). **Falta: commitear el bloque**)
+**Última actualización:** 2026-07-12 (**holster + orden de armas + manos
+default implementados** — entry 9 `[PENDIENTE]`, roadmap #22 parcial + #4:
+teclas 1-7 → slots (1 melee … 7 camera), re-apretar enfunda, SWEP
+`corpus_cargo_hands` "Hands" reciclado de Apex Hands con créditos, elección
+Hands/nada en el tab Q. Mecanismo confirmado en juego; **el fix de brazos
+oscuros NO sirvió, sigue pendiente**. Commit hecho, sin push)
 
 ---
 
@@ -41,9 +40,20 @@ invertido — la notación del autor es alto×ancho). **Falta: commitear el bloq
   256 px/celda, toolgun `{3,2}`.
 - **Todo (entries 1-8) commiteado y pusheado a `origin/main`** (2026-07-12):
   el remoto estaba 12 commits atrás y se puso al día; sin divergencia.
+- **Holster + orden STALKER + manos default — entry 9 `[PENDIENTE]`**
+  (2026-07-12): SWEP "Hands" (`corpus_cargo_hands`, Apex Hands reciclado +
+  fix de lighting), teclas 1-7 por `PlayerBindPress`→intent→server,
+  re-apretar enfunda, spawn enfundado, crowbar capturado cae en `melee`.
+  Convars `cargo_weapon_slots` / `cargo_holster_hands` (tab Q); comando
+  `cargo_holster`. Sin commit todavía.
 
 ## Pendiente de verificar
 
+- **CHANGELOG #9** (holster/hotkeys/manos): el mecanismo funciona (1.ª
+  pasada 2026-07-12), pero **el fix de brazos oscuros NO sirvió** — sigue
+  pendiente (probar `render.SetModelLighting`/`SuppressEngineLighting` en
+  `PreDrawViewModel` o fullbright del material). Resto del checklist sin
+  verificar aún.
 - **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar —
   el único frente suelto de rondas anteriores.
 
@@ -61,15 +71,16 @@ invertido — la notación del autor es alto×ancho). **Falta: commitear el bloq
   cerrado, no se reabre). Los íconos de render **no-ARC9** sí subieron a 256
   px/celda (entry 8, 2.ª pasada). Captura de armas de mundo aún no bajada al
   spec (`Cargo_ItemImages_Arquitectura.md`; solo CHANGELOG entry 7).
-- **Manejo de armas #16-22 diseño parcial** (#17 parcial implementado); manos
-  default (#4, Apex Hands aprobado); `Corpus.Data` sin `Delete`; peso nominal
-  attachments; instancias huérfanas sin GC; comandos dev sin gate admin; sin `addon.json`.
+- **Manejo de armas #16-22 diseño parcial** (#17 parcial; #22 parcial: falta
+  matar notificaciones de GMod + verificar 7.º slot vs HUD D/GL4); fix de
+  brazos oscuros pendiente de confirmar y **remitir a Twilight**;
+  `Corpus.Data` sin `Delete`; peso nominal attachments; instancias huérfanas
+  sin GC; comandos dev sin gate admin; sin `addon.json`.
 
 ## Próximo paso
 
-1. **Commitear el entry 8** (UI fullscreen §15 + ajustes 1.ª/2.ª pasada) —
-   alcances `ui`, `inventory`, `items`, `arc9`, `dev`. El autor lo pide
-   explícitamente; sin push.
+1. **Verificar en juego el entry 9** (checklist en el CHANGELOG) y commitear
+   cuando el autor lo pida.
 2. **Borrar el handoff** `dev/HANDOFF_cargo_iconos_persistencia.md` (los tres
    entries que cubría ya cerraron) y bajar captura de armas de mundo al spec
    de `Cargo_ItemImages_Arquitectura.md` cuando haya tiempo (no bloqueante).

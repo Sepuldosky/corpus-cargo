@@ -762,3 +762,95 @@ código): su "2x3" = 2 alto × 3 ancho = `{w=3, h=2}`, pero se había aplicado
 2 alto) — footprint de código sobre el mismo mecanismo `def.size` ya
 confirmado en el resto de las clases; el def autogen re-registra el size en el
 boot del server y el ícono re-keya solo. Entry cerrado.
+
+---
+
+## 9. Orden de armas estilo STALKER + holster + manos default (roadmap #22 parcial + #4) `[PENDIENTE]`
+
+Baja a código el pedido del autor (2026-07-12): teclas 1-7 mapeadas a los
+slots de equipamiento, re-apretar la tecla del arma en mano la **enfunda**, y
+el estado desenfundado es elegible — manos vacías totales (sin arma) o el
+SWEP de manos reciclado de Apex Hands, renombrado **"Hands"**. El resto del
+#22 (matar las notificaciones de obtención de armas de GMod + verificar
+compat del 7.º slot con el HUD D/GL4) queda para otra tanda.
+
+1. **SWEP `corpus_cargo_hands` ("Hands")** (`lua/weapons/corpus_cargo_hands.lua`):
+   reciclado de "Apex Legends: Holster/Melee SWEP" (Workshop 2792160770,
+   Twilight Sparkle & Buu342; créditos completos en el header + política de
+   retirar assets si lo piden — aprobado por el autor 2026-07-11, mapa §2).
+   Puñetazos con ambos botones (combos/uppercut/daño y "los números
+   específicos" de knockback intactos), R inspecciona, anims de
+   caminar/sprint/agacharse/saltar con convars renombradas `cargo_hands_*`,
+   hitmarker con material relocado. Sonidos re-namespaced `corpus_hands.*`
+   (cero colisión si el mod original sigue montado) y el `sound.Add` de
+   swing que declaraba `sound` dos veces (el left hook moría) ahora mergea
+   ambos sets. Operadores C-style reescritos a Lua estándar (estilo del
+   repo + harness offline). Assets copiados: viewmodel `c_arms_apex` (mismo
+   path — un .mdl no se renombra sin recompilar), 41 wavs usados, íconos
+   vgui/killicon/spawnmenu renombrados con VMTs propios.
+2. **FIX de brazos oscuros** (repro refinado del autor 2026-07-11: el
+   viewmodel se oscurece mirando al horizonte, recupera mirando arriba/abajo
+   o flotando → el `$illumposition` horneado del modelo porteado rota con
+   los eye angles y cae BAJO el piso, muestreando lightmap negro): el Deploy
+   ancla el lighting origin del viewmodel al jugador
+   (`vm:SetLightingOriginEntity(owner)` — la misma técnica que ARC9 usa
+   para sus c_hands, `sh_deploy.lua:88`) y el Holster/OnRemove lo sueltan
+   (`NULL`) para no contaminar las demás armas. Confirmar in-game y
+   **remitir el fix a Twilight** (TODO del roadmap #4).
+3. **Orden de armas 1-7** (`CARGO.Slots.Hotkeys`, data SHARED en
+   `corpus_cargo_slots.lua`): 1=melee, 2=sidearm, 3=primary, 4=secondary,
+   5=physgun, 6=toolgun, 7=camera. El cliente
+   (`corpus_cargo_hotkeys.lua`) intercepta `slot1`-`slot7` en
+   `PlayerBindPress` (la barra de buckets de GMod no abre para esas teclas;
+   8/9/0 quedan stock) y manda SOLO el intent (`slotkey`, contrato #7);
+   convar `cargo_weapon_slots` (default 1, toggleable como pide el roadmap).
+4. **Holster server-side** (`corpus_cargo_holster.lua`): resuelve el intent
+   contra `rec.equip` — slot vacío no hace nada; el arma del slot se
+   selecciona; **re-apretar la tecla del arma activa enfunda**. Estilo de
+   holster por jugador vía userinfo `cargo_holster_hands` (default 1 =
+   Hands; 0 = `SetActiveWeapon(NULL)` + viewmodel oculto, técnica Simple
+   Holster — referencia COMPAT del mapa §2, no se copió código). Comando
+   `cargo_holster` para bindear el enfunde directo. `PlayerSwitchWeapon`
+   levanta el hide del viewmodel en cualquier cambio a arma real.
+5. **Manos default al spawn (roadmap #4):** con la captura activa
+   (`cargo_capture_weapons` 1), tras asentarse el loadout + captura +
+   reconcile (timer 0.25 > 0.1 del reconcile), el jugador spawnea
+   **enfundado** en su estado elegido (Hands o nada) en vez del viewmodel
+   vacío del engine. `corpus_cargo_hands` y `apexswep` (por si el original
+   sigue montado) entran en `CARGO.Capture.Ignore` — las manos SON el
+   estado desarmado, nunca un ítem.
+6. **Crowbar/stunstick capturados caen en categoría `melee`** (autogen en
+   `corpus_cargo_capture.lua`): sin esto la tecla 1 no tenía qué
+   seleccionar — un crowbar capturado era `weapons` y no entraba al slot
+   Melee. Los saves viejos sanan solos (la def se re-registra en el boot).
+7. **Utilities → Corpus → Cargo:** checkbox de las teclas STALKER y
+   checkbox "Holster to Hands" (la elección del holster que pidió el
+   autor), con help del comando `cargo_holster`.
+
+**Verificación previa (2026-07-12):** sintaxis 8/8 (luaparser) + harness
+offline (lupa/LuaJIT, stubs GMod): file-scope de los 5 archivos
+nuevos/tocados limpio (incl. el SWEP con su global inyectado), mapa de
+hotkeys exacto al pedido (1-7 sobre slots reales), `Capture.Ignore` con
+ambas clases de manos, matriz de `Decide` intacta y `SlotKey` robusto
+(slot vacío / holster directo / fuera de rango). Selftest suma 2 checks
+(mapa de hotkeys + melee dev equipable en su slot).
+
+**1.ª pasada en juego (2026-07-12, feedback del autor):** el mecanismo
+funciona ("está bien"). **El fix de brazos oscuros (punto 2) NO resolvió el
+problema** — los brazos siguen oscureciéndose mirando al horizonte pese al
+anclaje del lighting origin al jugador. Queda **PENDIENTE**: el
+`SetLightingOriginEntity` no bastó (posible causa: el modelo hornea el
+oscurecimiento en su propio `$illumposition`/flags de material, o el
+lighting origin del viewmodel no se respeta como el de las manos ARC9 —
+falta otra vía: `render.SetModelLighting`/`SuppressEngineLighting` en un
+`PreDrawViewModel`, o forzar `fullbright` en el material del brazo). No se
+remite nada a Twilight hasta tener un fix real.
+
+**Pendiente para `[APLICADO]` (resto del checklist, sin verificar aún):**
+spawn con las manos afuera (y con `cargo_holster_hands 0`, sin arma); 1-7
+seleccionan lo equipado en cada slot (crowbar capturado en Melee incluido) y
+la tecla del arma activa enfunda; puños/anims/hitmarker del SWEP; toggles del
+tab Q (`cargo_weapon_slots` 0 devuelve los buckets stock; el checkbox de
+Hands cambia el estilo de enfunde en vivo); regresión: physgun/toolgun/
+camera siguen seleccionables vía 5/6/7 y la rueda del mouse sigue stock.
+**+ brazos oscuros: fix pendiente (arriba).**

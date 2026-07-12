@@ -32,8 +32,9 @@ SIGUIENTES BLOQUES
    PREREQUISITO DURO: #5 (imágenes) — las gradas no valen con fallback de letra.
    La implementación VGUI es un bloque aparte, DESPUÉS de #5.
 
-4. MANOS DEFAULT (estado desarmado). Con la captura de armas activa el
-   jugador spawnea desarmado; hoy queda el viewmodel vacío del engine.
+4. MANOS DEFAULT (estado desarmado).  [IMPLEMENTADO v1 2026-07-12,
+   CHANGELOG #9 [PENDIENTE] verif. in-game]  Con la captura de armas activa
+   el jugador spawnea desarmado; hoy queda el viewmodel vacío del engine.
    Decisión del autor (2026-07-11): reciclar "Apex Legends: Holster/Melee
    SWEP" (Twilight Sparkle + Buu342, Workshop 2792160770) como manos
    default de Corpus, con rename + créditos completos + política de retirar
@@ -44,6 +45,12 @@ SIGUIENTES BLOQUES
    lighting origin del viewmodel muestreando el suelo), remitir el fix a
    Twilight, y meter su clase en CARGO.Capture.Ignore. Ver
    ../../dev/mods_workshop_mapa.md §2.
+   -> Hecho como SWEP corpus_cargo_hands ("Hands"), clase (+apexswep) en
+   Capture.Ignore, elección Hands/nada en el tab Q (cargo_holster_hands).
+   El fix de brazos oscuros (SetLightingOriginEntity -> jugador) NO sirvió
+   in-game (1.ª pasada 2026-07-12); sigue PENDIENTE (probar
+   render.SetModelLighting/SuppressEngineLighting en PreDrawViewModel o
+   fullbright del material). No remitir nada a Twilight hasta tener un fix.
 
 5. SISTEMA DE IMÁGENES DE ÍTEMS  [DISEÑO CERRADO 2026-07-11]
    -> Cargo_ItemImages_Arquitectura.md (doc propio). Render del modelo a RT
@@ -114,7 +121,11 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
   - #17 -> PARCIAL (CHANGELOG #7): el arma dropeada/tomada conserva su instancia
     de Cargo (uid en la entidad, GiveEntry al recuperarla). FALTA la tecla que
     bote el arma en mano directamente.
-  - #18, #20, #22 -> SIN diseñar.
+  - #22 -> PARCIAL implementado (CHANGELOG #9, 2026-07-12): orden 1-7 +
+    holster por re-apretar + manos default (#4). FALTA: matar las
+    notificaciones de obtención de armas de GMod + verificar el 7.º slot
+    contra el HUD D/GL4.
+  - #18, #20 -> SIN diseñar.
 
 16. PICKUP POR MIRAR + USE, no por contacto [Cargo]. Hoy, sin el mod L4D, un arma
     generada por toolgun se recoge SOLA al pasarle por encima (AllowPlayerPickup
@@ -162,6 +173,8 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     del sandbox. Toggleable con "hide" en el inventario. -> DISEÑADO en §15.
 
 22. ORDEN DE ARMAS ESTILO STALKER + HOLSTER + matar notificaciones de GMod
+    [PARCIAL 2026-07-12 -> CHANGELOG #9: orden 1-7 + holster listos; faltan
+    las notificaciones y la verificación D/GL4]
     [Cargo UI/quickslots + compat HUD]. Reordenar las armas de GMod (toggleable):
     1=melee, 2=sidearm, 3=primary, 4=secondary, 5/6/7=physgun/toolgun/camera (el autor
     vio que se puede un 7º slot; verificar compat con el HUD objetivo). Holster
