@@ -320,14 +320,16 @@ function Icons.QuantizeFootprint(projW, projH, category)
 
     local caps = CARGO.Items.ICON_CATEGORY_CAPS
     local cap = caps[category] or caps.default
+    local mins = CARGO.Items.ICON_CATEGORY_MINS[category]
     local aspect = projW / projH
     local targetLong = math.max(projW, projH) / UNITS_PER_CELL
 
     local best, bestScore
     for _, fp in ipairs(CARGO.Items.ICON_FOOTPRINTS) do
-        if fp[1] <= cap[1] and fp[2] <= cap[2] then
+        if fp[1] <= cap[1] and fp[2] <= cap[2]
+            and (mins == nil or (fp[1] >= mins[1] and fp[2] >= mins[2])) then
             -- closest aspect wins; the long-side term separates same-aspect
-            -- candidates (3x1 vs 6x2) by projected physical length
+            -- candidates (3x2 vs 6x2) by projected physical length
             local score = math.abs(math.log((fp[1] / fp[2]) / aspect))
                 + LEN_WEIGHT * math.abs(math.max(fp[1], fp[2]) - targetLong)
             if best == nil or score < bestScore - 1e-9
@@ -337,8 +339,41 @@ function Icons.QuantizeFootprint(projW, projH, category)
             end
         end
     end
-    -- {1,1} always passes every cap, so best is never nil
+    if best == nil then
+        -- min > cap for this category would empty the candidate set; the
+        -- floor yields rather than break the closed-set guarantee
+        return Icons.QuantizeFootprint(projW, projH, nil)
+    end
     return { w = best[1], h = best[2] }
+end
+
+-- Category floor over an ALREADY-quantized footprint (persisted metas from
+-- captures older than the floor, ICON_CATEGORY_MINS). Grows the short side
+-- to the min and re-picks the closest allowed width for the new height so
+-- the aspect suffers as little as possible: a 3x1 rifle meta lands on 6x2,
+-- a 2x1 pistol meta on 4x2. Explicit def.size / editor overrides never
+-- pass through here.
+function Icons.ClampFootprintMin(fp, category)
+    local mins = CARGO.Items.ICON_CATEGORY_MINS[category]
+    if mins == nil or (fp.w >= mins[1] and fp.h >= mins[2]) then return fp end
+
+    local caps = CARGO.Items.ICON_CATEGORY_CAPS
+    local cap = caps[category] or caps.default
+    local h = math.Clamp(math.max(fp.h, mins[2]), 1, cap[2])
+    local targetW = math.Clamp(math.Round((fp.w / fp.h) * h), mins[1], cap[1])
+
+    local bestW
+    for _, cand in ipairs(CARGO.Items.ICON_FOOTPRINTS) do
+        if cand[2] == h and cand[1] >= mins[1] and cand[1] <= cap[1] then
+            if bestW == nil or math.abs(cand[1] - targetW) < math.abs(bestW - targetW)
+                or (math.abs(cand[1] - targetW) == math.abs(bestW - targetW)
+                    and cand[1] < bestW) then
+                bestW = cand[1]
+            end
+        end
+    end
+    if bestW == nil then return fp end -- no allowed width at that height
+    return { w = bestW, h = h }
 end
 
 -- effective camera as a stable string for the cache key: data override ->
@@ -422,10 +457,12 @@ function Icons.GetFootprint(defidOrDef)
     if cached ~= nil then return cached end
 
     -- a previous ASSEMBLED capture persisted its measured footprint — reuse
-    -- it so the cache filename stays stable across sessions
+    -- it so the cache filename stays stable across sessions. The category
+    -- floor applies over it: metas older than the floor carry flat weapon
+    -- footprints (author calibration, first fullscreen pass)
     local m = def.id and iconMeta[def.id] or nil
     if istable(m) and isnumber(m.w) and isnumber(m.h) then
-        local fp = { w = m.w, h = m.h }
+        local fp = Icons.ClampFootprintMin({ w = m.w, h = m.h }, def.category)
         fpCache[def.id] = fp
         return fp
     end
