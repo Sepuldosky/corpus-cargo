@@ -15,16 +15,21 @@
 --     mounted alongside).
 --   * GLua C-style operators (&&/||/!=///) rewritten as standard Lua, matching
 --     the repo style and the offline syntax harness.
---   * DARK ARMS (attempted fix — did NOT work in-game, still open): the
---     original viewmodel goes dark looking at the horizon and recovers
---     looking up/down or floating (author repro 2026-07-11). Attempt below:
---     pin the viewmodel's lighting origin to the player while these hands
---     are deployed (the technique ARC9 uses for its c_hands,
---     sh_deploy.lua:88), released on holster. 1st in-game pass 2026-07-12:
---     the darkening persists — SetLightingOriginEntity was not enough. Next
---     approach to try: render.SetModelLighting / SuppressEngineLighting in
---     PreDrawViewModel, or forcing the arm material fullbright. Do NOT remit
---     upstream to Twilight until a real fix lands. See CHANGELOG #9.
+--   * DARK ARMS FIX (2nd attempt): the original viewmodel goes dark looking
+--     at the horizon and recovers looking up/down or floating (author repro
+--     2026-07-11) — the ported model's baked $illumposition samples the
+--     lightmap under the player. The 1st attempt (SetLightingOriginEntity ->
+--     player, 2026-07-12) did NOT work: the engine still lit the viewmodel
+--     off the bad illumposition. This attempt bypasses engine lighting for
+--     the viewmodel entirely: PreDrawViewModel/PreDrawPlayerHands take the
+--     wheel with render.SuppressEngineLighting(true) + a lighting box we
+--     build ourselves, restored in the Post hooks. The box is NOT flat
+--     fullbright — it samples the world light at the player's EYE position
+--     (render.GetLightColor, a stable point that never dips under the floor
+--     with view angle) with a floor so the arms are never pitch black, plus
+--     a top-down key so they keep some volume. Result: arms react to the
+--     room (dark cellar, bright outside) but never to the horizon glitch.
+--     If confirmed in-game, remit the fix upstream to Twilight Sparkle.
 --   * melee_swing sound.Add: the original declared the `sound` key twice
 --     (left hook overwritten by right hook — Lua keeps the last); both sets
 --     are merged here, which is what the code visibly intended.
@@ -286,12 +291,6 @@ function SWEP:Deploy()
     vm:SetWeaponModel("models/weapons/c_arms_apex.mdl", self)
     vm:SetPlaybackRate(speed)
 
-    -- dark-arms fix (see header): sample lighting where the player model
-    -- does, instead of the ported model's broken $illumposition
-    if isfunction(vm.SetLightingOriginEntity) then
-        vm:SetLightingOriginEntity(self.Owner)
-    end
-
     self:SetNextPrimaryFire(CurTime() + vm:SequenceDuration() / speed)
     self:SetNextSecondaryFire(CurTime() + vm:SequenceDuration() / speed)
     self:SetAnim("deploy", true, 1)
@@ -303,27 +302,58 @@ function SWEP:Deploy()
     return true
 end
 
--- release the lighting-origin pin so the next weapon's viewmodel keeps
--- stock engine lighting (the property lives on the vm entity, not on us)
-local function ReleaseLightingPin(owner)
-    if not IsValid(owner) or not isfunction(owner.GetViewModel) then return end
-    local vm = owner:GetViewModel()
-    if IsValid(vm) and isfunction(vm.SetLightingOriginEntity) then
-        vm:SetLightingOriginEntity(NULL)
-    end
-end
-
 function SWEP:Holster()
-    ReleaseLightingPin(self.Owner)
     return true
-end
-
-function SWEP:OnRemove()
-    ReleaseLightingPin(self.Owner)
 end
 
 function SWEP:OnDrop()
     self:Remove() -- you can't drop fists
+end
+
+-- ------------------------------------------------------------------
+-- Dark-arms fix (see header): drive the viewmodel lighting ourselves so the
+-- model's broken $illumposition never gets a say. CLIENT only.
+-- ------------------------------------------------------------------
+if CLIENT then
+    -- never let the arms go fully black; keep them reacting to the room
+    local LIGHT_FLOOR = 0.16 -- minimum ambient per channel
+    local KEY_BOOST   = 1.35 -- top-down key light, for a little volume
+
+    -- Apply a hand-built lighting box for the current frame. Sampled at the
+    -- player's EYE position: a point that tracks the head, not the floor
+    -- patch the bad illumposition drifts onto when looking at the horizon.
+    function SWEP:ApplyHandsLighting()
+        local ply = self.Owner
+        local amb
+        if IsValid(ply) then
+            amb = render.GetLightColor(ply:EyePos())
+        end
+        local r = math.max(amb and amb.x or LIGHT_FLOOR, LIGHT_FLOOR)
+        local g = math.max(amb and amb.y or LIGHT_FLOOR, LIGHT_FLOOR)
+        local b = math.max(amb and amb.z or LIGHT_FLOOR, LIGHT_FLOOR)
+
+        render.SuppressEngineLighting(true)
+        render.ResetModelLighting(r, g, b)          -- uniform ambient, all 6 faces
+        render.SetModelLighting(BOX_TOP, r * KEY_BOOST, g * KEY_BOOST, b * KEY_BOOST)
+    end
+
+    function SWEP:PreDrawViewModel(vm, weapon, ply)
+        self:ApplyHandsLighting()
+    end
+
+    function SWEP:PostDrawViewModel(vm, weapon, ply)
+        render.SuppressEngineLighting(false)
+    end
+
+    -- UseHands = true draws the playermodel's c_hands in a separate pass;
+    -- cover it too so a visible seam of hand never lights differently
+    function SWEP:PreDrawPlayerHands(hands, vm, ply, weapon)
+        self:ApplyHandsLighting()
+    end
+
+    function SWEP:PostDrawPlayerHands(hands, vm, ply, weapon)
+        render.SuppressEngineLighting(false)
+    end
 end
 
 function SWEP:PrimaryAttack(right)
