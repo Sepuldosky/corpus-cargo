@@ -955,11 +955,11 @@ local function BuildFrame(state)
         end
 
         if snap then
-            -- the money button docks on the right edge: text sits left of it
-            draw.SimpleText(snap.money or "?", "CargoTitle", w - 56, 8,
+            -- the money button docks on the right edge: text sits left of it.
+            -- No provider subtitle (author call, 2nd fullscreen pass
+            -- 2026-07-12: the "native USD / provider" line was noise).
+            draw.SimpleText(snap.money or "?", "CargoTitle", w - 56, 16,
                 T.Colors.money, TEXT_ALIGN_RIGHT)
-            draw.SimpleText((snap.moneyLabel or "") .. " / provider", "CargoSmall",
-                w - 56, 32, T.Colors.textDim, TEXT_ALIGN_RIGHT)
         end
     end
 

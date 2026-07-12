@@ -30,10 +30,15 @@ local function CategoryOrder(catId)
 end
 
 local function PaintCell(self, w, h)
-    local hovered = self:IsHovered()
-    draw.RoundedBox(4, 0, 0, w, h, hovered and T.Colors.cellHover or T.Colors.cell)
-    surface.SetDrawColor(hovered and T.Colors.borderHi or T.Colors.border)
-    surface.DrawOutlinedRect(0, 0, w, h, 1)
+    -- No filled tile behind items (author call, 2nd fullscreen pass
+    -- 2026-07-12: the dark block dirtied the view — STALKER floats items on
+    -- the bare reticle). Only the hover state paints a highlight + border;
+    -- resting cells show just the faint layout reticle and the icon.
+    if self:IsHovered() then
+        draw.RoundedBox(4, 0, 0, w, h, T.Colors.cellHover)
+        surface.SetDrawColor(T.Colors.borderHi)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+    end
 
     local def = self.cargoDef
     if def == nil then return end
