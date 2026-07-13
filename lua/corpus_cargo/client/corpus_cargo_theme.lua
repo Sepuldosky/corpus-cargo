@@ -1,34 +1,86 @@
 -- corpus_cargo_theme.lua — palette, fonts and paint helpers (CLIENT)
--- Single place the whole Cargo UI reads its look from. Dark palette taken
--- from the frozen mockups (docs/mockups/). The mocks are CSS; VGUI has no
--- flexbox/grid — everything here is manual painting on purpose.
+-- Single place the whole Cargo UI reads its look from. The mocks are CSS;
+-- VGUI has no flexbox/grid — everything here is manual painting on purpose.
+--
+-- RUNTIME PALETTES (roadmap #29, mock docs/mockups/cargo_theme_dynamic_mock_v1_1.html):
+-- the palette is swappable at runtime. T.Colors keys keep their names AND
+-- their table identity — ApplyPalette mutates every Color IN PLACE, so all
+-- the Paint closures (and file-scope tables) that captured a T.Colors.*
+-- reference re-skin on the next frame with zero consumer changes.
+--   · base "spawnmenu" (DEFAULT, author call): neutral grays in the key of
+--     GMod's own spawnmenu/browser — benign, ready to integrate over it.
+--   · base "olive": the original GAMMA palette from the fullscreen mock.
+--   · DGL4 mounted + cargo_theme_dgl4: the whole palette derives from the
+--     ACTIVE HoloHUD2 preset color (COMPAT-RUNTIME — read via its API,
+--     never assumed; without the mod the base palette stands, no crash).
 
 local CARGO = Corpus.GetModule("cargo")
 
 CARGO.Theme = CARGO.Theme or {}
 local T = CARGO.Theme
 
--- olive/military palette lifted from the fullscreen mock
--- (cargo_fullscreen_ui_mock_v1.html :root vars)
+-- Color objects are created ONCE; palettes below only mutate their rgba.
+-- Starts on the neutral base; RefreshTheme() at the bottom settles it.
 T.Colors = {
-    bg        = Color(11, 12, 10, 245),
-    panel     = Color(20, 21, 15),
-    panelAlt  = Color(25, 26, 19),
-    cell      = Color(15, 16, 11),
-    cellHover = Color(34, 37, 26),
-    border    = Color(43, 45, 34),
-    borderHi  = Color(58, 61, 46),
-    text      = Color(214, 217, 200),
-    textDim   = Color(110, 114, 99),
-    green     = Color(157, 192, 75),
-    greenDim  = Color(92, 112, 48),
-    amber     = Color(217, 161, 59),
-    orange    = Color(216, 122, 44),
-    red       = Color(199, 80, 58),
-    blue      = Color(91, 143, 168),
-    blueDark  = Color(24, 34, 40),
-    money     = Color(222, 216, 194),
-    barBack   = Color(10, 11, 7),
+    bg        = Color(8, 10, 12, 245),
+    scrim     = Color(8, 10, 12, 205),   -- fullscreen backdrop (frame + wheel)
+    panel     = Color(38, 42, 48),
+    panelAlt  = Color(46, 51, 58),
+    cell      = Color(24, 27, 31),
+    cellHover = Color(52, 58, 66),
+    border    = Color(74, 80, 88),
+    borderHi  = Color(104, 112, 122),
+    text      = Color(223, 226, 229),
+    textDim   = Color(139, 146, 153),
+    accent    = Color(79, 155, 214),     -- selection/highlight identity color
+    accentDim = Color(46, 90, 124),
+    green     = Color(108, 191, 90),     -- "good" (condition, weight)
+    greenDim  = Color(63, 111, 52),
+    amber     = Color(214, 165, 79),
+    orange    = Color(214, 130, 60),
+    red       = Color(207, 80, 64),
+    blue      = Color(79, 155, 214),
+    blueDark  = Color(20, 32, 42),
+    money     = Color(225, 225, 218),
+    barBack   = Color(10, 11, 13),
+}
+
+-- plain rgba tables (NOT Color objects: palettes are data, T.Colors is the
+-- live surface)
+local function C(r, g, b, a) return { r = r, g = g, b = b, a = a or 255 } end
+
+T.PALETTES = {
+    -- neutral spawnmenu-family grays (#29a). Values from the author's
+    -- dynamic-palette mock ("spawnmenu (derma)" theme) — tuned against the
+    -- real Derma Default skin family rather than invented olive-adjacent grays.
+    spawnmenu = {
+        bg = C(8, 10, 12, 245),   scrim = C(8, 10, 12, 205),
+        panel = C(38, 42, 48),    panelAlt = C(46, 51, 58),
+        cell = C(24, 27, 31),     cellHover = C(52, 58, 66),
+        border = C(74, 80, 88),   borderHi = C(104, 112, 122),
+        text = C(223, 226, 229),  textDim = C(139, 146, 153),
+        accent = C(79, 155, 214), accentDim = C(46, 90, 124),
+        green = C(108, 191, 90),  greenDim = C(63, 111, 52),
+        amber = C(214, 165, 79),  orange = C(214, 130, 60),
+        red = C(207, 80, 64),     blue = C(79, 155, 214),
+        blueDark = C(20, 32, 42), money = C(225, 225, 218),
+        barBack = C(10, 11, 13),
+    },
+    -- the original olive/military palette (cargo_fullscreen_ui_mock_v1.html),
+    -- kept as an option: cargo_theme olive
+    olive = {
+        bg = C(11, 12, 10, 245),  scrim = C(4, 5, 3, 205),
+        panel = C(20, 21, 15),    panelAlt = C(25, 26, 19),
+        cell = C(15, 16, 11),     cellHover = C(34, 37, 26),
+        border = C(43, 45, 34),   borderHi = C(58, 61, 46),
+        text = C(214, 217, 200),  textDim = C(110, 114, 99),
+        accent = C(157, 192, 75), accentDim = C(92, 112, 48),
+        green = C(157, 192, 75),  greenDim = C(92, 112, 48),
+        amber = C(217, 161, 59),  orange = C(216, 122, 44),
+        red = C(199, 80, 58),     blue = C(91, 143, 168),
+        blueDark = C(24, 34, 40), money = C(222, 216, 194),
+        barBack = C(10, 11, 7),
+    },
 }
 
 surface.CreateFont("CargoTitle",   { font = "Roboto", size = 20, weight = 700 })
@@ -217,4 +269,132 @@ function T.FitText(text, font, maxW)
         if surface.GetTextSize(out .. "...") <= maxW then break end
     end
     return out .. "..."
+end
+
+-- ------------------------------------------------------------------
+-- Runtime theme (#29): base palette convar + DGL4 preset tint.
+-- ------------------------------------------------------------------
+
+local cvTheme = CreateClientConVar("cargo_theme", "spawnmenu", true, false,
+    "Cargo base palette: spawnmenu (neutral grays, default) or olive (GAMMA)")
+local cvThemeDGL4 = CreateClientConVar("cargo_theme_dgl4", "1", true, false,
+    "Derive the Cargo UI palette from the DGL4 holographic HUD's active preset when mounted")
+
+-- write a palette onto the live Color objects (identity preserved — that IS
+-- the re-skin mechanism; see header)
+local function ApplyPalette(pal)
+    for key, live in pairs(T.Colors) do
+        local src = pal[key]
+        if istable(src) then
+            live.r, live.g, live.b = src.r, src.g, src.b
+            live.a = src.a or 255
+        end
+    end
+end
+
+local function Mix(a, b, f)
+    return C(a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f)
+end
+local function Scaled(a, f, alpha)
+    return C(a.r * f, a.g * f, a.b * f, alpha)
+end
+
+-- Monochrome palette derived from one accent color — the approximation of
+-- the mock's DGL4 snapshots (foxtrot/classic): panels are deep tints of the
+-- accent, text is the accent lifted toward white, warn/bad/info stay fixed
+-- signal colors (they must read as warnings under ANY tint).
+local WHITE = C(255, 255, 255)
+function T.BuildDGL4Palette(accent)
+    local a = C(accent.r, accent.g, accent.b)
+    return {
+        bg = Scaled(a, 0.05, 245),   scrim = Scaled(a, 0.04, 205),
+        panel = Scaled(a, 0.10),     panelAlt = Scaled(a, 0.14),
+        cell = Scaled(a, 0.07),      cellHover = Scaled(a, 0.22),
+        border = Scaled(a, 0.30),    borderHi = Scaled(a, 0.55),
+        text = Mix(a, WHITE, 0.35),  textDim = Scaled(a, 0.55),
+        accent = a,                  accentDim = Scaled(a, 0.5),
+        green = a,                   greenDim = Scaled(a, 0.5),
+        amber = C(255, 210, 74),     orange = C(255, 150, 60),
+        red = C(255, 90, 60),        blue = C(124, 232, 255),
+        blueDark = Scaled(a, 0.12),  money = Mix(a, WHITE, 0.35),
+        barBack = Scaled(a, 0.04),
+    }
+end
+
+-- the healthy end of a HoloHUD2 PARAM_COLORRANGES value: highest threshold
+-- key wins (health at 100% = the preset's identity color)
+local function RangesTopColor(param)
+    if not istable(param) or not istable(param.colors) then return nil end
+    local bestK, best
+    for k, col in pairs(param.colors) do
+        k = tonumber(k)
+        if k ~= nil and istable(col) and col.r ~= nil
+            and (bestK == nil or k > bestK) then
+            bestK, best = k, col
+        end
+    end
+    return best
+end
+
+-- The accent of the ACTIVE DGL4 preset. COMPAT-RUNTIME: every call goes
+-- through pcall against the live API (mapped 2026-07-13 vs the mounted mod:
+-- HOLOHUD2.client.GetModifiers() modules/client.lua:24, HOLOHUD2.settings.Get
+-- modules/settings.lua:30). Two sources, in order:
+--   1. the GLOBAL tint (GetModifiers().color) when set and not plain white;
+--   2. DECISION (handoff §3.4 asked for it in writing): presets don't expose
+--      an active-preset name — they are per-element value tables — so the
+--      accent falls back to the HEALTHY color of the health element
+--      (settings.health.health_color, top threshold). health is the one
+--      element every official preset styles, and its 100% color IS the
+--      preset's identity (Foxtrot Uniform: the PCV green 180,255,100 —
+--      read from preset4.lua, not from memory).
+-- Returns nil when DGL4 is absent or exposes nothing usable.
+function T.DGL4Accent()
+    if not istable(HOLOHUD2) then return nil end
+
+    local okM, mods = pcall(function() return HOLOHUD2.client.GetModifiers() end)
+    if okM and istable(mods) and istable(mods.color) and mods.color.r ~= nil then
+        local c = mods.color
+        if not (c.r >= 250 and c.g >= 250 and c.b >= 250) then
+            return C(c.r, c.g, c.b)
+        end
+    end
+
+    local okS, hs = pcall(function() return HOLOHUD2.settings.Get("health") end)
+    if okS and istable(hs) then
+        local top = RangesTopColor(hs.health_color)
+        if top ~= nil then return C(top.r, top.g, top.b) end
+    end
+    return nil
+end
+
+function T.RefreshTheme()
+    local pal = T.PALETTES[cvTheme:GetString()] or T.PALETTES.spawnmenu
+    if cvThemeDGL4:GetBool() then
+        local accent = T.DGL4Accent()
+        if accent ~= nil then pal = T.BuildDGL4Palette(accent) end
+    end
+    ApplyPalette(pal)
+end
+
+-- settle now (base palette; DGL4 may not be mounted yet at include time),
+-- again at ready (mount order is never assumed), live on its settings hook
+-- (HOLOHUD2's OWN hook system, not GMod's — modules/settings.lua:69 fires
+-- "OnSettingsChanged" through HOLOHUD2.hook.Call) and on convar flips.
+T.RefreshTheme()
+
+Corpus.OnReady(function()
+    T.RefreshTheme()
+    if istable(HOLOHUD2) and istable(HOLOHUD2.hook)
+        and isfunction(HOLOHUD2.hook.Add) then
+        pcall(HOLOHUD2.hook.Add, "OnSettingsChanged", "corpus_cargo_theme",
+            function() T.RefreshTheme() end)
+    end
+end)
+
+if istable(cvars) and isfunction(cvars.AddChangeCallback) then
+    cvars.AddChangeCallback("cargo_theme", function() T.RefreshTheme() end,
+        "corpus_cargo_theme")
+    cvars.AddChangeCallback("cargo_theme_dgl4", function() T.RefreshTheme() end,
+        "corpus_cargo_theme")
 end

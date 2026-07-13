@@ -735,14 +735,14 @@ local function BuildTabs(bar)
         btn.Paint = function(self, w, h)
             local activeTab = grid and grid.filter == cat.id
             if activeTab then
-                surface.SetDrawColor(T.Colors.green.r, T.Colors.green.g,
-                    T.Colors.green.b, 16)
+                surface.SetDrawColor(T.Colors.accent.r, T.Colors.accent.g,
+                    T.Colors.accent.b, 16)
                 surface.DrawRect(0, 0, w, h)
-                surface.SetDrawColor(T.Colors.greenDim)
+                surface.SetDrawColor(T.Colors.accentDim)
                 surface.DrawOutlinedRect(0, 0, w, h, 1)
             end
             draw.SimpleText(cat.label, "CargoSmall", w / 2, h / 2,
-                activeTab and T.Colors.green
+                activeTab and T.Colors.accent
                     or (self:IsHovered() and T.Colors.text or T.Colors.textDim),
                 TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
@@ -919,8 +919,9 @@ function BuildFrame(state)
     frame:SetKeyboardInputEnabled(false)
     frame.cargoState = state
     frame.Paint = function(_, w, h)
-        -- scrim only — the world stays visible behind (mock .scrim)
-        surface.SetDrawColor(4, 5, 3, 205)
+        -- scrim only — the world stays visible behind (mock .scrim); the
+        -- color rides the theme (#29) like everything else
+        surface.SetDrawColor(T.Colors.scrim)
         surface.DrawRect(0, 0, w, h)
     end
     -- ESC closes the inventory instead of stacking the game menu on top of

@@ -77,6 +77,12 @@ local function BuildCargoTab(p)
     alignCombo:AddChoice("left")
     alignCombo:AddChoice("center")
 
+    -- theme (#29): neutral base + DGL4 preset tint
+    local themeCombo = p:ComboBox("UI palette", "cargo_theme")
+    themeCombo:AddChoice("spawnmenu")
+    themeCombo:AddChoice("olive")
+    p:CheckBox("Tint the UI from the DGL4 holographic HUD preset (when mounted)", "cargo_theme_dgl4")
+
     p:Help("Server (replicated convars; changing them needs server rights)")
     p:Help("cargo_capacity_base — base carry capacity in kg (54). cargo_quick_base — quick slots with no suit (2). cargo_arc9_bridge — ARC9 attachment bridge (1). cargo_capture_weapons — engine-given weapons go to the inventory (1).")
 

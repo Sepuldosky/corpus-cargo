@@ -474,8 +474,10 @@ local function DrawWheel(st)
     local snap = S()
     local activeClass = ActiveClass()
 
-    -- light scrim: the world stays readable behind the wheel
-    surface.SetDrawColor(4, 5, 3, 140)
+    -- light scrim: the world stays readable behind the wheel (theme rgb,
+    -- lighter alpha than the inventory's — this one shows during combat)
+    local sc = T.Colors.scrim
+    surface.SetDrawColor(sc.r, sc.g, sc.b, 140)
     surface.DrawRect(0, 0, ScrW(), ScrH())
 
     for _, s in ipairs(st.sectors) do
@@ -519,7 +521,7 @@ local function DrawWheel(st)
             if def and isstring(def.weapon_class) and def.weapon_class == activeClass then
                 local rDot = L.rOut - 7 * L.scale
                 T.DrawCircle(L.cx + math.cos(mid) * rDot,
-                    L.cy + math.sin(mid) * rDot, 4 * L.scale, T.Colors.green, 16)
+                    L.cy + math.sin(mid) * rDot, 4 * L.scale, T.Colors.accent, 16)
             end
         else
             draw.SimpleText("—", "CargoHeading", cx, cy, T.Colors.textDim,
