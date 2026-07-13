@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cargo — Mock paleta dinámica v1</title>
+<style>
+/* ============================================================
+   CARGO — MOCK PALETA DINÁMICA v1
+   Demuestra: misma UI (layout congelado de §15), tokens de tema
+   intercambiables en runtime. Los nombres de token son el
+   contrato propuesto para el refactor de corpus_cargo_theme.lua.
+   Los temas D/GL4 son SNAPSHOTS aproximados; en el juego los
+   valores se leen del preset activo (holohud2 API).
+   ============================================================ */
+
+:root {
+  /* tokens — se sobreescriben por JS al cambiar tema */
+  --scrim:       rgba(10,11,7,.78);
+  --world-a:     #2a2e22;
+  --world-b:     #11130c;
+  --panel:       rgba(29,31,21,.94);
+  --panel2:      rgba(36,38,26,.94);
+  --inset:       rgba(18,20,12,.9);
+  --line:        #3c3f2b;
+  --line-hi:     #5b5f40;
+  --text:        #cfcfb8;
+  --dim:         #83866f;
+  --accent:      #a8b06a;
+  --accent-ink:  #14160e;
+  --good:        #82a24e;
+  --warn:        #c9a24b;
+  --bad:         #b0492f;
+  --info:        #7d97a8;
+  --glow-c:      transparent;
+  --glow-s:      0px;
+  --radius:      2px;
+  --font-ui:     "Bahnschrift", "Bahnschrift SemiCondensed", "Arial Narrow", "Segoe UI", sans-serif;
+  --font-data:   "Bahnschrift", "Arial Narrow", sans-serif;
+  --track:       .04em;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html,body { height:100%; }
+body {
+  font-family: var(--font-ui);
+  letter-spacing: var(--track);
+  background:
+    radial-gradient(1200px 600px at 30% 20%, var(--world-a), transparent 70%),
+    radial-gradient(900px 700px at 75% 80%, var(--world-a), transparent 65%),
+    linear-gradient(160deg, var(--world-b), #000 140%);
+  color: var(--text);
+  overflow-x:auto;
+  min-height:100vh;
+}
+
+/* ---- chrome del mock (no es parte de la UI del juego) ---- */
+.mockbar {
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:10px 18px;
+  background:#0b0c0a; border-bottom:1px solid #23251c;
+  font-size:11px; text-transform:uppercase; color:#8d907c;
+}
+.mockbar b { color:#c9cbb6; font-weight:600; letter-spacing:.08em; }
+.pills { display:flex; gap:6px; flex-wrap:wrap; }
+.pill {
+  font:inherit; letter-spacing:.06em; cursor:pointer;
+  padding:5px 12px; border:1px solid #3a3d2e; border-radius:2px;
+  background:#14160f; color:#a3a68e; text-transform:uppercase;
+}
+.pill[aria-pressed="true"] { background:#2c2f1f; color:#e3e5cf; border-color:#6a6e4c; }
+.pill:focus-visible { outline:2px solid #a8b06a; outline-offset:2px; }
+.mocknote { margin-left:auto; font-size:10px; color:#6e715f; letter-spacing:.05em; }
+
+/* ---- escenario ---- */
+.stage {
+  position:relative;
+  min-width:1180px;
+  min-height: calc(100vh - 42px);
+  display:flex; align-items:flex-start; justify-content:center;
+  padding:26px 20px 40px;
+}
+.stage::before { /* scrim sobre el mundo */
+  content:""; position:absolute; inset:0; background:var(--scrim);
+}
+
+/* capa de scanlines — solo temas D/GL4 */
+body.fx-scan .stage::after {
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:5;
+  background: repeating-linear-gradient(
+    to bottom, rgba(0,0,0,.16) 0px, rgba(0,0,0,.16) 1px,
+    transparent 1px, transparent 3px);
+  mix-blend-mode:multiply;
+}
+body.fx-glow .ui { animation: holoflicker 7s infinite steps(1); }
+@keyframes holoflicker {
+  0%,96.4%,97.2%,100% { opacity:1; }
+  96.6%,97% { opacity:.86; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.fx-glow .ui { animation:none; }
+}
+
+/* modo mono (D/GL4): tipografía de proyección */
+body.fx-mono { --track:.09em; }
+body.fx-mono .ui { text-transform:uppercase; }
+
+.ui {
+  position:relative; z-index:2;
+  display:flex; gap:14px; align-items:flex-start;
+}
+
+/* ============ paneles genéricos ============ */
+.panel {
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow: 0 0 var(--glow-s) var(--glow-c), inset 0 0 0 1px rgba(0,0,0,.15);
+}
+h2.sec {
+  font-size:10px; font-weight:600; text-transform:uppercase; color:var(--dim);
+  letter-spacing:.12em; padding:8px 10px 4px;
+  text-shadow: 0 0 var(--glow-s) var(--glow-c);
+}
+.glowtext { text-shadow: 0 0 var(--glow-s) var(--glow-c); }
+
+/* ============ COLUMNA CENTRO — equipamiento ============ */
+.equip { width:420px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+
+.slotrow { display:flex; gap:8px; justify-content:center; }
+.slot {
+  position:relative; background:var(--inset); border:1px solid var(--line);
+  border-radius:var(--radius); color:var(--dim);
+  display:flex; align-items:center; justify-content:center; flex-direction:column; gap:4px;
+}
+.slot .lbl {
+  position:absolute; top:3px; left:5px; font-size:8px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--dim); opacity:.85;
+}
+.slot.filled { border-color:var(--line-hi); color:var(--text); }
+.slot svg { width:60%; height:60%; fill:currentColor; opacity:.9;
+  filter: drop-shadow(0 0 var(--glow-s) var(--glow-c)); }
+
+.sq  { width:70px; height:70px; }
+.tall{ width:96px;  height:170px; }
+.body-slot { width:150px; height:170px; }
+
+/* badge grupo de munición A/B */
+.abadge {
+  position:absolute; top:3px; right:3px; font-size:9px; font-weight:700;
+  background:var(--accent); color:var(--accent-ink);
+  padding:1px 5px; border-radius:1px;
+}
+.calib {
+  position:absolute; bottom:14px; left:5px; font-size:8px; color:var(--dim);
+  letter-spacing:.08em;
+}
+/* barra segmentada de condición bajo slots de arma/armadura */
+.segbar { position:absolute; bottom:4px; left:5px; right:5px; display:flex; gap:2px; height:4px; }
+.segbar i { flex:1; background:var(--line); }
+.segbar i.on { background:var(--good); box-shadow:0 0 var(--glow-s) var(--glow-c); }
+.segbar.mid i.on { background:var(--warn); }
+.segbar.low i.on { background:var(--bad); }
+
+/* quick slots */
+.quick { display:flex; gap:8px; justify-content:center; }
+.quick .slot { width:62px; height:62px; }
+.qkey {
+  position:absolute; bottom:3px; right:5px; font-size:8px; color:var(--dim);
+}
+.lock { font-size:16px; opacity:.5; }
+
+/* círculos sandbox */
+.sbrow { display:flex; gap:12px; align-items:center; justify-content:center; padding:2px 0; }
+.circle {
+  width:44px; height:44px; border-radius:50%;
+  background:var(--inset); border:1px solid var(--line-hi);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--accent); box-shadow: 0 0 var(--glow-s) var(--glow-c);
+}
+.circle svg { width:22px; height:22px; fill:currentColor; }
+.hidebtn {
+  font-size:8px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--dim); border:1px solid var(--line); background:none;
+  padding:3px 7px; border-radius:var(--radius); cursor:pointer; font-family:inherit;
+}
+
+/* cinturón */
+.belt { display:flex; gap:6px; justify-content:center; }
+.belt .slot { width:52px; height:52px; }
+.stack {
+  position:absolute; top:2px; right:4px; font-size:9px; font-weight:700; color:var(--text);
+  text-shadow:0 0 var(--glow-s) var(--glow-c);
+}
+.belt .calib { bottom:3px; }
+
+/* panel de estado (stat-bars registrables §11) */
+.status { padding:10px 12px 12px; display:flex; flex-direction:column; gap:7px; }
+.bar { display:grid; grid-template-columns:74px 1fr 40px; gap:8px; align-items:center; }
+.bar .name { font-size:9px; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); }
+.bar .track { height:7px; background:var(--inset); border:1px solid var(--line); position:relative; }
+.bar .fill { position:absolute; inset:0; right:auto;
+  box-shadow:0 0 var(--glow-s) var(--glow-c); }
+.bar .val { font-size:9px; color:var(--text); text-align:right; font-family:var(--font-data); }
+.f-vital { background:var(--good); }
+.f-blood { background:var(--bad); }
+.f-hun   { background:var(--warn); }
+.f-hyd   { background:var(--info); }
+
+/* ============ COLUMNA DERECHA — inventario ============ */
+.inv { width:672px; display:flex; flex-direction:column; }
+
+.profile {
+  display:flex; align-items:center; gap:12px; padding:10px 12px;
+  border-bottom:1px solid var(--line);
+}
+.avatar {
+  width:46px; height:46px; background:var(--inset); border:1px solid var(--line-hi);
+  display:flex; align-items:center; justify-content:center; color:var(--accent);
+}
+.avatar svg { width:26px; height:26px; fill:currentColor; }
+.pid { display:flex; flex-direction:column; gap:2px; }
+.pname { font-size:14px; font-weight:600; letter-spacing:.06em; }
+.pfac { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--dim); }
+.money { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.money .amt { font-size:14px; font-family:var(--font-data); color:var(--accent); }
+.moneybtn {
+  width:26px; height:26px; border:1px solid var(--line-hi); background:var(--inset);
+  color:var(--accent); font-size:13px; font-weight:700; cursor:pointer;
+  border-radius:var(--radius); font-family:inherit;
+}
+
+.tabs { display:flex; border-bottom:1px solid var(--line); }
+.tab {
+  font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  padding:8px 14px; color:var(--dim); cursor:pointer; background:none; border:none;
+  border-right:1px solid var(--line); font-family:inherit;
+}
+.tab[aria-selected="true"] {
+  color:var(--accent-ink); background:var(--accent); font-weight:700;
+  box-shadow:0 0 var(--glow-s) var(--glow-c);
+}
+
+/* grid de gradas: unidad 40px, gap 2 — footprint w×h solo render */
+.gridwrap { padding:12px; }
+.grid {
+  --u:40px; --g:2px;
+  position:relative;
+  display:grid;
+  grid-template-columns:repeat(15, var(--u));
+  grid-auto-rows:var(--u);
+  gap:var(--g);
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: calc(var(--u) + var(--g)) calc(var(--u) + var(--g));
+  background-position:-1px -1px;
+  border:1px solid var(--line);
+  padding:1px;
+}
+.item {
+  position:relative; background:var(--panel2); border:1px solid var(--line-hi);
+  border-radius:var(--radius);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--text); cursor:default;
+}
+.item:hover { border-color:var(--accent); }
+.item svg { width:78%; height:66%; fill:currentColor; opacity:.92;
+  filter:drop-shadow(0 0 var(--glow-s) var(--glow-c)); }
+.item .stack { top:1px; right:4px; }
+.item .cond { position:absolute; bottom:1px; right:4px; font-size:8px; color:var(--dim); font-family:var(--font-data); }
+.item .fx   { position:absolute; bottom:1px; left:4px; font-size:9px; color:var(--accent); }
+.item .cal  { position:absolute; bottom:1px; left:4px; font-size:7px; color:var(--dim); letter-spacing:.06em; }
+.item .ab   { position:absolute; top:1px; left:4px; font-size:8px; font-weight:700;
+  color:var(--accent-ink); background:var(--accent); padding:0 3px; }
+.item .cbar { position:absolute; bottom:0; left:0; height:2px; background:var(--good); }
+.item .cbar.mid { background:var(--warn); } .item .cbar.low { background:var(--bad); }
+
+.footer {
+  border-top:1px solid var(--line); padding:9px 12px;
+  display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center;
+}
+.footer .wlbl { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--dim); }
+.wtrack { height:8px; background:var(--inset); border:1px solid var(--line); position:relative; }
+.wfill { position:absolute; inset:0; right:43%; background:var(--accent);
+  box-shadow:0 0 var(--glow-s) var(--glow-c); }
+.wval { font-size:11px; font-family:var(--font-data); }
+.wval small { color:var(--dim); font-size:9px; margin-left:6px; }
+
+/* ============ leyenda de tokens ============ */
+.tokens {
+  position:fixed; left:14px; bottom:12px; z-index:20;
+  background:#0c0d0a; border:1px solid #26281e; border-radius:2px;
+  font-size:9px; color:#8d907c; max-width:270px;
+}
+.tokens summary { padding:6px 10px; cursor:pointer; letter-spacing:.1em; text-transform:uppercase; }
+.tokens .rows { padding:2px 10px 8px; display:grid; grid-template-columns:auto 1fr; gap:2px 10px; }
+.tokens .sw { display:inline-block; width:9px; height:9px; border:1px solid #333; margin-right:5px; vertical-align:-1px; }
+.tokens code { font-family:Consolas, monospace; color:#b9bca4; }
+</style>
+</head>
+<body>
+
+<!-- glifos -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="g-rifle" viewBox="0 0 100 30">
+    <path d="M2 16 h12 v-5 h6 v5 h34 l3 -9 h6 l-2 9 h20 l6 3 v4 h-28 l-4 7 h-7 l3 -7 h-14 v5 h-8 v-5 h-15 l-6 6 h-6 z"/>
+  </symbol>
+  <symbol id="g-pistol" viewBox="0 0 60 40">
+    <path d="M4 10 h48 v9 h-6 l-4 16 h-12 l4 -16 h-18 v5 h-8 z"/>
+  </symbol>
+  <symbol id="g-knife" viewBox="0 0 60 20">
+    <path d="M2 10 q18 -8 34 -6 l4 3 h16 v6 h-16 l-4 3 q-16 2 -34 -6 z"/>
+  </symbol>
+  <symbol id="g-helm" viewBox="0 0 40 30">
+    <path d="M6 22 q0 -16 14 -16 t14 16 l-4 4 h-6 v-4 h-8 v4 h-6 z"/>
+  </symbol>
+  <symbol id="g-vest" viewBox="0 0 40 44">
+    <path d="M8 4 h8 l4 5 4 -5 h8 v14 l-4 22 h-16 l-4 -22 z"/>
+  </symbol>
+  <symbol id="g-pack" viewBox="0 0 40 44">
+    <path d="M10 8 q10 -8 20 0 v4 h4 v26 h-28 v-26 h4 z M14 24 h12 v10 h-12 z"/>
+  </symbol>
+  <symbol id="g-medkit" viewBox="0 0 40 34">
+    <path d="M3 8 h34 v23 h-34 z M17 12 h6 v5 h5 v6 h-5 v5 h-6 v-5 h-5 v-6 h5 z" fill-rule="evenodd"/>
+  </symbol>
+  <symbol id="g-band" viewBox="0 0 30 30">
+    <circle cx="15" cy="15" r="11" fill="none" stroke="currentColor" stroke-width="5"/>
+    <path d="M15 4 h11 v6 h-11 z"/>
+  </symbol>
+  <symbol id="g-ammo" viewBox="0 0 30 30">
+    <path d="M4 10 h22 v16 h-22 z M8 10 v-4 h4 v4 z M13 10 v-4 h4 v4 z M18 10 v-4 h4 v4 z"/>
+  </symbol>
+  <symbol id="g-plate" viewBox="0 0 34 40">
+    <path d="M6 4 h22 l4 6 v26 h-30 v-26 z" fill="none" stroke="currentColor" stroke-width="4"/>
+  </symbol>
+  <symbol id="g-food" viewBox="0 0 34 24">
+    <path d="M3 14 q14 -12 28 0 q-4 8 -14 8 t-14 -8 z"/>
+  </symbol>
+  <symbol id="g-bottle" viewBox="0 0 20 40">
+    <path d="M7 2 h6 v7 q5 4 5 10 v19 h-16 v-19 q0 -6 5 -10 z"/>
+  </symbol>
+  <symbol id="g-nvg" viewBox="0 0 40 24">
+    <path d="M4 8 h32 v6 h-4 v8 h-8 v-8 h-8 v8 h-8 v-8 h-4 z"/>
+  </symbol>
+  <symbol id="g-user" viewBox="0 0 30 30">
+    <circle cx="15" cy="10" r="6"/><path d="M3 28 q0 -10 12 -10 t12 10 z"/>
+  </symbol>
+  <symbol id="g-phys" viewBox="0 0 24 24">
+    <path d="M3 13 l6 -3 -3 -2 8 -6 -2 6 3 2 -8 6 2 -6 z M14 16 l7 5 -2 2 -7 -5 z"/>
+  </symbol>
+  <symbol id="g-tool" viewBox="0 0 24 24">
+    <path d="M20 7 a6 6 0 0 1 -8 7 l-7 7 -3 -3 7 -7 a6 6 0 0 1 7 -8 l-3 3 1 3 3 1 z"/>
+  </symbol>
+  <symbol id="g-cam" viewBox="0 0 24 24">
+    <path d="M3 7 h5 l2 -3 h4 l2 3 h5 v13 h-18 z M12 10 a4 4 0 1 0 0 8 a4 4 0 0 0 0 -8 z" fill-rule="evenodd"/>
+  </symbol>
+</svg>
+
+<!-- chrome del mock -->
+<div class="mockbar">
+  <b>CARGO · MOCK PALETA DINÁMICA v1</b>
+  <div class="pills" id="pills"></div>
+  <span class="mocknote" id="srcnote">FUENTE DE TEMA: corpus_cargo_theme.lua (tokens estáticos)</span>
+</div>
+
+<div class="stage">
+  <div class="ui">
+
+    <!-- CENTRO: equipamiento (orden STALKER §15.2) -->
+    <div class="equip panel">
+      <div class="slotrow">
+        <div class="slot sq"><span class="lbl">Acc 1</span></div>
+        <div class="slot sq filled"><span class="lbl">Head</span>
+          <svg><use href="#g-helm"/></svg>
+          <div class="segbar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+        </div>
+        <div class="slot sq filled"><span class="lbl">Acc 2</span><svg><use href="#g-nvg"/></svg></div>
+      </div>
+
+      <div class="slotrow">
+        <div class="slot tall"><span class="lbl">Secondary</span></div>
+        <div class="slot body-slot filled"><span class="lbl">Body</span>
+          <svg><use href="#g-vest"/></svg>
+          <div class="segbar mid"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+        </div>
+        <div class="slot tall filled"><span class="lbl">Primary</span>
+          <span class="abadge">A</span>
+          <svg style="transform:rotate(90deg); width:150%; height:auto"><use href="#g-rifle"/></svg>
+          <span class="calib">5.45×39</span>
+          <div class="segbar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+        </div>
+      </div>
+
+      <div class="slotrow">
+        <div class="slot sq filled"><span class="lbl">Sidearm</span>
+          <span class="abadge">B</span><svg><use href="#g-pistol"/></svg>
+          <div class="segbar low"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="slot sq filled"><span class="lbl">Back</span><svg><use href="#g-pack"/></svg></div>
+        <div class="slot sq filled"><span class="lbl">Melee</span><svg><use href="#g-knife"/></svg></div>
+      </div>
+
+      <h2 class="sec">Quick</h2>
+      <div class="quick">
+        <div class="slot filled"><svg><use href="#g-medkit"/></svg><span class="qkey">F1</span></div>
+        <div class="slot filled"><svg><use href="#g-band"/></svg><span class="qkey">F2</span></div>
+        <div class="slot"><span class="qkey">F3</span></div>
+        <div class="slot"><span class="lock">🔒</span><span class="qkey">F4</span></div>
+      </div>
+
+      <div class="sbrow">
+        <div class="circle"><svg><use href="#g-phys"/></svg></div>
+        <div class="circle"><svg><use href="#g-tool"/></svg></div>
+        <div class="circle"><svg><use href="#g-cam"/></svg></div>
+        <button class="hidebtn">hide</button>
+      </div>
+
+      <h2 class="sec">Cinturón</h2>
+      <div class="belt">
+        <div class="slot filled"><svg><use href="#g-ammo"/></svg><span class="stack">87</span><span class="calib">5.45 · A</span></div>
+        <div class="slot filled"><svg><use href="#g-ammo"/></svg><span class="stack">32</span><span class="calib">9×19 · B</span></div>
+        <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+      </div>
+
+      <div class="status panel" style="border-left:none;border-right:none;border-bottom:none;border-radius:0;background:transparent;box-shadow:none">
+        <div class="bar"><span class="name">Vital</span><span class="track"><span class="fill f-vital" style="right:18%"></span></span><span class="val">82%</span></div>
+        <div class="bar"><span class="name">Sangre</span><span class="track"><span class="fill f-blood" style="right:9%"></span></span><span class="val">5.4 L</span></div>
+        <div class="bar"><span class="name">Hambre</span><span class="track"><span class="fill f-hun" style="right:37%"></span></span><span class="val">63%</span></div>
+        <div class="bar"><span class="name">Hidratación</span><span class="track"><span class="fill f-hyd" style="right:24%"></span></span><span class="val">76%</span></div>
+      </div>
+    </div>
+
+    <!-- DERECHA: inventario propio -->
+    <div class="inv panel">
+      <div class="profile">
+        <div class="avatar"><svg><use href="#g-user"/></svg></div>
+        <div class="pid">
+          <span class="pname glowtext">SEPULDOSKY</span>
+          <span class="pfac">Loners · Sargento</span>
+        </div>
+        <div class="money">
+          <span class="amt glowtext">$ 12 450</span>
+          <button class="moneybtn">$</button>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true">Todo</button>
+        <button class="tab" role="tab" aria-selected="false">Armas</button>
+        <button class="tab" role="tab" aria-selected="false">Munición</button>
+        <button class="tab" role="tab" aria-selected="false">Médico</button>
+        <button class="tab" role="tab" aria-selected="false">Comida</button>
+        <button class="tab" role="tab" aria-selected="false">Misc</button>
+      </div>
+
+      <div class="gridwrap">
+        <div class="grid">
+          <!-- footprint = solo render (§7 enmendado) -->
+          <div class="item" style="grid-column:1/span 5; grid-row:1/span 2" title="AKS-74U">
+            <span class="ab">A</span><svg><use href="#g-rifle"/></svg>
+            <span class="cal">5.45×39</span><span class="cond">72</span>
+            <span class="cbar" style="width:72%"></span>
+          </div>
+          <div class="item" style="grid-column:6/span 2; grid-row:1" title="PM">
+            <span class="ab">B</span><svg><use href="#g-pistol"/></svg>
+            <span class="cond">41</span><span class="cbar mid" style="width:41%"></span>
+          </div>
+          <div class="item" style="grid-column:8/span 2; grid-row:1/span 2" title="Placa IV">
+            <svg><use href="#g-plate"/></svg><span class="cond">88</span>
+            <span class="cbar" style="width:88%"></span>
+          </div>
+          <div class="item" style="grid-column:10/span 2; grid-row:1/span 2" title="Botiquín">
+            <svg><use href="#g-medkit"/></svg><span class="fx">✚</span><span class="cond">85</span>
+          </div>
+          <div class="item" style="grid-column:12; grid-row:1" title="Venda">
+            <svg><use href="#g-band"/></svg><span class="stack">4</span>
+          </div>
+          <div class="item" style="grid-column:13; grid-row:1" title="5.45×39">
+            <svg><use href="#g-ammo"/></svg><span class="stack">120</span><span class="cal">5.45</span>
+          </div>
+          <div class="item" style="grid-column:12; grid-row:2" title="Sopaipilla">
+            <svg><use href="#g-food"/></svg><span class="stack">3</span>
+          </div>
+          <div class="item" style="grid-column:13; grid-row:2" title="Agua">
+            <svg><use href="#g-bottle"/></svg>
+          </div>
+          <div class="item" style="grid-column:6/span 2; grid-row:2" title="9×19">
+            <svg><use href="#g-ammo"/></svg><span class="stack">64</span><span class="cal">9×19</span>
+          </div>
+          <!-- relleno de filas vacías para mostrar retícula -->
+          <div style="grid-column:1; grid-row:7; visibility:hidden"></div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span class="wlbl">Peso</span>
+        <span class="wtrack"><span class="wfill"></span></span>
+        <span class="wval glowtext">34.2 / 60.0 kg <small>base 20 + mochila 40</small></span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<details class="tokens">
+  <summary>Tokens del tema activo</summary>
+  <div class="rows" id="tokrows"></div>
+</details>
+
+<script>
+/* =========================================================
+   TEMAS — el contrato de tokens propuesto para
+   corpus_cargo_theme.lua. Un tema = tabla de colores + flags
+   de FX. Los temas "dgl4_*" son snapshots: en el juego, los
+   valores se leen del preset ACTIVO de D/GL4 en runtime.
+   ========================================================= */
+const THEMES = {
+  gamma_oliva: {
+    label: "GAMMA Oliva (default)",
+    note:  "FUENTE DE TEMA: corpus_cargo_theme.lua (tokens estáticos)",
+    fx: { glow:false, scan:false, mono:false },
+    vars: {
+      "--scrim":"rgba(10,11,7,.78)", "--world-a":"#2a2e22", "--world-b":"#11130c",
+      "--panel":"rgba(29,31,21,.94)", "--panel2":"rgba(36,38,26,.94)",
+      "--inset":"rgba(18,20,12,.9)",
+      "--line":"#3c3f2b", "--line-hi":"#5b5f40",
+      "--text":"#cfcfb8", "--dim":"#83866f",
+      "--accent":"#a8b06a", "--accent-ink":"#14160e",
+      "--good":"#82a24e", "--warn":"#c9a24b", "--bad":"#b0492f", "--info":"#7d97a8",
+      "--glow-c":"transparent", "--glow-s":"0px", "--radius":"2px"
+    }
+  },
+  spawnmenu: {
+    label: "Spawnmenu (derma)",
+    note:  "FUENTE DE TEMA: color del spawnmenu (derivado en runtime)",
+    fx: { glow:false, scan:false, mono:false },
+    vars: {
+      "--scrim":"rgba(8,10,12,.78)", "--world-a":"#232830", "--world-b":"#0d1013",
+      "--panel":"rgba(38,42,48,.95)", "--panel2":"rgba(46,51,58,.95)",
+      "--inset":"rgba(24,27,31,.92)",
+      "--line":"#4a5058", "--line-hi":"#68707a",
+      "--text":"#dfe2e5", "--dim":"#8b9299",
+      "--accent":"#4f9bd6", "--accent-ink":"#0d1013",
+      "--good":"#6cbf5a", "--warn":"#d6a54f", "--bad":"#cf5040", "--info":"#4f9bd6",
+      "--glow-c":"transparent", "--glow-s":"0px", "--radius":"4px"
+    }
+  },
+  dgl4_foxtrot: {
+    label: "D/GL4 · Foxtrot Uniform",
+    note:  "FUENTE DE TEMA: preset activo de D/GL4 vía holohud2 (snapshot aproximado)",
+    fx: { glow:true, scan:true, mono:true },
+    vars: {
+      "--scrim":"rgba(0,4,0,.74)", "--world-a":"#0c1a0c", "--world-b":"#020502",
+      "--panel":"rgba(6,16,6,.66)", "--panel2":"rgba(10,24,10,.6)",
+      "--inset":"rgba(2,9,2,.72)",
+      "--line":"rgba(95,255,90,.26)", "--line-hi":"rgba(125,255,115,.55)",
+      "--text":"#a6ffa0", "--dim":"#4e8f4c",
+      "--accent":"#5dff4a", "--accent-ink":"#031403",
+      "--good":"#5dff4a", "--warn":"#ffd24a", "--bad":"#ff5a3c", "--info":"#7ce8ff",
+      "--glow-c":"rgba(80,255,60,.5)", "--glow-s":"9px", "--radius":"0px"
+    }
+  },
+  dgl4_classic: {
+    label: "D/GL4 · Classic",
+    note:  "FUENTE DE TEMA: preset activo de D/GL4 vía holohud2 (snapshot aproximado)",
+    fx: { glow:true, scan:true, mono:true },
+    vars: {
+      "--scrim":"rgba(4,2,0,.74)", "--world-a":"#1c1206", "--world-b":"#050301",
+      "--panel":"rgba(20,11,2,.62)", "--panel2":"rgba(28,16,4,.58)",
+      "--inset":"rgba(11,6,1,.72)",
+      "--line":"rgba(255,176,15,.26)", "--line-hi":"rgba(255,196,60,.55)",
+      "--text":"#ffd28a", "--dim":"#8f6f3a",
+      "--accent":"#ffb00f", "--accent-ink":"#170d02",
+      "--good":"#a8e05a", "--warn":"#ffb00f", "--bad":"#ff5a3c", "--info":"#7ce8ff",
+      "--glow-c":"rgba(255,150,0,.45)", "--glow-s":"9px", "--radius":"0px"
+    }
+  }
+};
+
+const pills = document.getElementById("pills");
+const note  = document.getElementById("srcnote");
+const rows  = document.getElementById("tokrows");
+
+function apply(key) {
+  const t = THEMES[key];
+  for (const [k,v] of Object.entries(t.vars))
+    document.documentElement.style.setProperty(k, v);
+  document.body.classList.toggle("fx-glow", t.fx.glow);
+  document.body.classList.toggle("fx-scan", t.fx.scan);
+  document.body.classList.toggle("fx-mono", t.fx.mono);
+  note.textContent = t.note;
+  for (const b of pills.children)
+    b.setAttribute("aria-pressed", b.dataset.key === key ? "true" : "false");
+  rows.innerHTML = Object.entries(t.vars)
+    .filter(([k]) => !k.startsWith("--world") && k !== "--radius")
+    .map(([k,v]) =>
+      `<span><span class="sw" style="background:${v}"></span><code>${k.slice(2)}</code></span><code>${v}</code>`
+    ).join("") +
+    `<span><code>fx</code></span><code>glow=${t.fx.glow} scan=${t.fx.scan}</code>`;
+}
+
+for (const [key,t] of Object.entries(THEMES)) {
+  const b = document.createElement("button");
+  b.className = "pill"; b.textContent = t.label; b.dataset.key = key;
+  b.addEventListener("click", () => apply(key));
+  pills.appendChild(b);
+}
+apply("gamma_oliva");
+</script>
+</body>
+</html>

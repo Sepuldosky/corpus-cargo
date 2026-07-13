@@ -1242,3 +1242,71 @@ del autor (PCV de Opposing Force / Foxtrot uniform; mod nuevo en `dev/other/`:
 al inventario** al clickearlos (sin toolgun no hay forma de obtener
 physgun/toolgun/camera); falta un **wheel menu** (diseño pendiente en Claude
 Desktop).
+
+## 13. Wheel menu + slot Throwable + enmiendas de la columna (roadmap #31 · #21 fix · §4/§15.2) `[PENDIENTE]`
+
+Quinta tanda, bajada de la sesión de diseño en Claude Desktop (2026-07-13,
+ratificada por el autor; prompt semilla `dev/PROMPT_CC_Cargo_wheel_y_equipcolumn.md`).
+Mockups congelados en `docs/mockups/`: `cargo_wheel_menu_mock_v2_1.html` y
+`cargo_equipcolumn_throwable_mock_v1_1.html` (+ PNGs de referencia). Ejecutada
+en **modo auto**: el autor no verificó en juego todavía — checklist consolidado
+en `cargo_estado.md` §"Pendiente de verificar". Cuatro frentes, un commit cada uno:
+
+1. **Primitiva de círculo** (`3e3f367`) — los círculos sandbox se veían con
+   bordes duros in-game (#21): el polígono de 24 segmentos + `surface.DrawCircle`
+   no alcanzan a tamaño de slot (y `draw.RoundedBox` con radio mitad tampoco es
+   círculo: su radio está cuantizado a los materiales de esquina — trampa
+   anotada). `Theme.DrawCircle` (polígono triangulado, 32/48 segmentos según
+   radio) + `Theme.DrawCircleOutlined`, elegido sobre un material con alpha
+   porque no necesita asset y tinta directo de la paleta (#29 gratis).
+   Consumidores migrados: círculos sandbox, botón `$`, hub del wheel.
+2. **Slot `throwable`** (`fd17ee3`) — enmienda §4: primer slot de **stack** del
+   equipo (`rec.equip.throwable` = entry `{id, count, condition?}`, no uid;
+   todos los consumidores de `rec.equip` ramifican con `istable()`). Categoría
+   `throwables`, give/take del `weapon_class`, badge `×N`, sin barra de
+   condición, sin remap legacy. **El `×N` es reserva real**: el stack equipado
+   entra al espejo de §16 (suma en `BeltTotals`) y **se drena primero** al
+   lanzar; vaciarse vacía el slot y stripea el SWEP. El give del equip va con
+   `noAmmo` (el default clip de `weapon_frag` caería al pool → éter lavado al
+   cinturón) y el equip/unequip hace `AmmoPool.Push`. El capture aprende a ver
+   el stack equipado (`EquippedClassCount`/`HasWeaponItem` vía `EquippedDefOf`)
+   — sin eso el give del equip se recapturaba y duplicaba. Ítem dev
+   `cargo_dev_frag` (weapon_frag, hl2 `Grenade`, max_stack 4) en el kit.
+   *Borde conocido:* `cargo_drop` con la granada en mano bota el SWEP sin tocar
+   el slot — coherente con el modelo (los "rounds" viven en el slot; el
+   take-back re-equipa por `keep`), y el drop desde slot es #28 (fuera de tanda).
+3. **Enmiendas de la columna** (`938951a`) — §15.2: fila baja **apilada (Clear
+   Sky)**: 3 columnas, la tercera se divide en Throwable (chico, arriba) sobre
+   Melee; Sidearm/Back conservan su ancho (la variante de 4 columnas queda
+   descartada, vive solo en el mock). Círculos sandbox: **toggle "hide"
+   restaurado** (chip; oculto, la fila colapsa) + alineación `cargo_ui_tools_align`
+   (left default / center), ambas en el tab Q; selección factorizada en
+   `CARGO.UI.SelectTool`. **El panel de estado se estira hasta el fondo** de la
+   columna (era alto fijo); las barras siguen siendo registrables (§11) — nada
+   se hardcodea; **HL2 Armor queda declarado legacy** (sale cuando Caliber
+   Block 3 traiga la armadura propia; hoy se conserva como demo bar).
+4. **Wheel menu** (`8602625`) — roadmap #31, archivo nuevo
+   `client/corpus_cargo_wheel.lua`. **Cero lógica de server nueva**: commit de
+   sector = intent `slotkey` existente (el resolver del holster solo suma el
+   intent **8** wheel-only del throwable — `CARGO.Slots.WheelSlots`; el cliente
+   jamás intercepta `slot8`), chips quick = ruta de quick use existente, chips
+   de herramientas = `CARGO.UI.SelectTool`, gated por `cargo_ui_tools`. Dibujo
+   por HUDPaint sin VGUI (cursor libre con `gui.EnableScreenClicker`; los
+   clicks no disparan), sectores anulares por `surface.DrawPoly` en quads
+   convexos, colores 100% del theme. Geometría y mapa reloj del mock v2 (una
+   sola función de layout). Hub = superficie de información universal (fire
+   mode por `SWEP:GetFiremodeName()` de ARC9 — verificado contra
+   `sh_firemodes.lua:158`, se oculta si no está; reserva = pool del engine que
+   el espejo §16 mantiene igual al cinturón). Hold/release con
+   `cargo_key_wheel` (default G, **con aviso** si la tecla ya tiene bind) o
+   `+cargo_wheel`; anclajes de chips configurables con resolver único y
+   fallback logueado. Todo configurable desde el tab de Cargo del menú Q.
+
+**Verificación offline:** `luaparser` limpio en todo lo tocado; harness
+`dev/harness_cargo.py` extendido con **+18 checks** del throwable (equip,
+espejo, drain slot-primero, unequip, rechazo de uniques, peso) y **+17** del
+wheel (anclajes/colisión, layout, pick por sector/chip/deadzone/fuera, commit
+del intent, no-op honesto, HUDPaint limpio) — **verde en ambos realms**; +5
+checks puros en `cargo_selftest` (52 client / 45 server). Lo NO testeable
+offline (que los círculos SE VEAN circulares, el layout apilado, el teñido del
+hover, el hub legible) queda declarado al checklist en juego.

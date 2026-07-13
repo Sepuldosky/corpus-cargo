@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cargo — Columna de equipamiento + Throwable, mock v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ==== TOKENS — espejo de corpus_cargo_theme.lua (en Lua: Theme.*) ==== */
+:root{
+  --panel:        rgba(14, 15, 10, 0.88);
+  --panel-hover:  rgba(30, 32, 20, 0.94);
+  --panel-empty:  rgba(14, 15, 10, 0.55);
+  --line:         #33382a;
+  --line-strong:  #4a5138;
+  --text:         #dfe3cf;
+  --text-dim:     #83886c;
+  --accent:       #aab82f;
+  --amber:        #d2b62c;
+  --danger:       #c0392b;
+  --hl2armor:     #3d7ec2;
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ min-height:100%; }
+body{
+  font-family:'Roboto Condensed','Roboto',Tahoma,sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.82) 70%, rgba(0,0,0,0.92) 100%),
+    linear-gradient(180deg, #3b4a4e 0%, #46524a 38%, #3a4234 62%, #262b20 100%);
+  background-attachment:fixed;
+  padding:64px 0 40px;
+  display:flex; justify-content:center;
+}
+body::before{
+  content:''; position:fixed; inset:0; pointer-events:none; opacity:.05;
+  background-image: repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px),
+                    repeating-linear-gradient(90deg,#fff 0 1px,transparent 1px 3px);
+}
+
+/* ---- strip dev ---- */
+#devstrip{
+  position:fixed; left:12px; top:12px; display:flex; gap:8px; align-items:center;
+  font:400 12px 'Roboto'; color:var(--text-dim); z-index:10; flex-wrap:wrap;
+}
+#devstrip .tag{ border:1px solid var(--line-strong); padding:2px 8px; color:var(--accent); font-weight:500; background:var(--panel); }
+#devstrip label{ display:flex; gap:4px; align-items:center; cursor:pointer;
+  background:var(--panel); border:1px solid var(--line); padding:3px 8px; }
+#devstrip input{ accent-color:var(--accent); }
+
+/* ---- columna ---- */
+#col{ width:420px; display:flex; flex-direction:column; gap:8px; position:relative; z-index:1;
+      min-height:calc(100vh - 104px); }
+#status{ flex:1; }
+.row{ display:grid; gap:8px; }
+.r-acc  { grid-template-columns:1fr 1.15fr 1fr; height:104px; }
+.r-high { grid-template-columns:1fr 1.2fr 1fr; height:250px; }
+.r-lowA { grid-template-columns:1fr 1fr 1fr 1fr; height:104px; }
+.r-lowB { grid-template-columns:1fr 1fr 1fr; height:104px; }
+.r-quick{ grid-template-columns:repeat(4,1fr); height:80px; }
+
+.slot{
+  position:relative; background:var(--panel); border:1px solid var(--line);
+  overflow:hidden; transition:background .12s ease, border-color .12s ease;
+}
+.slot:hover{ background:var(--panel-hover); border-color:var(--line-strong); }
+.slot.empty{ background:var(--panel-empty); }
+.slot .sname{ position:absolute; top:4px; left:6px; font:700 10px 'Roboto Condensed'; letter-spacing:.1em; color:var(--text-dim); text-transform:uppercase; }
+.slot .cal{ position:absolute; top:4px; right:6px; font:700 10px 'Roboto Condensed'; color:var(--amber); letter-spacing:.05em; }
+.slot .cal .grp{ display:inline-block; border:1px solid var(--accent); color:var(--accent); padding:0 3px; margin-right:3px; }
+.slot .iname{ position:absolute; bottom:16px; left:6px; right:6px; text-align:center; font:400 11px 'Roboto Condensed'; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.slot .qty{ position:absolute; top:4px; right:6px; font:700 13px 'Roboto Condensed'; color:var(--text); }
+.slot .fkey{ position:absolute; top:4px; left:6px; font:700 11px 'Roboto Condensed'; color:var(--text-dim); letter-spacing:.08em; }
+.slot .dash{ position:absolute; inset:0; display:grid; place-items:center; font:400 15px 'Roboto Condensed'; color:var(--text-dim); }
+.slot .icon{ position:absolute; inset:0; display:grid; place-items:center; color:var(--text); opacity:.9; }
+.slot .icon.vert svg{ transform:rotate(-90deg); }
+.slot.locked{ border-style:dashed;
+  background:repeating-linear-gradient(45deg, rgba(14,15,10,.75) 0 8px, rgba(30,32,20,.75) 8px 16px); }
+.slot.locked .icon{ opacity:.45; }
+
+/* condición segmentada al pie del slot */
+.cond{ position:absolute; bottom:6px; left:6px; right:6px; display:flex; gap:2px; }
+.cond i{ flex:1; height:4px; background:var(--accent); }
+.cond i.off{ background:var(--line); }
+.cond i.low{ background:var(--danger); }
+
+/* variante B: celda dividida throwable/melee */
+.split{ display:grid; grid-template-rows:0.85fr 1.15fr; gap:8px; }
+
+/* círculos sandbox */
+.r-tools{ display:flex; align-items:center; gap:12px; padding:2px 4px; }
+.r-tools.centered{ justify-content:center; }
+.r-tools.centered .hide{ margin-left:16px; }
+.circle{
+  width:38px; height:38px; border-radius:50%; background:var(--panel);
+  border:1.5px solid var(--line-strong); display:grid; place-items:center;
+  font:700 13px 'Roboto Condensed'; color:var(--accent); cursor:pointer;
+  transition:background .12s ease;
+}
+.circle:hover{ background:var(--panel-hover); }
+.r-tools .hide{ margin-left:auto; font:400 11px 'Roboto Condensed'; color:var(--text-dim); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+.r-tools.centered .hide{ margin-left:16px; }
+
+/* cinturón */
+.r-belt{ grid-template-columns:repeat(6,1fr); height:62px; }
+
+/* panel de estado */
+#status{ background:var(--panel); border:1px solid var(--line); padding:10px 12px; }
+#status .stitle{ font:700 11px 'Roboto Condensed'; letter-spacing:.14em; color:var(--text-dim); text-transform:uppercase; margin-bottom:8px; }
+#status .srow{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+#status .srow:last-child{ margin-bottom:0; }
+#status .sbar{ flex:1; height:8px; background:#0a0b07; border:1px solid var(--line); position:relative; }
+#status .sbar i{ position:absolute; inset:1px auto 1px 1px; }
+#status .slabel{ width:70px; font:400 11px 'Roboto Condensed'; color:var(--text-dim); text-align:right; }
+
+/* ---- notas ---- */
+#notes{
+  position:fixed; right:0; top:0; bottom:0; width:min(440px,92vw);
+  background:rgba(8,9,6,0.97); border-left:1px solid var(--line-strong);
+  padding:22px 24px; overflow-y:auto; z-index:20;
+  font:400 13px/1.55 'Roboto'; color:var(--text);
+  transform:translateX(100%); transition:transform .2s ease;
+}
+#notes.open{ transform:translateX(0); }
+#notes h2{ font:700 15px 'Roboto Condensed'; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin:18px 0 6px; }
+#notes h2:first-child{ margin-top:0; }
+#notes code{ font:12px ui-monospace,monospace; color:var(--amber); }
+#notes p,#notes li{ color:#c6cab4; margin-bottom:6px; }
+#notes ul{ padding-left:18px; }
+#notes .close{ position:absolute; top:10px; right:14px; cursor:pointer; color:var(--text-dim); font:700 16px 'Roboto Condensed'; background:none; border:none; }
+
+@media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body>
+
+<div id="devstrip">
+  <span class="tag">MOCK equip v1 — no es UI final</span>
+  <label><input type="radio" name="variant" value="A"> Variante A — fila baja ×4</label>
+  <label><input type="radio" name="variant" value="B" checked> Variante B — apilado (Clear Sky) · elegida</label>
+  <label><input type="checkbox" id="tgCenter"> Tools centrados</label>
+  <label><input type="checkbox" id="tgNotes"> Notas de spec</label>
+</div>
+
+<div id="col">
+
+  <!-- fila accesorios y cabeza -->
+  <div class="row r-acc">
+    <div class="slot empty"><span class="sname">Accessory 1</span><span class="dash">—</span></div>
+    <div class="slot">
+      <span class="sname">Head</span>
+      <div class="icon"><svg width="52" height="34" viewBox="0 0 52 34" fill="currentColor">
+        <path d="M4 30 q0 -26 22 -26 q22 0 22 26 z"/><rect x="2" y="28" width="48" height="4"/>
+      </svg></div>
+      <div class="iname">Sphere-08 Helmet (dev)</div>
+      <div class="cond" data-cond="0.9" data-n="12"></div>
+    </div>
+    <div class="slot empty"><span class="sname">Accessory 2</span><span class="dash">—</span></div>
+  </div>
+
+  <!-- fila alta: Secondary · Body · Primary -->
+  <div class="row r-high">
+    <div class="slot empty"><span class="sname">Secondary</span><span class="dash">—</span></div>
+    <div class="slot">
+      <span class="sname">Body</span>
+      <div class="icon"><svg width="72" height="88" viewBox="0 0 72 88" fill="currentColor">
+        <path d="M10 6 h16 l10 8 l10 -8 h16 v30 l-8 6 v40 h-36 v-40 l-8 -6 z"/>
+      </svg></div>
+      <div class="iname">CS-3a Vest (dev)</div>
+      <div class="cond" data-cond="0.78" data-n="14"></div>
+    </div>
+    <div class="slot">
+      <span class="sname">Primary</span>
+      <span class="cal"><span class="grp">A</span>4.6x30</span>
+      <div class="icon vert"><svg width="120" height="60" viewBox="-20 0 120 60" fill="currentColor">
+        <rect x="0" y="12" width="66" height="11" rx="2"/><rect x="66" y="14" width="16" height="6"/>
+        <rect x="-13" y="14" width="13" height="7"/>
+        <polygon points="18,23 29,23 25,41 15,41"/><polygon points="38,23 51,23 46,46 33,46"/>
+      </svg></div>
+      <div class="iname">Tactical SMG (dev)</div>
+      <div class="cond" data-cond="0.82" data-n="14"></div>
+    </div>
+  </div>
+
+  <!-- fila baja — VARIANTE A: 4 columnas -->
+  <div class="row r-lowA" id="rowA" style="display:none">
+    <div class="slot">
+      <span class="sname">Sidearm</span>
+      <span class="cal"><span class="grp">A</span>9x19</span>
+      <div class="icon"><svg width="56" height="42" viewBox="0 0 56 48" fill="currentColor">
+        <rect x="4" y="8" width="46" height="11" rx="1"/>
+        <polygon points="30,19 45,19 38,46 24,46"/><rect x="20" y="19" width="8" height="8"/>
+      </svg></div>
+      <div class="iname">Service Pistol (dev)</div>
+      <div class="cond" data-cond="0.67" data-n="10"></div>
+    </div>
+    <div class="slot">
+      <span class="sname">Back</span>
+      <div class="icon"><svg width="42" height="50" viewBox="0 0 42 50" fill="currentColor">
+        <rect x="4" y="8" width="34" height="38" rx="8"/><rect x="10" y="2" width="22" height="10" rx="5"/>
+        <rect x="12" y="22" width="18" height="12" rx="2" fill="var(--panel)"/>
+      </svg></div>
+      <div class="iname">Tri-Zip Backpack (dev)</div>
+      <div class="cond" data-cond="1" data-n="10"></div>
+    </div>
+    <div class="slot">
+      <span class="sname">Melee</span>
+      <div class="icon"><svg width="64" height="40" viewBox="0 0 84 46" fill="currentColor">
+        <path d="M4 34 Q4 12 24 12 L80 12" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+        <path d="M4 34 l-2 8" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+      </svg></div>
+      <div class="iname">Crowbar (dev)</div>
+      <div class="cond" data-cond="1" data-n="10"></div>
+    </div>
+    <div class="slot">
+      <span class="sname">Throwable</span>
+      <span class="qty">×3</span>
+      <div class="icon"><svg width="44" height="46" viewBox="0 0 60 52" fill="currentColor">
+        <ellipse cx="30" cy="30" rx="14" ry="17"/><rect x="24" y="6" width="12" height="8"/>
+        <path d="M36 8 q14 0 12 14" fill="none" stroke="currentColor" stroke-width="4"/>
+        <circle cx="14" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="3"/>
+      </svg></div>
+      <div class="iname">Frag Grenade (dev)</div>
+    </div>
+  </div>
+
+  <!-- fila baja — VARIANTE B: 3 columnas, Throwable apilado sobre Melee -->
+  <div class="row r-lowB" id="rowB">
+    <div class="slot">
+      <span class="sname">Sidearm</span>
+      <span class="cal"><span class="grp">A</span>9x19</span>
+      <div class="icon"><svg width="56" height="42" viewBox="0 0 56 48" fill="currentColor">
+        <rect x="4" y="8" width="46" height="11" rx="1"/>
+        <polygon points="30,19 45,19 38,46 24,46"/><rect x="20" y="19" width="8" height="8"/>
+      </svg></div>
+      <div class="iname">Service Pistol (dev)</div>
+      <div class="cond" data-cond="0.67" data-n="10"></div>
+    </div>
+    <div class="slot">
+      <span class="sname">Back</span>
+      <div class="icon"><svg width="42" height="50" viewBox="0 0 42 50" fill="currentColor">
+        <rect x="4" y="8" width="34" height="38" rx="8"/><rect x="10" y="2" width="22" height="10" rx="5"/>
+        <rect x="12" y="22" width="18" height="12" rx="2" fill="var(--panel)"/>
+      </svg></div>
+      <div class="iname">Tri-Zip Backpack (dev)</div>
+      <div class="cond" data-cond="1" data-n="10"></div>
+    </div>
+    <div class="split">
+      <div class="slot">
+        <span class="sname">Throwable</span>
+        <span class="qty">×3</span>
+        <div class="icon"><svg width="30" height="30" viewBox="0 0 60 52" fill="currentColor">
+          <ellipse cx="30" cy="30" rx="14" ry="17"/><rect x="24" y="6" width="12" height="8"/>
+          <path d="M36 8 q14 0 12 14" fill="none" stroke="currentColor" stroke-width="4"/>
+          <circle cx="14" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="3"/>
+        </svg></div>
+      </div>
+      <div class="slot">
+        <span class="sname">Melee</span>
+        <div class="icon"><svg width="52" height="30" viewBox="0 0 84 46" fill="currentColor">
+          <path d="M4 34 Q4 12 24 12 L80 12" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+          <path d="M4 34 l-2 8" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+        </svg></div>
+        <div class="iname">Crowbar (dev)</div>
+        <div class="cond" data-cond="1" data-n="10"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- quick slots F1-F4 -->
+  <div class="row r-quick">
+    <div class="slot">
+      <span class="fkey">F1</span><span class="qty">×8</span>
+      <div class="icon"><svg width="34" height="26" viewBox="0 0 30 30" fill="currentColor">
+        <rect x="0" y="4" width="30" height="22" rx="3"/>
+        <rect x="12" y="8" width="6" height="14" fill="var(--panel)"/><rect x="8" y="12" width="14" height="6" fill="var(--panel)"/>
+      </svg></div>
+    </div>
+    <div class="slot">
+      <span class="fkey">F2</span><span class="qty">×10</span>
+      <div class="icon"><svg width="30" height="28" viewBox="0 0 30 32" fill="currentColor">
+        <polygon points="3,8 27,8 24,28 6,28"/><rect x="1" y="4" width="28" height="5"/>
+      </svg></div>
+    </div>
+    <div class="slot empty"><span class="fkey">F3</span><span class="dash">—</span></div>
+    <div class="slot locked">
+      <span class="fkey">F4</span>
+      <div class="icon"><svg width="24" height="24" viewBox="0 0 30 30" fill="currentColor">
+        <rect x="6" y="13" width="18" height="14" rx="2"/>
+        <path d="M10 13 v-4 a5 5 0 0 1 10 0 v4" fill="none" stroke="currentColor" stroke-width="3.5"/>
+      </svg></div>
+    </div>
+  </div>
+
+  <!-- círculos sandbox -->
+  <div class="r-tools">
+    <div class="circle">P</div><div class="circle">T</div><div class="circle">C</div>
+    <span class="hide">hide</span>
+  </div>
+
+  <!-- cinturón de munición -->
+  <div class="row r-belt">
+    <div class="slot">
+      <span class="qty">×112</span>
+      <div class="icon"><svg width="30" height="22" viewBox="0 0 34 24" fill="currentColor">
+        <rect x="0" y="4" width="34" height="20" rx="2"/><rect x="0" y="9" width="34" height="4" fill="var(--amber)"/>
+      </svg></div>
+      <div class="iname" style="bottom:3px;font-size:9px;color:var(--amber)">4.6x30</div>
+    </div>
+    <div class="slot">
+      <span class="qty">×105</span>
+      <div class="icon"><svg width="30" height="22" viewBox="0 0 34 24" fill="currentColor">
+        <rect x="0" y="4" width="34" height="20" rx="2"/><rect x="0" y="9" width="34" height="4" fill="var(--amber)"/>
+      </svg></div>
+      <div class="iname" style="bottom:3px;font-size:9px;color:var(--amber)">9x19</div>
+    </div>
+    <div class="slot empty"><span class="dash">—</span></div>
+    <div class="slot empty"><span class="dash">—</span></div>
+    <div class="slot empty"><span class="dash">—</span></div>
+    <div class="slot empty"><span class="dash">—</span></div>
+  </div>
+
+  <!-- panel de estado — stat-bars registrables (§11); se estira hasta el fondo -->
+  <div id="status">
+    <div class="stitle">Status</div>
+    <div class="srow"><div class="sbar"><i style="width:82%;background:var(--danger)"></i></div><div class="slabel">Health</div></div>
+    <div class="srow"><div class="sbar"><i style="width:91%;background:#8a1f1f"></i></div><div class="slabel">Blood</div></div>
+    <div class="srow"><div class="sbar"><i style="width:64%;background:#c07a2b"></i></div><div class="slabel">Hunger</div></div>
+    <div class="srow"><div class="sbar"><i style="width:47%;background:var(--hl2armor)"></i></div><div class="slabel">Hydration</div></div>
+    <div class="srow" style="opacity:.45"><div class="sbar"><i style="width:0%;background:var(--hl2armor)"></i></div><div class="slabel">HL2 Armor</div></div>
+  </div>
+
+</div>
+
+<aside id="notes">
+  <button class="close" id="notesClose">✕</button>
+  <h2>Qué cambia (enmienda §4 + §15.2)</h2>
+  <p><b>Slot Throwable</b> nuevo de primer nivel: categoría <code>throwables</code>,
+  give/take de weapon_class como los demás slots de arma, count del stack como
+  badge <code>×N</code> (sin barra de condición). Persistencia:
+  <code>rec.equip.throwable</code> — slot nuevo, no rename → sin remap legacy.
+  El wheel lo consume (sector de las 8 en punto).</p>
+
+  <h2>Variante B — apilado (Clear Sky) · ELEGIDA</h2>
+  <p>Fila conserva 3 columnas; la tercera se divide vertical:
+  <b>Throwable arriba (chico) · Melee abajo</b> — el patrón exacto de la referencia
+  (granada sobre el cuchillo). Sidearm/Back conservan el ancho actual y la granada
+  lee como slot menor, que es lo que es. La variante A queda en el mock solo como
+  comparación.</p>
+
+  <h2>Círculos sandbox: hide restaurado + variante centrada</h2>
+  <p>El toggle <b>hide</b> vuelve (se había sacado en juego; decisión del autor:
+  restaurarlo). Variante de alineación: <b>centrados</b> en la fila (toggle del
+  strip) — decidir cuál baja a código.</p>
+
+  <h2>Círculos VGUI con bordes duros (hallazgo ingame)</h2>
+  <p>El círculo actual no se ve circular — causa típica en GMod:
+  <code>draw.RoundedBox</code> con radio = mitad del tamaño produce esquinas
+  chatas (el radius de RoundedBox está cuantizado a los materiales de esquina).
+  Fix de spec: círculos por <b>polígono triangulado</b>
+  (<code>surface.DrawPoly</code>, ≥32 segmentos) o por <b>material circular suave</b>
+  (PNG con alpha cargado <code>"smooth"</code> — el pipeline de íconos ya genera
+  PNGs, un círculo blanco tintable es trivial). Aplica a: círculos sandbox,
+  botón $, hub del wheel. La misma primitiva de círculo se implementa UNA vez
+  en <code>corpus_cargo_theme.lua</code> y la consumen todos.</p>
+
+  <h2>Panel de estado — hasta el fondo, poblado por providers</h2>
+  <p>El panel se estira hasta lo más bajo de la pantalla (como ingame). Las barras
+  son <b>registrables</b> (§11, <code>StatusPanel.RegisterBar</code>) — cada módulo
+  registra las suyas por soft-dependency cuando exista:</p>
+  <ul>
+    <li><b>Coagulant:</b> Health + Blood (cantidad de sangre).</li>
+    <li><b>Craving:</b> Hunger + Hydration.</li>
+    <li><b>HL2 Armor:</b> legacy — sale cuando Caliber Block 3 (armadura de
+    jugador propia) reemplace el sistema HL2. En el mock va atenuada a propósito.</li>
+  </ul>
+
+  <h2>Todo lo demás intacto</h2>
+  <ul>
+    <li>Quick F1–F4 con candado del traje (F4).</li>
+    <li>Cinturón de munición (6, solo <code>category "ammo"</code>).</li>
+  </ul>
+
+  <h2>Nota de implementación</h2>
+  <p>La fila baja ya existe en <code>corpus_cargo_ui.lua</code> (§15.2 punto 3);
+  la variante elegida solo cambia el layout de esa fila. El slot en sí toca
+  <code>corpus_cargo_inventory.lua</code> (schema/equip) y el resolver de
+  <code>corpus_cargo_holster.lua</code> si se le da tecla propia (el wheel ya
+  lo alcanza sin tecla).</p>
+</aside>
+
+<script>
+/* condición segmentada */
+document.querySelectorAll('.cond').forEach(el=>{
+  const cond = parseFloat(el.dataset.cond||'1');
+  const n = parseInt(el.dataset.n||'10',10);
+  let s='';
+  for(let i=0;i<n;i++){
+    const on=(i+1)/n<=cond+1e-6, low=cond<0.25;
+    s+=`<i class="${on?(low?'low':''):'off'}"></i>`;
+  }
+  el.innerHTML=s;
+});
+/* variantes */
+document.querySelectorAll('input[name=variant]').forEach(r=>{
+  r.addEventListener('change', ()=>{
+    const A = document.querySelector('input[name=variant]:checked').value==='A';
+    document.getElementById('rowA').style.display = A ? 'grid' : 'none';
+    document.getElementById('rowB').style.display = A ? 'none' : 'grid';
+  });
+});
+/* tools centrados */
+document.getElementById('tgCenter').addEventListener('change', e=>{
+  document.querySelector('.r-tools').classList.toggle('centered', e.target.checked);
+});
+/* notas */
+const tg=document.getElementById('tgNotes'), notes=document.getElementById('notes');
+tg.addEventListener('change', e=> notes.classList.toggle('open', e.target.checked));
+document.getElementById('notesClose').addEventListener('click', ()=>{ notes.classList.remove('open'); tg.checked=false; });
+</script>
+</body>
+</html>

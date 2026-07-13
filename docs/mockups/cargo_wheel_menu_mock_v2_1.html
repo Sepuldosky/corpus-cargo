@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cargo — Wheel Menu mock v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS — espejo de corpus_cargo_theme.lua (única fuente de
+   estilo en el juego). En Lua NO se hardcodean: Theme.*
+   ============================================================ */
+:root{
+  --panel:        rgba(14, 15, 10, 0.88);   /* Theme.Panel        */
+  --panel-hover:  rgba(30, 32, 20, 0.94);   /* Theme.PanelHover   */
+  --panel-empty:  rgba(14, 15, 10, 0.55);   /* Theme.PanelDim     */
+  --line:         #33382a;                  /* Theme.Line         */
+  --line-strong:  #4a5138;                  /* Theme.LineStrong   */
+  --text:         #dfe3cf;                  /* Theme.Text         */
+  --text-dim:     #83886c;                  /* Theme.TextDim      */
+  --accent:       #aab82f;                  /* Theme.Accent (oliva/lima — barras de condición) */
+  --amber:        #d2b62c;                  /* Theme.Amber  (calibre / munición) */
+  --danger:       #c0392b;                  /* Theme.Danger (condición baja / salud) */
+  --hub:          rgba(10, 11, 7, 0.94);
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  font-family:'Roboto Condensed', 'Roboto', Tahoma, sans-serif;
+  color:var(--text);
+  overflow:hidden;
+  /* backdrop: simula el mundo detrás (bosque brumoso) — en juego es el 3D + scrim */
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.8) 68%, rgba(0,0,0,0.92) 100%),
+    linear-gradient(180deg, #3b4a4e 0%, #46524a 38%, #3a4234 62%, #262b20 100%);
+}
+/* grano sutil del backdrop */
+body::before{
+  content:''; position:fixed; inset:0; pointer-events:none; opacity:.05;
+  background-image: repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 3px),
+                    repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 3px);
+}
+
+/* ---------- escenario ---------- */
+#stage{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  aspect-ratio: 3 / 2;
+  width:min(96vw, calc(96vh * 1.5));
+  user-select:none;
+}
+#wheel{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+/* ---------- sectores (SVG) ---------- */
+.sector-hit{ cursor:pointer; }
+.sector-bg{
+  fill:var(--panel);
+  stroke:var(--line);
+  stroke-width:1.5;
+  transition: fill .12s ease, stroke .12s ease;
+}
+.sector.active .sector-bg{ fill:var(--panel-hover); stroke:var(--line-strong); }
+.sector.empty  .sector-bg{ fill:var(--panel-empty); stroke:var(--line); stroke-dasharray:4 4; }
+.sector-content{ transition: transform .12s ease; }
+.sector.active .sector-content{ /* leve empuje radial — se setea inline por JS */ }
+.sector .icon{ color:var(--text); opacity:.92; }
+.sector.empty .icon{ opacity:0; }
+.sector .count{ font:700 26px 'Roboto Condensed'; fill:var(--text); }
+.sector .count .reserve{ font-weight:400; fill:var(--text-dim); }
+.sector .slotlabel{ font:700 13px 'Roboto Condensed'; letter-spacing:.14em; fill:var(--text-dim); text-transform:uppercase; }
+.sector.empty .slotlabel{ fill:var(--text-dim); }
+.sector .emptymark{ font:400 12px 'Roboto Condensed'; fill:var(--text-dim); letter-spacing:.08em; }
+.badge-group rect{ fill:none; stroke:var(--accent); stroke-width:1.5; }
+.badge-group text{ font:700 12px 'Roboto Condensed'; fill:var(--accent); }
+.cond-seg{ fill:var(--accent); }
+.cond-seg.off{ fill:var(--line); }
+.cond-seg.low{ fill:var(--danger); }
+.equipped-dot{ fill:var(--accent); }
+
+/* ---------- chips F1-F4 (fila inferior del wheel) ---------- */
+.qchip{ cursor:pointer; }
+.qchip .chip-bg{ fill:var(--panel); stroke:var(--line); stroke-width:1.5; transition: fill .12s ease, stroke .12s ease; }
+.qchip:hover .chip-bg{ fill:var(--panel-hover); stroke:var(--line-strong); }
+.qchip.locked .chip-bg{ stroke-dasharray:4 4; }
+.qchip .qkey{ font:700 11px 'Roboto Condensed'; fill:var(--text-dim); letter-spacing:.08em; }
+.qchip .qcount{ font:700 14px 'Roboto Condensed'; fill:var(--text); }
+.qchip .qicon{ color:var(--text); opacity:.9; }
+.qchip.locked .qicon, .qchip.empty .qicon{ opacity:.4; }
+.qchip .qempty{ font:400 13px 'Roboto Condensed'; fill:var(--text-dim); }
+@media (prefers-reduced-motion: reduce){
+  .sector-bg, .sector-content{ transition:none; }
+}
+
+/* ---------- hub (foreignObject dentro del SVG: escala con el viewBox) ---------- */
+#hub{
+  width:100%; height:100%; border-radius:50%;
+  background:var(--hub);
+  border:1.5px solid var(--line-strong);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; gap:3px; padding:24px 22px;
+  overflow:hidden;
+  pointer-events:none; /* la deadzone la maneja el stage por radio */
+}
+#hub .eyebrow{ font:700 10px 'Roboto Condensed'; letter-spacing:.18em; color:var(--text-dim); text-transform:uppercase; }
+#hub .name{ font:700 19px 'Roboto Condensed'; line-height:1.05; }
+#hub .meta{ display:flex; gap:5px; align-items:center; justify-content:center; margin-top:2px; flex-wrap:wrap; }
+#hub .pill{
+  font:700 10px 'Roboto Condensed'; letter-spacing:.06em; color:var(--amber);
+  border:1px solid var(--amber); padding:1px 5px; text-transform:uppercase;
+}
+#hub .pill.mode{ color:var(--text-dim); border-color:var(--line-strong); }
+#hub .pill.group{ color:var(--accent); border-color:var(--accent); }
+#hub .bigcount{ font:700 30px 'Roboto Condensed'; margin-top:1px; line-height:1; }
+#hub .bigcount span{ font-weight:400; font-size:17px; color:var(--text-dim); }
+#hub .condbar{ display:flex; gap:2px; margin-top:4px; }
+#hub .condbar i{ width:8px; height:4px; background:var(--accent); }
+#hub .condbar i.off{ background:var(--line); }
+#hub .condbar i.low{ background:var(--danger); }
+#hub .hint{ font:400 10px/1.25 'Roboto Condensed'; color:var(--text-dim); letter-spacing:.04em; margin-top:5px; max-width:150px; }
+
+/* ---------- chips de herramientas sandbox (opcional v1) ---------- */
+#toolchips{
+  position:absolute; right:1.5%; top:50%; transform:translateY(-50%);
+  display:flex; flex-direction:column; gap:10px;
+}
+.chip{
+  display:flex; align-items:center; gap:10px;
+  background:var(--panel); border:1px solid var(--line);
+  padding:8px 14px 8px 10px; cursor:pointer; min-width:150px;
+  transition: background .12s ease, border-color .12s ease;
+}
+.chip:hover{ background:var(--panel-hover); border-color:var(--line-strong); }
+.chip .dot{
+  width:26px; height:26px; border-radius:50%;
+  border:1.5px solid var(--line-strong); display:grid; place-items:center;
+  font:700 11px 'Roboto Condensed'; color:var(--accent);
+}
+.chip .lbl{ font:400 13px 'Roboto Condensed'; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; }
+
+/* ---------- toast de intent + strip dev ---------- */
+#toast{
+  position:fixed; left:50%; bottom:4%; transform:translateX(-50%);
+  background:var(--panel); border:1px solid var(--line-strong);
+  padding:8px 18px; font:400 13px 'Roboto'; color:var(--text-dim);
+  opacity:0; transition:opacity .2s ease; pointer-events:none;
+}
+#toast b{ color:var(--accent); font-weight:500; }
+#toast.show{ opacity:1; }
+
+#devstrip{
+  position:fixed; left:12px; top:12px; display:flex; gap:8px; align-items:center;
+  font:400 12px 'Roboto'; color:var(--text-dim); z-index:10;
+}
+#devstrip .tag{ border:1px solid var(--line-strong); padding:2px 8px; color:var(--accent); font-weight:500; }
+#devstrip label{ display:flex; gap:4px; align-items:center; cursor:pointer;
+  background:var(--panel); border:1px solid var(--line); padding:3px 8px; }
+#devstrip input{ accent-color:var(--accent); }
+
+/* ---------- panel de notas de spec ---------- */
+#notes{
+  position:fixed; right:0; top:0; bottom:0; width:min(440px, 92vw);
+  background:rgba(8,9,6,0.97); border-left:1px solid var(--line-strong);
+  padding:22px 24px; overflow-y:auto; z-index:20;
+  font:400 13px/1.55 'Roboto'; color:var(--text);
+  transform:translateX(100%); transition:transform .2s ease;
+}
+#notes.open{ transform:translateX(0); }
+#notes h2{ font:700 15px 'Roboto Condensed'; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin:18px 0 6px; }
+#notes h2:first-child{ margin-top:0; }
+#notes code{ font:12px ui-monospace, monospace; color:var(--amber); }
+#notes p, #notes li{ color:#c6cab4; margin-bottom:6px; }
+#notes ul{ padding-left:18px; }
+#notes .close{ position:absolute; top:10px; right:14px; cursor:pointer; color:var(--text-dim); font:700 16px 'Roboto Condensed'; background:none; border:none; }
+</style>
+</head>
+<body>
+
+<div id="devstrip">
+  <span class="tag">MOCK v2 — no es UI final</span>
+  <label><input type="checkbox" id="tgSecondary"> Secondary con arma</label>
+  <label><input type="checkbox" id="tgChips" checked> Chips herramientas</label>
+  <label><input type="checkbox" id="tgNotes"> Notas de spec</label>
+</div>
+
+<div id="stage">
+  <svg id="wheel" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">
+    <g id="sectorsG"></g>
+    <g id="quickG"></g>
+    <foreignObject x="482" y="282" width="236" height="236">
+      <div id="hub" xmlns="http://www.w3.org/1999/xhtml">
+        <div class="eyebrow" id="hubSlot">Primary</div>
+        <div class="name" id="hubName">Tactical SMG</div>
+        <div class="meta" id="hubMeta"></div>
+        <div class="bigcount" id="hubCount"></div>
+        <div class="condbar" id="hubCond"></div>
+        <div class="hint" id="hubHint">Suelta para equipar</div>
+      </div>
+    </foreignObject>
+  </svg>
+
+  <div id="toolchips">
+    <div class="chip" data-tool="physgun"><span class="dot">P</span><span class="lbl">Physgun</span></div>
+    <div class="chip" data-tool="toolgun"><span class="dot">T</span><span class="lbl">Toolgun</span></div>
+    <div class="chip" data-tool="camera"><span class="dot">C</span><span class="lbl">Camera</span></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<aside id="notes">
+  <button class="close" id="notesClose">✕</button>
+  <h2>Geometría</h2>
+  <p>6 sectores anulares de <b>50°</b> con gaps de <b>10°</b>. Hub r = <code>118</code>,
+  exterior r = <code>300</code> en viewBox 1200×800 → en juego, escalar uniforme sobre
+  ScrH (referencia @1080: hub ≈ 120 px, exterior ≈ 305 px). Deadzone = radio del hub.</p>
+  <p>Posiciones reloj: <b>12 Primary · 2 Sidearm · 4 Melee · 6 Hands · 8 Throwable · 10 Secondary</b>
+  (largas arriba, pistola derecha, granada abajo-izq, melee abajo-der — mapa STALKER 2 adaptado).</p>
+
+  <h2>Interacción</h2>
+  <ul>
+    <li><b>Hold</b> de tecla bindable (<code>+cargo_wheel</code>) abre; cursor libre
+    (<code>gui.EnableScreenClicker</code>). <b>Soltar</b> = commit del sector activo.</li>
+    <li>Soltar en la <b>deadzone</b> (hub) o fuera = cancelar.</li>
+    <li>Seleccionar el sector del <b>arma actual</b> = enfundar (misma semántica
+    re-press del roadmap #22 / Hands).</li>
+    <li>Sector vacío = no-op (no cancela: hint honesto en el hub).</li>
+  </ul>
+
+  <h2>Pipeline (cero lógica server nueva)</h2>
+  <p>El wheel es un front-end alternativo de las teclas 1-7: al commit manda el
+  <b>mismo intent</b> <code>slotkey</code> que <code>corpus_cargo_hotkeys.lua</code>;
+  lo resuelve <code>corpus_cargo_holster.lua</code> como hoy. Excepción: el slot
+  <b>Throwable</b> es nuevo (schema §4 + equip).</p>
+
+  <h2>Datos del hub / sectores</h2>
+  <p>El hub es la <b>superficie de información universal</b> del wheel: sectores,
+  chips quick F1-F4 y chips de herramientas alimentan el mismo panel central al
+  hacer hover (nombre, cantidad/munición, condición, hint de acción según el tipo).</p>
+  <ul>
+    <li>Nombre, calibre, grupo A/B → def del ítem equipado.</li>
+    <li>Cargador → <code>Clip1</code> del SWEP; reserva → suma del cinturón (espejo §16).</li>
+    <li>Condición → blob de instancia (barra segmentada; &lt;25% en Danger).</li>
+    <li>Fire mode → ARC9 <b>COMPAT-RUNTIME</b>: verificar API viva; si no expone, se oculta.</li>
+    <li>Íconos → <code>Cargo.Icons.Get(defid)</code> (PNG alpha, Plan A). Las siluetas
+    del mock son placeholder.</li>
+  </ul>
+
+  <h2>Estilo — sin texturas</h2>
+  <p>Sectores por <code>surface.DrawPoly</code> (anillo triangulado), colores 100%
+  desde <code>corpus_cargo_theme.lua</code>. Así el roadmap <b>#29</b> (neutro
+  spawnmenu + tinte DGL4 en runtime) re-skinnea el wheel gratis — texturas horneadas
+  lo impedirían.</p>
+
+  <h2>Slot Throwable (nuevo)</h2>
+  <p>Slot de primer nivel (§4), categoría <code>throwables</code>; give/take de
+  weapon_class como los demás slots de arma; count del stack como badge. Su
+  posición en la columna de equipamiento se decide en el mock aparte
+  (<code>cargo_equipcolumn_throwable_mock_v1.html</code>, variantes A/B).</p>
+
+  <h2>Quick slots F1–F4 (chips inferiores) — aprobado</h2>
+  <p>Fila de 4 chips bajo la rueda (posición del pill inferior de STALKER 2).
+  Verbo distinto (<b>usar</b>, no equipar) → forma distinta: chips rectangulares,
+  no sectores; no participan del pick angular. Click/soltar sobre un chip =
+  intent de <b>quick use</b> del slot. Candado del traje respetado (F4 del mock);
+  vacío = no-op honesto.</p>
+
+  <h2>Chips laterales (aprobado)</h2>
+  <p>Physgun / Toolgun / Camera — mismo comportamiento que los círculos sandbox del
+  inventario (<code>input.SelectWeapon</code> / equip). Respetan
+  <code>cargo_ui_tools</code>.</p>
+
+  <h2>Bind y configuración</h2>
+  <p><code>cargo_wheel</code> (enable, 1) · bind default <code>+cargo_wheel</code>
+  (tecla default a fijar en implementación; sugerida <b>G</b>). El <b>cambio de
+  tecla vive en el tab de Cargo del menú Q (utilities)</b> — binder que escribe el
+  bind, junto a las demás opciones (<code>corpus_cargo_options.lua</code>). Chips
+  de herramientas gated por <code>cargo_ui_tools</code>.</p>
+</aside>
+
+<script>
+/* ================= datos demo ================= */
+const SLOTS = [
+  { key:'primary',   label:'Primary',   angle:-90,  item:{ name:'Tactical SMG', caliber:'4.6x30', group:'A', mag:38, reserve:112, cond:0.82, fire:'AUTO',   icon:'smg'    } },
+  { key:'sidearm',   label:'Sidearm',   angle:-30,  item:{ name:'Service Pistol', caliber:'9x19', group:'A', mag:15, reserve:105, cond:0.67, fire:'SINGLE', icon:'pistol' } },
+  { key:'melee',     label:'Melee',     angle: 30,  item:{ name:'Crowbar', cond:1.0, icon:'crowbar' } },
+  { key:'hands',     label:'Hands',     angle: 90,  item:{ name:'Hands', icon:'hands' } },
+  { key:'throwable', label:'Throwable', angle: 150, item:{ name:'Frag Grenade', count:3, icon:'grenade' } },
+  { key:'secondary', label:'Secondary', angle:-150, item:null },
+];
+const SECONDARY_DEMO = { name:'AKS-74U', caliber:'5.45x39', group:'B', mag:24, reserve:78, cond:0.41, fire:'AUTO', icon:'rifle' };
+
+const CX=600, CY=400, R_IN=118, R_OUT=300, SPAN=50;
+let equippedKey = 'primary';
+let hover = { kind:null, key:null };   // 'sector' | 'quick' | 'tool' | null
+const activeSector = () => hover.kind==='sector' ? hover.key : null;
+
+/* ================= helpers geométricos ================= */
+const rad = d => d*Math.PI/180;
+const px  = (a,r) => CX + r*Math.cos(rad(a));
+const py  = (a,r) => CY + r*Math.sin(rad(a));
+function annular(a0,a1,r0,r1){
+  const large = (a1-a0)>180 ? 1 : 0;
+  return `M ${px(a0,r1)} ${py(a0,r1)}
+          A ${r1} ${r1} 0 ${large} 1 ${px(a1,r1)} ${py(a1,r1)}
+          L ${px(a1,r0)} ${py(a1,r0)}
+          A ${r0} ${r0} 0 ${large} 0 ${px(a0,r0)} ${py(a0,r0)} Z`;
+}
+
+/* ================= siluetas placeholder ================= */
+const ICONS = {
+  smg:     `<rect x="0" y="12" width="66" height="11" rx="2"/><rect x="66" y="14" width="16" height="6"/>
+            <rect x="-13" y="14" width="13" height="7"/>
+            <polygon points="18,23 29,23 25,41 15,41"/><polygon points="38,23 51,23 46,46 33,46"/>`,
+  rifle:   `<rect x="-6" y="12" width="84" height="10" rx="2"/><rect x="78" y="13" width="20" height="5"/>
+            <rect x="-22" y="13" width="16" height="8"/>
+            <polygon points="14,22 25,22 21,38 12,38"/><polygon points="36,22 50,22 42,48 29,46"/>
+            <rect x="30" y="6" width="22" height="6"/>`,
+  pistol:  `<rect x="4" y="8" width="46" height="11" rx="1"/>
+            <polygon points="30,19 45,19 38,46 24,46"/><rect x="20" y="19" width="8" height="8"/>`,
+  crowbar: `<path d="M2 34 Q2 12 22 12 L78 12" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+            <path d="M2 34 l-2 8" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>`,
+  grenade: `<ellipse cx="30" cy="30" rx="14" ry="17"/><rect x="24" y="6" width="12" height="8"/>
+            <path d="M36 8 q14 0 12 14" fill="none" stroke="currentColor" stroke-width="4"/>
+            <circle cx="14" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="3"/>`,
+  hands:   `<rect x="6" y="16" width="26" height="26" rx="8"/><rect x="8" y="6" width="5" height="14" rx="2.5"/>
+            <rect x="15" y="3" width="5" height="16" rx="2.5"/><rect x="22" y="5" width="5" height="15" rx="2.5"/>
+            <rect x="0" y="22" width="10" height="6" rx="3"/>
+            <rect x="46" y="16" width="26" height="26" rx="8"/><rect x="65" y="6" width="5" height="14" rx="2.5"/>
+            <rect x="58" y="3" width="5" height="16" rx="2.5"/><rect x="51" y="5" width="5" height="15" rx="2.5"/>
+            <rect x="68" y="22" width="10" height="6" rx="3"/>`,
+};
+
+/* ================= condición segmentada ================= */
+function condSegsSVG(x, y, cond){
+  let s=''; const n=10;
+  for(let i=0;i<n;i++){
+    const on = (i+1)/n <= cond + 1e-6;
+    const low = cond < 0.25;
+    s += `<rect class="cond-seg ${on ? (low?'low':'') : 'off'}" x="${x+i*11}" y="${y}" width="8" height="4"/>`;
+  }
+  return s;
+}
+
+/* ================= render de sectores ================= */
+const sectorsG = document.getElementById('sectorsG');
+function render(){
+  let out = '';
+  for(const s of SLOTS){
+    const a0 = s.angle - SPAN/2, a1 = s.angle + SPAN/2;
+    const midR = (R_IN + R_OUT)/2 + 8;
+    const cx = px(s.angle, midR), cy = py(s.angle, midR);
+    const empty = !s.item;
+    const isActive = s.key === activeSector();
+    const pushX = isActive ? 7*Math.cos(rad(s.angle)) : 0;
+    const pushY = isActive ? 7*Math.sin(rad(s.angle)) : 0;
+
+    let content = '';
+    if(empty){
+      content = `<text class="slotlabel" x="${cx}" y="${cy-4}" text-anchor="middle">${s.label}</text>
+                 <text class="emptymark" x="${cx}" y="${cy+16}" text-anchor="middle">— vacío —</text>`;
+    }else{
+      const it = s.item;
+      // contador arriba del ícono
+      if(it.mag !== undefined){
+        content += `<text class="count" x="${cx}" y="${cy-34}" text-anchor="middle">${it.mag}<tspan class="reserve"> / ${it.reserve}</tspan></text>`;
+      }else if(it.count !== undefined){
+        content += `<text class="count" x="${cx}" y="${cy-34}" text-anchor="middle">${it.count}</text>`;
+      }else{
+        content += `<text class="slotlabel" x="${cx}" y="${cy-36}" text-anchor="middle">${s.label}</text>`;
+      }
+      // ícono (silueta placeholder — en juego: Cargo.Icons.Get)
+      content += `<g class="icon" transform="translate(${cx-40},${cy-24})" fill="currentColor">${ICONS[it.icon]||''}</g>`;
+      // badge de grupo A/B
+      if(it.group){
+        content += `<g class="badge-group" transform="translate(${cx+42},${cy-52})">
+                      <rect x="0" y="0" width="18" height="18"/>
+                      <text x="9" y="13.5" text-anchor="middle">${it.group}</text></g>`;
+      }
+      // barra de condición
+      if(it.cond !== undefined){
+        content += condSegsSVG(cx-54, cy+34, it.cond);
+      }
+    }
+    // marcador del arma actualmente en mano
+    const eq = (s.key === equippedKey)
+      ? `<circle class="equipped-dot" cx="${px(s.angle, R_OUT+12)}" cy="${py(s.angle, R_OUT+12)}" r="4"/>`
+      : '';
+
+    out += `<g class="sector ${empty?'empty':''} ${isActive?'active':''}" data-key="${s.key}">
+              <path class="sector-bg sector-hit" d="${annular(a0,a1,R_IN+10,R_OUT)}"/>
+              <g class="sector-content" style="transform:translate(${pushX}px,${pushY}px)">${content}</g>
+              ${eq}
+            </g>`;
+  }
+  sectorsG.innerHTML = out;
+}
+
+/* ================= hub ================= */
+const $ = id => document.getElementById(id);
+function condBarHTML(cond){
+  let s=''; for(let i=0;i<10;i++){
+    const on=(i+1)/10<=cond+1e-6, low=cond<0.25;
+    s+=`<i class="${on?(low?'low':''):'off'}"></i>`;
+  } return s;
+}
+function updateHub(){
+  // --- chips de herramientas sandbox ---
+  if(hover.kind==='tool'){
+    const names={ physgun:'Physgun', toolgun:'Tool Gun', camera:'Camera' };
+    $('hubSlot').textContent='Sandbox';
+    $('hubName').textContent=names[hover.key]||hover.key;
+    $('hubMeta').innerHTML=''; $('hubCount').innerHTML=''; $('hubCond').innerHTML='';
+    $('hubHint').textContent='Suelta para seleccionar';
+    return;
+  }
+  // --- chips quick F1-F4 ---
+  if(hover.kind==='quick'){
+    const q=QUICK.find(x=>x.key===hover.key);
+    $('hubSlot').textContent='Quick '+q.key;
+    $('hubMeta').innerHTML=''; $('hubCond').innerHTML='';
+    if(q.locked){
+      $('hubName').textContent='Bloqueado';
+      $('hubCount').innerHTML='';
+      $('hubHint').textContent='Lo habilita el traje equipado';
+    }else if(!q.item){
+      $('hubName').textContent='Sin ítem';
+      $('hubCount').innerHTML='';
+      $('hubHint').textContent='Slot vacío — no hace nada';
+    }else{
+      $('hubName').textContent=q.item.name;
+      $('hubCount').innerHTML=`×${q.item.count}`;
+      $('hubHint').textContent='Suelta para usar';
+    }
+    return;
+  }
+  // --- sectores ---
+  const s = SLOTS.find(x=>x.key===activeSector()) || SLOTS.find(x=>x.key===equippedKey);
+  const inDead = activeSector()===null;
+  $('hubSlot').textContent = s.label;
+  if(!s.item){
+    $('hubName').textContent = 'Sin arma';
+    $('hubMeta').innerHTML=''; $('hubCount').innerHTML=''; $('hubCond').innerHTML='';
+    $('hubHint').textContent = 'Slot vacío — no hace nada';
+    return;
+  }
+  const it = s.item;
+  $('hubName').textContent = it.name;
+  let meta='';
+  if(it.caliber) meta += `<span class="pill">${it.caliber}</span>`;
+  if(it.fire)    meta += `<span class="pill mode">${it.fire}</span>`;
+  if(it.group)   meta += `<span class="pill group">${it.group}</span>`;
+  $('hubMeta').innerHTML = meta;
+  $('hubCount').innerHTML = it.mag!==undefined ? `${it.mag}<span> / ${it.reserve}</span>`
+                          : it.count!==undefined ? `×${it.count}` : '';
+  $('hubCond').innerHTML = it.cond!==undefined ? condBarHTML(it.cond) : '';
+  $('hubHint').textContent = inDead ? 'Zona muerta — suelta para cancelar'
+                        : (s.key===equippedKey ? 'Arma actual — suelta para enfundar'
+                                               : 'Suelta para equipar');
+}
+
+/* ================= chips F1-F4 (quick use) ================= */
+const QUICK = [
+  { key:'F1', item:{ name:'Field Medkit',    count:8,  icon:'medkit' } },
+  { key:'F2', item:{ name:'Instant Noodles', count:10, icon:'food'   } },
+  { key:'F3', item:null },
+  { key:'F4', locked:true },
+];
+const QICONS = {
+  medkit: `<rect x="0" y="4" width="30" height="22" rx="3"/>
+           <rect x="12" y="8" width="6" height="14" fill="var(--panel)"/>
+           <rect x="8" y="12" width="14" height="6" fill="var(--panel)"/>`,
+  food:   `<polygon points="3,8 27,8 24,28 6,28"/><rect x="1" y="4" width="28" height="5"/>`,
+  lock:   `<rect x="6" y="13" width="18" height="14" rx="2"/>
+           <path d="M10 13 v-4 a5 5 0 0 1 10 0 v4" fill="none" stroke="currentColor" stroke-width="3.5"/>`,
+};
+function buildQuick(){
+  const W=74, H=54, GAP=10, y0=722;
+  const total = QUICK.length*W + (QUICK.length-1)*GAP;
+  let x = CX - total/2, out='';
+  for(const q of QUICK){
+    const cls = q.locked ? 'locked' : (!q.item ? 'empty' : '');
+    let inner = `<rect class="chip-bg" x="${x}" y="${y0}" width="${W}" height="${H}" />
+                 <text class="qkey" x="${x+6}" y="${y0+15}">${q.key}</text>`;
+    if(q.locked){
+      inner += `<g class="qicon" transform="translate(${x+W/2-15},${y0+16})" fill="currentColor">${QICONS.lock}</g>`;
+    }else if(!q.item){
+      inner += `<text class="qempty" x="${x+W/2}" y="${y0+H/2+10}" text-anchor="middle">—</text>`;
+    }else{
+      inner += `<g class="qicon" transform="translate(${x+W/2-15},${y0+14})" fill="currentColor">${QICONS[q.item.icon]||''}</g>
+                <text class="qcount" x="${x+W-6}" y="${y0+H-7}" text-anchor="end">×${q.item.count}</text>`;
+    }
+    out += `<g class="qchip ${cls}" data-q="${q.key}">${inner}</g>`;
+    x += W + GAP;
+  }
+  document.getElementById('quickG').innerHTML = out;
+}
+function handleQuick(key){
+  const q = QUICK.find(x=>x.key===key);
+  if(q.locked){ toast(`<b>${key}</b> bloqueado — lo habilita el traje equipado`); return; }
+  if(!q.item){ toast(`slot <b>${key}</b> vacío — no-op`); return; }
+  toast(`intent → <b>quick use ${key}</b> (${q.item.name})`);
+}
+
+/* ================= puntero → sector ================= */
+const stage = $('stage');
+function pick(e){
+  const r = stage.getBoundingClientRect();
+  const vx = (e.clientX - r.left) * (1200 / r.width);
+  const vy = (e.clientY - r.top ) * ( 800 / r.height);
+  const dx = vx-CX, dy = vy-CY;
+  const dist = Math.hypot(dx,dy);
+  if(dist < R_IN){ return null; }               // deadzone
+  if(dist > R_OUT + 90){ return null; }          // muy afuera (chips/aire)
+  let ang = Math.atan2(dy,dx)*180/Math.PI;       // -180..180, 0=este
+  let best=null;
+  for(const s of SLOTS){
+    let d = Math.abs(((ang - s.angle + 540)%360)-180);
+    if(d <= SPAN/2 + 5) best = s.key;
+  }
+  return best;
+}
+function setHover(kind, key){
+  if(hover.kind===kind && hover.key===key) return;
+  hover = { kind, key };
+  render(); updateHub();
+}
+stage.addEventListener('pointermove', e=>{
+  const tool = e.target.closest('.chip[data-tool]');
+  if(tool){ setHover('tool', tool.dataset.tool); return; }
+  const q = e.target.closest('[data-q]');
+  if(q){ setHover('quick', q.dataset.q); return; }
+  const k = pick(e);
+  setHover(k ? 'sector' : null, k);
+});
+stage.addEventListener('pointerleave', ()=> setHover(null, null));
+
+/* ================= commit (click simula soltar la tecla) ================= */
+let toastT=null;
+function toast(html){
+  const t=$('toast'); t.innerHTML=html; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 2200);
+}
+stage.addEventListener('click', e=>{
+  if(e.target.closest('.chip')) return;
+  const q = e.target.closest('[data-q]');
+  if(q){ handleQuick(q.dataset.q); return; }
+  const k = pick(e);
+  if(!k){ toast('cancelado <b>(deadzone)</b>'); return; }
+  const s = SLOTS.find(x=>x.key===k);
+  if(!s.item){ toast(`slot <b>${s.label}</b> vacío — no-op`); return; }
+  if(k===equippedKey){ toast(`intent → <b>holster</b> (re-select de ${s.item.name})`); equippedKey='hands'; }
+  else { toast(`intent → <b>slotkey "${k}"</b> (${s.item.name})`); equippedKey=k; }
+  render(); updateHub();
+});
+document.querySelectorAll('.chip').forEach(c=>{
+  c.addEventListener('click', ()=> toast(`chip → <b>${c.dataset.tool}</b> (input.SelectWeapon / equip)`));
+});
+
+/* ================= strip dev ================= */
+$('tgSecondary').addEventListener('change', e=>{
+  SLOTS.find(s=>s.key==='secondary').item = e.target.checked ? {...SECONDARY_DEMO} : null;
+  render(); updateHub();
+});
+$('tgChips').addEventListener('change', e=>{
+  $('toolchips').style.display = e.target.checked ? 'flex' : 'none';
+});
+$('tgNotes').addEventListener('change', e=> $('notes').classList.toggle('open', e.target.checked));
+$('notesClose').addEventListener('click', ()=>{ $('notes').classList.remove('open'); $('tgNotes').checked=false; });
+
+render(); buildQuick(); updateHub();
+</script>
+</body>
+</html>

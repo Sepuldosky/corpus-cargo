@@ -5,14 +5,14 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-12 (**Bloque C CERRADO** — entry 12
-`[APLICADO]`, confirmado en juego: reordenar el cinturón, `cargo_unload` +
-"Unload magazine" (ARC9 con animación y sin re-llenado del contador) y el gate
-WALK+USE de ítems botados; el intento de exploit de reserva "gratis" del autor
-no pasó. Incluye el fix de la **duplicación latente** del poll. La pasada dejó
-4 frentes nuevos → roadmap **#28** (drop de equipadas), **#29** (color UI
-neutro + DGL4), **#30** (spawnmenu no entrega al inventario) y **#31** (wheel
-menu, diseño en Desktop). Semilla de dev/ borrada)
+**Última actualización:** 2026-07-13 (**Bloque del wheel IMPLEMENTADO, sin
+verificar** — entry 13 `[PENDIENTE]`, 4 commits en modo auto desde el diseño
+ratificado en Desktop: primitiva de círculo del theme (#21 fix), slot
+`throwable` de stack con `×N` real en el espejo §16, columna con fila baja
+apilada Clear Sky + hide/align de tools + status panel al fondo, y el **wheel
+menu (#31)** como front-end radial de las teclas 1-7 con cero server nuevo.
+Harness verde en ambos realms (+35 checks); checklist en juego abajo. El
+Bloque D del handoff (#30 #28 #24 #29) sigue SIN implementar.)
 
 ---
 
@@ -69,18 +69,37 @@ menu, diseño en Desktop). Semilla de dev/ borrada)
 
 ## Pendiente de verificar
 
+- **Entry 13 (wheel + throwable + columna) — checklist consolidado en juego:**
+  1. Wheel: hold de G abre (aviso en consola si G ya tenía bind), soltar
+     commitea, deadzone/fuera cancela, sector vacío no hace nada.
+  2. Re-seleccionar el arma en mano en su sector **enfunda** (== re-press).
+  3. Hover sobre sector / chip quick / chip tool actualiza el **hub** (los 3).
+  4. Cargador y reserva del hub coinciden con el HUD y el cinturón; fire mode
+     solo en armas ARC9.
+  5. Granada dev (`cargo_dev_give`): equipar el stack al slot Throwable
+     (menú "Equip on..." o drag), aparece en el wheel, lanzar baja el `×N`;
+     la última granada vacía el slot y quita el SWEP.
+  6. Círculos **se ven circulares** (sandbox + botón `$` + hub del wheel).
+  7. Anclajes quick/tools en las 4 posiciones; anclajes iguales → tools cae
+     al lado libre con aviso en consola, sin romper.
+  8. Cambiar la tecla del wheel desde el tab Q y que persista.
+  9. Columna: fila baja apilada (Throwable sobre Melee), hide/show de tools,
+     alineación left/center, status panel llega al fondo.
+  10. **Regresión:** teclas 1-7, holster, cinturón, quick F1-F4, grid,
+      contenedores, peso y persistencia (reconectar con la granada equipada).
 - **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar — el
   frente suelto más viejo.
 
 ## Frentes abiertos (anotados, NO arreglados)
 
-- **Hallazgos de la pasada del Bloque C** (2026-07-12) → roadmap **#28-#31**:
+- **Hallazgos de la pasada del Bloque C** (2026-07-12) → roadmap **#28-#30**:
   **#28** no hay drop de armas EQUIPADAS desde su slot; **#29** el color de la
   UI debe ser neutro estilo spawnmenu e integrarse en runtime con el preset del
-  HUD DGL4 (autor usa PCV de Opposing Force; mod nuevo en `dev/other/`:
-  "[dgl4] official presets pack"); **#30** el ícono de arma del spawnmenu no
-  llega al inventario (sin toolgun no se pueden obtener physgun/toolgun/camera);
-  **#31** falta un wheel menu — el diseño queda en Claude Desktop.
+  HUD DGL4 (autor usa PCV de Opposing Force; mockup nuevo
+  `docs/mockups/cargo_theme_dynamic_mock_v1_1.html`); **#30** el ícono de arma
+  del spawnmenu no llega al inventario (sin toolgun no se pueden obtener
+  physgun/toolgun/camera). El **#31 (wheel)** salió de esta lista: está
+  implementado, pendiente de verificación (entry 13).
 - **Retícula del grid**: se pierde con el inventario vacío y se corta en el último
   ítem cuando hay pocos → **roadmap #24** (causa probable ya diagnosticada: la
   dibuja el propio `DIconLayout`, cuyo alto es el del contenido).
@@ -117,21 +136,20 @@ menu, diseño en Desktop). Semilla de dev/ borrada)
 
 ## Próximo paso
 
-1. **Bloque D — pendientes de UX (#30 · #28 · #24 · #29)**, en ese orden. Se
-   arranca en un **chat nuevo** con la semilla
-   `../../dev/HANDOFF_cargo_bloque_d_ux_pendientes.md`, que trae el inventario
-   completo de lo que queda + las **cuatro causas ya diagnosticadas** con
-   `archivo:línea` (contra Cargo, el gamemode sandbox y el HUD DGL4) + las
-   reglas de **modo auto** (nada se marca `[APLICADO]` sin pasada en juego).
-   **#31 (wheel menu) queda fuera:** lo diseña el autor en Claude Desktop.
-2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor: mod
-   original Workshop 2792160770); si se cierra del todo el #22, matar las
-   notificaciones de obtención de armas de GMod + verificar el 7.º slot contra
-   el HUD D/GL4.
-3. Después: **retícula del grid** (roadmap #24), **categorías fijas de tabs**
-   (roadmap #23, bloque propio) y **comercio** (`Cargo_Trade_Arquitectura.md`).
-   Deuda no bloqueante: bajar la captura de armas de mundo al spec de
-   `Cargo_ItemImages_Arquitectura.md`.
+1. **Pasada en juego del autor sobre el entry 13** (checklist arriba) →
+   `[PENDIENTE]` → `[APLICADO]` + bajar el diseño a la arquitectura (§4
+   enmienda, §15.2 enmienda, §17 nueva del wheel — lo manda el §8 del prompt
+   semilla `../../dev/PROMPT_CC_Cargo_wheel_y_equipcolumn.md`).
+2. **Bloque D — pendientes de UX (#30 · #28 · #24 · #29)**, en ese orden, con
+   la semilla `../../dev/HANDOFF_cargo_bloque_d_ux_pendientes.md` (causas ya
+   diagnosticadas con `archivo:línea`; reglas de modo auto). El **#29** ya
+   tiene mockup nuevo: `docs/mockups/cargo_theme_dynamic_mock_v1_1.html`
+   (teñido DGL4 en runtime) — el wheel y los círculos ya nacen tiñibles.
+3. **Remitir el fix de brazos oscuros a Twilight** (acción del autor); resto
+   del #22 (notificaciones de GMod + 7.º slot vs HUD DGL4).
+4. Después: **categorías fijas de tabs** (#23, bloque propio) y **comercio**
+   (`Cargo_Trade_Arquitectura.md`). Deuda no bloqueante: bajar la captura de
+   armas de mundo al spec de `Cargo_ItemImages_Arquitectura.md`.
 
 ---
 
