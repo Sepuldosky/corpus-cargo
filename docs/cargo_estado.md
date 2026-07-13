@@ -117,10 +117,13 @@ menu, diseño en Desktop). Semilla de dev/ borrada)
 
 ## Próximo paso
 
-1. **Frentes #28-#31** (orden a definir con el autor): drop de equipadas (#28)
-   y el diagnóstico del spawnmenu (#30) son chicos; el color UI + DGL4 (#29)
-   pide investigación COMPAT-RUNTIME en `dev/other/`; el wheel menu (#31)
-   espera el diseño de Claude Desktop.
+1. **Bloque D — pendientes de UX (#30 · #28 · #24 · #29)**, en ese orden. Se
+   arranca en un **chat nuevo** con la semilla
+   `../../dev/HANDOFF_cargo_bloque_d_ux_pendientes.md`, que trae el inventario
+   completo de lo que queda + las **cuatro causas ya diagnosticadas** con
+   `archivo:línea` (contra Cargo, el gamemode sandbox y el HUD DGL4) + las
+   reglas de **modo auto** (nada se marca `[APLICADO]` sin pasada en juego).
+   **#31 (wheel menu) queda fuera:** lo diseña el autor en Claude Desktop.
 2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor: mod
    original Workshop 2792160770); si se cierra del todo el #22, matar las
    notificaciones de obtención de armas de GMod + verificar el 7.º slot contra
