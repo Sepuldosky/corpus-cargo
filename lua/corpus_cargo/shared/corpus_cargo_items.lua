@@ -132,6 +132,14 @@ function CARGO.Items.Register(def)
         Corpus.Log("cargo", "Items.Register: '" .. def.id .. "' re-registered; replacing previous def")
     end
 
+    -- Precache the declared model: a prop the map never used is NOT in the
+    -- precache table, and the drop entity / icon gate then read it as invalid
+    -- (see Items.ModelUsable). Precaching also networks it to clients.
+    if SERVER and isstring(def.model) and def.model ~= ""
+        and file.Exists(def.model, "GAME") then
+        util.PrecacheModel(def.model)
+    end
+
     -- persisted icon overrides re-attach on (re-)register: autogen defs are
     -- rebuilt every session, but their editor adjustments must survive
     -- (Cargo_ItemImages §4.3). Server-only: clients receive the field with
@@ -189,6 +197,20 @@ function CARGO.Items.ResolveModel(def)
         return ENGINE_WMODELS[def.weapon_class]
     end
     return nil
+end
+
+-- Can the engine actually show this model? `util.IsValidModel` ALONE is not a
+-- sufficient gate: it answers false for models that exist in mounted content
+-- but were never precached on the current map. In-game report 2026-07-12:
+-- models/props_junk/garbage_takeoutcarton001a.mdl (a real HL2 prop, verified
+-- present in hl2_misc_dir.vpk) silently fell back to the letter icon and to
+-- the cardboard drop, while models/items/healthkit.mdl — precached because
+-- HL2 registers item_healthkit — worked. The file check covers the
+-- mounted-but-unprecached case; both together never let a bogus path through.
+function CARGO.Items.ModelUsable(model)
+    if not isstring(model) or model == "" then return false end
+    if util.IsValidModel(model) then return true end
+    return file.Exists(model, "GAME")
 end
 
 -- ------------------------------------------------------------------
