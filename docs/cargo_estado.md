@@ -30,8 +30,8 @@ de HUD) y las cuatro semillas de `dev/` borradas.)
 - **Harness offline: 229 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 52 client / 45 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
-  `origin` al día hasta el 2026-07-12; lo posterior está commiteado local,
-  **sin push** (se pushea cuando el autor lo pida).
+  `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
+  MIT y el rename `corpus_stalker` en el kit dev).
 
 ## Pendiente de verificar
 
