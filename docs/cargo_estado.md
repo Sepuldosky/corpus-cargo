@@ -5,14 +5,23 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-12 (**holster + orden de armas + manos
-default CERRADO** — entry 9 `[APLICADO]`, roadmap #22 parcial + #4: teclas
-1-7 → slots (1 melee … 7 camera), re-apretar enfunda, SWEP
-`corpus_cargo_hands` "Hands" reciclado de Apex Hands con créditos, elección
-Hands/nada en el tab Q. Mecanismo y **fix de brazos oscuros (2.º intento,
-control manual del lighting del viewmodel) confirmados in-game** — el fix
-aplicó en vivo sin reiniciar. Commiteado, sin push. Queda **remitir el fix a
-Twilight** (acción del autor))
+**Última actualización:** 2026-07-12 (**Bloque A CERRADO** — entry 10
+`[APLICADO]`, confirmado en juego en 3 pasadas. Segunda tanda del autor, partida
+en dos bloques: (A) drop + muerte + modelos dev — este; (B) **munición =
+roadmap #19**, se arranca en **chat nuevo** con la semilla
+`../../dev/HANDOFF_cargo_bloque_b_municion.md`. Del Bloque A: drop nativo
+`cargo_drop` + **reconciliador universal de `PlayerDroppedWeapon`** (el arma
+botada deja de quedar fantasma en el equipo y vuelve como su misma instancia —
+verificado incluso con el mod "Drop Weapon" montado, que el autor igual dará de
+baja); `cargo_lose_on_death` (wipe total, dinero por provider) y
+`cargo_persistence`; **persistencia del cargador** en el blob (#18); modelos
+dev de comida/medkit + sonido. Tres bugs de terceros diagnosticados y resueltos
+del lado nuestro: los errores del revólver ARC9 (timer de recarga sin guard de
+dueño → `cargo_drop` no bota durante la recarga), el **cargador que se
+rellenaba solo** (ARC9 lo regala en su `PostModify` vía `AlreadyGaveAmmo` — se
+**reclama la bandera** en vez de correrle una carrera) y `util.IsValidModel`
+fallando **en silencio** con props montados sin precachear (→ `Items.ModelUsable`
++ precache en `Register`). Commiteado, **sin push**)
 
 ---
 
@@ -55,7 +64,19 @@ Twilight** (acción del autor))
 ## Pendiente de verificar
 
 - **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar —
-  el único frente suelto de rondas anteriores.
+  el único frente suelto de rondas anteriores. El Bloque A (entry 10) cerró
+  completo.
+
+## Frentes abiertos que dejó la 3.ª pasada (anotados, NO arreglados)
+
+- **ARC9 regala munición de reserva al tomar un arma** (*"no puede aparecer del
+  éter"*): es `InitialDefaultClip` (`sh_deploy.lua:130`, vía un `timer.Simple(0.4)`
+  de su `Initialize`). **Es justo lo que contaminaría el "cinturón = pool real"**,
+  así que se resuelve dentro del **Bloque B** → roadmap #19 (opciones ya anotadas
+  en la semilla §3.5).
+- **Retícula del grid**: se pierde con el inventario vacío y se corta en el último
+  ítem cuando hay pocos → **roadmap #24** (causa probable ya diagnosticada: la
+  dibuja el propio `DIconLayout`, cuyo alto es el del contenido).
 
 ## Remanentes / deuda conocida
 
@@ -79,14 +100,21 @@ Twilight** (acción del autor))
 
 ## Próximo paso
 
-1. **Remitir el fix de brazos oscuros a Twilight** (acción del autor: mod
-   original Workshop 2792160770) y, si se quiere cerrar del todo el #22,
-   matar las notificaciones de obtención de armas de GMod + verificar el 7.º
-   slot contra el HUD D/GL4.
-2. **Borrar el handoff** `dev/HANDOFF_cargo_iconos_persistencia.md` (los tres
-   entries que cubría ya cerraron) y bajar captura de armas de mundo al spec
-   de `Cargo_ItemImages_Arquitectura.md` cuando haya tiempo (no bloqueante).
-3. Después: comercio (`Cargo_Trade_Arquitectura.md`).
+1. **Bloque B — sistema de munición (roadmap #19).** **Se arranca en un chat
+   NUEVO** con la semilla `../../dev/HANDOFF_cargo_bloque_b_municion.md`, que
+   trae el estado, el modelo ya decidido (**cinturón = pool real por calibre**;
+   el cargador por-arma ya lo resuelven `Clip1` + el blob) y **toda la
+   investigación de ARC9 con archivo:línea** — incluida la trampa del **regalo
+   de reserva** (`InitialDefaultClip`) que este bloque **debe** neutralizar. El
+   harness offline quedó guardado en `../../dev/harness_cargo.py` (reusable).
+2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor: mod
+   original Workshop 2792160770); si se cierra del todo el #22, matar las
+   notificaciones de obtención de armas de GMod + verificar el 7.º slot contra
+   el HUD D/GL4.
+3. Después: **retícula del grid** (roadmap #24), **categorías fijas de tabs**
+   (roadmap #23, bloque propio) y **comercio** (`Cargo_Trade_Arquitectura.md`).
+   Deuda no bloqueante: bajar la captura de armas de mundo al spec de
+   `Cargo_ItemImages_Arquitectura.md`.
 
 ---
 

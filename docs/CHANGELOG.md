@@ -858,3 +858,186 @@ se revirtió. Entry cerrado.
 brazos oscuros a Twilight Sparkle (mod original Workshop 2792160770). Del
 roadmap #22 queda, para otra tanda, matar las notificaciones de obtención de
 armas de GMod y verificar el 7.º slot contra el HUD D/GL4.
+
+---
+
+## 10. Bloque A: drop de armas + muerte + modelos dev (roadmap #17 · #18 · #15 parcial) `[APLICADO 2026-07-12]`
+
+Segunda tanda del autor (2026-07-12), partida en dos bloques (metodología §2,
+corte por cambio de modo temático). **Bloque A** = tres features concretas; el
+sistema de munición (roadmap #19) va como Bloque B aparte. Ninguna suma
+archivos nuevos (no toca el manifest).
+
+1. **Compat "Drop Weapon" + drop nativo (roadmap #17, la mitad que faltaba)**
+   (`corpus_cargo_capture.lua`): un **reconciliador universal** en el hook
+   `PlayerDroppedWeapon` cubre CUALQUIER ruta de drop — el mod "Drop Weapon"
+   (Workshop 946373028, cuyo `+drop` llama `ply:DropWeapon`), el comando
+   nativo de Cargo o cualquier otro addon. Antes el arma botada por el mod
+   salía de la mano pero **quedaba fantasma en `rec.equip`**; ahora el
+   reconciliador **vacía el slot** (sin devolverla al grid — se va al mundo) y
+   **taguea la entidad** con `CargoInstanceUid` + `CargoWorldSpawned`, de modo
+   que el world gate no la aspira por contacto y el take-back (WALK+USE) la
+   recupera como LA MISMA instancia (blob/attachments; el cargador `Clip1`
+   viaja en la propia entidad). Decisión del autor: **el mod gana** — su
+   comportamiento queda intacto, Cargo solo reconcilia. Comando nativo
+   `cargo_drop` (bota el arma en mano al frente vía `ply:DropWeapon`, gateado
+   por `cargo_native_drop` default 1) para el caso sin el mod. Tecla bindeable
+   sin consola: convar cliente `cargo_key_drop` + poller de flanco en `Think`
+   (`corpus_cargo_hotkeys.lua`, mismo patrón que la tecla de inventario) +
+   **DBinder en el tab Q** (`corpus_cargo_options.lua`).
+2. **Muerte pierde todo + toggle de persistencia (roadmap #15 parcial)**
+   (`corpus_cargo_inventory.lua`): dos convars independientes.
+   `cargo_lose_on_death` (`FCVAR_ARCHIVE`, default **0**): en `PlayerDeath`,
+   `WipeOnDeath` borra grid + equipo + quick + cinturón y pone el dinero en 0
+   **por el provider activo** (respeta DarkRP etc., §6), destruyendo las
+   instancias alcanzables (host + sub-slots uid'd) para no dejar blobs
+   huérfanos. Corre en `PlayerDeath` para que el `PlayerLoadout` reconcile
+   encuentre `equip` vacío y no re-dé nada. `cargo_persistence`
+   (`FCVAR_ARCHIVE`, default **1**): en 0, `GetRecord`/`SaveRecord` no leen ni
+   escriben a disco (sesión en memoria; el equipo sobrevive al respawn DENTRO
+   de la sesión vía `_records`, solo se pierde entre reinicios/reconexiones).
+   Nota de deuda: los blobs de instancia (`inst_<uid>`) todavía escriben a
+   disco con persistencia off — quedan huérfanos, GC futuro (roadmap #15).
+3. **Modelos dev + sonido de curación** (`corpus_cargo_dev.lua`, pedido del
+   autor): `cargo_dev_food` → `models/props_junk/garbage_takeoutcarton001a.mdl`;
+   `cargo_dev_medkit` (el consumible de quick slots) →
+   `models/items/healthkit.mdl` + `EmitSound("items/medshot4.wav")` en su
+   `onUse`. El campo `model` alimenta `ResolveModel` (drops + render de ícono);
+   el ícono re-keya solo (el modelo entra en `IconCacheKey`), sin regen manual.
+
+**Verificación previa (2026-07-12):** sintaxis 5/5 (luaparser) + harness
+offline (lupa/LuaJIT 2.1, framework real de `corpus/` + módulo real, ambos
+realms): selftest 31/38 sin regresión, y **15 checks nuevos del Bloque A** —
+persistencia (reload con on, fresh con off, SaveRecord no-op con off), wipe de
+muerte (grid/equipo/quick/cinturón vacíos, dinero en 0 por provider, instancia
+equipada purgada sin huérfano), reconciliador de drop (slot vaciado, entidad
+tagueada con uid + world-spawned, instancia conservada para take-back, arma
+no-Cargo intacta) — todo verde.
+
+**1.ª pasada en juego (2026-07-12, feedback del autor):** `cargo_lose_on_death`
+y `cargo_persistence` **funcionan** (el dinero se explica abajo); el modelo del
+**medkit** aplicó, el de **comida NO**; y botar un arma **ARC9 EFT** escupió 5
+errores de Lua. Fixes de la pasada:
+
+4. **Persistencia del cargador (roadmap #18 — la causa real del reporte)**
+   (`corpus_cargo_inventory.lua` + `corpus_cargo_capture.lua`). El autor:
+   *"pasó de perder 3 balas a tenerlas todas cuando lo traje de vuelta al
+   inventario"*. Causa: un arma que sale del jugador se **destruye como
+   entidad** (strip al desequipar, `Remove` en el take-back) y vuelve por
+   `ply:Give`, que reparte el `DefaultClip` del SWEP — cargador lleno gratis.
+   Ahora el conteo de balas cargadas **viaja en el blob de instancia**
+   (`blob.clip1`; Cargo transporta el número, la base del arma le da
+   significado — contrato §3): `Inventory.StoreClip` lo guarda al desequipar,
+   al botar (reconciliador) y en el take-back (antes del `Remove`);
+   `Inventory.RestoreClip` lo restaura tras cada `ply:Give` (equip, loadout,
+   reconcile) y `ApplyClipToEntity` en el arma de mundo dropeada desde el grid.
+   Se aplica **ahora y un tick después** (la base del arma llena el clip en su
+   propio `Initialize`/`Deploy`, después de que `ply:Give` retorna) y espeja
+   `LoadedRounds` cuando el SWEP lo expone (ARC9 mantiene el cargador real en
+   el `Clip1` nativo y lo replica ahí — verificado contra la base). El roadmap
+   ya declaraba el #18 **prerequisito del #17**, así que cierra acá.
+5. **Los 5 errores de ARC9 EFT NO eran nuestros** — y el drop nativo ahora los
+   esquiva. Causa verificada contra el código vivo (`Arc9 EFT pistols/lua/
+   weapons/arc9_eft_cr200ds.lua:403-406`): el revólver recarga **bala por
+   bala** y arma un `timer.Simple(2)` **por cada una**; ese timer valida
+   `IsValid(swep)` pero **nunca al dueño**, y hace
+   `swep:GetOwner():GetAmmoCount(swep.Ammo)` → al botar el arma a media
+   recarga los timers quedan huérfanos, `GetAmmoCount` devuelve nil y revienta
+   `math.Clamp` (uno por bala pendiente = los 5 errores). Es bug de ARC9 y
+   pasa igual con el mod "Drop Weapon" solo. ARC9 es **COMPAT-RUNTIME (nunca
+   se forkea)**, así que `cargo_drop` simplemente **se niega a botar mientras
+   el arma recarga** (`wep:GetReloading()`, NetworkVar real de la base) con un
+   aviso. Un mod externo que llame `ply:DropWeapon` crudo puede seguir
+   pegándole — no está en nuestras manos.
+6. **El modelo de comida no aplicaba: `util.IsValidModel` NO alcanza como
+   gate.** El path era correcto (`models/props_junk/garbage_takeoutcarton001a.mdl`
+   existe — verificado parseando `hl2_misc_dir.vpk`), pero esa función
+   devuelve **false** para modelos que están en el contenido montado y **nunca
+   fueron precacheados en el mapa** — y el gate del pipeline de íconos
+   retornaba **en silencio** (sin log), así que el ítem se quedaba con la letra
+   y el drop con la caja de cartón. El medkit funcionaba porque HL2 precachea
+   `models/items/healthkit.mdl` vía `item_healthkit`. Fix en dos capas:
+   `CARGO.Items.ModelUsable(model)` (SHARED) = `util.IsValidModel` **o**
+   `file.Exists(model, "GAME")`, usado ahora por el render de íconos, el
+   footprint, el editor y la entidad de drop; y `Items.Register` **precachea**
+   el `def.model` declarado en el server (también lo networkea al cliente).
+   Arregla la clase entera del problema, no solo este ítem.
+7. **El dinero NO persiste — se re-siembra** (aclaración, sin cambio de
+   código). Con `cargo_persistence 0` el record nace fresco, así que la wallet
+   se re-inicializa a **`cargo_money_start`** (default **$1000**) en cada
+   sesión: no conserva el balance viejo, lo **regala de nuevo** al valor de
+   arranque — indistinguible de "persistente" si tu balance ya era 1000.
+   Verificado en el harness (con persistencia ON un balance de 6000 sobrevive;
+   con OFF vuelve a 1000, no a 6000). Para arrancar sin plata: `cargo_money_start 0`.
+
+**Verificación de los fixes (2026-07-12):** sintaxis 9/9 (luaparser) + harness
+offline ambos realms: selftest 31/38 sin regresión y **24 checks** —
+persistencia, dinero bajo el toggle (ON conserva 6000 / OFF vuelve a 1000),
+wipe de muerte, reconciliador de drop, **round-trip del cargador** (StoreClip
+al blob, RestoreClip pisando el DefaultClip 30→27, arma de mundo con su
+cargador, y sin cargador guardado el DefaultClip queda intacto) y `ModelUsable`.
+
+**2.ª pasada en juego (2026-07-12, feedback del autor):** comida **OK**,
+persistencia **OK**, **sin errores de ARC9** (el guard de recarga funcionó).
+Único frente abierto: el **cargador seguía volviendo lleno** (AK-19: disparar
+15 de 30, mandarla al inventario y re-equiparla → 30 otra vez). Fix:
+
+8. **ARC9 regala un cargador lleno: hay que RECLAMAR su bandera, no correrle
+   una carrera** (`corpus_cargo_inventory.lua`). El punto 4 guardaba y
+   restauraba `Clip1` bien — pero ARC9 lo pisaba después. Causa verificada
+   contra la base viva (`sh_attach.lua:147-155`), dentro de `PostModify`
+   (server, con dueño válido):
+
+   ```lua
+   timer.Simple(0, function()          -- corre tras acoplar cada attachment
+       if (cambió ammo/clipsize) and self.AlreadyGaveAmmo then ...
+       elseif !self.AlreadyGaveAmmo then
+           self:SetClip1(self:GetProcessedValue("ClipSize"))  -- CARGADOR LLENO
+           self.AlreadyGaveAmmo = true
+       end
+   end)
+   ```
+
+   `Initialize` siembra `AlreadyGaveAmmo = false` (`sh_init.lua:44`) y
+   `PostModify` recién se asienta cuando lo hacen los attachments — **a un
+   round-trip de red DESPUÉS de `ply:Give`**, o sea después de cualquier timer
+   que nosotros pudiéramos encolar. Por eso ningún `timer.Simple(0)` alcanzaba.
+   Solución: `ApplyClip` **reclama la bandera** (`wep.AlreadyGaveAmmo = true`)
+   antes de fijar el `Clip1`; con ella en true ARC9 no toma ninguna de las dos
+   ramas y nuestro cargador queda. Un arma **sin** cargador guardado nunca
+   llega ahí (`RestoreClip` corta antes), así que un arma nueva sigue
+   recibiendo su cargador lleno de ARC9, tal como corresponde. Aplica igual al
+   arma dropeada como entidad (`ApplyClipToEntity`), que si no se rellenaba
+   sola al recogerla.
+9. **Mod "Drop Weapon": el autor lo da de baja** (lo saca de su suscripción de
+   Workshop). La compat **se conserva tal cual** — el reconciliador de
+   `PlayerDroppedWeapon` es agnóstico de la fuente y sigue cubriendo cualquier
+   mod de drop futuro; el drop nativo (`cargo_drop`) pasa a ser la ruta única
+   en su setup. Sin cambio de código.
+
+**Verificación del fix (2026-07-12):** sintaxis OK + harness ambos realms:
+selftest 31/38 sin regresión, 25 checks — incl. `AlreadyGaveAmmo` reclamada
+sobre un SWEP que simula el estado post-`Initialize` de ARC9.
+
+**Confirmado in-game por el autor (3.ª pasada, 2026-07-12 — cierre del entry):**
+el drop de armas funciona completo, **incluso con el mod "Drop Weapon" todavía
+montado** (el reconciliador universal cumple: el arma deja de quedar fantasma en
+el equipo y vuelve como su misma instancia), y el cargador ya no se rellena solo.
+Comida, persistencia y ausencia de errores de ARC9 ya venían confirmados de la
+2.ª pasada. **Entry cerrado.**
+
+**Dos frentes NUEVOS que abrió esta pasada — anotados, NO arreglados acá**
+(decisión del autor: "eso no solucionar, anotar"):
+
+- **ARC9 regala munición de reserva al tomar un arma** — *"la munición no puede
+  aparecer del éter"*. Es `SWEP:InitialDefaultClip()` (`sh_deploy.lua:130-146`),
+  que ARC9 dispara desde un `timer.Simple(0.4)` en su `Initialize`
+  (`sh_init.lua:80-86`) y hace `ply:GiveAmmo(ClipSize * arc9_mult_defaultammo)`.
+  **Es exactamente lo que contamina el "cinturón = pool real" del Bloque B**, así
+  que se resuelve ahí → **roadmap #19** (ya documentado en la semilla
+  `dev/HANDOFF_cargo_bloque_b_municion.md` §3.5, con las opciones a evaluar).
+- **La retícula del grid se pierde con el inventario vacío / se corta con pocos
+  ítems** → **roadmap #24** (nuevo). Causa probable: desde el entry 8 la dibuja el
+  propio `DIconLayout` (para que comparta origen con las celdas y scrollee con el
+  contenido), así que su alto = alto del contenido: sin ítems no hay nada que
+  pintar, y con pocos se corta en el último.

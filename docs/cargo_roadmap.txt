@@ -103,6 +103,10 @@ INTEGRACIONES / DEUDA PROPIA
 15. Loot on death / GC de instancias huérfanas — diseño posterior; incluye
     la segunda arma de mundo de una clase ya poseída (hoy la captura la
     absorbe, dedup v1). Enlaza con loot de cadáveres (Trade §9, cruce Cortex).
+    PARCIAL (CHANGELOG #10, [PENDIENTE] verif.): variante WIPE lista
+    (cargo_lose_on_death borra todo + dinero al morir; cargo_persistence 0 =
+    sesión en memoria). La variante LOOT (todo cae recuperable) y el GC de
+    huérfanos siguen pendientes — decisión del autor fue wipe, no loot.
 
 
 BLOQUE DE MANEJO / INTERACCIÓN DE ARMAS (hallazgos in-game 2026-07-11)
@@ -120,9 +124,11 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
   - #16 -> IMPLEMENTADO v1 (CHANGELOG #7, [PENDIENTE] verif. in-game): sin pickup
     por contacto; WALK+USE toma, USE agarra como prop; drops de armas = SWEP real.
     Convar cargo_weapon_world_pickup.
-  - #17 -> PARCIAL (CHANGELOG #7): el arma dropeada/tomada conserva su instancia
-    de Cargo (uid en la entidad, GiveEntry al recuperarla). FALTA la tecla que
-    bote el arma en mano directamente.
+  - #17 -> IMPLEMENTADO (CHANGELOG #10, [PENDIENTE] verif. in-game): reconciliador
+    universal en PlayerDroppedWeapon (compat mod "Drop Weapon" — gana sobre la
+    nativa; el arma botada ya no queda fantasma en el equipo) + comando nativo
+    cargo_drop (bota al frente, conserva la instancia). Antes: PARCIAL (CHANGELOG
+    #7, el arma dropeada conservaba su uid; faltaba la tecla de drop).
   - #22 -> PARCIAL implementado (CHANGELOG #9, 2026-07-12): orden 1-7 +
     holster por re-apretar + manos default (#4). FALTA: matar las
     notificaciones de obtención de armas de GMod + verificar el 7.º slot
@@ -136,13 +142,15 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     (walk para no autorecoger al pasar por encima; use para tomarla como cualquier
     prop) — algo que gmod/hl2 no permiten nativo → plus. Toca corpus_cargo_capture.
 
-17. BOTAR ARMA CON TECLA, conservando funciones de Corpus [Cargo + Caliber]. Falta
-    una tecla que bote directamente el arma en mano, y que el arma botada NO sea un
-    SWEP nuevo del engine: debe conservar sus funciones de Corpus (seguir siendo la
-    instancia-ítem de Cargo con su blob, no un arma fresca). Referencia: mod "Drop
-    Weapon" (YuRaNnNzZZ, 946373028, dev/other/ — mapa §2/§4: suelta arma conservando
-    munición del cargador; licencia silenciosa → integrar en runtime o reciclar con
-    permiso). Debe conservar el punto 18 (persistencia de munición).
+17. BOTAR ARMA CON TECLA, conservando funciones de Corpus [Cargo + Caliber].
+    [IMPLEMENTADO CHANGELOG #10, PENDIENTE verif. in-game] Reconciliador universal
+    en PlayerDroppedWeapon: cualquier ruta de drop (comando nativo cargo_drop, el
+    mod "Drop Weapon" YuRaNnNzZZ 946373028, u otro) vacía el slot de equipo y
+    taguea la entidad con el uid de la instancia — el arma botada sigue siendo la
+    instancia-ítem de Cargo con su blob (no un arma fresca), y el take-back la
+    restaura. Decisión del autor: el mod "Drop Weapon" gana sobre la nativa. El
+    cargador viaja en el Clip1 de la entidad (persistencia de #18 a nivel entidad;
+    la persistencia del cargador en el BLOB del ítem para el grid es del Bloque B).
 
 18. PERSISTENCIA DE MUNICIÓN DEL CARGADOR [Caliber semántica + Cargo blob]. Si el
     cargador es 30 y se disparan 15, el arma debe quedar con 15 (hoy no persiste al
@@ -159,6 +167,20 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     algo parecido. Toca el puente ARC9 (corpus_cargo_arc9) + la UI de equipamiento.
     NOTA: la FORMA (cinturón de munición) ya está diseñada en §15 — es el punto de
     anclaje visual que esta semántica va a llenar.
+    MODELO YA DECIDIDO con el autor (2026-07-12): CINTURÓN = POOL REAL POR CALIBRE
+    (ply:GiveAmmo/SetAmmo; las armas del mismo calibre HL2 comparten reserva, como
+    HL2 y STALKER); el grid es solo almacén en data; lo distinto POR ARMA es el
+    CARGADOR (Clip1), que ARC9 guarda por entidad y Cargo ya persiste en el blob
+    (#18, CHANGELOG #10). NO se hace reserva por-arma con swap.
+    *** BLOQUEANTE A RESOLVER EN ESTE BLOQUE (reporte in-game 2026-07-12): ARC9
+    REGALA MUNICIÓN DE RESERVA al entregar un arma — "la munición no puede aparecer
+    del éter" (autor). Es SWEP:InitialDefaultClip() (sh_deploy.lua:130-146),
+    disparado por un timer.Simple(0.4) desde su Initialize (sh_init.lua:80-86):
+    ply:GiveAmmo(ClipSize * arc9_mult_defaultammo). Contamina el pool que el
+    cinturón debe poseer. Opciones a evaluar: arc9_mult_defaultammo 0 / re-sincronizar
+    el pool desde el cinturón después de cada give. ***
+    SEMILLA COMPLETA (estado + modelo + investigación ARC9 con archivo:línea):
+    ../../dev/HANDOFF_cargo_bloque_b_municion.md
 
 20. CONDICIÓN / MANTENIMIENTO DEL ARMA [Caliber semántica + Cargo condición-blob].
     ARC9 EFT ya traba armas por calor / muchos disparos (sistema propio de ARC9 EFT):
@@ -187,6 +209,36 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     (corpus_cargo_pickup). Compat objetivo del autor: "D/GL4 Holographic HUD" (DyaMetR,
     3459525275, GPL-3.0, COMPAT-RUNTIME — mapa §2); verificar que el 7º slot no rompa
     ese HUD.
+
+23. CATEGORÍAS FIJAS PARA LA FILA DE TABS DEL GRID [Cargo UI] — SIN DISEÑAR.
+    Pedido del autor (2026-07-12, pasada del Bloque A). HOY: el set de
+    categorías es ABIERTO — Items.RegisterCategory auto-registra cualquier
+    categoría que un def mencione (corpus_cargo_items.lua), así que la fila de
+    tabs CRECE sola y hace wrap: "Backpacks" termina en una segunda línea,
+    debajo de "All". Se sale de la línea.
+    OBJETIVO: NO poblar los filtros dinámicamente. Diseñar ANTES un set FIJO y
+    acotado de categorías de DISPLAY (tabs), y mapear las categorías internas
+    de ítem contra ellas — p.ej. un tab "Armor" que agrupe helmets + armor de
+    Body (y así con el resto), de modo que la fila entre siempre en una línea.
+    Es una capa de AGRUPACIÓN de display sobre las categorías de ítem, no un
+    renombre: las categorías internas siguen sirviendo a los filtros de slot y
+    sub-slot ("category:a,b"), que no deben romperse.
+    NOTA: hacerlo bien exige decidir el set fijo primero (sesión de diseño), no
+    parchear la fila. Toca §7/§15 de Cargo_Architecture.md.
+
+24. RETÍCULA DEL GRID: SE PIERDE VACÍO, SE CORTA CON POCOS ÍTEMS [Cargo UI] — SIN
+    ARREGLAR. Reporte in-game del autor (2026-07-12, 3.ª pasada del Bloque A): con
+    el inventario VACÍO el grid no muestra gradas/retícula, y con POCOS ítems la
+    retícula se corta en el último ítem en vez de llenar el área visible.
+    CAUSA PROBABLE (leer antes de tocar): desde CHANGELOG #8 (ajuste 1 de la 1.ª
+    pasada fullscreen) la retícula la dibuja el PROPIO DIconLayout — se hizo así a
+    propósito, para que comparta origen con las celdas y scrollee con el contenido.
+    Pero el alto del DIconLayout ES el alto del contenido: sin ítems no hay nada que
+    pintar, y con pocos termina en el último. Hay que pintarla en un fondo que cubra
+    el viewport SIN perder la alineación con las celdas ni el scroll (esa alineación
+    fue justo lo que el ajuste arregló — no regresarla). Ojo con la trampa VGUI ya
+    documentada: DIconLayout con Dock(FILL) dentro de DScrollPanel colapsa.
+    Toca corpus_cargo_grid.lua.
 
 =====================================================
 Diseño de referencia: Cargo_Architecture.md (inventario, Block 1 + §15 UI fullscreen),
