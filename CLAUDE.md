@@ -47,23 +47,31 @@ Un **manifest de carga explícito** (`corpus_cargo_init.lua`, único archivo en 
 | [`lua/corpus_cargo/shared/corpus_cargo_items.lua`](lua/corpus_cargo/shared/corpus_cargo_items.lua) | shared | **Contrato de ítems** (§3): `Items.Register`, categorías, filtro único, **sub-slots** (`DeclareSubSlot`, §4) |
 | [`lua/corpus_cargo/shared/corpus_cargo_slots.lua`](lua/corpus_cargo/shared/corpus_cargo_slots.lua) | shared | Slots de equipamiento (data, incl. Accessory 1/2 genéricos y los 3 de herramienta sandbox con clase exacta) + quick F1–F4 (disponibilidad por traje) + cinturón (`BELT_COUNT`) |
 | [`lua/corpus_cargo/shared/corpus_cargo_weight.lua`](lua/corpus_cargo/shared/corpus_cargo_weight.lua) | shared | Curva pura peso→velocidad (§5) + capacidad base+mochila |
+| [`lua/corpus_cargo/shared/corpus_cargo_movecompat.lua`](lua/corpus_cargo/shared/corpus_cargo_movecompat.lua) | shared | **Compat #34** (§5 enmienda): hook `Move` re-aplica la curva sobre mods que pisan walk/run cada tick (mult publicado por NW2Float `cargo_speed_mult`, piso 30); gated por `cargo_movement_compat` + el `sv_bm_enabled` del mod |
+| [`lua/corpus_cargo/shared/corpus_cargo_ammo.lua`](lua/corpus_cargo/shared/corpus_cargo_ammo.lua) | shared | Tipos de munición HL2 como ítems (§16.2: modelo, peso, `max_stack`, etiqueta de calibre) + caras throwable canónicas (`cargo_throw_frag/slam`, §4) + remap `LegacyThrowIds` |
 | [`lua/corpus_cargo/shared/corpus_cargo_arc9.lua`](lua/corpus_cargo/shared/corpus_cargo_arc9.lua) | shared | **Puente ARC9** (§10): hooks de inventario verificados + helpers de attach/detach/stats |
 | [`lua/corpus_cargo/shared/corpus_cargo_dev.lua`](lua/corpus_cargo/shared/corpus_cargo_dev.lua) | shared | `cargo_selftest` + kit de ítems demo (`cargo_dev_give`) + barras demo |
 | [`lua/corpus_cargo/server/corpus_cargo_instances.lua`](lua/corpus_cargo/server/corpus_cargo_instances.lua) | server | Blobs de instancia únicos, uid, un archivo por instancia (§12) |
 | [`lua/corpus_cargo/server/corpus_cargo_money.lua`](lua/corpus_cargo/server/corpus_cargo_money.lua) | server | Interfaz de dinero + provider nativo USD (§6) |
 | [`lua/corpus_cargo/server/corpus_cargo_inventory.lua`](lua/corpus_cargo/server/corpus_cargo_inventory.lua) | server | Inventario por SteamID64: stacks, equip, quick, cinturón (§15.2, solo forma), eyección obligatoria, net |
-| [`lua/corpus_cargo/server/corpus_cargo_movement.lua`](lua/corpus_cargo/server/corpus_cargo_movement.lua) | server | Aplica la curva a walk/run + lazy-check Coagulant |
+| [`lua/corpus_cargo/server/corpus_cargo_movement.lua`](lua/corpus_cargo/server/corpus_cargo_movement.lua) | server | Aplica la curva a walk/run + lazy-check Coagulant + publica el mult (NW2Float) para movecompat |
+| [`lua/corpus_cargo/server/corpus_cargo_ammopool.lua`](lua/corpus_cargo/server/corpus_cargo_ammopool.lua) | server | Espejo cinturón↔pool a 4 Hz (§16.3-16.5, §16.9: el stack throwable equipado cuenta y paga primero), unload (#26), `WorldAmmoSpec` + veto puro de `item_ammo_*` |
+| [`lua/corpus_cargo/server/corpus_cargo_weapon_weights.lua`](lua/corpus_cargo/server/corpus_cargo_weapon_weights.lua) | server | Pesos reales clase→kg para defs autogen (GAMMA DB 0.9.5 / `EFT approx`; fallback 2.5 kg). El manifest la carga **antes** de `capture.lua`: el re-registro al boot re-pesa lo ya capturado |
+| [`lua/corpus_cargo/server/corpus_cargo_icons.lua`](lua/corpus_cargo/server/corpus_cargo_icons.lua) | server | Registro de overrides de cámara/footprint de íconos (def-level, persiste en `Corpus.Data` y viaja en el snapshot de defs) — ItemImages §4.3/§10 |
 | [`lua/corpus_cargo/server/corpus_cargo_containers.lua`](lua/corpus_cargo/server/corpus_cargo_containers.lua) | server | Contenedores en mundo, transferencias, Take/Move all (§8) |
 | [`lua/corpus_cargo/server/corpus_cargo_capture.lua`](lua/corpus_cargo/server/corpus_cargo_capture.lua) | server | Captura de armas del engine → ítems (spawn desarmado). **Post-equip vía `WeaponEquip`, nunca vetando `PlayerCanPickupWeapon`** — compat con mods de pickup (lección L4D IPS, ver header del archivo). Defs `autogen` (crowbar/stunstick caen en `melee`) + `Capture.Ignore` para SWEPs de manos |
 | [`lua/corpus_cargo/server/corpus_cargo_holster.lua`](lua/corpus_cargo/server/corpus_cargo_holster.lua) | server | Orden STALKER + holster (#22/#4): resuelve el intent `slotkey` contra `rec.equip`, re-apretar enfunda (Hands o nada, userinfo `cargo_holster_hands`), manos default al spawn |
-| [`lua/corpus_cargo/client/corpus_cargo_theme.lua`](lua/corpus_cargo/client/corpus_cargo_theme.lua) | client | Paleta/fuentes/helpers de pintado (única fuente de estilo) |
+| [`lua/corpus_cargo/client/corpus_cargo_theme.lua`](lua/corpus_cargo/client/corpus_cargo_theme.lua) | client | Paleta/fuentes/helpers de pintado (única fuente de estilo) + paletas runtime y teñido DGL4 (§15.5) + `DrawCircle`/`DrawCircleOutlined` (primitiva única de círculo) + `SkinScroll` |
+| [`lua/corpus_cargo/client/corpus_cargo_icons.lua`](lua/corpus_cargo/client/corpus_cargo_icons.lua) | client | Pipeline de íconos (modelo→RT→PNG en `data/`, caché local por cliente) — `Cargo_ItemImages_Arquitectura.md` |
+| [`lua/corpus_cargo/client/corpus_cargo_iconeditor.lua`](lua/corpus_cargo/client/corpus_cargo_iconeditor.lua) | client | Editor dev `cargo_icon_edit` (encuadre orbit/zoom/pan + footprint manual → override en data) — ItemImages §8 |
 | [`lua/corpus_cargo/client/corpus_cargo_statuspanel.lua`](lua/corpus_cargo/client/corpus_cargo_statuspanel.lua) | client | `StatusPanel.RegisterBar` + render (§11) |
 | [`lua/corpus_cargo/client/corpus_cargo_pickup.lua`](lua/corpus_cargo/client/corpus_cargo_pickup.lua) | client | Feed de pickup en pantalla (`cargo_pickup_feed`) — señala el ítem recogido |
 | [`lua/corpus_cargo/client/corpus_cargo_tooltip.lua`](lua/corpus_cargo/client/corpus_cargo_tooltip.lua) | client | Tooltip de inspección (§9): stats ARC9/manual, zonas, sub-slots |
 | [`lua/corpus_cargo/client/corpus_cargo_grid.lua`](lua/corpus_cargo/client/corpus_cargo_grid.lua) | client | Grid por **gradas** (footprint `w×h`, §7 enmendado) + overlays por esquina (PaintOver, no CSS) |
 | [`lua/corpus_cargo/client/corpus_cargo_ui.lua`](lua/corpus_cargo/client/corpus_cargo_ui.lua) | client | Frame **fullscreen 3 columnas / 3 estados** (§15: Solo/Loot/Trade-reservado; equip STALKER, quick, cinturón, círculos sandbox, botón $, tabs, footer) + binds |
 | [`lua/corpus_cargo/client/corpus_cargo_transfer.lua`](lua/corpus_cargo/client/corpus_cargo_transfer.lua) | client | Estado/wire de contenedores (§8): net + intents; el frame Loot vive en `corpus_cargo_ui.lua` |
-| [`lua/corpus_cargo/client/corpus_cargo_hotkeys.lua`](lua/corpus_cargo/client/corpus_cargo_hotkeys.lua) | client | Teclas STALKER 1-7 (#22): intercepta `slot1`-`slot7` en `PlayerBindPress` y manda solo el intent (`cargo_weapon_slots` lo apaga); comando `cargo_holster` |
+| [`lua/corpus_cargo/client/corpus_cargo_hotkeys.lua`](lua/corpus_cargo/client/corpus_cargo_hotkeys.lua) | client | Teclas STALKER 1-7 (#22): intercepta `slot1`-`slot7` en `PlayerBindPress` y manda solo el intent (`cargo_weapon_slots` lo apaga); comando `cargo_holster`. Jamás intercepta `slot8` (el intent 8 es wheel-only) |
+| [`lua/corpus_cargo/client/corpus_cargo_wheel.lua`](lua/corpus_cargo/client/corpus_cargo_wheel.lua) | client | **Wheel radial** (§17): HUDPaint sin VGUI, hold `cargo_key_wheel` (default G) / `+cargo_wheel`; commit = intent `slotkey` existente (+8 wheel-only del throwable); hub de info universal (AmmoInfo/CaliberOf verificados contra ARC9); chips quick/tools con anclajes configurables |
 | [`lua/corpus_cargo/client/corpus_cargo_options.lua`](lua/corpus_cargo/client/corpus_cargo_options.lua) | client | Tab único `Corpus.UI.RegisterTab("cargo", …)` |
 | [`lua/weapons/corpus_cargo_hands.lua`](lua/weapons/corpus_cargo_hands.lua) | shared | SWEP **"Hands"** — Apex Hands reciclado (créditos en el header, Workshop 2792160770) con fix de brazos oscuros (`SetLightingOriginEntity`→jugador en Deploy, suelto en Holster); assets propios salvo el .mdl (path original, no se recompila) |
 | [`lua/entities/corpus_cargo_crate.lua`](lua/entities/corpus_cargo_crate.lua) | shared | Caja de prueba spawnable (E → panel de transferencia) |
@@ -82,13 +90,18 @@ Un **manifest de carga explícito** (`corpus_cargo_init.lua`, único archivo en 
 9. **Detección, nunca asunción.** Cortex (facción), Coagulant (stamina) y ARC9 se consultan con lazy-check + pcall; sin ellos el header omite facción, la penalización queda en velocidad y el puente se apaga — degradación honesta, jamás crash.
 10. **Prefijo de archivo por módulo:** `corpus_cargo_*.lua` en todo lo que cargue el engine.
 
-## Trampas de VGUI (heredadas del proyecto — no las redescubras)
+## Trampas de VGUI y HUD (heredadas del proyecto — no las redescubras)
 
 - `DNumSlider` y `DPropertySheet:Dock(FILL)` colapsan dentro de `DScrollPanel` — filas manuales.
 - **`DIconLayout:Dock(FILL)` dentro de `DScrollPanel` también colapsa** (canvas se dimensiona a los hijos, el hijo llena el canvas): celdas recortadas y `Refresh()` repoblando un layout de altura cero. Usa `Dock(TOP)` + `InvalidateLayout(true)` — pagado en la primera pasada en juego de este repo.
 - Overlays de celda = `PaintOver`/paneles con `SetPos`, no flexbox.
 - Texto en celdas/filas siempre con `Theme.FitText` (elipsis) — los nombres largos desbordan.
 - Refresca en sitio leyendo `CARGO.ClientState` desde los `Paint` (así está hecho el frame); no reconstruyas el panel en callbacks de valor.
+- **`draw.RoundedBox` con radio = mitad NO produce un círculo** — su radio está cuantizado a los materiales de esquina de GMod. Todo círculo pasa por `Theme.DrawCircle`/`DrawCircleOutlined` (polígono triangulado, primitiva única del theme) — pagado in-game en los círculos sandbox (entry 13).
+- **GMod DESENGANCHA un hook de `HUDPaint` que erra**: un error de pintado y la superficie muere en silencio la sesión entera. Pintado y commit van en `pcall` + `Corpus.Log` ruidoso (patrón del wheel, pagado en la 1.ª pasada del entry 13).
+- **`HUDPaint` no tiene clipping de panel**: todo lo que pueda sangrar (hatching, rellenos parciales) se recorta con `render.SetScissorRect` — pagado con el hatching de los quickslots del wheel.
+- **Leer `gui.MousePos` ANTES de apagar `gui.EnableScreenClicker`**: apagado el screen clicker, no está garantizado que siga reportando la posición del cursor libre.
+- **Los nombres de API de ARC9 y de los mods de movimiento se verifican contra `dev/other/`, nunca de memoria** (contrato #8 para ARC9; los headers de `corpus_cargo_arc9.lua`, `corpus_cargo_wheel.lua` y `corpus_cargo_movecompat.lua` anotan lo ya verificado).
 
 ## Verificación
 

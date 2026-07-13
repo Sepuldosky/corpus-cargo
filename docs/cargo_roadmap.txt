@@ -119,7 +119,11 @@ se resuelve AL diseñar el bloque. Varios tocan la UI fullscreen (#3).
 Espejado como cross-ref en caliber_roadmap.txt §2[5].
 
 Estado de diseño de este bloque tras la sesión 2026-07-11:
-  - #21 (círculos de herramienta sandbox) -> DISEÑADO dentro de §15 (Cargo_Architecture.md).
+  - #21 (círculos de herramienta sandbox) -> DISEÑADO dentro de §15; FIX de
+    render CERRADO (CHANGELOG #13, APLICADO 2026-07-13): Theme.DrawCircle /
+    DrawCircleOutlined, primitiva única del theme (draw.RoundedBox no hace
+    círculos — radio cuantizado); consumida por sandbox + botón $ + hub del
+    wheel.
   - #19 (cinturón de munición) -> FORMA en §15; SEMÁNTICA CERRADA en §16 e
     IMPLEMENTADA (CHANGELOG #11, [PENDIENTE] verif. in-game): el cinturón ES la
     reserva real. Queda abierto: cargadores rellenables con toggle + binding de
@@ -238,8 +242,12 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     NOTA: hacerlo bien exige decidir el set fijo primero (sesión de diseño), no
     parchear la fila. Toca §7/§15 de Cargo_Architecture.md.
 
-24. RETÍCULA DEL GRID: SE PIERDE VACÍO, SE CORTA CON POCOS ÍTEMS [Cargo UI] — SIN
-    ARREGLAR. Reporte in-game del autor (2026-07-12, 3.ª pasada del Bloque A): con
+24. RETÍCULA DEL GRID: SE PIERDE VACÍO, SE CORTA CON POCOS ÍTEMS [Cargo UI].
+    [CERRADO — CHANGELOG #14, APLICADO 2026-07-13: la retícula la pinta el
+    fondo del viewport (scroll.Paint) desplazada por el offset del canvas —
+    cubre el área visible siempre y la fase queda clavada a las celdas; la
+    alineación del entry 8 no regresó.]
+    Reporte in-game del autor (2026-07-12, 3.ª pasada del Bloque A): con
     el inventario VACÍO el grid no muestra gradas/retícula, y con POCOS ítems la
     retícula se corta en el último ítem en vez de llenar el área visible.
     CAUSA PROBABLE (leer antes de tocar): desde CHANGELOG #8 (ajuste 1 de la 1.ª
@@ -292,7 +300,12 @@ no pasó). La semilla de dev/ se borró al cerrar.
 
 HALLAZGOS IN-GAME 2026-07-12 (pasada del Bloque C) — SIN DISEÑAR
 -----------------------------------------------------------------
-28. DROP DE ARMAS EQUIPADAS [Cargo UI + inventory]. Reporte del autor: "falta un
+28. DROP DE ARMAS EQUIPADAS [Cargo UI + inventory].
+    [CERRADO — CHANGELOG #14, APLICADO 2026-07-13: opción "Drop" en el menú
+    del slot equipado (incl. círculos de herramienta y throwable) → intent
+    equip_drop → Inventory.DropEquipped, todo con maquinaria existente; las
+    cuatro formas confirmadas en juego.]
+    Reporte del autor: "falta un
     drop weapon de armas equipadas". Hoy el camino es unequip al grid y drop
     desde ahí, o cargo_drop con el arma en la mano. Candidato natural: opción
     "Drop" en el menú contextual del slot equipado, reusando la maquinaria de
@@ -300,6 +313,11 @@ HALLAZGOS IN-GAME 2026-07-12 (pasada del Bloque C) — SIN DISEÑAR
     (#17) con el cargador persistido (#18).
 
 29. COLOR DE LA UI: NEUTRO ESTILO SPAWNMENU + INTEGRACIÓN DGL4 [Cargo UI].
+    [CERRADO — CHANGELOG #14, APLICADO 2026-07-13 → §15.5 de la arquitectura:
+    paletas runtime que mutan T.Colors en sitio; base spawnmenu default,
+    cargo_theme olive restaura la GAMMA; teñido DGL4 del preset activo con
+    re-tint en vivo (OnSettingsChanged). El wheel nació listo para el tinte
+    (cero colores horneados).]
     Pedido del autor: el color base de Cargo debe ser el del spawnmenu/browser
     de GMod — neutro, "listo para integrarse con cambios benignos sobre el
     spawnmenu" — y con el HUD DGL4 montado la UI debería teñirse según su preset
@@ -311,15 +329,24 @@ HALLAZGOS IN-GAME 2026-07-12 (pasada del Bloque C) — SIN DISEÑAR
     de ahí).
 
 30. SPAWNMENU: EL ÍCONO DE ARMA NO LLEGA AL INVENTARIO [Cargo capture].
+    [CERRADO — CHANGELOG #14, APLICADO 2026-07-13: el hook PlayerGiveSWEP
+    (sandbox commands.lua:940) marca el give del spawnmenu como deliberate
+    (ventana 1 s); el dedup avisa "You already have one." en vez de comerse
+    el click.]
     Reporte del autor: sin el toolgun no hay forma de obtener physgun/toolgun/
     camera; al clickear el ícono del arma en el spawnmenu, el arma no llega al
     inventario. Sospecha (NO confirmada): el filtro de loadout de sandbox del
     entry 8 (cargo_capture_sandbox_tools 0) o el flujo de give del spawnmenu
     esquivan la captura — diagnosticar leyendo capture.lua ANTES de arreglar.
 
-31. WHEEL MENU [Cargo UI]. Falta un menú radial. El DISEÑO queda en Claude
-    Desktop (proyecto "Corpus Framework"); acá solo se implementa cuando el
-    diseño baje aprobado.
+31. WHEEL MENU [Cargo UI].
+    [CERRADO — CHANGELOG #13, APLICADO 2026-07-13: diseño bajado de Claude
+    Desktop (prompt semilla del wheel, mock congelado v2_1), implementado en
+    client/corpus_cargo_wheel.lua y verificado en juego en dos pasadas + el
+    re-chequeo visual. Arquitectura → §17: cero server nuevo (intent slotkey
+    + 8 wheel-only del throwable), hub de información universal con las
+    rutas ARC9 verificadas (#33), chips quick/tools con anclajes
+    configurables, HUDPaint blindado con pcall.]
 
 =====================================================
 Diseño de referencia: Cargo_Architecture.md (inventario, Block 1 + §15 UI fullscreen),
@@ -332,11 +359,11 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 ../../dev/HANDOFF_cargo_pendientes_pasada2.md
 -----------------------------------------------------------------
 32. TAXONOMÍA DE GRANADAS + GATE DE CAJAS DE MUNICIÓN [Cargo ammo/items].
-    [IMPLEMENTADO — CHANGELOG #16, [PENDIENTE] verif. in-game: la cara
-    canónica de Grenade/slam es el lanzable (cargo_throw_frag/slam), el
-    espejo absorbe al slot/grid, la captura no acuña wpn_weapon_frag, ids
-    viejos remapean, y las cajas item_ammo_* van por WALK+USE en el gate
-    único de capture.lua.]
+    [CERRADO — CHANGELOG #16, APLICADO 2026-07-13 (confirmado in-game): la
+    cara canónica de Grenade/slam es el lanzable (cargo_throw_frag/slam), el
+    espejo absorbe al slot/grid (§16.9), la captura no acuña wpn_weapon_frag,
+    ids viejos remapean (LegacyThrowIds), y las cajas item_ammo_* van por
+    WALK+USE en el gate único de capture.lua (veto puro).]
     Reporte del autor: el frag de HL2 se genera como ítem de MUNICIÓN
     (cargo_ammo_grenade, cara canónica del tipo "Grenade" desde el Bloque B)
     al morir/spawnearlo — debería ser LANZABLE (categoría throwables, slot);
@@ -347,9 +374,10 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     PlayerCanPickupItem, ammopool.lua) — el autor quiere WALK+USE también
     ahí; reusar el patrón del gate de capture.lua.
 33. HUB ARC9 INCOMPLETO EN EL WHEEL [Cargo UI].
-    [IMPLEMENTADO — CHANGELOG #16, [PENDIENTE] verif. in-game: AmmoInfo con
-    la ruta del Ammo1 de ARC9 + fallbacks SWEP.Ammo/GetLoadedRounds; defs
-    autogen con def.ammo.caliber (etiqueta del pool) + derivación runtime.]
+    [CERRADO — CHANGELOG #16, APLICADO 2026-07-13 (confirmado in-game):
+    AmmoInfo con la ruta del Ammo1 de ARC9 + fallbacks SWEP.Ammo/
+    GetLoadedRounds; defs autogen con def.ammo.caliber (etiqueta del pool) +
+    derivación runtime (CaliberOf). Arquitectura → §17.5.]
     Muestra "Auto · Group A":
     falta el calibre (defs autogen wpn_<clase> sin def.ammo — poblarlo al
     capturar o leer de ARC9 en runtime) y cargador/reserva (AmmoInfo de
@@ -357,10 +385,10 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     responde — diagnosticar contra el ARC9 vivo qué devuelven Clip1 /
     GetProcessedValue("Ammo") / GetPrimaryAmmoType client-side).
 34. VELOCIDAD PISADA POR EL MOD DE MOVIMIENTO [Cargo movement, COMPAT].
-    [IMPLEMENTADO — CHANGELOG #16, CONFIRMADO in-game 2026-07-13: hook Move
-    shared (corpus_cargo_movecompat.lua) que escala el MaxSpeed del move
-    data con el mult publicado por NW2Float; gated por sv_bm_enabled y
-    cargo_movement_compat; vanilla intacto sin el mod.]
+    [CERRADO — CHANGELOG #16, APLICADO 2026-07-13 (confirmado in-game): hook
+    Move shared (corpus_cargo_movecompat.lua) que escala el MaxSpeed del
+    move data con el mult publicado por NW2Float; gated por sv_bm_enabled y
+    cargo_movement_compat; vanilla intacto sin el mod. Arquitectura → §5.]
 35. FOOTSTEPS MUDOS AL TOGGLEAR EL MOD DE MOVIMIENTO [COMPAT, lado mod] —
     SIN ARREGLAR. Reporte del autor (2026-07-13, pasada del entry 16): con
     sv_bm_enabled 0 los pasos quedan en silencio, y el remedio hipotetizado

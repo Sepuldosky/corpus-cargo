@@ -26,6 +26,7 @@
 14. [Estado de este documento](#14-estado-de-este-documento)
 15. [UI fullscreen (rediseño de forma)](#15-ui-fullscreen-rediseño-de-forma)
 16. [Sistema de munición: el cinturón ES el pool](#16-sistema-de-munición-el-cinturón-es-el-pool)
+17. [Wheel menu (menú radial de armas)](#17-wheel-menu-menú-radial-de-armas)
 
 ---
 
@@ -96,8 +97,33 @@ Cada ítem único persiste un blob propio vía `Corpus.Data`, namespaced por ins
 | Back | Mochila | modificador de capacidad de peso |
 | Primary / Secondary / Sidearm | Armas | grupo de munición bindeado (A/B) |
 | Melee | Arma cuerpo a cuerpo | — |
+| Throwable | Lanzable equipado (granada, SLAM) | slot de **stack**, no de instancia — *enmienda 2026-07-13, ver abajo* |
 | Accessory 1 / Accessory 2 | Accesorios menores (categoría genérica `accessories`) | slots dedicados, sin sub-slots propios. *Enmienda 2026-07-10: nacieron como "PDA / Detector", renombrados por el autor en la primera pasada en juego — eso es mobiliario STALKER y Corpus es agnóstico de ambientación* |
 | Quick slots F1–F4 | Consumibles bindeados | algunos condicionales — ver abajo |
+
+> **Enmienda 2026-07-13 — slot `throwable` (entry 13) + taxonomía de granadas (entry 16, roadmap #32).**
+>
+> - **Primer slot de stack del equipo.** `rec.equip.throwable` guarda una **entry de stack**
+>   `{id, count, condition?}`, no un uid de instancia (todos los consumidores de `rec.equip`
+>   ramifican con `istable()`). Categoría `throwables`, give/take del `weapon_class` al
+>   equipar/desequipar, badge `×N`, sin barra de condición. La **eyección obligatoria no
+>   aplica**: un stack no tiene sub-slots que eyectar.
+> - **El `×N` es reserva real.** El stack equipado entra al espejo de §16 (suma en
+>   `BeltTotals`) y **se drena primero** al lanzar (slot-primero, después el cinturón);
+>   al vaciarse, el slot se vacía y el SWEP se stripea. El give del equip va con `noAmmo`
+>   (el default clip caería al pool → éter lavado al cinturón) y el equip/unequip hace
+>   `AmmoPool.Push`. La captura ve el stack equipado (`EquippedDefOf`) para no recapturar
+>   ni duplicar el give del equip. Detalle del espejo → §16.9.
+> - **Taxonomía (#32):** la cara canónica de los tipos HL2 `Grenade`/`slam` es el
+>   **lanzable** — `cargo_throw_frag` / `cargo_throw_slam` (categoría `throwables`,
+>   registrados en `corpus_cargo_ammo.lua` junto al resto de los tipos manejados); la
+>   granada del SMG1 sigue siendo munición de cinturón. Los ids muertos
+>   (`cargo_ammo_grenade/slam`, `cargo_dev_frag`, `wpn_weapon_frag/slam`) remapean al
+>   cargar records y contenedores vía `CARGO.Ammo.LegacyThrowIds`; el stack legacy del
+>   cinturón baja al grid.
+> - **Sin tecla propia:** el wheel lo alcanza con el intent wheel-only 8
+>   (`CARGO.Slots.WheelSlots`, §17.1). Darle una tecla después es mover la entrada a
+>   `Slots.Hotkeys` — extensión, no rediseño.
 
 ### Primitivo genérico: sub-slots
 
@@ -131,6 +157,21 @@ Regla dura, aplica en todo flujo que destruye o reemplaza un ítem con sub-slots
 **Coagulant soft-dep**: dueño del recurso de stamina. Si está presente, se suma *encima* de la penalización base: drenaje de stamina por sobrepeso, efectos de fatiga, interacción con vitales. Cargo nunca depende de la stamina de Coagulant para su propia consecuencia — evita degradación deshonesta si Coagulant no está montado.
 
 Capacidad total = base del jugador + bonus de mochila equipada (Back). El footer de peso muestra el desglose (`base + mochila = total`) y colorea según proximidad al límite.
+
+> **Enmienda 2026-07-13 — compat con mods de movimiento (entry 16, roadmap #34).** Un mod
+> que re-estampa walk/run **cada tick** desde sus propias convars ("better movement v2":
+> su `SetupMove` reescribe `SetWalkSpeed`/`SetRunSpeed`, `sh_bm_main.lua:455-457`) mata las
+> bases que la ruta vanilla captura al spawn — la curva deja de morder. La pata de compat
+> ([`shared/corpus_cargo_movecompat.lua`](../lua/corpus_cargo/shared/corpus_cargo_movecompat.lua))
+> escala el `MaxSpeed` del move data en un hook `Move` propio (corre **después** de
+> `SetupMove` en el pipeline de predicción), con el mult que `Movement.Refresh` publica en
+> el NW2Float `cargo_speed_mult`; piso absoluto 30 (sobrecargado = lento, nunca inmóvil).
+> Es SHARED porque `Move` es predicho: el cliente debe escalar el mismo número o hay
+> rubber-banding en multiplayer. No toca al mod ni realimenta su matemática (él relee sus
+> convars cada tick). Gates: `cargo_movement_compat` (default 1) y el `sv_bm_enabled` del
+> propio mod — sin el mod o apagado, la pata no corre y la ruta vanilla es toda la
+> historia: **degradación honesta en ambas direcciones**. Borde cosmético declarado: el
+> mod timea sus sonidos de pasos con SU velocidad lerpeada, que nunca ve nuestra escala.
 
 ---
 
@@ -292,8 +333,9 @@ Bloque de diseño de Cargo (inventario) cerrado y validado en sesión de diseño
 |---|---|
 | Contrato de ítems, slots/sub-slots, peso, providers, grid, contenedores, tooltip, stat-bars | **Cerrado — este documento** |
 | Attachments de armas (UX + puente ARC9) | **Cerrado en diseño** — API exacta de ARC9 pendiente de verificación contra código |
-| UI fullscreen (forma) | **Cerrado — §15**; VGUI es bloque de implementación aparte; depende de Cargo_ItemImages |
-| Sistema de munición (el cinturón ES el pool) | **Cerrado — §16** (Bloque B, roadmap #19). UX (reorder, unload, gate WALK+USE de ítems) **cerrada — §16.8** (Bloque C, roadmap #25 · #26 · #27). Abierto: cargadores rellenables con toggle, y el binding de ammo-atts de EFT (§16.6) |
+| UI fullscreen (forma) | **Cerrado — §15**; VGUI es bloque de implementación aparte; depende de Cargo_ItemImages. Paletas runtime + teñido DGL4 **cerrados — §15.5** (entry 14) |
+| Sistema de munición (el cinturón ES el pool) | **Cerrado — §16** (Bloque B, roadmap #19). UX (reorder, unload, gate WALK+USE de ítems) **cerrada — §16.8** (Bloque C, roadmap #25 · #26 · #27). Throwables y cajas de mundo **cerrados — §16.9** (entries 13/16). Abierto: cargadores rellenables con toggle, y el binding de ammo-atts de EFT (§16.6) |
+| Wheel menu + slot throwable + compat de movimiento | **Cerrado — §17, §4/§5 (enmiendas)** (entries 13/14/16, verificados en juego 2026-07-13) |
 | Workbench (craft/reparación/desarme, upgrades pendiente) | Cerrado en su mayoría — ver documento aparte |
 | Efectos de armadura y escudos de jugador | Pendiente — Caliber Block 3 |
 | Crafting profundo (recetas de materiales, categorías) | Pendiente — diseño posterior |
@@ -362,6 +404,25 @@ Reordena los slots de §4 a la disposición GAMMA. De arriba a abajo:
 6. **Cinturón de munición** *(nuevo — forma de roadmap #19, ver abajo)*.
 7. **Panel de estado** (§11, stat-bars registrables) — al fondo de la columna.
 
+> **Enmienda 2026-07-13 (entry 13 — bloque wheel/throwable).** Mockup congelado:
+> `mockups/cargo_equipcolumn_throwable_mock_v1_1.html`.
+>
+> - **Fila baja apilada (patrón Clear Sky):** conserva 3 columnas; la tercera se divide en
+>   vertical — **Throwable (chico, arriba) sobre Melee**. Sidearm y Back conservan su
+>   ancho; el throwable lee como slot menor, que es lo que es. La variante de 4 columnas
+>   iguales queda **descartada** (vive en el mock solo como comparación visual).
+> - **Círculos sandbox:** toggle **"hide" restaurado** (chip al lado; ocultos, la fila
+>   colapsa) + alineación configurable `cargo_ui_tools_align` (`left` default / `center`),
+>   ambos en el tab de Cargo del menú Q. La selección está factorizada en
+>   `CARGO.UI.SelectTool` — la consumen la columna y los chips del wheel (§17.6). Pintan
+>   con `Theme.DrawCircle` (primitiva única de círculo, §17.5).
+> - **El panel de estado se estira hasta el fondo** de la columna (era alto fijo): va a
+>   crecer con las barras de otros módulos. Las barras siguen siendo **registrables**
+>   (§11) — nada se hardcodea; cada módulo registra las suyas por soft-dep cuando exista:
+>   Coagulant (Health · Blood), Craving (Hunger · Hydration), Caliber Block 3 (armadura
+>   propia). **HL2 Armor queda declarado legacy**: hoy se conserva como demo bar y sale
+>   cuando Caliber Block 3 traiga la armadura propia.
+
 #### Cinturón de munición (solo la FORMA)
 
 Fila de **6 slots cuadrados** (tipo cinturón — la munición no es lo bastante grande
@@ -399,6 +460,30 @@ comercio.
   refleja en este bloque como el **orden visual** de los slots de equipamiento (15.2).
 - **Semántica de munición (roadmap #19):** solo la forma del cinturón entra (15.2).
 - **Comportamiento de pickup/drop (roadmap #16–18, #20):** ajenos a la forma de la UI.
+
+### 15.5 Paletas runtime y teñido DGL4 (roadmap #29 — entry 14)
+
+*(Contrato de tokens del mock `mockups/cargo_theme_dynamic_mock_v1_1.html`. Todo vive en
+`corpus_cargo_theme.lua` — la única fuente de estilo.)*
+
+- **Mutación en sitio.** Los objetos `Color` de `T.Colors` se crean UNA vez; una paleta
+  solo muta sus rgba (`ApplyPalette`), conservando nombre **e identidad de tabla** — todos
+  los closures de `Paint` (y tablas de file-scope) que capturaron una referencia se
+  re-skinnean al frame siguiente sin tocar un consumidor.
+- **Bases.** Default **`spawnmenu`** (grises neutros en la clave del spawnmenu/browser de
+  GMod — decisión del autor: "benigno, listo para integrarse"); `cargo_theme olive`
+  restaura la paleta GAMMA del mock fullscreen original. Claves nuevas del contrato:
+  `accent`/`accentDim`/`scrim` (fin de los colores hardcodeados del scrim).
+- **Teñido DGL4** (HOLOHUD2, COMPAT-RUNTIME). Con el mod montado y `cargo_theme_dgl4`
+  (default 1), la paleta entera deriva del preset activo: el tint global de
+  `GetModifiers().color` cuando está seteado y no es blanco pelado, o — **decisión
+  anotada**: los presets no exponen nombre — el color sano de `health_color` (umbral más
+  alto) del elemento `health` (Foxtrot Uniform = verde PCV 180,255,100). Re-tint **en
+  vivo** vía su hook propio `OnSettingsChanged` y en los flips de convar. Sin mod / API
+  rota: base neutra, jamás crash.
+- **`Theme.SkinScroll`** re-skinnea los scrollbars Derma stock con la paleta (grid y
+  editor de íconos — entry 16, fleco) — el re-tinte DGL4 los alcanza gratis.
+- Los FX del mock (glow/scan) quedan anotados como **futuros** — no entran.
 
 ---
 
@@ -615,3 +700,152 @@ convar `cargo_world_guns` sigue gateando **solo** la rama de armas, no la de ít
 
 **Sin convars nuevas** en este bloque. Net nuevo: `belt_move`, `unload` (ambos vía
 `Corpus.Net.Register("cargo", …)`, como todo mensaje del módulo).
+
+### 16.9 Enmiendas del espejo: throwables y cajas de mundo (entries 13/16)
+
+*(El slot `throwable` de §4 y la taxonomía de granadas del roadmap #32 le enseñan la cara
+lanzable al espejo de §16.3. Todo en `server/corpus_cargo_ammopool.lua`.)*
+
+- **El stack equipado cuenta como reserva.** `BeltTotals` suma también
+  `rec.equip.throwable`: el invariante pasa a ser `pool == cinturón + stack equipado` para
+  los tipos con cara lanzable. Al gastar (lanzar), **el slot paga primero** y recién
+  después los stacks del cinturón; al vaciarse el slot, se quita el SWEP.
+- **`AbsorbType` ramifica por cara.** Para un tipo cuya cara canónica **no** es munición
+  (`Grenade`/`slam`): el filtro del cinturón rechaza su categoría, así que la única
+  reserva que puede absorber es el **stack equipado**, topeado bajo `max_stack` (esto es
+  lo que mueve el `×N` cuando el engine regala una granada). El excedente vuelve al
+  caller, cuyo camino de overflow lo manda al **grid** Y baja el pool a la suma de reserva
+  — una granada en el grid es almacén, no reserva. Decisión conservadora: **nunca
+  auto-equipa** un slot vacío.
+- **Cajas `item_ammo_*` por WALK+USE (#32).** Ya no se toman por contacto:
+  `PlayerCanPickupItem` pasa a **veto puro** (nunca reparte), y la toma vive en el MISMO
+  gate de `PlayerUse` de `capture.lua` que armas e ítems botados (§16.8), leyendo
+  `AmmoPool.WorldAmmoSpec(clase)` — USE pelado carga la caja como prop;
+  `cargo_ammo_world_pickup 0` restaura el pickup crudo del engine. La captura tampoco
+  acuña ya `wpn_weapon_frag`: la entidad del give muere y el espejo contabiliza (con el
+  stack equipado, la clase es suya — el take-back del entry 13 intacto).
+
+---
+
+## 17. Wheel menu (menú radial de armas)
+
+*(Roadmap #31 — entry 13, con las enmiendas del hub del entry 16 (#33). Archivo
+[`client/corpus_cargo_wheel.lua`](../lua/corpus_cargo/client/corpus_cargo_wheel.lua).
+Mockup congelado: `mockups/cargo_wheel_menu_mock_v2_1.html` — manda hasta que exista VGUI
+real; en divergencia, el código manda.)*
+
+### 17.1 Principio rector — cero lógica de server nueva
+
+El wheel es un **front-end alternativo de las teclas 1-7**: el commit de un sector manda
+el **mismo intent `slotkey`** que `corpus_cargo_hotkeys.lua`, y lo resuelve
+`corpus_cargo_holster.lua` como hoy. Lo único que el bloque sumó al server es que el
+resolver acepta los **intents wheel-only** de `CARGO.Slots.WheelSlots` (**8 =
+throwable** — slots sin tecla numérica propia); el cliente **jamás intercepta `slot8`**
+(queda stock GMod), solo el commit del wheel lo emite. Los chips quick llaman a la ruta de
+quick use existente (`CARGO.UI.QuickUse`); los chips de herramientas a `CARGO.UI.SelectTool`
+(§15.2), gated por `cargo_ui_tools`. **Cero mensajes de red nuevos.**
+
+### 17.2 Geometría y render
+
+- Dibujo por **HUDPaint sin VGUI**: cursor libre con `gui.EnableScreenClicker` (que además
+  se traga los clicks — nada dispara mientras se apunta el wheel); teclado y movimiento
+  quedan con el juego.
+- **Una sola función de layout** (`CARGO.Wheel.BuildLayout`) resuelve centro, radios y
+  cajas de chips; sectores, hub, chips y el pick beben todos de ahí (el bug del mock v1
+  fue exactamente dos sistemas de escala desincronizados). Escala **uniforme** sobre
+  `ScrH`: mock viewBox 1200×800, referencia @1080 → hub 120 px, borde exterior 305 px.
+- **6 sectores anulares de 50° con gaps de 10°**, triangulados como quads convexos
+  (~5° por paso) vía `surface.DrawPoly` (un sector anular no es convexo; DrawPoly abanica
+  desde su primer vértice). **Nada de texturas horneadas** — todo color lee el theme, así
+  el teñido de §15.5 re-tiñe el wheel entero gratis.
+- **Contenido del sector agrupado en el radio medio** (enmienda del entry 16 — el mock
+  nunca tuvo labels sueltos en el borde): línea de info **encima** del ícono (`×N` del
+  stack / `cargador / reserva` del arma / el label del slot cuando ninguna aplica); label
+  solo en sectores **vacíos**. Punto de acento del arma en mano **fuera** del anillo
+  (`rOut + 12`).
+
+### 17.3 Mapa de sectores (posiciones de reloj)
+
+| Reloj | Slot | Intent `slotkey` |
+|---|---|---|
+| 12 | Primary | 3 |
+| 2 | Sidearm | 2 |
+| 4 | Melee | 1 |
+| 6 | Hands (holster) | 0 |
+| 8 | Throwable | 8 (wheel-only) |
+| 10 | Secondary | 4 |
+
+### 17.4 Interacción
+
+- **Hold** abre, **soltar commitea**. Tecla por convar `cargo_key_wheel` (default `G`,
+  polleada en Think — el patrón de binds probado del proyecto) o `+cargo_wheel`/
+  `-cargo_wheel` para binds de consola. Si la tecla ya tiene un bind del engine, **aviso
+  único** por `Corpus.Log` (regla del autor: jamás pisar un bind en silencio — el engine
+  bind no se toca, ambos disparan).
+- Soltar en la **deadzone** (hub) o **fuera del anillo** = cancelar. Sector **vacío** =
+  **no-op honesto** (el hub lo dijo en el hover). Re-seleccionar el sector del arma **en
+  mano** = **enfundar** — la misma semántica del re-press de las teclas (#22); decide el
+  server. ESC o muerte cancelan sin commit.
+- El **pick re-corre al soltar** (el cursor pudo moverse tras el último frame pintado).
+  Dentro del anillo el pick es por **sector más cercano** al ángulo del cursor — los gaps
+  de 10° perdonan. El cursor arranca centrado en la deadzone, como el mock. Chips primero:
+  un cursor sobre un chip **nunca** activa un sector.
+
+### 17.5 Hub central = superficie de información universal
+
+Todo lo que recibe hover alimenta el hub — sectores, chips quick, chips de tools y la
+deadzone (que muestra lo que hay en mano y ofrece la salida). **Ningún dato se inventa:**
+
+- **Cargador / reserva** → `CARGO.Wheel.AmmoInfo`, con las rutas **verificadas contra el
+  ARC9 vivo** (2.ª pasada, 2026-07-13): el tipo de munición sigue la ruta del propio
+  `Ammo1()` de ARC9 (`GetProcessedValue("Ammo")`, `sh_reload.lua:578`), con respaldo en el
+  campo plano `SWEP.Ammo` (dato estático de clase, legible aun sin estado procesado en el
+  cliente) y recién después `GetPrimaryAmmoType` (**no confiable en ARC9**: el
+  `Primary.Ammo` de clase es `""` y solo `Initialize` lo corrige por instancia — queda
+  como última pata, para armas del engine). El clip cae al espejo `GetLoadedRounds`
+  (NetworkVar broadcast) cuando `Clip1` responde -1. La **reserva se lee del pool del
+  engine**, que el espejo de §16 mantiene igual al cinturón — se lee, no se recalcula.
+- **Calibre** → los defs autogen nacen/upgradean con `def.ammo.caliber` resuelto del arma
+  viva y persistido (#33); la etiqueta es **la del pool de Cargo** — la misma con que
+  agrupa el cinturón (§16.2); el calibre EFT real solo existe como token de trivia sin
+  API (decisión anotada). Cuando el def no la trae, `CARGO.Wheel.CaliberOf` la deriva en
+  runtime del tipo del arma viva.
+- **Fire mode** → solo ARC9, COMPAT-RUNTIME: `SWEP:GetFiremodeName()` (verificado,
+  `sh_firemodes.lua:158`); si no está, el campo **se oculta** — jamás se adivina.
+- **Condición** → blob de instancia; barra segmentada, `< 25%` pinta en danger. **×N** del
+  throwable: el count ES la línea de munición.
+- El círculo del hub (y el marcador de en-mano) pintan con **`Theme.DrawCircle` /
+  `DrawCircleOutlined`** — la **primitiva única de círculo** del theme (polígono
+  triangulado, 32/48 segmentos según radio; `draw.RoundedBox` con radio mitad NO es un
+  círculo — su radio está cuantizado a los materiales de esquina). La consumen también los
+  círculos sandbox de la columna y el botón `$` del header (#21).
+
+### 17.6 Chips
+
+- **Quick F1-F4**: fila de 4 chips **rectangulares** — verbo distinto = forma distinta
+  (se **usan**, no se equipan; mezclar ambos verbos en sectores del mismo anillo es error
+  de UX). No participan del pick angular. Candado del traje respetado (mismo hatching de
+  la UI fullscreen, recortado con **scissor** — HUDPaint no tiene clipping de panel);
+  vacío = no-op honesto. El commit llama a la ruta de quick use existente.
+- **Tools sandbox**: mismo comportamiento que los círculos de la columna
+  (`CARGO.UI.SelectTool`), mismo gate `cargo_ui_tools`.
+- **Anclajes configurables** (pedido del autor): `cargo_wheel_quick_anchor` (default
+  `bottom`) y `cargo_wheel_tools_anchor` (default `right`), valores
+  `bottom·top·left·right`, con un **resolver de anclaje único** (`ResolveAnchors`) que
+  sirve a ambos grupos. Dos grupos no comparten lado: si colisionan, **quick gana** y
+  tools cae al anclaje libre más cercano, con aviso único por `Corpus.Log` — se resuelve
+  en el layout, jamás con un error.
+- Toda la configuración (habilitación `cargo_wheel`, tecla, anclajes) vive en el **tab de
+  Cargo del menú Q**, junto al resto de las opciones del módulo.
+
+### 17.7 Robustez (pagada in-game, 1.ª pasada 2026-07-13)
+
+- GMod **desengancha** un hook de HUDPaint que erra: un hover malo y el wheel muere en
+  silencio la sesión entera (la forma exacta de la falla reportada). Pintado y commit
+  corren en **pcall** con `Corpus.Log` ruidoso — el error se loguea una vez, con línea, y
+  el wheel sigue vivo.
+- `gui.MousePos` se lee **antes** de apagar el screen clicker: apagado, no está
+  garantizado que siga reportando la posición del cursor libre.
+- El primer open de una sesión puede preceder cualquier sync de inventario: se pide un
+  snapshot con el intent `open` existente (el mismo que usa la UI).
+

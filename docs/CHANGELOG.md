@@ -1243,7 +1243,7 @@ al inventario** al clickearlos (sin toolgun no hay forma de obtener
 physgun/toolgun/camera); falta un **wheel menu** (diseño pendiente en Claude
 Desktop).
 
-## 13. Wheel menu + slot Throwable + enmiendas de la columna (roadmap #31 · #21 fix · §4/§15.2) `[PENDIENTE]`
+## 13. Wheel menu + slot Throwable + enmiendas de la columna (roadmap #31 · #21 fix · §4/§15.2) `[APLICADO 2026-07-13]`
 
 Quinta tanda, bajada de la sesión de diseño en Claude Desktop (2026-07-13,
 ratificada por el autor; prompt semilla `dev/PROMPT_CC_Cargo_wheel_y_equipcolumn.md`).
@@ -1311,7 +1311,7 @@ checks puros en `cargo_selftest` (52 client / 45 server). Lo NO testeable
 offline (que los círculos SE VEAN circulares, el layout apilado, el teñido del
 hover, el hub legible) queda declarado al checklist en juego.
 
-## 14. Bloque D: pendientes de UX (roadmap #30 · #28 · #24 · #29) `[PENDIENTE]`
+## 14. Bloque D: pendientes de UX (roadmap #30 · #28 · #24 · #29) `[APLICADO 2026-07-13]`
 
 Sexta tanda, arrancada de la semilla `dev/HANDOFF_cargo_bloque_d_ux_pendientes.md`
 (causas ya diagnosticadas a nivel `archivo:línea` — no se re-investigaron) y
@@ -1463,7 +1463,7 @@ con ícono STALKER renderizado (no letra); (c) spawnear un arma EFT (p. ej.
 AK-74M) → tooltip pesa 3.4 kg y el footer de peso lo refleja; (d) desmontar el
 addon ZONA → los dev items vuelven a su modelo anterior/letra sin errores.
 
-## 16. Frentes de la 2.ª pasada: taxonomía de granadas, hub ARC9 y compat de movimiento (roadmap #32 · #33 · #34) `[PENDIENTE]`
+## 16. Frentes de la 2.ª pasada: taxonomía de granadas, hub ARC9 y compat de movimiento (roadmap #32 · #33 · #34) `[APLICADO 2026-07-13]`
 
 Séptima tanda, arrancada de la semilla `dev/HANDOFF_cargo_pendientes_pasada2.md`
 (los tres frentes que dejó la 2.ª pasada in-game de los entries 13/14) y

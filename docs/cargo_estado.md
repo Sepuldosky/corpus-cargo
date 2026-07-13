@@ -5,114 +5,46 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (entry 16 **VERIFICADO COMPLETO**: los
-5 puntos del checklist corto Y el re-chequeo visual de los flecos (letras
-del wheel, hatching, scroll con paleta) confirmados por el autor; el volcado
-de `cargo_dev_dump_weapons` generado (soporte entry 15 / GAMMA DB). Harness:
-229 checks verdes. ÚNICO fleco abierto: **footsteps mudos al togglear
-`sv_bm_enabled`** — el remedio hipotetizado NO funcionó → **roadmap #35**,
-lado mod, investigar con el mod vivo. Lo que sigue es la **tanda de CIERRE**
-(chat nuevo, semilla `../../dev/HANDOFF_cargo_cierre_entries_13_14_16.md`):
-flip de 13/14/16, bajar el diseño a la arquitectura, CLAUDE.md, y borrar las
-semillas de `dev/`.)
+**Última actualización:** 2026-07-13 (tanda de CIERRE ejecutada: entries
+**13/14/16 → `[APLICADO]`**, diseño bajado a la arquitectura (§4 throwable +
+taxonomía, §5 movecompat, §15.2 columna apilada, §15.5 paletas/DGL4, §16.9
+espejo, **§17 wheel** nueva), CLAUDE.md refrescado (mapa completo + trampas
+de HUD) y las cuatro semillas de `dev/` borradas.)
 
 ---
 
 ## Qué existe hoy
 
-- **Block 1 (inventario) verificado en juego** (pasadas #1-#3) + batch #4 (feed
-  de pickup). 23+ archivos Lua; mapa → [`../CLAUDE.md`](../CLAUDE.md).
-- **Sistema de imágenes de ítems (#5) — entry 5 `[APLICADO 2026-07-11]`**:
-  render a RT + caché en disco + footprint + editor, Plan A (alpha real).
-  **Armas ARC9 (MirrorVMWM): el ícono viene del select icon del PROPIO ARC9**
-  (`arc9_presets/<base>_icon.arc9.png`), re-cropeado en 2D al footprint; se
-  regenera abriendo el menú de customize ≥1 s (watcher,
-  `cargo_icon_arc9_menu_capture`). Resolución de render **256 px/celda**
-  (subida de 128 en entry 8, confirmada); la captura ARC9 "funciona
-  correctamente" pero su fuente 256² upscalea (deuda aceptada, abajo).
-- **Persistencia de armas equipadas — entry 6 `[APLICADO 2026-07-11]`**: defs
-  autogen persistidas, `Decide` conserva equipadas, reconcile diferido, heal
-  de blobs huérfanos. Sobrevive reinicio/reconexión completa, confirmado.
-- **Armas de mundo — entry 7 `[APLICADO 2026-07-11]`**: drops = SWEP real,
-  sin auto-pickup, USE agarra/suelta (HL2), WALK+USE toma, take-back con la
-  misma instancia. Confirmado completo.
-- **UI fullscreen §15 — entry 8 `[APLICADO 2026-07-12]`**: 3 columnas / 3
-  estados, gradas por footprint, cinturón, círculos = slots de herramienta,
-  botón $. 3 pasadas + 2 rondas de ajustes, todo confirmado. Última tanda:
-  header sin subtítulo, grid sin bloque oscuro (solo hover), loadout de
-  sandbox no auto-stockeado (`cargo_capture_sandbox_tools` 0), render no-ARC9
-  256 px/celda, toolgun `{3,2}`.
-- **Todo (entries 1-8) commiteado y pusheado a `origin/main`** (2026-07-12):
-  el remoto estaba 12 commits atrás y se puso al día; sin divergencia.
-- **Holster + orden STALKER + manos default — entry 9 `[APLICADO 2026-07-12]`**:
-  SWEP "Hands" (`corpus_cargo_hands`, Apex Hands reciclado), teclas 1-7 por
-  `PlayerBindPress`→intent→server, re-apretar enfunda, spawn enfundado,
-  crowbar capturado cae en `melee`. Convars `cargo_weapon_slots` /
-  `cargo_holster_hands` (tab Q); comando `cargo_holster`. **Fix de brazos
-  oscuros (2.º intento: `SuppressEngineLighting` + caja de luz propia
-  muestreada en `EyePos` con piso, en `PreDrawViewModel`/`PreDrawPlayerHands`)
-  confirmado in-game**, aplicó en vivo sin reiniciar. Queda remitir el fix a
-  Twilight (acción del autor).
-- **Bloque A — entry 10 `[APLICADO 2026-07-12]`**: drop nativo `cargo_drop` +
-  **reconciliador universal de `PlayerDroppedWeapon`** (el arma botada deja de
-  quedar fantasma en el equipo y vuelve como su misma instancia),
-  `cargo_lose_on_death` + `cargo_persistence`, **persistencia del cargador** en
-  el blob (#18), modelos dev de comida/medkit. Confirmado en juego en 3 pasadas.
-- **Bloque B — munición, entry 11 `[APLICADO 2026-07-12]`** (§16 nueva): **el
-  cinturón ES la reserva real**, no un almacén. Los 11 tipos de HL2 son ítems
-  (modelo verificado contra los VPK, peso, `max_stack`); espejo a 4 Hz
-  `GetAmmoCount(tipo) == suma del cinturón`, **agnóstico de base** (cero hooks de
-  ARC9); armas del mismo tipo HL2 **comparten** reserva. **El éter murió**:
-  `arc9_mult_defaultammo` forzado a 0 + `StripAmmo`+`Push` al spawn + gate del
-  reconciliador. Munición del mapa → **grid**. Muerte vacía cinturón **y** pool.
-  Convars: `cargo_ammo_pool`, `cargo_ammo_arc9_takeover`,
-  `cargo_ammo_world_pickup`. **Confirmado en juego**; único bug de la pasada
-  (modelos de AR2 cruzados) arreglado dentro del entry.
+- **Todo el arco de entries 1-14 y 16 `[APLICADO]` y confirmado en juego.**
+  En orden: Block 1 (inventario: contrato de ítems, slots/sub-slots, peso,
+  providers, contenedores), captura de armas del engine, imágenes de ítems
+  (render a RT + editor), persistencia completa de equipadas, armas de mundo
+  por WALK+USE, UI fullscreen 3 columnas/3 estados con gradas, holster +
+  orden STALKER + SWEP "Hands", drop nativo + reconciliador universal,
+  **munición: el cinturón ES el pool** (§16, espejo 4 Hz agnóstico de base)
+  + su UX (reorder, unload, gate de ítems), **wheel menu** (§17) + **slot
+  throwable** (§4) + columna apilada, Bloque D de UX (#30 spawnmenu, #28
+  drop de slot, #24 retícula, **#29 paletas runtime + teñido DGL4**) y los
+  frentes de la 2.ª pasada (#32 taxonomía de granadas + cajas por WALK+USE,
+  #33 hub ARC9 completo, #34 compat con mods de movimiento).
+- **Harness offline: 229 checks verdes en ambos realms** (con gate final: un
+  FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 52 client / 45 server.
+- **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
+  `origin` al día hasta el 2026-07-12; lo posterior está commiteado local,
+  **sin push** (se pushea cuando el autor lo pida).
 
 ## Pendiente de verificar
 
-- **Entry 16 (frentes #32-34 + flecos): VERIFICADO COMPLETO por el autor
-  (2026-07-13, checklist corto 1-5 + re-chequeo visual).** Solo espera el
-  flip administrativo de la tanda de cierre, junto con 13 y 14 (sus
-  checklists de abajo quedaron cubiertos por las dos pasadas + esta).
-- **Entry 15 (assets ZONA + pesos GAMMA) — checklist en juego:** playermodels
-  "ZONA *" en el menú C; `cargo_dev_give` con íconos STALKER (addon opcional
-  `corpus_zona_assets`, junction desde `dev/`); armas EFT con peso real de la
-  base de datos GAMMA (tabla nueva `corpus_cargo_weapon_weights.lua`, fallback
-  2.5 kg); sin el addon, los dev items degradan a su modelo anterior/letra.
-- **Entry 14 (Bloque D) — checklist en juego:**
-  1. **#30**: click del ícono de physgun/toolgun/camera en el spawnmenu →
-     entra al grid; repetirlo avisa "You already have one."; el loadout de
-     spawn sigue SIN stockear tools (regresión entry 8).
-  2. **#28**: "Drop" en el menú del slot — arma en mano (cae adelante, misma
-     instancia/cargador), arma equipada no-en-mano, casco con NVG montado
-     (recogerlo devuelve el NVG adentro), granada equipada (cae el stack ×N).
-  3. **#24**: grid VACÍO muestra retícula completa; con 1 ítem llena el área;
-     scrollear la mueve con las celdas; los bordes de tile caen exactos.
-  4. **#29**: sin DGL4 → grises neutros estilo spawnmenu; con DGL4 y el preset
-     Foxtrot (PCV) → toda la UI (inventario + wheel) teñida verde PCV; cambiar
-     de preset re-tiñe en vivo; `cargo_theme_dgl4 0` apaga; `cargo_theme
-     olive` restaura la paleta GAMMA.
-- **Entry 13 (wheel + throwable + columna) — checklist consolidado en juego:**
-  1. Wheel: hold de G abre (aviso en consola si G ya tenía bind), soltar
-     commitea, deadzone/fuera cancela, sector vacío no hace nada.
-  2. Re-seleccionar el arma en mano en su sector **enfunda** (== re-press).
-  3. Hover sobre sector / chip quick / chip tool actualiza el **hub** (los 3).
-  4. Cargador y reserva del hub coinciden con el HUD y el cinturón; fire mode
-     solo en armas ARC9.
-  5. Granada dev (`cargo_dev_give`): equipar el stack al slot Throwable
-     (menú "Equip on..." o drag), aparece en el wheel, lanzar baja el `×N`;
-     la última granada vacía el slot y quita el SWEP.
-  6. Círculos **se ven circulares** (sandbox + botón `$` + hub del wheel).
-  7. Anclajes quick/tools en las 4 posiciones; anclajes iguales → tools cae
-     al lado libre con aviso en consola, sin romper.
-  8. Cambiar la tecla del wheel desde el tab Q y que persista.
-  9. Columna: fila baja apilada (Throwable sobre Melee), hide/show de tools,
-     alineación left/center, status panel llega al fondo.
-  10. **Regresión:** teclas 1-7, holster, cinturón, quick F1-F4, grid,
-      contenedores, peso y persistencia (reconectar con la granada equipada).
-- **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar — el
-  frente suelto más viejo.
+- **Entry 15 (assets ZONA + pesos GAMMA) — checklist del autor en juego:**
+  (a) playermodels "ZONA *" en el menú C con brazos propios;
+  (b) `cargo_dev_give` con íconos STALKER (addon opcional `corpus_stalker` —
+  renombrado 2026-07-13, antes `corpus_zona_assets` —, junction desde `dev/`);
+  (c) arma EFT con peso real de la GAMMA DB (ej. AK-74M 3.4 kg) y el footer
+  lo refleja; (d) sin el addon, los dev items degradan a su modelo
+  anterior/letra sin errores. Soporte listo: el volcado de
+  `cargo_dev_dump_weapons` ya se generó.
+- **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar —
+  el frente suelto más viejo.
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -123,48 +55,30 @@ semillas de `dev/`.)
 
 ## Remanentes / deuda conocida
 
-- **Diseñado sin implementar:** comercio (`Cargo_Trade`) — siguiente bloque
-  cuando #8 cierre.
-- **Munición, lo que el Bloque B dejó abierto a propósito:** (a) **cargadores
-  rellenables con toggle** (lo único que queda de #19); (b) **binding de
-  ammo-atts de EFT** (§16.6): los tipos de bala de EFT son attachments que **no**
-  cambian el tipo HL2, solo la balística — la palanca es que el stack activo del
-  cinturón decida qué ammo-att va montado, dando munición realmente distinta
-  sobre el mismo pool (`def.ammo.att` ya reservado en el schema); (c) **hueco del
-  éter declarado**: `SWEP.ForceDefaultAmmo` saltea la convar que forzamos —
-  ningún arma instalada lo usa, escalación anotada (ledger de conservación);
-  (d) las entidades `arc9_ammo` reparten por su propio `Touch` y el espejo las
-  absorbe al cinturón en vez del grid.
-- **El editor de íconos NO afecta la cámara de armas ARC9** (la foto de ARC9 es
-  el encuadre; el override de tamaño sí aplica). **Fuente de íconos ARC9
-  256² — deuda aceptada** (2.ª pasada 2026-07-12): ARC9 hornea su select icon
-  a 256² en pantallas ≤1100px y 512² arriba, en un RT de file-scope que Cargo
-  no puede redimensionar sin forkear ARC9 (COMPAT-RUNTIME). A ≥1440p sale 512
-  gratis; forzarlo en 1080p exigiría una captura ensamblada propia (camino ya
-  cerrado, no se reabre). Los íconos de render **no-ARC9** sí subieron a 256
-  px/celda (entry 8, 2.ª pasada). Captura de armas de mundo aún no bajada al
-  spec (`Cargo_ItemImages_Arquitectura.md`; solo CHANGELOG entry 7).
-- **Manejo de armas #16-22 diseño parcial** (#17 parcial; #22 parcial: falta
-  matar notificaciones de GMod + verificar 7.º slot vs HUD D/GL4); **remitir
-  el fix de brazos oscuros a Twilight** (ya confirmado, acción del autor);
-  `Corpus.Data` sin `Delete`; peso nominal attachments; instancias huérfanas
-  sin GC; comandos dev sin gate admin; sin `addon.json`.
+- **Diseñado sin implementar:** comercio (`Cargo_Trade`) — siguiente bloque.
+- **Munición (§16.6/§16.7):** cargadores rellenables con toggle; binding de
+  ammo-atts de EFT (`def.ammo.att` reservado en el schema); hueco
+  `SWEP.ForceDefaultAmmo` declarado (escalación anotada: ledger de
+  conservación); las entidades `arc9_ammo` reparten por su propio `Touch` y
+  el espejo las absorbe al cinturón en vez del grid.
+- **Íconos:** fuente ARC9 256² a 1080p (deuda aceptada, 2.ª pasada
+  2026-07-12); el editor no afecta la cámara de armas ARC9; captura de armas
+  de mundo sin bajar al spec de `Cargo_ItemImages_Arquitectura.md`.
+- **Resto del #22:** matar notificaciones de GMod + verificar 7.º slot vs
+  HUD DGL4. **Remitir el fix de brazos oscuros a Twilight** (ya confirmado,
+  acción del autor).
+- `Corpus.Data` sin `Delete`; peso nominal de attachments; instancias
+  huérfanas sin GC; comandos dev sin gate admin; sin `addon.json`.
 
 ## Próximo paso
 
-1. **Re-chequeo visual del autor** (bloque de arriba) y después la tanda de
-   CIERRE en un chat nuevo con la semilla
-   `../../dev/HANDOFF_cargo_cierre_entries_13_14_16.md`: entries 13/14/16 →
-   `[APLICADO]` (y el 15 si su checklist pasó), bajar el diseño a la
-   arquitectura (§4 throwable + taxonomía, §15.2, §16, §17 wheel, teñido,
-   movecompat — §8 del prompt semilla del wheel), refrescar el `CLAUDE.md`
-   (mapa + trampas nuevas) y borrar las CUATRO semillas de `dev/`.
-2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor); resto
-   del #22 (notificaciones de GMod + 7.º slot vs HUD DGL4).
-3. Después: **categorías fijas de tabs** (#23, bloque propio, exige sesión de
-   diseño del set fijo) y **comercio** (`Cargo_Trade_Arquitectura.md`). Deuda
-   no bloqueante: bajar la captura de armas de mundo al spec de
-   `Cargo_ItemImages_Arquitectura.md`.
+1. **Checklist del entry 15** (el autor, en juego) → su flip es independiente
+   de esta tanda.
+2. Resto del **#22** (notificaciones de GMod + 7.º slot vs HUD DGL4) y
+   remitir el fix de brazos oscuros a Twilight (acción del autor).
+3. Después: **categorías fijas de tabs** (#23, exige sesión de diseño del set
+   fijo) y **comercio** (`Cargo_Trade_Arquitectura.md`). El **#35**
+   (footsteps) se investiga con el mod vivo cuando el autor lo priorice.
 
 ---
 
