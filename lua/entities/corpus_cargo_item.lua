@@ -20,9 +20,11 @@ if SERVER then
         if CARGO and istable(self.CargoEntry) then
             local def = CARGO.Items.Get(self.CargoEntry.id)
             -- shared chain (CARGO.Items.ResolveModel, CHANGELOG #3): def.model
-            -- -> SWEP WorldModel -> engine map; cardboard box is last resort
+            -- -> SWEP WorldModel -> engine map; cardboard box is last resort.
+            -- ModelUsable, not util.IsValidModel alone: a mounted-but-unprecached
+            -- prop reads as invalid and silently fell back to the box.
             local resolved = CARGO.Items.ResolveModel(def)
-            if isstring(resolved) and util.IsValidModel(resolved) then
+            if CARGO.Items.ModelUsable(resolved) then
                 model = resolved
             end
             if istable(def) then
@@ -82,7 +84,7 @@ else
         local model = CARGO.Icons and CARGO.Icons.ModelFor
             and CARGO.Icons.ModelFor(def) or nil
         if not isstring(model) or model == self:GetModel()
-            or not util.IsValidModel(model) then
+            or not CARGO.Items.ModelUsable(model) then
             return nil
         end
 
