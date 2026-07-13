@@ -245,6 +245,46 @@ if SERVER then
         Corpus.Log("cargo", "cargo_dev_atts: " .. given .. " attachments x2 a " .. ply:Nick())
     end, nil, "Gives N bridged ARC9 attachment items x2 (args: [count] [name filter])")
 
+    -- Arsenal dump (author request 2026-07-13, entry 15 support): one line
+    -- per installed ARC9 weapon — class, print name, EFT type (SubCategory),
+    -- HL2 ammo, clip size and the weight the autogen def would get TODAY
+    -- (WeaponWeights hit or the 2.5 nominal fallback) — so the GAMMA
+    -- database (stalker-gamma-db.com) can be cross-referenced without
+    -- unpacking the mods into dev/. Console + tab-separated
+    -- data/corpus/cargo/weapon_dump.txt. Arg "all" dumps every SWEP.
+    concommand.Add("cargo_dev_dump_weapons", function(_, _, args)
+        local wantAll = istable(args) and args[1] == "all"
+        local weights = istable(CARGO.Capture)
+            and CARGO.Capture.WeaponWeights or {}
+        local rows = {}
+        for _, t in ipairs(weapons.GetList() or {}) do
+            local class = isstring(t.ClassName) and t.ClassName or ""
+            local base = isstring(t.Base) and t.Base or ""
+            local isArc9 = t.ARC9 == true or base:find("arc9", 1, true) ~= nil
+                or class:find("^arc9_") ~= nil
+            if class ~= "" and (wantAll or isArc9) then
+                local kg = weights[class]
+                rows[#rows + 1] = table.concat({
+                    class,
+                    isstring(t.PrintName) and t.PrintName or class,
+                    isstring(t.SubCategory) and t.SubCategory or "-",
+                    isstring(t.Ammo) and t.Ammo or "-",
+                    tostring(tonumber(t.ClipSize) or "-"),
+                    kg ~= nil and string.format("%.2f kg", kg)
+                        or "MISSING (2.5 nominal)",
+                }, "\t")
+            end
+        end
+        table.sort(rows)
+        local body = "class\tname\ttype\tammo\tclip\tweight\n"
+            .. table.concat(rows, "\n")
+        file.CreateDir("corpus/cargo")
+        file.Write("corpus/cargo/weapon_dump.txt", body)
+        MsgN(body)
+        Corpus.Log("cargo", "cargo_dev_dump_weapons: " .. #rows
+            .. " armas volcadas a data/corpus/cargo/weapon_dump.txt")
+    end, nil, "Dump installed ARC9 weapons (class/name/type/ammo/clip/weight) to console + data file; arg 'all' dumps every SWEP")
+
 end
 
 -- ------------------------------------------------------------------
