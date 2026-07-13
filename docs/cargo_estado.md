@@ -69,8 +69,10 @@ borrada de `dev/`.)
 
 ## Próximo paso
 
-1. **Categorías fijas de tabs** (#23, exige sesión de diseño del set fijo)
-   y después **comercio** (`Cargo_Trade_Arquitectura.md`, el bloque grande).
+1. **Categorías fijas de tabs** (#23, exige sesión de diseño del set fijo con
+   el autor) y después **comercio** (`Cargo_Trade_Arquitectura.md`, el bloque
+   grande) — semilla del chat nuevo:
+   [`../../dev/HANDOFF_cargo_23_comercio.md`](../../dev/HANDOFF_cargo_23_comercio.md).
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 3. Cuando se prioricen: **#36** (slot HL2 alineado), **#37** (drop VJ,
    diagnóstico contra el mod vivo), **#35** (footsteps), **#38** (trivia).
