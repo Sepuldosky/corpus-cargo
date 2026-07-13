@@ -11,7 +11,7 @@ local CARGO = Corpus.GetModule("cargo")
 -- Demo item kit (both realms: the client grid renders from defs too)
 -- ------------------------------------------------------------------
 
--- STALKER prop models from the OPTIONAL corpus_zona_assets addon (recycled
+-- STALKER prop models from the OPTIONAL corpus_stalker addon (recycled
 -- ZONA StalkerRP packs — see dev/zona_stalkerrp_contenido.md). The addon is
 -- personal/unpublishable (GSC assets), so nothing here may assume it:
 -- honest fallback to the previous model (or the letter placeholder) when
