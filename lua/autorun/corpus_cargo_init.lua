@@ -43,6 +43,7 @@ local SHARED = {
     "shared/corpus_cargo_items.lua",    -- item contract + sub-slot primitive
     "shared/corpus_cargo_slots.lua",    -- equipment slot table (data, no UI)
     "shared/corpus_cargo_weight.lua",   -- pure weight -> speed curve
+    "shared/corpus_cargo_movecompat.lua", -- curve vs speed-stomping movement mods (#34)
     "shared/corpus_cargo_ammo.lua",     -- HL2 ammo items + caliber map (§16)
     "shared/corpus_cargo_arc9.lua",     -- ARC9 bridge (realm-guarded inside)
     "shared/corpus_cargo_dev.lua",      -- selftest + dev item kit (verification)

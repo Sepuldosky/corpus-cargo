@@ -29,6 +29,12 @@ function CARGO.Movement.Refresh(ply)
     ply:SetWalkSpeed(math.max(ply.CargoBaseWalk * mult, 30))
     ply:SetRunSpeed(math.max(ply.CargoBaseRun * mult, 40))
 
+    -- the multiplier also travels networked (roadmap #34): speed-stomping
+    -- movement mods rewrite walk/run every move tick, killing the two Set*
+    -- above — the shared Move hook (corpus_cargo_movecompat.lua) re-applies
+    -- this SAME number over whatever the mod wrote, on both realms
+    ply:SetNW2Float("cargo_speed_mult", mult)
+
     -- Soft-dep: Coagulant owns stamina. Expected contract (mock-first,
     -- Coagulant block pending): coagulant.OnEncumbrance(ply, fraction) —
     -- called on every weight change so it can drive drain/fatigue. Honest
