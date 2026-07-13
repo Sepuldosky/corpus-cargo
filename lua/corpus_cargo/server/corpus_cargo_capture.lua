@@ -337,6 +337,23 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
     return false -- the interaction is ours either way
 end)
 
+-- Spawnmenu gives are DELIBERATE (roadmap #30, in-game report 2026-07-12:
+-- clicking a weapon icon never reached the inventory — without a toolgun
+-- there was no way to obtain physgun/toolgun/camera at all). Left-clicking
+-- an icon runs gm_giveswep -> CCGiveSWEP, which fires PlayerGiveSWEP right
+-- before its anonymous ply:Give (sandbox commands.lua:940-948) — and ONLY
+-- on that route, which makes it exactly the "the player asked for this by
+-- hand" signal the sandbox-tools filter below could not see (both the spawn
+-- loadout and the spawnmenu arrive as anonymous gives). Mark the player
+-- with class + time; the capture consumes the mark as `deliberate`, same
+-- semantics as a WALK+USE take. Nothing is returned from the hook: a
+-- non-nil return would hijack sandbox's own allow/deny chain
+-- (PlayerGiveSWEP true = allowed, sandbox player.lua:90-94).
+hook.Add("PlayerGiveSWEP", "corpus_cargo_capture_spawnmenu", function(ply, class)
+    if not IsValid(ply) or not isstring(class) then return end
+    ply.CargoSpawnmenuGive = { class = class, t = CurTime() }
+end)
+
 hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
     if not cvCapture:GetBool() then return end
     if not IsValid(wep) then return end
@@ -366,6 +383,15 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
         end
         if not IsValid(owner) or not owner:IsPlayer() then return end
         if owner.CargoEquipGive then return end
+
+        -- spawnmenu mark (#30): consumed on class match, short window — an
+        -- expired or mismatched mark proves nothing about THIS give
+        local mark = owner.CargoSpawnmenuGive
+        if not deliberate and istable(mark) and mark.class == class
+            and CurTime() - mark.t < 1 then
+            deliberate = true
+            owner.CargoSpawnmenuGive = nil
+        end
 
         -- a dropped Cargo instance always comes back AS ITSELF: it is not a
         -- duplicate to dedup, it is a concrete item with its own blob
@@ -413,6 +439,14 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
                 CARGO.Inventory.Notice(owner, "You can't carry that.")
             end
         end
+        -- the dedup still rules (one item per class): a deliberate give of a
+        -- class already owned is removed like any duplicate, but AUDIBLY —
+        -- silently eating a spawnmenu click reads as a bug (#30). The rule
+        -- itself does not change.
+        if action == "remove" and deliberate then
+            CARGO.Inventory.Notice(owner, "You already have one.")
+        end
+
         -- capture/remove: take out ONLY the entity the engine just gave,
         -- never StripWeapon(class) — that strips every weapon of the class
         -- (in-game report 2026-07-11: it nuked equipped physgun/toolgun on
