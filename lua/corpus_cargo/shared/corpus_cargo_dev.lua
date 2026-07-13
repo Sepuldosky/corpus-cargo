@@ -92,11 +92,15 @@ CARGO.Items.Register({
     end,
 })
 
+-- Feeds the SAME engine pool as the real "Pistol Rounds" item (§16): a second
+-- item on one HL2 type is exactly the case the author raised (two weapons of
+-- "different" calibers that both eat HL2 pistol ammo), so keeping this dev
+-- stack around is what makes the shared-pool and drain-order paths testable.
 CARGO.Items.Register({
     id = "cargo_dev_ammo_9mm", name = "9x19 FMJ (dev)",
     weight = 0.012, class = "stackable", category = "ammo",
-    size = { 2, 1 },
-    ammo = { caliber = "9x19", types = { "FMJ", "AP", "HP" } },
+    size = { 2, 1 }, max_stack = 120,
+    ammo = { caliber = "9x19", hl2 = "Pistol", types = { "FMJ", "AP", "HP" } },
     trivia = "Test ammunition for caliber overlays and large stacks.",
 })
 
@@ -158,9 +162,13 @@ if SERVER then
         { "cargo_dev_helmet" }, { "cargo_dev_nvg" }, { "cargo_dev_vest" },
         { "cargo_dev_backpack" }, { "cargo_dev_plate", 3 },
         { "cargo_dev_medkit", 4 }, { "cargo_dev_food", 5 },
-        { "cargo_dev_ammo_9mm", 120 }, { "cargo_dev_smg" },
+        { "cargo_dev_ammo_9mm", 60 }, { "cargo_dev_smg" },
         { "cargo_dev_pistol" }, { "cargo_dev_melee" },
         { "cargo_dev_pda" }, { "cargo_dev_detector" },
+        -- real HL2 ammo (§16): enough to hang stacks on the belt and watch the
+        -- reserve follow. cargo_ammo_pistol shares its pool with the dev 9mm.
+        { "cargo_ammo_pistol", 120 }, { "cargo_ammo_smg1", 120 },
+        { "cargo_ammo_buckshot", 40 }, { "cargo_ammo_357", 24 },
     }
 
     concommand.Add("cargo_dev_give", function(ply)
@@ -384,6 +392,47 @@ function CARGO._SelfTest()
         check("icons: modelo distinto cambia la clave", CARGO.Icons.IconCacheKey({
             id = "st_icons", model = "models/b.mdl", size = { 2, 1 },
         }) ~= k1)
+    end
+
+    -- ammo map (§16, roadmap #19): the pure surface of "the belt IS the pool".
+    -- The mirror itself needs a live player, so it is verified by the offline
+    -- harness and in game — here we only pin the map that the mirror reads.
+    if CARGO.Ammo ~= nil then
+        check("ammo: los 11 tipos de HL2 registrados", #CARGO.Ammo.TYPES == 11)
+
+        local pistolId = CARGO.Ammo.ItemForType("Pistol")
+        check("ammo: el tipo resuelve a su ítem", pistolId == "cargo_ammo_pistol")
+        -- ARC9 spells it "pistol", HL2 spells it "Pistol", and GetAmmoCount
+        -- takes either: the map must too, or ARC9 weapons feed nothing
+        check("ammo: la resolución es case-insensitive",
+            CARGO.Ammo.ItemForType("pistol") == pistolId)
+        check("ammo: un tipo ajeno no es nuestro", CARGO.Ammo.ItemForType("xen_goo") == nil)
+        check("ammo: Managed sigue a ItemForType",
+            CARGO.Ammo.Managed("BUCKSHOT") and not CARGO.Ammo.Managed("xen_goo"))
+
+        check("ammo: el ítem declara su tipo de engine",
+            CARGO.Ammo.TypeOfDef(CARGO.Items.Get("cargo_ammo_pistol")) == "Pistol")
+        -- a WEAPON def carries def.ammo too, but only as a display label — if it
+        -- leaked into the pool key, every weapon would be a stack of ammunition
+        check("ammo: el def de un arma no declara tipo de pool",
+            CARGO.Ammo.TypeOfDef(CARGO.Items.Get("cargo_dev_smg")) == nil)
+
+        -- two DIFFERENT items on ONE engine type: the author's point 4 (two
+        -- weapons of "different" calibers eating the same HL2 pool)
+        check("ammo: dos ítems distintos comparten un pool",
+            CARGO.Ammo.TypeOfDef(CARGO.Items.Get("cargo_dev_ammo_9mm")) == "Pistol")
+
+        local complete = true
+        for _, hl2 in ipairs(CARGO.Ammo.TYPES) do
+            local def = CARGO.Items.Get(CARGO.Ammo.ItemForType(hl2))
+            -- max_stack is what makes six belt slots a decision; a model is what
+            -- keeps the item off the letter-placeholder fallback
+            if not istable(def) or def.category ~= "ammo" or def.class ~= "stackable"
+                or not isnumber(def.max_stack) or not isstring(def.model) then
+                complete = false
+            end
+        end
+        check("ammo: todo tipo trae modelo, tope de stack y categoría", complete)
     end
 
     Corpus.Log("cargo", string.format("selftest %s: %d OK, %d fallas (realm %s)",
