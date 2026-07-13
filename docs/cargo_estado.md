@@ -5,11 +5,12 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (tanda de flecos: **resto del #22
-implementado** — entry 17 `[PENDIENTE]`: veto del historial stock de pickups
-(`cargo_hide_pickup_history`, alcance total decidido por el autor) +
-veredicto 7.º slot vs DGL4 por lectura del mod vivo (sin conflicto por
-construcción). Checklists de la tanda (15/17/4) entregados como artefacto.)
+**Última actualización:** 2026-07-13 (reporte de la ronda 1 de flecos:
+**entry 4 → `[APLICADO]`**; 15 confirmado a-c (queda solo la degradación
+sin addon, 15d); 17 confirmado a/c/d (el 17b estaba mal redactado: DGL4
+también veta el historial stock — re-check con su resourcehistory apagado).
+Frentes nuevos anotados: **#36** slot HL2 alineado, **#37** drop VJ que
+vuelve solo, **#38** trivia real. Artefacto actualizado a ronda 2.)
 
 ---
 
@@ -33,25 +34,25 @@ construcción). Checklists de la tanda (15/17/4) entregados como artefacto.)
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
   MIT y el rename `corpus_stalker` en el kit dev).
 
-## Pendiente de verificar
+## Pendiente de verificar (ronda 2, artefacto)
 
-- **Entry 15 (assets ZONA + pesos GAMMA) — checklist del autor en juego:**
-  (a) playermodels "ZONA *" en el menú C con brazos propios;
-  (b) `cargo_dev_give` con íconos STALKER (addon opcional `corpus_stalker` —
-  renombrado 2026-07-13, antes `corpus_zona_assets` —, junction desde `dev/`);
-  (c) arma EFT con peso real de la GAMMA DB (ej. AK-74M 3.4 kg) y el footer
-  lo refleja; (d) sin el addon, los dev items degradan a su modelo
-  anterior/letra sin errores. Soporte listo: el volcado de
-  `cargo_dev_dump_weapons` ya se generó.
-- **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar —
-  el frente suelto más viejo.
-- **Entry 17 (resto del #22)** — checklist del autor en juego: (a) historial
-  stock de pickups muerto con el feed propio vivo; (b) la convar lo revive;
-  (c) teclas 1-7 con DGL4 montado (7 = cámara, sin selector ajeno); (d)
-  `cargo_weapon_slots 0` devuelve las teclas a DGL4/stock.
+- **Entry 15 — solo el (d):** desmontar `corpus_stalker` → los dev items
+  degradan a modelo anterior/letra sin errores (a-c ya confirmados; el
+  autor lo dejó pendiente por tiempo).
+- **Entry 17 — solo el (b), corregido:** con el elemento `resourcehistory`
+  de DGL4 APAGADO (o DGL4 desmontado), `cargo_hide_pickup_history 0`
+  revive el historial stock (a/c/d ya confirmados; el ✗ de la ronda 1 era
+  el veto propio de DGL4, no bug de Cargo).
 
 ## Frentes abiertos (anotados, NO arreglados)
 
+- **Drop de armas VJ vuelve solo al inventario** → **roadmap #37** (reporte
+  4c: re-captura instantánea del drop; diagnóstico contra el mod vivo).
+- **Slot del menú HL2 desalineado del slot Cargo** → **roadmap #36** (pedido
+  17c: la RPD de EFT es Slot 4 de engine aunque esté equipada como primary).
+- **Texturas negras en playermodels ZONA** (SEVA Woodland/Heavy/EXO-Heavy
+  cuerpo; Cadpat/Freedom/Monolith chaleco) — lado addon `corpus_stalker`
+  (territorio del autor; huelen a `.vmt/.vtf` faltantes en el copy).
 - **Footsteps mudos al togglear `sv_bm_enabled`** → **roadmap #35** (lado
   mod: better movement v2; el remedio `sv_bm_slow_footsteps 0` NO funcionó —
   la sospecha del math.huge queda sin confirmar; investigar con el mod vivo).
@@ -75,10 +76,9 @@ construcción). Checklists de la tanda (15/17/4) entregados como artefacto.)
 
 ## Próximo paso
 
-1. **Pasada en juego de la tanda de flecos** (artefacto "Cargo —
-   Verificación en juego"): checklists de los entries **15**, **17** (resto
-   del #22) y **#4** (feed de pickup). Con el reporte del autor flipean los
-   tres y se borra la semilla `dev/HANDOFF_cargo_flecos_15_22_4.md`.
+1. **Ronda 2 del artefacto** (dos checks): 15d (degradación sin addon) y
+   17b corregido (resourcehistory de DGL4 apagado). Con ese reporte flipean
+   15 y 17 y se borra la semilla `dev/HANDOFF_cargo_flecos_15_22_4.md`.
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 3. Después: **categorías fijas de tabs** (#23, exige sesión de diseño del set
    fijo) y **comercio** (`Cargo_Trade_Arquitectura.md`). El **#35**

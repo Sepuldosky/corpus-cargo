@@ -157,7 +157,7 @@ elimina el conflicto; re-verificar sin él en el entry 4.
 
 ---
 
-## 4. Feed de pickup en pantalla + baja del mod L4D `[PENDIENTE]`
+## 4. Feed de pickup en pantalla + baja del mod L4D `[APLICADO 2026-07-13]`
 
 Salido de la segunda pasada (2026-07-11):
 
@@ -187,6 +187,17 @@ ambos realms.
 el feed listando el loadout capturado; recoger un arma de mundo (toolgun,
 spawnmenu) por contacto ahora que nada bloquea `AllowPlayerPickup`; recoger un
 drop con E y ver la línea del feed; `cargo_pickup_feed 0` lo apaga.
+
+### Addendum — re-verificación de la tanda de flecos (2026-07-13): FLIP
+
+Re-verificado por el autor contra el código de HOY (el checklist original era
+pre-entry 7; la toma de mundo es WALK+USE desde entonces): **(a) WALK+USE
+sobre arma de mundo → el feed señala ✓; (b) `cargo_pickup_feed 0` lo apaga ✓;
+(c) regresión del gate (nada por contacto ni USE pelado) ✓.** Frente NUEVO
+que dejó la pasada (→ roadmap #37, NO bloquea este entry): las armas de
+**VJ Base** se toman una sola vez con USE, entran bien al inventario, pero
+al dropearlas **vuelven de inmediato al inventario** (re-captura instantánea
+del drop) — diagnóstico primero, `archivo:línea`, después arreglo.
 
 ---
 
@@ -1463,6 +1474,23 @@ con ícono STALKER renderizado (no letra); (c) spawnear un arma EFT (p. ej.
 AK-74M) → tooltip pesa 3.4 kg y el footer de peso lo refleja; (d) desmontar el
 addon ZONA → los dev items vuelven a su modelo anterior/letra sin errores.
 
+### Addendum — pasada del autor (2026-07-13): a-c ✓, queda solo (d)
+
+**(a) ✓** con notas de ASSETS (lado addon `corpus_stalker`, territorio del
+autor — no bloquean): texturas negras en el cuerpo de "ZONA SEVA Woodland /
+Seva Heavy / EXO-Heavy" (botas, casco, guantes y mochila respiradora bien) y
+en el chaleco de "ZONA Seva Cadpat / Seva Freedom Heavy / Seva Monolith
+Heavy"; el resto bien — huelen a `.vmt/.vtf` faltantes en el copy, revisar
+contra el inventario `dev/zona_stalkerrp_contenido.md` cuando se priorice.
+**(b) ✓** con stand-ins asumidos y anotados: la placa es una placa de
+circuitos (`materials_textolite`, ya declarado stand-in), el NVG es un
+kneepad (`dome_mask` era stand-in; candidato a mejor modelo del pack), pda y
+detector perfectos. **(c) ✓** — y deja idea del autor → roadmap #38: mover
+el "autocaptured" del footer del tooltip a la trivia estilo ARC9, y/o
+generar trivias reales para el arsenal EFT del volcado. **(d) sin probar**
+(por tiempo, decisión del autor) — el entry queda `[PENDIENTE]` SOLO por la
+degradación sin addon; todo lo demás confirmado.
+
 ## 16. Frentes de la 2.ª pasada: taxonomía de granadas, hub ARC9 y compat de movimiento (roadmap #32 · #33 · #34) `[APLICADO 2026-07-13]`
 
 Séptima tanda, arrancada de la semilla `dev/HANDOFF_cargo_pendientes_pasada2.md`
@@ -1623,3 +1651,18 @@ sí señala; (b) `cargo_hide_pickup_history 0` → el historial stock vuelve;
 (c) con DGL4 montado: teclas 1-7 mandan los intents de Cargo (7 = cámara),
 sin selector DGL4 abierto ni errores; la rueda del mouse sigue abriendo el
 selector DGL4; (d) `cargo_weapon_slots 0` → las teclas vuelven a DGL4/stock.
+
+### Addendum — pasada del autor (2026-07-13): a/c/d ✓, el (b) estaba mal redactado
+
+**(a) ✓ (c) ✓ (d) ✓.** El **(b) ✗** ("con la convar en 0 el stock no vuelve")
+NO es bug de Cargo — es el propio DGL4: su `resourcehistory` también veta el
+historial stock cuando su elemento está activo (`resourcehistory.lua:920`,
+devuelve `false` en el mismo hook), así que con DGL4 montado el stock no
+puede volver aunque nuestro veto se corra a un lado (el harness prueba que
+en 0 nuestro hook devuelve nil). El check estaba mal redactado para un setup
+con DGL4: la ronda 2 lo repite con el elemento resourcehistory de DGL4
+apagado (o DGL4 desmontado). El entry queda `[PENDIENTE]` solo por ese
+re-check. ADEMÁS, pedido nuevo del autor desde el (c) → roadmap #36: alinear
+el slot del MENÚ HL2 del arma con el slot Cargo equipado (ej. la RPD de EFT
+declara Slot 4 de engine — equipada como primary debería vivir en el bucket
+3 de la rueda del mouse, coherente con la tecla 3).

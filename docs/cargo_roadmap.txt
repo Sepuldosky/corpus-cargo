@@ -405,3 +405,31 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     (dev/other/) sobreescribe walk/run y anula la curva peso→velocidad.
     El footer muestra bien. Leer el mod vivo y decidir la palanca
     (re-aplicar, hook de Move, o detectar su API) — jamás forkearlo.
+
+36. ALINEAR EL SLOT DEL MENÚ HL2 CON EL SLOT CARGO [Cargo UI/quickslots,
+    compat] — SIN DISEÑAR. Pedido del autor (2026-07-13, pasada del entry
+    17c): hay armas que declaran otro Slot de engine (la RPD de EFT es Slot
+    4) — equipada como primary debería vivir en el bucket 3 del menú por
+    rueda del mouse (HL2 o DGL4), coherente con la tecla 3 de Cargo. Palanca
+    candidata: pisar SWEP.Slot (lo que lee weapon:GetSlot(); DGL4 bucketiza
+    por GetSlot()+1) al equipar/dar el arma según el slot Cargo del record,
+    y restaurarlo al dropear. Verificar contra el mod vivo si ARC9 relee
+    Slot en runtime y en qué realm hay que escribirlo.
+
+37. ARMAS VJ: EL DROP VUELVE SOLO AL INVENTARIO [Cargo capture, COMPAT] —
+    SIN DIAGNOSTICAR. Reporte del autor (2026-07-13, pasada del entry 4c):
+    las armas de VJ Base se toman UNA sola vez con USE, entran bien al
+    inventario, pero al dropearlas la re-captura es instantánea (el arma
+    vuelve al inventario y no queda en el piso). Sospecha a verificar contra
+    el mod vivo (dev/other/, referencia dev/Cortex_VJBase_Referencia.md):
+    el SWEP de VJ o su entidad de mundo re-da el arma al contacto y el
+    WeaponEquip post-drop dispara la captura — mirar la marca de "recién
+    dropeada" del reconciliador (capture.lua/holster.lua) y por qué no cubre
+    la ruta VJ. Diagnóstico primero, archivo:línea, después arreglo.
+
+38. TRIVIA REAL PARA ARMAS CAPTURADAS [Cargo UI, idea] — SIN DISEÑAR.
+    Idea del autor (2026-07-13, pasada del entry 15c): el "autocaptured" del
+    footer del tooltip podría moverse a la trivia estilo ARC9, y/o generarse
+    trivias con datos reales (EFT/GAMMA) para el arsenal del volcado de
+    cargo_dev_dump_weapons. Baja prioridad; decidir fuente y formato con el
+    autor cuando se priorice.
