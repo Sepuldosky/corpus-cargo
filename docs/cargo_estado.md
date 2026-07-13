@@ -5,16 +5,17 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (los 3 frentes de la 2.ª pasada están
-**implementados** — entry 16 `[PENDIENTE]`: **#32** frag/SLAM son LANZABLES
-(cara canónica `cargo_throw_frag/slam`, remap de ids viejos al cargar) y las
-cajas `item_ammo_*` se toman con WALK+USE, no por contacto; **#33** el hub
-del wheel completa calibre y cargador/reserva ARC9 (fallbacks verificados
-contra la base viva); **#34** la curva peso→velocidad sobrevive a better
-movement v2 (hook Move shared + NW2Float). Harness: 220 checks verdes en
-ambos realms. Falta SOLO la pasada corta del autor (checklist abajo); los
-entries **13/14/16 cierran juntos** y recién ahí baja el diseño a la
-arquitectura y se borran las semillas de `dev/`.)
+**Última actualización:** 2026-07-13 (entry 16: **el autor confirmó los 5
+puntos del checklist corto** (#32 granadas/cajas, #33 hub, #34 velocidad,
+regresión). Flecos de esa pasada arreglados en el acto (addendum del entry
+16): sectores del wheel según el mock, hatching de quickslots recortado,
+scroll del inventario con paleta, y `cargo_dev_dump_weapons` (soporte del
+entry 15 / GAMMA DB). Los footsteps mudos con `sv_bm_enabled 0` son del
+LADO MOD (math.huge en PlayerStepSoundTime con slow_footsteps 1) — remedio:
+`sv_bm_slow_footsteps 0` o respawn. Harness: 229 checks verdes. Queda el
+**re-chequeo visual** de wheel/hatching/scroll; con eso los entries
+**13/14/16 flipean juntos** y baja el diseño a la arquitectura + se borran
+las semillas de `dev/`.)
 
 ---
 
@@ -71,7 +72,15 @@ arquitectura y se borran las semillas de `dev/`.)
 
 ## Pendiente de verificar
 
-- **Entry 16 (frentes #32-34) — checklist en juego, CORTO:**
+- **Entry 16 — re-chequeo visual de los flecos (lo ÚNICO que queda):**
+  1. Wheel: sin labels sueltos en el borde; en cada sector la info va sobre
+     el ícono (×N / `cargador / reserva` / label), vacíos con "— empty —",
+     punto de en-mano fuera del anillo.
+  2. Chips F3/F4 bloqueados: el rayado queda DENTRO de la caja.
+  3. Scroll del grid: barra plana con la paleta (y teñida con DGL4), sin el
+     gris Derma.
+- **Entry 16 (frentes #32-34) — checklist en juego, CORTO
+  [CONFIRMADO 1-5 por el autor, 2026-07-13]:**
   1. **#32 granadas**: spawnear `weapon_frag` (click medio) → NO se toma por
      contacto; WALK+USE lo suma como lanzable (al ×N del slot si está
      equipado, si no al grid como "Frag Grenade") — nunca más frags-munición

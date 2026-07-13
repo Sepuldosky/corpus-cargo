@@ -1523,3 +1523,32 @@ del #32, stub ARC9 frío y sano + calibre en captura del #33, decisión pura +
 escala/piso/toggles del #34) — **220 checks verdes en ambos realms**; selftest
 actualizado a la cara canónica (`cargo_throw_frag`, mapa clase→throwable).
 Checklist en juego (corto, solo #32-34 + regresión) en `cargo_estado.md`.
+
+### Addendum entry 16 — pasada del autor (2026-07-13): 1-5 OK + flecos
+
+El autor corrió el checklist corto: **los cinco puntos pasaron** (#32
+granadas y cajas, #33 hub, #34 velocidad, regresión). Flecos de la misma
+pasada, arreglados en el acto:
+
+1. **Letras del wheel** (`46afd09`) — los labels chicos en el borde de cada
+   sector no estaban en el mock congelado: el contenido va agrupado en el
+   radio medio (info encima del ícono: ×N / cargador-reserva / label según
+   aplique; label solo en vacíos; punto de en-mano fuera del anillo).
+2. **Hatching de quickslots bloqueados** (`46afd09`) — sangraba fuera del
+   chip: HUDPaint no tiene clipping de panel — scissor rect.
+3. **Scroll del inventario en Derma stock** (`46afd09`) — `Theme.SkinScroll`
+   sobre el grid y el editor de íconos; el re-tinte DGL4 lo alcanza gratis.
+4. **`cargo_dev_dump_weapons`** (`40639b3`) — pedido del autor: volcado del
+   arsenal ARC9 (clase/nombre/tipo/ammo/clip/peso actual) a consola +
+   `data/corpus/cargo/weapon_dump.txt` para cruzar con la GAMMA DB (entry 15).
+5. **Footsteps mudos con `sv_bm_enabled 0`** — diagnóstico contra el mod
+   vivo, LADO MOD (no se toca): con `sv_bm_slow_footsteps 1` el mod suprime
+   los pasos del engine devolviendo `math.huge` en `PlayerStepSoundTime` y
+   los toca él mismo desde un Tick; al apagar `sv_bm_enabled` su Tick muere
+   Y el engine quedó agendado al infinito → silencio hasta respawn/cambio de
+   mapa. Remedio: `sv_bm_slow_footsteps 0` antes de apagar, o respawnear.
+   Nuestra pata de compat no toca rutas de sonido.
+
+Harness tras los flecos: **229 checks verdes en ambos realms** + gate final
+nuevo (un FAIL tardío ya no puede imprimir ALL GREEN). Queda el re-chequeo
+visual de 1-3 en juego; con eso los entries 13/14/16 flipean juntos.
