@@ -67,12 +67,14 @@ CARGO.Items.Register({
     id = "cargo_dev_medkit", name = "Field Medkit (dev)",
     weight = 0.4, class = "stackable", category = "medical",
     size = { 2, 2 },
+    model = "models/items/healthkit.mdl",
     effect_icon = "hemostatic",
     trivia = "Test consumable for the onUse flow. Real medicine is Coagulant's domain.",
     -- onUse is the OWNER-module side of the contract (CORPUS_Architecture
     -- §5): this dev item plays that role for verification only.
     onUse = function(ply)
         ply:SetHealth(math.min(ply:Health() + 25, ply:GetMaxHealth()))
+        ply:EmitSound("items/medshot4.wav") -- HL2 healthkit heal cue
         return true -- consume one unit
     end,
 })
@@ -81,6 +83,7 @@ CARGO.Items.Register({
     id = "cargo_dev_food", name = "Canned Food (dev)",
     weight = 0.3, class = "stackable", category = "food",
     size = { 2, 2 },
+    model = "models/props_junk/garbage_takeoutcarton001a.mdl",
     trivia = "Test food. Real hunger is Craving's domain.",
     onUse = function(ply)
         local cargoMod = Corpus.GetModule("cargo")
