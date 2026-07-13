@@ -1389,3 +1389,29 @@ básico del wheel, columna apilada, #30 completo, #28 completo (las 4 formas),
    TotalWeight con slot de stack y movement verdes en el harness) — a la
    ronda 2 con el log del wheel activo; sospecha: colateral de los errores
    de sesión del punto 2.
+
+### Addendum 2 — 2.ª pasada in-game (2026-07-13, 46 OK / fallas reales: 3)
+
+El fix `dfeafcc` **funcionó**: holster desde el sector activo, hub actualizando
+en los tres tipos de hover y quick use desde el chip F1 pasaron en la ronda 2
+(las marcas 19-22/52 del reporte son estado persistido de la ronda 1 — sus
+gemelos de la ronda 2 pasaron). Granadas ya no se toman por contacto en la
+ruta arreglada. Quedan **3 frentes abiertos**, diagnóstico y semilla en
+`dev/HANDOFF_cargo_pendientes_pasada2.md` (roadmap **#32 #33 #34**):
+
+1. **#32 Taxonomía de granadas + gate de cajas de munición.** El frag de HL2
+   aparece como ítem de MUNICIÓN (cara canónica `cargo_ammo_grenade` del
+   Bloque B) al morir/spawnearlo — el autor lo quiere LANZABLE (throwable);
+   la granada del SMG1 sí es munición. Además las cajas `item_ammo_*`
+   spawneadas con click medio se toman por contacto (diseño del Bloque B,
+   hoy indeseado): extender el patrón WALK+USE también ahí.
+2. **#33 Hub ARC9 incompleto.** Muestra "Auto · Group A" — faltan calibre
+   (los defs autogen no llevan `def.ammo`) y cargador/reserva (`AmmoInfo`
+   devolvió nil con SWEP válido — FiremodeOf sí funcionó).
+3. **#34 Velocidad vs mod de movimiento.** El autor identificó la causa: su
+   mod de movimiento ("better movement v2") sobreescribe walk/run y pisa la
+   curva de Cargo. El footer sí muestra bien. COMPAT-RUNTIME: leer el mod
+   vivo antes de elegir palanca.
+
+Los entries 13 y 14 siguen `[PENDIENTE]` hasta que estos tres cierren y el
+autor confirme la pasada limpia.

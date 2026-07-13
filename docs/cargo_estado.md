@@ -5,14 +5,16 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (**DOS bloques implementados en modo
-auto, sin verificar**: entry 13 — wheel (#31) + slot throwable + columna
-apilada + primitiva de círculo — y entry 14 — Bloque D completo: #30
-spawnmenu→inventario, #28 drop desde el slot, #24 retícula del viewport,
-#29 paletas runtime con base spawnmenu neutra + teñido DGL4. 9 commits, un
-frente cada uno; harness verde en ambos realms con +64 checks nuevos.
-Checklist consolidado abajo — TODO queda `[PENDIENTE]` hasta la pasada del
-autor.)
+**Última actualización:** 2026-07-13 (entries 13 y 14 implementados y con
+**DOS pasadas in-game del autor**: 46 OK en la 2.ª — wheel, throwable,
+columna, #30, #28, #24 y #29 confirmados funcionando; el fix `dfeafcc`
+cerró el touch-hoover del spawnmenu y revivió hub/chips del wheel. Quedan
+**3 frentes reales** → roadmap **#32** (frag debe ser lanzable, no munición
+de cinturón + WALK+USE para cajas item_ammo_*), **#33** (hub ARC9 sin
+calibre ni cargador/reserva) y **#34** (el mod de movimiento pisa la curva
+peso→velocidad). Semilla del próximo chat:
+`../../dev/HANDOFF_cargo_pendientes_pasada2.md`. Los entries siguen
+`[PENDIENTE]` hasta cerrar esos tres.)
 
 ---
 
@@ -144,12 +146,12 @@ autor.)
 
 ## Próximo paso
 
-1. **Pasada en juego del autor sobre los entries 13 y 14** (checklists
-   arriba) → `[PENDIENTE]` → `[APLICADO]` + bajar el diseño a la arquitectura
-   (§4 y §15.2 enmiendas, §17 nueva del wheel, teñido en §15 — lo manda el §8
-   del prompt semilla `../../dev/PROMPT_CC_Cargo_wheel_y_equipcolumn.md`).
-   Al cerrar: borrar las semillas de `dev/` (HANDOFF del Bloque D + PROMPT
-   del wheel), como se hizo con las anteriores.
+1. **Roadmap #32 · #33 · #34** (hallazgos de la 2.ª pasada) en un chat
+   nuevo con la semilla `../../dev/HANDOFF_cargo_pendientes_pasada2.md` —
+   trae el diagnóstico parcial de cada uno y las reglas de modo auto. Al
+   cerrar los tres: entries 13/14 → `[APLICADO]`, bajar el diseño a la
+   arquitectura (§4, §15.2, §17 wheel, teñido — §8 del prompt semilla del
+   wheel) y borrar las TRES semillas de `dev/`.
 2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor); resto
    del #22 (notificaciones de GMod + 7.º slot vs HUD DGL4).
 3. Después: **categorías fijas de tabs** (#23, bloque propio, exige sesión de
