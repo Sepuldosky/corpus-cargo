@@ -140,6 +140,29 @@ function T.PaintPanel(w, h, bgCol, borderCol)
     surface.DrawOutlinedRect(0, 0, w, h, 1)
 end
 
+-- Skin a DScrollPanel's scrollbar to the palette (in-game report 2026-07-13:
+-- the inventory scroll was still stock Derma). Buttons hidden, spawnmenu-flat
+-- track + grip; colors are READ inside the Paint closures, so a palette swap
+-- (#29 / DGL4 tint) re-skins live like everything else. Touches only the
+-- VBar — the scroll's own Paint (the grid reticle, #24) stays whose it is.
+function T.SkinScroll(scroll)
+    if not IsValid(scroll) or not isfunction(scroll.GetVBar) then return end
+    local bar = scroll:GetVBar()
+    if not IsValid(bar) then return end
+    bar:SetHideButtons(true)
+    bar.Paint = function(_, w, h)
+        surface.SetDrawColor(T.Colors.panelAlt)
+        surface.DrawRect(0, 0, w, h)
+        surface.SetDrawColor(T.Colors.border)
+        surface.DrawRect(0, 0, 1, h) -- hairline seam against the content
+    end
+    bar.btnGrip.Paint = function(self, w, h)
+        local col = (self.Depressed or self:IsHovered())
+            and T.Colors.borderHi or T.Colors.border
+        draw.RoundedBox(2, 2, 0, w - 4, h, col)
+    end
+end
+
 -- THE circle primitive (in-game finding 2026-07-13: the sandbox tool circles
 -- had hard, flat edges). draw.RoundedBox with radius = half the size does NOT
 -- make a circle — its radius is quantized to GMod's corner materials — and the

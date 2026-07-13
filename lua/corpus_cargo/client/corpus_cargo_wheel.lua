@@ -535,17 +535,16 @@ local function DrawWheel(st)
             surface.DrawPoly(q)
         end
 
+        -- Sector content per the frozen mock (2nd-pass report 2026-07-13:
+        -- the rim labels read scattered — the mock never had them). ALL of
+        -- it groups at the mid radius: an info line ABOVE the icon (×N for
+        -- the stack, mag/reserve for a weapon, the slot label when neither
+        -- applies — mock rows 359-372), and the label alone only on EMPTY
+        -- sectors. The name still lives in the hub on hover.
         local mid = math.rad(sec.angle)
-        local rMid = (L.rIn + L.rOut) / 2 + 6 * L.scale
+        local rMid = (L.rIn + L.rOut) / 2 + 8 * L.scale
         local cx = L.cx + math.cos(mid) * rMid
         local cy = L.cy + math.sin(mid) * rMid
-
-        -- slot label toward the outer edge
-        local rLab = L.rOut - 16 * L.scale
-        draw.SimpleText(sec.label, "CargoTiny",
-            L.cx + math.cos(mid) * rLab, L.cy + math.sin(mid) * rLab,
-            hovered and T.Colors.text or T.Colors.textDim,
-            TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
         if sec.slot == "hands" then
             draw.SimpleText("HANDS", "CargoHeading", cx, cy,
@@ -553,22 +552,41 @@ local function DrawWheel(st)
                 TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         elseif entry ~= nil then
             local isz = math.Round(78 * L.scale)
-            DrawEntryIcon(entry, cx - isz / 2, cy - isz / 2, isz)
-            if entry.count ~= nil then
-                draw.SimpleText("×" .. entry.count, "CargoSmall",
-                    cx + isz / 2, cy - isz / 2, T.Colors.text)
-            end
+            local iconY = cy - isz / 2 + 8 * L.scale
 
-            -- accent marker on the weapon currently in hand (spec 4.4)
             local def = CARGO.Items.Get(entry.id)
+            local info, infoFont, infoCol = nil, "CargoHeading", T.Colors.text
+            if entry.count ~= nil then
+                info = "×" .. entry.count
+            elseif def ~= nil then
+                local clip, reserve = AmmoInfo(def)
+                if clip ~= nil or reserve ~= nil then
+                    info = (clip ~= nil and tostring(clip) or "—") .. " / "
+                        .. (reserve ~= nil and tostring(reserve) or "—")
+                end
+            end
+            if info == nil then -- melee & friends: the label takes the row
+                info, infoFont = string.upper(sec.label), "CargoSmall"
+                infoCol = hovered and T.Colors.text or T.Colors.textDim
+            end
+            draw.SimpleText(info, infoFont, cx, iconY - 4 * L.scale, infoCol,
+                TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+            DrawEntryIcon(entry, cx - isz / 2, iconY, isz)
+
+            -- accent marker on the weapon currently in hand (spec 4.4) —
+            -- OUTSIDE the ring, like the mock's equipped-dot (R_OUT + 12)
             if def and isstring(def.weapon_class) and def.weapon_class == activeClass then
-                local rDot = L.rOut - 7 * L.scale
+                local rDot = L.rOut + 12 * L.scale
                 T.DrawCircle(L.cx + math.cos(mid) * rDot,
                     L.cy + math.sin(mid) * rDot, 4 * L.scale, T.Colors.accent, 16)
             end
         else
-            draw.SimpleText("—", "CargoHeading", cx, cy, T.Colors.textDim,
+            draw.SimpleText(string.upper(sec.label), "CargoSmall",
+                cx, cy - 9 * L.scale,
+                hovered and T.Colors.text or T.Colors.textDim,
                 TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText("— empty —", "CargoTiny", cx, cy + 10 * L.scale,
+                T.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
     end
 
@@ -583,10 +601,15 @@ local function DrawWheel(st)
         local unlocked = snap and n <= (snap.quickUnlocked or 0)
         local itemId = snap and snap.quick and snap.quick[n] or nil
         if not unlocked then
+            -- same hatch the fullscreen UI uses — but HUDPaint has no panel
+            -- clipping, so scissor or the stripes bleed past the chip box
+            -- (in-game report 2026-07-13)
             surface.SetDrawColor(T.Colors.border)
+            render.SetScissorRect(c.x, c.y, c.x + c.w, c.y + c.h, true)
             for off = -c.h, c.w, 10 do
                 surface.DrawLine(c.x + off, c.y + c.h, c.x + off + c.h, c.y)
             end
+            render.SetScissorRect(0, 0, 0, 0, false)
         elseif itemId ~= nil then
             local def = CARGO.Items.Get(itemId)
             if def then

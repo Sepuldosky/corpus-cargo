@@ -374,6 +374,7 @@ function CARGO.IconEditor.BuildBrowser(parent)
     -- docked buttons inside a DScrollPanel are safe (the inherited traps
     -- are DIconLayout/DNumSlider/DPropertySheet, see CLAUDE.md)
     local scroll = vgui.Create("DScrollPanel", wrap)
+    T.SkinScroll(scroll)
     scroll:Dock(FILL)
     scroll:DockMargin(4, 0, 4, 4)
 

@@ -102,6 +102,7 @@ function CARGO.Grid.Create(parent, opts)
     local controller = { filter = "all" }
 
     local scroll = vgui.Create("DScrollPanel", parent)
+    T.SkinScroll(scroll) -- stock Derma bar breaks the palette (report 2026-07-13)
     scroll.Paint = function(self, w, h)
         surface.SetDrawColor(T.Colors.panelAlt)
         surface.DrawRect(0, 0, w, h)
