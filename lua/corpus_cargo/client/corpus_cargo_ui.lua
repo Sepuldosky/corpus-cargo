@@ -410,7 +410,8 @@ end
 -- Quick slot cells
 -- ------------------------------------------------------------------
 
-local function QuickCount(itemId)
+-- exported: the wheel's quick chips (#31) show the same count
+function CARGO.UI.QuickCount(itemId)
     local snap = S()
     if snap == nil or itemId == nil then return 0 end
     local n = 0
@@ -418,6 +419,13 @@ local function QuickCount(itemId)
         if entry.uid == nil and entry.id == itemId then n = n + (entry.count or 1) end
     end
     return n
+end
+local QuickCount = CARGO.UI.QuickCount
+
+-- exported: the wheel's quick chips commit through the SAME quick-use route
+-- (roadmap #31 rule: zero new server logic — this is the existing intent)
+function CARGO.UI.QuickUse(n)
+    SendQuickUse(n)
 end
 
 local function MakeQuickCell(parent, n)
@@ -585,8 +593,9 @@ end
 -- like any other slot. Author calibration, first fullscreen pass.
 -- ------------------------------------------------------------------
 
--- the tool as a grid item (captured weapons carry def.weapon_class)
-local function FindToolItem(class)
+-- the tool as a grid item (captured weapons carry def.weapon_class).
+-- Exported: the wheel's tool chips (#31) resolve their icon entry with it.
+function CARGO.UI.FindToolItem(class)
     local snap = S()
     if snap == nil then return nil end
     for _, entry in ipairs(snap.items or {}) do
@@ -595,6 +604,7 @@ local function FindToolItem(class)
     end
     return nil
 end
+local FindToolItem = CARGO.UI.FindToolItem
 
 -- Select or equip a sandbox tool — ONE behavior shared by the column
 -- circles and the wheel's tool chips (#31): equipped -> switch to it (the

@@ -64,7 +64,9 @@ function CARGO.Holster.SlotKey(ply, n)
         return
     end
 
-    local slotId = CARGO.Slots.Hotkeys[n]
+    -- 1-7 are the number-row keys; WheelSlots are wheel-only intents
+    -- (8 = throwable, roadmap #31) that no key ever sends
+    local slotId = CARGO.Slots.Hotkeys[n] or CARGO.Slots.WheelSlots[n]
     if slotId == nil then return end
 
     local blob = CARGO.Inventory.GetEquipped(ply, slotId)

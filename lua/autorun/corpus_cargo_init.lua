@@ -69,6 +69,7 @@ local CLIENT_FILES = {
     "client/corpus_cargo_ui.lua",          -- main inventory frame + binds
     "client/corpus_cargo_transfer.lua",    -- container transfer panel (§8)
     "client/corpus_cargo_hotkeys.lua",     -- STALKER weapon keys 1-7 (#22)
+    "client/corpus_cargo_wheel.lua",       -- radial weapon wheel (#31)
     "client/corpus_cargo_options.lua",     -- Corpus.UI.RegisterTab entry
 }
 
