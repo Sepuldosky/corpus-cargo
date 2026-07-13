@@ -181,12 +181,13 @@ las semillas de `dev/`.)
 
 ## Próximo paso
 
-1. **Pasada corta del autor** (checklist del entry 16, arriba). Al pasar:
-   entries 13/14/16 → `[APLICADO]`, bajar el diseño a la arquitectura (§4
-   throwable + taxonomía de granadas, §15.2, §17 wheel, teñido — §8 del
-   prompt semilla del wheel), refrescar el `CLAUDE.md` (mapa:
-   `corpus_cargo_wheel.lua` + `corpus_cargo_movecompat.lua`; trampas
-   nuevas) y borrar las TRES semillas de `dev/`.
+1. **Re-chequeo visual del autor** (bloque de arriba) y después la tanda de
+   CIERRE en un chat nuevo con la semilla
+   `../../dev/HANDOFF_cargo_cierre_entries_13_14_16.md`: entries 13/14/16 →
+   `[APLICADO]` (y el 15 si su checklist pasó), bajar el diseño a la
+   arquitectura (§4 throwable + taxonomía, §15.2, §16, §17 wheel, teñido,
+   movecompat — §8 del prompt semilla del wheel), refrescar el `CLAUDE.md`
+   (mapa + trampas nuevas) y borrar las CUATRO semillas de `dev/`.
 2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor); resto
    del #22 (notificaciones de GMod + 7.º slot vs HUD DGL4).
 3. Después: **categorías fijas de tabs** (#23, bloque propio, exige sesión de
