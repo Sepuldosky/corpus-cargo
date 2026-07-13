@@ -1364,3 +1364,28 @@ flujo `PlayerGiveSWEP`→`WeaponEquip` completo, 14 del #28 con las cuatro
 formas del drop, 8 del #29 con HOLOHUD2 stubbeado) — **verde en ambos
 realms**. El stub de `Vector` ganó aritmética (posiciones de drop). Lo visual
 del #24/#29 (retícula, colores reales del teñido) es de la pasada en juego.
+
+### Addendum entries 13/14 — 1.ª pasada in-game (2026-07-13, 42 OK / 5 fallas)
+
+El autor corrió el checklist completo. **Confirmado en juego:** círculos,
+throwable entero (equip/lanzar/drenaje/persistencia), geometría y commit
+básico del wheel, columna apilada, #30 completo, #28 completo (las 4 formas),
+#24 y #29 completos. **Fallas → fix `dfeafcc`:**
+
+1. **Granadas por contacto** (reporte aparte): la ventana de give del world
+   gate dejaba pasar el touch de SWEPs recién spawneados por el click medio
+   del spawnmenu; con la clase ya en poder, el bump del engine absorbe la
+   munición y el espejo la deposita en el cinturón (no en el ×N — "el
+   contador no se actualiza"). Fix: `PlayerSpawnedSWEP` taguea
+   `CargoWorldSpawned` desde el primer frame + mismo tag para la cáscara del
+   throwable botada con `cargo_drop`.
+2. **Hub/chips del wheel muertos** (4 fallas con una sola forma: abrir/equipar
+   OK, hub sin actualizar, chips sin responder): GMod desengancha un HUDPaint
+   que erroró — un hover malo y el wheel muere en silencio la sesión entera.
+   Pintado y commit ahora en pcall con `Corpus.Log` ruidoso (la ronda 2
+   reporta la línea exacta si persiste) + `gui.MousePos` leído antes de
+   apagar el screen clicker.
+3. **Peso/velocidad (regresión reportada)**: no se reproduce offline (curva,
+   TotalWeight con slot de stack y movement verdes en el harness) — a la
+   ronda 2 con el log del wheel activo; sospecha: colateral de los errores
+   de sesión del punto 2.
