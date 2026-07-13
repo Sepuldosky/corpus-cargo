@@ -72,10 +72,15 @@ de HUD) y las cuatro semillas de `dev/` borradas.)
 
 ## Próximo paso
 
-1. **Checklist del entry 15** (el autor, en juego) → su flip es independiente
-   de esta tanda.
-2. Resto del **#22** (notificaciones de GMod + 7.º slot vs HUD DGL4) y
-   remitir el fix de brazos oscuros a Twilight (acción del autor).
+1. **Tanda de flecos** (chat nuevo, semilla
+   `../../dev/HANDOFF_cargo_flecos_15_22_4.md`): flip del **entry 15**
+   (checklist del autor), resto del **#22** (matar notificaciones de GMod +
+   verificar 7.º slot vs HUD DGL4) y re-verificación del **#4** (feed de
+   pickup, el frente suelto más viejo). Los checklists in-game van con el
+   **workflow nuevo de verificación** (artefacto browser con tick/cross +
+   notas por ítem — en formalización en un chat paralelo; buscarlo antes
+   del PASO 4).
+2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 3. Después: **categorías fijas de tabs** (#23, exige sesión de diseño del set
    fijo) y **comercio** (`Cargo_Trade_Arquitectura.md`). El **#35**
    (footsteps) se investiga con el mod vivo cuando el autor lo priorice.
