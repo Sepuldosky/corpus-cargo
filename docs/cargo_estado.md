@@ -5,17 +5,16 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (entry 16: **el autor confirmó los 5
-puntos del checklist corto** (#32 granadas/cajas, #33 hub, #34 velocidad,
-regresión). Flecos de esa pasada arreglados en el acto (addendum del entry
-16): sectores del wheel según el mock, hatching de quickslots recortado,
-scroll del inventario con paleta, y `cargo_dev_dump_weapons` (soporte del
-entry 15 / GAMMA DB). Los footsteps mudos con `sv_bm_enabled 0` son del
-LADO MOD (math.huge en PlayerStepSoundTime con slow_footsteps 1) — remedio:
-`sv_bm_slow_footsteps 0` o respawn. Harness: 229 checks verdes. Queda el
-**re-chequeo visual** de wheel/hatching/scroll; con eso los entries
-**13/14/16 flipean juntos** y baja el diseño a la arquitectura + se borran
-las semillas de `dev/`.)
+**Última actualización:** 2026-07-13 (entry 16 **VERIFICADO COMPLETO**: los
+5 puntos del checklist corto Y el re-chequeo visual de los flecos (letras
+del wheel, hatching, scroll con paleta) confirmados por el autor; el volcado
+de `cargo_dev_dump_weapons` generado (soporte entry 15 / GAMMA DB). Harness:
+229 checks verdes. ÚNICO fleco abierto: **footsteps mudos al togglear
+`sv_bm_enabled`** — el remedio hipotetizado NO funcionó → **roadmap #35**,
+lado mod, investigar con el mod vivo. Lo que sigue es la **tanda de CIERRE**
+(chat nuevo, semilla `../../dev/HANDOFF_cargo_cierre_entries_13_14_16.md`):
+flip de 13/14/16, bajar el diseño a la arquitectura, CLAUDE.md, y borrar las
+semillas de `dev/`.)
 
 ---
 
@@ -72,35 +71,10 @@ las semillas de `dev/`.)
 
 ## Pendiente de verificar
 
-- **Entry 16 — re-chequeo visual de los flecos (lo ÚNICO que queda):**
-  1. Wheel: sin labels sueltos en el borde; en cada sector la info va sobre
-     el ícono (×N / `cargador / reserva` / label), vacíos con "— empty —",
-     punto de en-mano fuera del anillo.
-  2. Chips F3/F4 bloqueados: el rayado queda DENTRO de la caja.
-  3. Scroll del grid: barra plana con la paleta (y teñida con DGL4), sin el
-     gris Derma.
-- **Entry 16 (frentes #32-34) — checklist en juego, CORTO
-  [CONFIRMADO 1-5 por el autor, 2026-07-13]:**
-  1. **#32 granadas**: spawnear `weapon_frag` (click medio) → NO se toma por
-     contacto; WALK+USE lo suma como lanzable (al ×N del slot si está
-     equipado, si no al grid como "Frag Grenade") — nunca más frags-munición
-     en el cinturón; morir y re-spawnear armas no acuña `Frag Grenades`; un
-     record viejo carga con granadas/SLAM remapeados al lanzable y el
-     cinturón limpio.
-  2. **#32 cajas**: spawnear `item_ammo_*` (click medio) → pisarlas NO las
-     toma; USE pelado carga como prop (USE de nuevo suelta); WALK+USE al
-     grid con feed de pickup (sobrepeso avisa y la deja en el piso);
-     `cargo_ammo_world_pickup 0` restaura el touch del engine.
-  3. **#33 hub**: wheel sobre arma ARC9 → `calibre · modo · Group` y
-     `cargador / reserva` coinciden con el HUD, también con el arma NO en
-     mano; armas HL2 muestran cargador/reserva; capturar un arma nueva deja
-     su calibre en el tooltip.
-  4. **#34 velocidad**: con better movement v2 activo, cargarse de peso
-     frena walk/run de verdad; `sv_bm_enabled 0` → vanilla puro con la curva
-     de siempre; `cargo_movement_compat 0` → vuelve el comportamiento pisado.
-  5. **Regresión**: lanzar drena el ×N y la última granada quita el SWEP;
-     equip/unequip/drop del stack; cinturón/espejo/unload de munición normal
-     intactos; velocidad vanilla sin el mod.
+- **Entry 16 (frentes #32-34 + flecos): VERIFICADO COMPLETO por el autor
+  (2026-07-13, checklist corto 1-5 + re-chequeo visual).** Solo espera el
+  flip administrativo de la tanda de cierre, junto con 13 y 14 (sus
+  checklists de abajo quedaron cubiertos por las dos pasadas + esta).
 - **Entry 15 (assets ZONA + pesos GAMMA) — checklist en juego:** playermodels
   "ZONA *" en el menú C; `cargo_dev_give` con íconos STALKER (addon opcional
   `corpus_zona_assets`, junction desde `dev/`); armas EFT con peso real de la
@@ -142,12 +116,9 @@ las semillas de `dev/`.)
 
 ## Frentes abiertos (anotados, NO arreglados)
 
-- Los hallazgos de la pasada del Bloque C (**#28 #29 #30**) y el **#31**
-  salieron de esta lista: implementados (entries 13 y 14), pendientes de
-  verificación. La **retícula (#24)** también (entry 14).
-- **Retícula del grid**: se pierde con el inventario vacío y se corta en el último
-  ítem cuando hay pocos → **roadmap #24** (causa probable ya diagnosticada: la
-  dibuja el propio `DIconLayout`, cuyo alto es el del contenido).
+- **Footsteps mudos al togglear `sv_bm_enabled`** → **roadmap #35** (lado
+  mod: better movement v2; el remedio `sv_bm_slow_footsteps 0` NO funcionó —
+  la sospecha del math.huge queda sin confirmar; investigar con el mod vivo).
 - **Categorías fijas de tabs** → **roadmap #23** (bloque propio, sin diseñar).
 
 ## Remanentes / deuda conocida

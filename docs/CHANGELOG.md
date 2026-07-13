@@ -1552,3 +1552,19 @@ pasada, arreglados en el acto:
 Harness tras los flecos: **229 checks verdes en ambos realms** + gate final
 nuevo (un FAIL tardío ya no puede imprimir ALL GREEN). Queda el re-chequeo
 visual de 1-3 en juego; con eso los entries 13/14/16 flipean juntos.
+
+### Addendum 2 entry 16 — re-chequeo visual (2026-07-13): TODO OK
+
+El autor confirmó los flecos: **letras del wheel, hatching y scroll
+perfectos**, y el volcado de `cargo_dev_dump_weapons` generado. Con esto los
+cinco puntos + los flecos del entry 16 están completos — los entries
+**13/14/16 quedan listos para flipear** en la tanda de cierre (semilla
+`dev/HANDOFF_cargo_cierre_entries_13_14_16.md`).
+
+**Excepción, queda ABIERTO (→ roadmap #35):** los footsteps siguen mudos al
+togglear `sv_bm_enabled 0`, y el remedio hipotetizado
+(`sv_bm_slow_footsteps 0`) NO funcionó — el diagnóstico del addendum
+anterior (math.huge en `PlayerStepSoundTime`) queda como sospecha no
+confirmada. Es comportamiento del mod de movimiento (nuestra pata de compat
+no toca rutas de sonido), pero se anota como frente propio para investigarlo
+con el mod vivo en juego, no de memoria.

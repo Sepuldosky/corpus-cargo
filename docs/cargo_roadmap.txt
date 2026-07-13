@@ -357,10 +357,20 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     responde — diagnosticar contra el ARC9 vivo qué devuelven Clip1 /
     GetProcessedValue("Ammo") / GetPrimaryAmmoType client-side).
 34. VELOCIDAD PISADA POR EL MOD DE MOVIMIENTO [Cargo movement, COMPAT].
-    [IMPLEMENTADO — CHANGELOG #16, [PENDIENTE] verif. in-game: hook Move
+    [IMPLEMENTADO — CHANGELOG #16, CONFIRMADO in-game 2026-07-13: hook Move
     shared (corpus_cargo_movecompat.lua) que escala el MaxSpeed del move
     data con el mult publicado por NW2Float; gated por sv_bm_enabled y
     cargo_movement_compat; vanilla intacto sin el mod.]
+35. FOOTSTEPS MUDOS AL TOGGLEAR EL MOD DE MOVIMIENTO [COMPAT, lado mod] —
+    SIN ARREGLAR. Reporte del autor (2026-07-13, pasada del entry 16): con
+    sv_bm_enabled 0 los pasos quedan en silencio, y el remedio hipotetizado
+    (sv_bm_slow_footsteps 0) NO funcionó — la sospecha del math.huge en
+    PlayerStepSoundTime (better movement v2, sh_bm_main.lua:492-496) queda
+    NO confirmada. La pata de compat de Cargo (#34) no toca rutas de sonido:
+    es comportamiento del mod, pero molesta al testear. Investigar CON EL
+    MOD VIVO en juego (¿qué queda enganchado tras el toggle? ¿recupera con
+    respawn/mapa?) antes de decidir si Cargo media o se documenta como
+    limitación del mod. COMPAT-RUNTIME: jamás forkearlo.
     Identificado por el autor: "better movement v2 with sprint step time"
     (dev/other/) sobreescribe walk/run y anula la curva peso→velocidad.
     El footer muestra bien. Leer el mod vivo y decidir la palanca
