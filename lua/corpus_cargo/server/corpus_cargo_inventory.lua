@@ -9,9 +9,9 @@
 --            unique entry: { id, uid } — blob lives in CARGO.Instances
 --   equip  : { [slotId] = uid }
 --   quick  : { [1..4] = itemId } (bindings; JSON round-trip re-normalized)
---   belt   : { [1..6] = stack entry } — ammo belt (§15.2, FORM only:
---            stacks stored here left the grid; feeding semantics is
---            roadmap #19). Numeric keys re-normalized like quick.
+--   belt   : { [1..6] = stack entry } — ammo belt (§16). These stacks ARE the
+--            player's engine ammo reserve, mirrored per HL2 ammo type by
+--            corpus_cargo_ammopool.lua. Numeric keys re-normalized like quick.
 --   wallet : native money provider storage
 --
 -- The server owns the inventory; the client only renders snapshots and
@@ -681,9 +681,11 @@ function CARGO.Inventory.QuickUse(ply, slotN)
 end
 
 -- ------------------------------------------------------------------
--- Ammo belt (§15.2, FORM only): ammo stacks move between the grid and
--- the belt slots. How the belt feeds the weapon is roadmap #19 — the
--- belt stores, nothing interprets it yet.
+-- Ammo belt (§16, roadmap #19). The belt is no longer inert storage: it IS
+-- the player's real reserve. Moving a stack here loads the engine ammo pool
+-- of its type; taking it back unloads it. The mirror that keeps the two sides
+-- equal lives in corpus_cargo_ammopool.lua — these two functions only have to
+-- push after they mutate.
 -- ------------------------------------------------------------------
 
 function CARGO.Inventory.BeltSet(ply, slotN, ref)
@@ -699,23 +701,38 @@ function CARGO.Inventory.BeltSet(ply, slotN, ref)
         return
     end
 
-    -- the whole stack moves; equal id+condition merges (anti-laundering
-    -- rule holds), a different occupant returns to the grid first — a
-    -- swap never silently loses a stack. No weight gate: the stack stays
-    -- on the same player either way.
+    -- the stack moves; equal id+condition merges (anti-laundering rule holds),
+    -- a different occupant returns to the grid first — a swap never silently
+    -- loses a stack. No weight gate: the stack stays on the same player either
+    -- way. What does NOT fit under max_stack stays behind in the grid: the
+    -- ceiling is what makes six belt slots a decision instead of decoration.
+    local maxStack = def.max_stack or math.huge
+    local moving = entry.count or 1
     local occ = rec.belt[slotN]
+
     if occ ~= nil and occ.id == entry.id and occ.condition == entry.condition then
-        occ.count = (occ.count or 1) + (entry.count or 1)
+        local room = maxStack - (occ.count or 1)
+        if room <= 0 then
+            CARGO.Inventory.Notice(ply, "That belt slot is full.")
+            return
+        end
+        local put = math.min(room, moving)
+        occ.count = (occ.count or 1) + put
+        moving = moving - put
     else
         if occ ~= nil then
             AddStack(rec, occ.id, occ.count or 1, occ.condition)
         end
-        rec.belt[slotN] = {
-            id = entry.id, count = entry.count or 1, condition = entry.condition,
-        }
+        local put = math.min(maxStack, moving)
+        rec.belt[slotN] = { id = entry.id, count = put, condition = entry.condition }
+        moving = moving - put
     end
+
     table.remove(rec.items, idx)
+    if moving > 0 then AddStack(rec, entry.id, moving, entry.condition) end
+
     CARGO.Inventory.Touch(ply)
+    if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
 end
 
 function CARGO.Inventory.BeltClear(ply, slotN)
@@ -725,6 +742,7 @@ function CARGO.Inventory.BeltClear(ply, slotN)
     rec.belt[slotN] = nil
     AddStack(rec, entry.id, entry.count or 1, entry.condition)
     CARGO.Inventory.Touch(ply)
+    if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
 end
 
 -- ------------------------------------------------------------------
@@ -937,6 +955,12 @@ function CARGO.Inventory.WipeOnDeath(ply)
     if okBal and isnumber(bal) and bal > 0 then pcall(CARGO.Money.Take, ply, bal) end
 
     rec.items, rec.equip, rec.quick, rec.belt = {}, {}, {}, {}
+
+    -- the belt was the reserve (§16), so wiping it must wipe the engine pool
+    -- too — otherwise the rounds survive the death that took the belt carrying
+    -- them, and the corpse respawns armed (in-game report 2026-07-12)
+    if CARGO.AmmoPool then CARGO.AmmoPool.Clear(ply) end
+
     CARGO.Inventory.Touch(ply)
 end
 
