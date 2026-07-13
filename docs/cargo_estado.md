@@ -5,14 +5,14 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (**Bloque del wheel IMPLEMENTADO, sin
-verificar** — entry 13 `[PENDIENTE]`, 4 commits en modo auto desde el diseño
-ratificado en Desktop: primitiva de círculo del theme (#21 fix), slot
-`throwable` de stack con `×N` real en el espejo §16, columna con fila baja
-apilada Clear Sky + hide/align de tools + status panel al fondo, y el **wheel
-menu (#31)** como front-end radial de las teclas 1-7 con cero server nuevo.
-Harness verde en ambos realms (+35 checks); checklist en juego abajo. El
-Bloque D del handoff (#30 #28 #24 #29) sigue SIN implementar.)
+**Última actualización:** 2026-07-13 (**DOS bloques implementados en modo
+auto, sin verificar**: entry 13 — wheel (#31) + slot throwable + columna
+apilada + primitiva de círculo — y entry 14 — Bloque D completo: #30
+spawnmenu→inventario, #28 drop desde el slot, #24 retícula del viewport,
+#29 paletas runtime con base spawnmenu neutra + teñido DGL4. 9 commits, un
+frente cada uno; harness verde en ambos realms con +64 checks nuevos.
+Checklist consolidado abajo — TODO queda `[PENDIENTE]` hasta la pasada del
+autor.)
 
 ---
 
@@ -69,6 +69,19 @@ Bloque D del handoff (#30 #28 #24 #29) sigue SIN implementar.)
 
 ## Pendiente de verificar
 
+- **Entry 14 (Bloque D) — checklist en juego:**
+  1. **#30**: click del ícono de physgun/toolgun/camera en el spawnmenu →
+     entra al grid; repetirlo avisa "You already have one."; el loadout de
+     spawn sigue SIN stockear tools (regresión entry 8).
+  2. **#28**: "Drop" en el menú del slot — arma en mano (cae adelante, misma
+     instancia/cargador), arma equipada no-en-mano, casco con NVG montado
+     (recogerlo devuelve el NVG adentro), granada equipada (cae el stack ×N).
+  3. **#24**: grid VACÍO muestra retícula completa; con 1 ítem llena el área;
+     scrollear la mueve con las celdas; los bordes de tile caen exactos.
+  4. **#29**: sin DGL4 → grises neutros estilo spawnmenu; con DGL4 y el preset
+     Foxtrot (PCV) → toda la UI (inventario + wheel) teñida verde PCV; cambiar
+     de preset re-tiñe en vivo; `cargo_theme_dgl4 0` apaga; `cargo_theme
+     olive` restaura la paleta GAMMA.
 - **Entry 13 (wheel + throwable + columna) — checklist consolidado en juego:**
   1. Wheel: hold de G abre (aviso en consola si G ya tenía bind), soltar
      commitea, deadzone/fuera cancela, sector vacío no hace nada.
@@ -92,14 +105,9 @@ Bloque D del handoff (#30 #28 #24 #29) sigue SIN implementar.)
 
 ## Frentes abiertos (anotados, NO arreglados)
 
-- **Hallazgos de la pasada del Bloque C** (2026-07-12) → roadmap **#28-#30**:
-  **#28** no hay drop de armas EQUIPADAS desde su slot; **#29** el color de la
-  UI debe ser neutro estilo spawnmenu e integrarse en runtime con el preset del
-  HUD DGL4 (autor usa PCV de Opposing Force; mockup nuevo
-  `docs/mockups/cargo_theme_dynamic_mock_v1_1.html`); **#30** el ícono de arma
-  del spawnmenu no llega al inventario (sin toolgun no se pueden obtener
-  physgun/toolgun/camera). El **#31 (wheel)** salió de esta lista: está
-  implementado, pendiente de verificación (entry 13).
+- Los hallazgos de la pasada del Bloque C (**#28 #29 #30**) y el **#31**
+  salieron de esta lista: implementados (entries 13 y 14), pendientes de
+  verificación. La **retícula (#24)** también (entry 14).
 - **Retícula del grid**: se pierde con el inventario vacío y se corta en el último
   ítem cuando hay pocos → **roadmap #24** (causa probable ya diagnosticada: la
   dibuja el propio `DIconLayout`, cuyo alto es el del contenido).
@@ -136,20 +144,18 @@ Bloque D del handoff (#30 #28 #24 #29) sigue SIN implementar.)
 
 ## Próximo paso
 
-1. **Pasada en juego del autor sobre el entry 13** (checklist arriba) →
-   `[PENDIENTE]` → `[APLICADO]` + bajar el diseño a la arquitectura (§4
-   enmienda, §15.2 enmienda, §17 nueva del wheel — lo manda el §8 del prompt
-   semilla `../../dev/PROMPT_CC_Cargo_wheel_y_equipcolumn.md`).
-2. **Bloque D — pendientes de UX (#30 · #28 · #24 · #29)**, en ese orden, con
-   la semilla `../../dev/HANDOFF_cargo_bloque_d_ux_pendientes.md` (causas ya
-   diagnosticadas con `archivo:línea`; reglas de modo auto). El **#29** ya
-   tiene mockup nuevo: `docs/mockups/cargo_theme_dynamic_mock_v1_1.html`
-   (teñido DGL4 en runtime) — el wheel y los círculos ya nacen tiñibles.
-3. **Remitir el fix de brazos oscuros a Twilight** (acción del autor); resto
+1. **Pasada en juego del autor sobre los entries 13 y 14** (checklists
+   arriba) → `[PENDIENTE]` → `[APLICADO]` + bajar el diseño a la arquitectura
+   (§4 y §15.2 enmiendas, §17 nueva del wheel, teñido en §15 — lo manda el §8
+   del prompt semilla `../../dev/PROMPT_CC_Cargo_wheel_y_equipcolumn.md`).
+   Al cerrar: borrar las semillas de `dev/` (HANDOFF del Bloque D + PROMPT
+   del wheel), como se hizo con las anteriores.
+2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor); resto
    del #22 (notificaciones de GMod + 7.º slot vs HUD DGL4).
-4. Después: **categorías fijas de tabs** (#23, bloque propio) y **comercio**
-   (`Cargo_Trade_Arquitectura.md`). Deuda no bloqueante: bajar la captura de
-   armas de mundo al spec de `Cargo_ItemImages_Arquitectura.md`.
+3. Después: **categorías fijas de tabs** (#23, bloque propio, exige sesión de
+   diseño del set fijo) y **comercio** (`Cargo_Trade_Arquitectura.md`). Deuda
+   no bloqueante: bajar la captura de armas de mundo al spec de
+   `Cargo_ItemImages_Arquitectura.md`.
 
 ---
 

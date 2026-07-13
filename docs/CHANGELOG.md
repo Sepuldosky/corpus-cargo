@@ -1310,3 +1310,57 @@ del intent, no-op honesto, HUDPaint limpio) — **verde en ambos realms**; +5
 checks puros en `cargo_selftest` (52 client / 45 server). Lo NO testeable
 offline (que los círculos SE VEAN circulares, el layout apilado, el teñido del
 hover, el hub legible) queda declarado al checklist en juego.
+
+## 14. Bloque D: pendientes de UX (roadmap #30 · #28 · #24 · #29) `[PENDIENTE]`
+
+Sexta tanda, arrancada de la semilla `dev/HANDOFF_cargo_bloque_d_ux_pendientes.md`
+(causas ya diagnosticadas a nivel `archivo:línea` — no se re-investigaron) y
+ejecutada en **modo auto** en la misma sesión que el entry 13. Orden del
+handoff (#30 → #28 → #24 → #29), un commit por frente; checklist consolidado
+en `cargo_estado.md`.
+
+1. **Spawnmenu → inventario (#30)** (`7d3febc`) — el click del ícono corre
+   `gm_giveswep`, cuyo `ply:Give` es **anónimo**: el filtro de tools del entry
+   8 lo descartaba (indistinguible del loadout de spawn) y sin toolgun no había
+   forma de obtener physgun/toolgun/camera. La señal que faltaba:
+   **`PlayerGiveSWEP`** (sandbox `commands.lua:940`) corre justo antes del give
+   y solo en esa ruta — el hook marca al jugador (clase + `CurTime`, sin
+   devolver nada: un return secuestraría el allow/deny de sandbox) y la captura
+   consume la marca como `deliberate` (semántica del WALK+USE), ventana 1 s.
+   El dedup no cambia pero avisa ("You already have one.") en vez de comerse
+   el click en silencio.
+2. **Drop desde el slot (#28)** (`06d711c`) — opción "Drop" en el menú del
+   slot equipado (incl. círculos de herramienta y throwable) → intent
+   `equip_drop` → `Inventory.DropEquipped`, todo con maquinaria existente:
+   arma en mano va por `ply:DropWeapon` (el reconciliador universal contabiliza
+   UNA vez; guard ARC9 de recarga compartido — `Capture.DropBlockedByReload`);
+   arma no-en-mano stripea y `SpawnWorldWeapon` con su instancia + `StoreClip`;
+   gear no-arma cae como `corpus_cargo_item` con el blob entero (placas y
+   sub-slots viajan DENTRO — nada se pierde); el stack throwable cae como ítem
+   y su reserva sale del pool. Body dropeado dispara `Corpus_Cargo_BodyChanged`.
+3. **Retícula del grid (#24)** (`4c0a8a2`) — la pintaba el propio `DIconLayout`
+   (alto = contenido: vacío no había retícula, con pocos ítems se cortaba).
+   Ahora la pinta el fondo del viewport (`scroll.Paint`) desplazada por el
+   **offset del canvas** (`(GetPos()+GAP) % (U+GAP)`): cubre el área visible
+   siempre y la fase queda clavada a las celdas — la alineación del entry 8
+   no regresa. Offline solo se barre que no explote; **lo visual es del
+   checklist**.
+4. **Paletas runtime + DGL4 (#29)** (`81f2f5c`) — contrato de tokens del mock
+   `cargo_theme_dynamic_mock_v1_1.html`. Las paletas mutan los `Color` de
+   `T.Colors` **en sitio** (misma identidad) — todos los closures se
+   re-skinnean gratis. Base default **spawnmenu** (grises neutros del mock del
+   autor; la oliva GAMMA queda como `cargo_theme olive`); claves nuevas
+   `accent`/`accentDim`/`scrim` (fin de los colores hardcodeados del scrim).
+   Con DGL4 montado y `cargo_theme_dgl4` (default 1) la paleta deriva del
+   preset activo: tint global de `GetModifiers().color` o — **decisión
+   anotada**, los presets no exponen nombre — el color sano de `health_color`
+   (umbral más alto) del elemento `health` (Foxtrot Uniform = verde PCV
+   180,255,100, leído de `preset4.lua`). Re-tint en vivo por el hook propio
+   `OnSettingsChanged` de HOLOHUD2. Sin mod / API rota: base neutra, jamás
+   crash. FX del mock (glow/scan) quedan anotados como futuros, no entran.
+
+**Verificación offline:** harness extendido **+29 checks** (7 del #30 con el
+flujo `PlayerGiveSWEP`→`WeaponEquip` completo, 14 del #28 con las cuatro
+formas del drop, 8 del #29 con HOLOHUD2 stubbeado) — **verde en ambos
+realms**. El stub de `Vector` ganó aritmética (posiciones de drop). Lo visual
+del #24/#29 (retícula, colores reales del teñido) es de la pasada en juego.
