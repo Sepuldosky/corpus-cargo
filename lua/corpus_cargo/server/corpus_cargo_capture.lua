@@ -101,7 +101,7 @@ local AUTOGEN_MELEE = {
     weapon_stunstick = true,
 }
 
-local function RegisterAutogen(class, name)
+local function RegisterAutogen(class, name, caliber)
     CARGO.Items.Register({
         id = "wpn_" .. class,
         name = name,
@@ -110,9 +110,32 @@ local function RegisterAutogen(class, name)
         category = AUTOGEN_MELEE[class] and "melee" or "weapons",
         weapon_class = class,
         size = AUTOGEN_SIZES[class],
+        -- display label only (schema rule §3: a weapon's REAL type comes from
+        -- its entity, never from the def) — the wheel hub and the tooltip
+        -- ammo row read it (roadmap #33)
+        ammo = isstring(caliber) and { caliber = caliber } or nil,
         autogen = true,
         trivia = "Auto-captured weapon (" .. class .. ").",
     })
+end
+
+-- Display caliber of a live weapon (roadmap #33): its engine ammo type,
+-- mapped to the label of the Cargo item that feeds it (the same label the
+-- belt badge groups on). ARC9 declares the type as the plain class field
+-- SWEP.Ammo ("smg1"/"ar2"/"357" across the EFT packs — verified against the
+-- live code 2026-07-13); engine weapons answer GetPrimaryAmmoType. A type
+-- Cargo does not manage resolves to nil and the def carries no caliber.
+local function ResolveCaliber(wep)
+    if not IsValid(wep) then return nil end
+    local hl2
+    if isstring(wep.Ammo) and wep.Ammo ~= "" then
+        hl2 = wep.Ammo
+    else
+        local ok, t = pcall(wep.GetPrimaryAmmoType, wep)
+        if ok and isnumber(t) and t >= 0 then hl2 = game.GetAmmoName(t) end
+    end
+    if hl2 == nil or CARGO.Ammo == nil then return nil end
+    return CARGO.Ammo.CaliberForType(hl2)
 end
 
 -- Autogen defs must survive restarts (CHANGELOG #6): they are born at
@@ -143,7 +166,8 @@ for id, meta in pairs(autogenDefs) do
         and CARGO.Items.Get(id) == nil then
         local name = isstring(meta.name) and meta.name ~= "" and meta.name
             or meta.weapon_class
-        RegisterAutogen(meta.weapon_class, name)
+        RegisterAutogen(meta.weapon_class, name,
+            isstring(meta.caliber) and meta.caliber or nil)
     end
 end
 if autogenDirty then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs) end
@@ -159,21 +183,34 @@ local function EnsureDef(class, wep)
         if ok and isstring(printName) and printName ~= "" then name = printName end
     end
 
+    local caliber = ResolveCaliber(wep)
+
     local existing = CARGO.Items.Get(id)
     if existing ~= nil then
+        local dirty = false
         -- a def resurrected from a bare blob id (heal below) carries the
         -- class as placeholder name — upgrade it now that the real weapon
         -- handed over its print name
         if existing.autogen and existing.name == class and name ~= class then
             existing.name = name -- by-ref: the next snapshot carries it
-            autogenDefs[id] = { name = name, weapon_class = class }
+            dirty = true
+        end
+        -- defs captured before #33 carry no caliber: upgrade in place now
+        -- that a live weapon of the class told us its type
+        if existing.autogen and existing.ammo == nil and caliber ~= nil then
+            existing.ammo = { caliber = caliber }
+            dirty = true
+        end
+        if dirty then
+            autogenDefs[id] = { name = existing.name, weapon_class = class,
+                caliber = istable(existing.ammo) and existing.ammo.caliber or nil }
             Corpus.Data.Save("cargo", "autogen_defs", autogenDefs)
         end
         return id
     end
 
-    RegisterAutogen(class, name)
-    autogenDefs[id] = { name = name, weapon_class = class }
+    RegisterAutogen(class, name, caliber)
+    autogenDefs[id] = { name = name, weapon_class = class, caliber = caliber }
     Corpus.Data.Save("cargo", "autogen_defs", autogenDefs)
     return id
 end

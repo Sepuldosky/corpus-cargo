@@ -224,12 +224,34 @@ local function ActiveClass()
     return IsValid(wep) and wep:GetClass() or nil
 end
 
--- magazine / reserve of an equipped weapon. The clip reads the live SWEP
--- (networked to its owner); the reserve reads the ENGINE POOL, which the
--- §16 mirror keeps equal to the belt sum — read, never recomputed. ARC9's
--- real consumed type is GetProcessedValue("Ammo") (ammo conversions);
--- non-ARC9 falls back to GetPrimaryAmmoType. Missing pieces just hide.
-local function AmmoInfo(def)
+-- Engine ammo type consumed by an equipped weapon. Every leg verified
+-- against the live ARC9 base (2nd-pass diagnosis, 2026-07-13): its own
+-- Ammo1() reads GetProcessedValue("Ammo") (sh_reload.lua:578), the plain
+-- class field SWEP.Ammo is the same type as static data ("smg1"/"ar2"/"357"
+-- across the EFT packs) and stays readable even when the processed-value
+-- machinery has no client state yet; GetPrimaryAmmoType is unreliable on
+-- ARC9 (class-level Primary.Ammo is "" — sh shared.lua:334 — and only
+-- Initialize corrects it per instance), so it is the LAST leg, for engine
+-- weapons. Exposed for the offline harness.
+function CARGO.Wheel.AmmoTypeOf(wep)
+    if wep.ARC9 then
+        local ok, t = pcall(wep.GetProcessedValue, wep, "Ammo")
+        if ok and isstring(t) and t ~= "" then return t end
+        if isstring(wep.Ammo) and wep.Ammo ~= "" then return wep.Ammo end
+    end
+    local ok, t = pcall(wep.GetPrimaryAmmoType, wep)
+    if ok and isnumber(t) and t >= 0 then return t end
+    return nil
+end
+
+-- magazine / reserve of an equipped weapon (2nd-pass fix, roadmap #33: this
+-- returned nil/nil in game). The clip reads the live SWEP; a Clip1 of -1
+-- (no networked local weapon data) falls back to ARC9's own LoadedRounds
+-- mirror (NetworkVar, shared.lua:1592 — broadcast, so it answers even for a
+-- non-deployed weapon). The reserve reads the ENGINE POOL, which the §16
+-- mirror keeps equal to the belt sum — read, never recomputed. Missing
+-- pieces still just hide. Exposed for the offline harness.
+function CARGO.Wheel.AmmoInfo(def)
     local ply = LocalPlayer()
     if not IsValid(ply) or not isstring(def.weapon_class) then return nil, nil end
     local wep = ply:GetWeapon(def.weapon_class)
@@ -238,18 +260,30 @@ local function AmmoInfo(def)
     local clip
     local okC, c = pcall(wep.Clip1, wep)
     if okC and isnumber(c) and c >= 0 then clip = c end
+    if clip == nil and wep.ARC9 and isfunction(wep.GetLoadedRounds) then
+        local okL, lr = pcall(wep.GetLoadedRounds, wep)
+        if okL and isnumber(lr) and lr >= 0 then clip = lr end
+    end
 
-    local ammoType
-    if wep.ARC9 then
-        local ok, t = pcall(wep.GetProcessedValue, wep, "Ammo")
-        if ok and isstring(t) and t ~= "" then ammoType = t end
-    end
-    if ammoType == nil then
-        local ok, t = pcall(wep.GetPrimaryAmmoType, wep)
-        if ok and isnumber(t) and t >= 0 then ammoType = t end
-    end
+    local ammoType = CARGO.Wheel.AmmoTypeOf(wep)
     local reserve = ammoType ~= nil and ply:GetAmmoCount(ammoType) or nil
     return clip, reserve
+end
+local AmmoInfo = CARGO.Wheel.AmmoInfo
+
+-- Display caliber when the def carries none (autogen captured before #33 or
+-- an equipped-only weapon whose def never re-captured): derive it live from
+-- the weapon's engine type, with Cargo's own label — the one the belt badge
+-- groups on. Exposed for the offline harness.
+function CARGO.Wheel.CaliberOf(def)
+    if istable(def.ammo) and def.ammo.caliber then return def.ammo.caliber end
+    local ply = LocalPlayer()
+    if not IsValid(ply) or not isstring(def.weapon_class) then return nil end
+    local wep = ply:GetWeapon(def.weapon_class)
+    if not IsValid(wep) then return nil end
+    local hl2 = CARGO.Wheel.AmmoTypeOf(wep)
+    if not isstring(hl2) then return nil end -- a numeric id names no label
+    return CARGO.Ammo.CaliberForType(hl2)
 end
 
 -- ARC9 fire mode — COMPAT-RUNTIME: SWEP:GetFiremodeName() verified against
@@ -399,9 +433,8 @@ local function DrawHub(L, hover)
 
             -- caliber · fire mode · A/B group — each piece hides when absent
             local bits = {}
-            if def and istable(def.ammo) and def.ammo.caliber then
-                bits[#bits + 1] = def.ammo.caliber
-            end
+            local cal = def and CARGO.Wheel.CaliberOf(def) or nil
+            if cal ~= nil then bits[#bits + 1] = cal end
             local fm = def and FiremodeOf(def) or nil
             if fm ~= nil then bits[#bits + 1] = fm end
             if entry.blob and entry.blob.ammo_group then

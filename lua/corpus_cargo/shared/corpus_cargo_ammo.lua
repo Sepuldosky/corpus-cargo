@@ -186,3 +186,13 @@ end
 function CARGO.Ammo.Managed(hl2)
     return CARGO.Ammo.ItemForType(hl2) ~= nil
 end
+
+-- Engine ammo type -> the DISPLAY caliber label of the item that carries it
+-- (roadmap #33: the wheel hub and the captured-weapon defs read it). It is
+-- deliberately the label the belt groups on — an EFT rifle eating "smg1"
+-- reads as the pool that actually feeds it, not as the trivia caliber EFT
+-- buries in localization tokens (checked live: no clean API exposes those).
+function CARGO.Ammo.CaliberForType(hl2)
+    local def = CARGO.Items.Get(CARGO.Ammo.ItemForType(hl2))
+    return istable(def) and istable(def.ammo) and def.ammo.caliber or nil
+end
