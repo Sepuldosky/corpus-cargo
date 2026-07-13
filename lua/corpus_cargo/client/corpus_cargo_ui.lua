@@ -576,17 +576,6 @@ local function FindToolItem(class)
     return nil
 end
 
-local function DrawCircleFilled(cx, cy, r, col)
-    local pts = {}
-    for i = 0, 23 do
-        local a = math.rad(i * 15)
-        pts[#pts + 1] = { x = cx + math.cos(a) * r, y = cy + math.sin(a) * r }
-    end
-    draw.NoTexture()
-    surface.SetDrawColor(col)
-    surface.DrawPoly(pts)
-end
-
 local function MakeToolCircle(parent, tool)
     local cell = vgui.Create("DButton", parent)
     cell:SetText("")
@@ -598,10 +587,11 @@ local function MakeToolCircle(parent, tool)
         local entry = equipped or FindToolItem(tool.class)
 
         local cx, cy, r = w / 2, h / 2, math.min(w, h) / 2 - 1
-        DrawCircleFilled(cx, cy, r,
-            self:IsHovered() and T.Colors.cellHover or T.Colors.cell)
-        local bc = equipped and T.Colors.borderHi or T.Colors.border
-        surface.DrawCircle(cx, cy, r, bc.r, bc.g, bc.b, bc.a)
+        -- Theme.DrawCircleOutlined: the ONE circle primitive (the old poly +
+        -- surface.DrawCircle pair is what looked flat in game)
+        T.DrawCircleOutlined(cx, cy, r,
+            self:IsHovered() and T.Colors.cellHover or T.Colors.cell,
+            equipped and T.Colors.borderHi or T.Colors.border, 1)
 
         if entry == nil then return end
         -- grid-only tools paint dim; equipping lights the circle up
@@ -1003,10 +993,9 @@ local function BuildFrame(state)
     moneyBtn:SetTooltip("Solo: drop money · Trade: offer money")
     moneyBtn.Paint = function(self, w, h)
         local cx, cy, r = w / 2, h / 2, math.min(w, h) / 2 - 1
-        DrawCircleFilled(cx, cy, r,
-            self:IsHovered() and T.Colors.cellHover or T.Colors.cell)
-        local bc = self:IsHovered() and T.Colors.amber or T.Colors.borderHi
-        surface.DrawCircle(cx, cy, r, bc.r, bc.g, bc.b, bc.a)
+        T.DrawCircleOutlined(cx, cy, r,
+            self:IsHovered() and T.Colors.cellHover or T.Colors.cell,
+            self:IsHovered() and T.Colors.amber or T.Colors.borderHi, 1)
         draw.SimpleText("$", "CargoHeading", cx, cy, T.Colors.amber,
             TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end

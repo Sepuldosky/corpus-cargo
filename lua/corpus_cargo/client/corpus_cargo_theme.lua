@@ -88,6 +88,33 @@ function T.PaintPanel(w, h, bgCol, borderCol)
     surface.DrawOutlinedRect(0, 0, w, h, 1)
 end
 
+-- THE circle primitive (in-game finding 2026-07-13: the sandbox tool circles
+-- had hard, flat edges). draw.RoundedBox with radius = half the size does NOT
+-- make a circle — its radius is quantized to GMod's corner materials — and the
+-- old 24-segment poly showed visible flats at slot size. One triangulated
+-- surface.DrawPoly here (no baked textures: #29 must be able to tint every
+-- circle from the palette at runtime), consumed by every circle in the module:
+-- the sandbox tool slots, the $ header button and the wheel hub.
+function T.DrawCircle(cx, cy, r, col, segments)
+    segments = segments or (r > 40 and 48 or 32)
+    local pts = {}
+    for i = 0, segments - 1 do
+        local a = math.rad(i * 360 / segments)
+        pts[i + 1] = { x = cx + math.cos(a) * r, y = cy + math.sin(a) * r }
+    end
+    draw.NoTexture()
+    surface.SetDrawColor(col)
+    surface.DrawPoly(pts)
+end
+
+-- filled circle + ring border, both from the same primitive (an opaque fill
+-- over a slightly larger border disc — palette colors are opaque, so the
+-- border never bleeds through the fill)
+function T.DrawCircleOutlined(cx, cy, r, fill, border, thickness)
+    T.DrawCircle(cx, cy, r, border)
+    T.DrawCircle(cx, cy, r - (thickness or 1), fill)
+end
+
 -- aspect-fit draw of an item icon inside a box — never stretched (the icon
 -- PNGs carry the footprint aspect, Cargo_ItemImages §6). Shared by grid
 -- cells, equipment/quick slots and the tooltip zoom.
