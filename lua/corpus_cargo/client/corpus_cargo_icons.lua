@@ -472,7 +472,7 @@ function Icons.GetFootprint(defidOrDef)
 
     local fp = { w = 1, h = 1 }
     local model = Icons.ModelFor(def)
-    if isstring(model) and util.IsValidModel(model) then
+    if CARGO.Items.ModelUsable(model) then
         local ent = ClientsideModel(model, RENDERGROUP_OTHER)
         if IsValid(ent) then
             ent:SetNoDraw(true)
@@ -819,7 +819,11 @@ local function RenderIconToFile(def)
     end
 
     local model = Icons.ModelFor(def)
-    if not isstring(model) or not util.IsValidModel(model) then return false end
+    -- ModelUsable, not util.IsValidModel alone: the latter reports false for
+    -- mounted-but-unprecached props and this gate returns SILENTLY (no log) —
+    -- the item just kept showing a letter (in-game report 2026-07-12, the
+    -- takeout-carton food model). See CARGO.Items.ModelUsable.
+    if not CARGO.Items.ModelUsable(model) then return false end
 
     local key = Icons.IconCacheKey(def)
     local fp = Icons.GetFootprint(def)
