@@ -43,6 +43,7 @@ local SHARED = {
     "shared/corpus_cargo_items.lua",    -- item contract + sub-slot primitive
     "shared/corpus_cargo_slots.lua",    -- equipment slot table (data, no UI)
     "shared/corpus_cargo_weight.lua",   -- pure weight -> speed curve
+    "shared/corpus_cargo_ammo.lua",     -- HL2 ammo items + caliber map (§16)
     "shared/corpus_cargo_arc9.lua",     -- ARC9 bridge (realm-guarded inside)
     "shared/corpus_cargo_dev.lua",      -- selftest + dev item kit (verification)
 }
@@ -50,6 +51,7 @@ local SERVER_FILES = {
     "server/corpus_cargo_instances.lua",  -- unique-item instance blobs + persistence
     "server/corpus_cargo_money.lua",      -- money provider interface + native USD
     "server/corpus_cargo_inventory.lua",  -- per-player inventory, equip, net handlers
+    "server/corpus_cargo_ammopool.lua",   -- the ammo belt IS the reserve pool (§16)
     "server/corpus_cargo_movement.lua",   -- weight -> walk/run speed application
     "server/corpus_cargo_containers.lua", -- world containers + transfer net
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)

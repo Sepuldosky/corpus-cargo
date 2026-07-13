@@ -83,7 +83,12 @@ end
 --   quick_slots    quick slots unlocked while equipped in Body (0-4)
 --   has_condition  instance/sub-slot entries start with condition = 100
 --   condition_zones { "torso", ... } instance starts zones table at 100 each
---   ammo           { caliber = "9x19", types = { "FMJ", ... } }
+--   ammo           { caliber = "9x19", hl2 = "Pistol" } — `hl2` is the ENGINE
+--                  ammo type and it is the pool key (§16: the belt IS the
+--                  reserve). `caliber` is a display label only; it is what the
+--                  A/B belt badge groups on. On a WEAPON def, ammo carries the
+--                  caliber label alone — a weapon's real type comes from its
+--                  entity, never from the def.
 --   effect_icon    small overlay tag drawn bottom-left ("hemostatic",
 --                  "radiation", "battery" — free string, UI maps known ones)
 --   material       display label for plate-like items (e.g. "Cerámica IV")
