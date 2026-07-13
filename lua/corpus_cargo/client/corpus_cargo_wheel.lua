@@ -332,11 +332,21 @@ end
 function CARGO.Wheel.Close(commit)
     if state == nil then return end
     local L = state.L
+    -- read the cursor BEFORE releasing the screen clicker: once it is off,
+    -- gui.MousePos is not guaranteed to keep reporting the free-cursor
+    -- position (post-1st-pass hardening, 2026-07-13)
+    local mx, my = gui.MousePos()
     state = nil
     gui.EnableScreenClicker(false)
     if commit then
-        local mx, my = gui.MousePos()
-        Commit(CARGO.Wheel.PickAt(L, mx, my, ToolsShown()))
+        -- protected: a commit error must never strand the wheel half-closed
+        local ok, err = pcall(function()
+            Commit(CARGO.Wheel.PickAt(L, mx, my, ToolsShown()))
+        end)
+        if not ok then
+            Corpus.Log("cargo", "wheel: error en el commit (reportar tal cual): "
+                .. tostring(err))
+        end
     end
 end
 
@@ -579,6 +589,14 @@ local function DrawWheel(st)
     end
 end
 
+-- Protected paint (post-1st-pass hardening, 2026-07-13): GMod UNHOOKS a
+-- HUDPaint hook that errors — one bad hover state and the wheel dies
+-- silently for the whole session, which is exactly the failure shape the
+-- author reported (open/equip worked, then hub/chips went dead). The pcall
+-- keeps the wheel alive and logs the actual error ONCE, loudly, so the next
+-- pass reports the offending line instead of a mystery.
+local lastPaintErr
+
 hook.Add("HUDPaint", "corpus_cargo_wheel", function()
     if state == nil then return end
     local ply = LocalPlayer()
@@ -586,9 +604,16 @@ hook.Add("HUDPaint", "corpus_cargo_wheel", function()
         CARGO.Wheel.Close(false) -- death / ESC: cancel, never commit
         return
     end
-    local mx, my = gui.MousePos()
-    state.hover = CARGO.Wheel.PickAt(state.L, mx, my, ToolsShown())
-    DrawWheel(state)
+    local ok, err = pcall(function()
+        local mx, my = gui.MousePos()
+        state.hover = CARGO.Wheel.PickAt(state.L, mx, my, ToolsShown())
+        DrawWheel(state)
+    end)
+    if not ok and lastPaintErr ~= tostring(err) then
+        lastPaintErr = tostring(err)
+        Corpus.Log("cargo", "wheel: error de pintado (reportar tal cual): "
+            .. lastPaintErr)
+    end
 end)
 
 -- ------------------------------------------------------------------

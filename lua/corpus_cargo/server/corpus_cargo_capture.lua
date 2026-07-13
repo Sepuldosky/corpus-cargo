@@ -278,6 +278,19 @@ function CARGO.Capture.SpawnWorldWeapon(class, pos, uid)
     return wep
 end
 
+-- Spawnmenu MIDDLE-CLICK spawns a weapon as a world entity (gm_spawnswep).
+-- In-game report 2026-07-13 (1st pass of entries 13/14): freshly spawned
+-- grenades were hoovered BY TOUCH — the gate's give-window below abstains
+-- for entities younger than 0.5 s, and a weapon you already carry gets its
+-- ammo absorbed by the engine bump the instant you step on it (the rounds
+-- then land on the BELT via the §16 mirror, not on the slot ×N — "counter
+-- didn't move"). Sandbox announces these spawns through PlayerSpawnedSWEP:
+-- tag them like our own world spawns, so they are world weapons from frame
+-- one — WALK+USE still takes them (the CargoUseTaken grant wins first).
+hook.Add("PlayerSpawnedSWEP", "corpus_cargo_world_spawnmenu", function(_, ent)
+    if IsValid(ent) then ent.CargoWorldSpawned = true end
+end)
+
 -- The world gate. Deny order matters: the WALK+USE grant wins, our own
 -- world spawns always deny, give flows (entity born an instant ago) pass,
 -- and anything that has been RESTING in the world is denied.
@@ -481,7 +494,22 @@ hook.Add("PlayerDroppedWeapon", "corpus_cargo_drop_reconcile", function(ply, wep
             break
         end
     end
-    if uid == nil then return end -- not a Cargo-equipped weapon: leave it alone
+    if uid == nil then
+        -- the equipped THROWABLE stack has no uid but its SWEP can still be
+        -- dropped (cargo_drop with the grenade in hand). The rounds stay in
+        -- the slot — the entity is just the launcher shell — but it must be
+        -- a WORLD weapon, or touching it re-absorbs it instantly (in-game
+        -- report 2026-07-13). Take-back lands on "keep" via the equipped
+        -- stack, which re-equips it, rounds untouched.
+        local eq = rec.equip.throwable
+        if istable(eq) then
+            local def = CARGO.Items.Get(eq.id)
+            if istable(def) and def.weapon_class == class then
+                wep.CargoWorldSpawned = true
+            end
+        end
+        return -- not a Cargo-equipped weapon: leave the rest alone
+    end
 
     -- unequip WITHOUT returning to the grid — the item is going to the world,
     -- not the backpack. Tag the entity so the world gate (no touch pickup) and
