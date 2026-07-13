@@ -102,24 +102,35 @@ function CARGO.Grid.Create(parent, opts)
     local controller = { filter = "all" }
 
     local scroll = vgui.Create("DScrollPanel", parent)
-    scroll.Paint = function(_, w, h)
+    scroll.Paint = function(self, w, h)
         surface.SetDrawColor(T.Colors.panelAlt)
         surface.DrawRect(0, 0, w, h)
+
+        -- faint cell reticle covering the WHOLE viewport (roadmap #24).
+        -- It used to live in the layout's Paint so it would share origin
+        -- with the tiles and scroll with them (entry 8's alignment fix) —
+        -- but a DIconLayout is only as tall as its content: an empty grid
+        -- showed no reticle at all and a short one cut off at the last row
+        -- (in-game report 2026-07-12). Painting the viewport keeps it full;
+        -- the CANVAS OFFSET keeps the phase locked to the tiles: a tile
+        -- edge always sits at margin + k*(U+GAP) in canvas space, and the
+        -- canvas rides at GetPos() while scrolling — so the reticle still
+        -- moves with the content and the entry-8 alignment survives.
+        local U, GAP = Metrics()
+        local step = U + GAP
+        local cx, cy = 0, 0
+        local canvas = self.GetCanvas ~= nil and self:GetCanvas() or nil
+        if IsValid(canvas) then cx, cy = canvas:GetPos() end
+        surface.SetDrawColor(255, 255, 255, 5)
+        for x = (cx + GAP) % step, w, step do
+            surface.DrawLine(x, 0, x, h)
+        end
+        for y = (cy + GAP) % step, h, step do
+            surface.DrawLine(0, y, w, y)
+        end
     end
 
     local layout = vgui.Create("DIconLayout", scroll)
-    -- faint cell reticle behind the tiles (mock's gridwrap background).
-    -- Painted by the LAYOUT, not the scroll: same origin as the tiles (a
-    -- tile's left/top edge always sits on a k*(U+GAP) multiple in layout
-    -- space) and it scrolls with the content — alignment came back wrong
-    -- from the first in-game pass when the scroll painted it.
-    layout.Paint = function(self, w, h)
-        local U, GAP = Metrics()
-        local step = U + GAP
-        surface.SetDrawColor(255, 255, 255, 5)
-        for x = 0, w, step do surface.DrawLine(x, 0, x, h) end
-        for y = 0, h, step do surface.DrawLine(0, y, w, y) end
-    end
     -- TOP, never FILL: inside a DScrollPanel the canvas sizes itself to its
     -- children while a FILL child sizes itself to the canvas — the circular
     -- collapse clipped the cells and made Refresh() repopulate a zero-height
