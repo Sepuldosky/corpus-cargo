@@ -32,6 +32,7 @@ local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
 local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
 local NET_BELT_MOVE = Corpus.Net.Register("cargo", "belt_move")
 local NET_UNLOAD    = Corpus.Net.Register("cargo", "unload")
+local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
 
 local cvKey = CreateClientConVar("cargo_key_inventory", tostring(KEY_I), true, false,
     "Key (KEY_* enum) that opens the Cargo inventory")
@@ -95,6 +96,9 @@ local function SendBeltMove(fromN, toN)
 end
 local function SendUnload()
     net.Start(NET_UNLOAD) net.SendToServer()
+end
+local function SendEquipDrop(slotId)
+    net.Start(NET_EQUIP_DROP) net.WriteString(slotId) net.SendToServer()
 end
 
 -- ------------------------------------------------------------------
@@ -268,6 +272,10 @@ local function OpenSlotMenu(slotId)
             end
         end
     end
+
+    -- drop straight from the slot (roadmap #28): weapons leave as the real
+    -- SWEP with their instance, gear as the item entity — server decides
+    menu:AddOption("Drop", function() SendEquipDrop(slotId) end)
 
     menu:Open()
 end
@@ -666,6 +674,7 @@ local function MakeToolCircle(parent, tool)
         if SlotEntryOf(tool.slotId) == nil then return end
         local menu = DermaMenu()
         menu:AddOption("Unequip", function() SendUnequip(tool.slotId) end)
+        menu:AddOption("Drop", function() SendEquipDrop(tool.slotId) end)
         menu:Open()
     end
 

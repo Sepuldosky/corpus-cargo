@@ -42,7 +42,8 @@ local NET_SUB_ATT   = Corpus.Net.Register("cargo", "subslot_attach")
 local NET_SUB_DET   = Corpus.Net.Register("cargo", "subslot_detach")
 local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
 local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
-local NET_BELT_MOVE = Corpus.Net.Register("cargo", "belt_move")
+local NET_BELT_MOVE  = Corpus.Net.Register("cargo", "belt_move")
+local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
 
 -- Lifecycle convars (server, archived):
 --   cargo_lose_on_death — death wipes the whole inventory + money (roadmap
@@ -701,6 +702,98 @@ function CARGO.Inventory.DropEntry(ply, ref, count)
     return true
 end
 
+-- Drop straight from an equipment slot (roadmap #28). Three shapes, all of
+-- them EXISTING machinery — the trap of this front is double bookkeeping:
+--   · weapon in hand    -> ply:DropWeapon. The universal PlayerDroppedWeapon
+--                          reconciler (capture.lua) empties the slot and tags
+--                          the entity with the uid EXACTLY ONCE — nothing is
+--                          repeated here.
+--   · weapon carried    -> no world entity exists to hand over: store the
+--                          magazine, clear the slot and spawn the real SWEP
+--                          with its instance (same route as DropEntry).
+--   · non-weapon gear / -> the corpus_cargo_item entity. A unique travels
+--     throwable stack      WITH its whole blob — plates and sub-slot content
+--                          ride inside it, nothing is lost (§4 ejection is
+--                          for destruction; a drop destroys nothing). The
+--                          throwable stack leaves the reserve, so Push.
+function CARGO.Inventory.DropEquipped(ply, slotId)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    local val = rec.equip[slotId]
+    if val == nil then return false end
+    local dropPos = ply:EyePos() + ply:GetAimVector() * 32
+
+    local function spawnItemEnt(entry)
+        local ent = ents.Create("corpus_cargo_item")
+        if IsValid(ent) then
+            ent.CargoEntry = entry
+            ent:SetPos(dropPos)
+            ent:Spawn()
+        end
+        return ent
+    end
+
+    -- stack slot (throwable): the stack drops as an item, the SWEP leaves
+    if istable(val) then
+        rec.equip[slotId] = nil
+        local def = CARGO.Items.Get(val.id)
+        if def then StripEquipWeapon(ply, def, nil) end
+        spawnItemEnt({ id = val.id, count = val.count or 1, condition = val.condition })
+        CARGO.Inventory.Touch(ply)
+        if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
+        return true
+    end
+
+    local uid = val
+    local blob = CARGO.Instances.Get(uid)
+    local def = blob and CARGO.Items.Get(blob.id) or nil
+    if def == nil then return false end
+
+    local class = isstring(def.weapon_class) and def.weapon_class ~= ""
+        and def.weapon_class or nil
+    if class ~= nil then
+        local wep = ply:GetWeapon(class)
+        local active = ply:GetActiveWeapon()
+        if IsValid(wep) and IsValid(active) and active == wep then
+            -- in hand: the honest route. Same ARC9 mid-reload guard as
+            -- cargo_drop (shared helper — orphaned per-round timers error)
+            if istable(CARGO.Capture) and isfunction(CARGO.Capture.DropBlockedByReload)
+                and CARGO.Capture.DropBlockedByReload(wep) then
+                CARGO.Inventory.Notice(ply, "Finish the reload before dropping.")
+                return false
+            end
+            ply:DropWeapon(wep, ply:GetShootPos() + ply:GetAimVector() * 48)
+            return true
+        end
+
+        -- carried (or eaten by a respawn race): no entity goes to the world
+        -- by itself — make one, with the magazine stored first (#18)
+        CARGO.Inventory.StoreClip(uid, wep)
+        rec.equip[slotId] = nil
+        if IsValid(wep) then ply:StripWeapon(class) end
+        local spawned
+        if istable(CARGO.Capture) and isfunction(CARGO.Capture.SpawnWorldWeapon)
+            and CARGO.Capture.WorldGunsEnabled() then
+            spawned = CARGO.Capture.SpawnWorldWeapon(class, dropPos, uid)
+        end
+        if spawned == nil then spawnItemEnt({ id = def.id, uid = uid }) end
+        if slotId == "body" then
+            hook.Run("Corpus_Cargo_BodyChanged", ply, nil, nil)
+        end
+        CARGO.Inventory.Touch(ply)
+        return true
+    end
+
+    -- non-weapon gear (helmet / vest / backpack / accessory): the item
+    -- entity, carrying its whole instance
+    rec.equip[slotId] = nil
+    spawnItemEnt({ id = def.id, uid = uid })
+    if slotId == "body" then
+        hook.Run("Corpus_Cargo_BodyChanged", ply, nil, nil)
+    end
+    CARGO.Inventory.Touch(ply)
+    return true
+end
+
 -- ------------------------------------------------------------------
 -- Quick slots (bind + use)
 -- ------------------------------------------------------------------
@@ -1003,6 +1096,11 @@ net.Receive(NET_BELT_MOVE, function(_, ply)
     local fromN = net.ReadUInt(4)
     local toN = net.ReadUInt(4)
     CARGO.Inventory.BeltMove(ply, fromN, toN)
+end)
+
+net.Receive(NET_EQUIP_DROP, function(_, ply)
+    if not IsValid(ply) or not ply:Alive() then return end
+    CARGO.Inventory.DropEquipped(ply, net.ReadString())
 end)
 
 net.Receive(NET_AMMOGROUP, function(_, ply)

@@ -495,6 +495,22 @@ hook.Add("PlayerDroppedWeapon", "corpus_cargo_drop_reconcile", function(ply, wep
     CARGO.Inventory.Touch(ply)
 end)
 
+-- Third-party bug guard (in-game report 2026-07-12, ARC9 EFT revolver
+-- cr200ds): its per-round reload arms one timer.Simple PER ROUND, and each
+-- one reads swep:GetOwner():GetAmmoCount(...) guarding only IsValid(swep),
+-- never the owner (arc9_eft_cr200ds.lua:406). Dropping mid-reload orphans
+-- those timers and every one of them errors. ARC9 is COMPAT-RUNTIME — we
+-- never fork it — so we simply refuse to drop until the reload finishes.
+-- Shared by cargo_drop and the slot Drop (#28). (An external drop mod calling
+-- ply:DropWeapon straight can still hit it; that is between it and ARC9.)
+function CARGO.Capture.DropBlockedByReload(wep)
+    if IsValid(wep) and isfunction(wep.GetReloading) then
+        local okR, reloading = pcall(wep.GetReloading, wep)
+        if okR and reloading then return true end
+    end
+    return false
+end
+
 -- Native "drop the weapon in hand" — bindable exactly like the mod's +drop.
 -- Funnels through ply:DropWeapon so the reconciler above does the bookkeeping
 -- either way; the target position tosses it in front of the player.
@@ -505,20 +521,9 @@ concommand.Add("cargo_drop", function(ply)
     if not IsValid(wep) then return end
     if CARGO.Capture.Ignore[wep:GetClass()] then return end -- hands aren't gear
 
-    -- Third-party bug guard (in-game report 2026-07-12, ARC9 EFT revolver
-    -- cr200ds): its per-round reload arms one timer.Simple PER ROUND, and each
-    -- one reads swep:GetOwner():GetAmmoCount(...) guarding only IsValid(swep),
-    -- never the owner (arc9_eft_cr200ds.lua:406). Dropping mid-reload orphans
-    -- those timers and every one of them errors. ARC9 is COMPAT-RUNTIME — we
-    -- never fork it — so we simply refuse to drop until the reload finishes.
-    -- (An external drop mod calling ply:DropWeapon straight can still hit it;
-    -- that is the mod's and ARC9's business, not ours.)
-    if isfunction(wep.GetReloading) then
-        local okR, reloading = pcall(wep.GetReloading, wep)
-        if okR and reloading then
-            CARGO.Inventory.Notice(ply, "Finish the reload before dropping.")
-            return
-        end
+    if CARGO.Capture.DropBlockedByReload(wep) then
+        CARGO.Inventory.Notice(ply, "Finish the reload before dropping.")
+        return
     end
 
     ply:DropWeapon(wep, ply:GetShootPos() + ply:GetAimVector() * 48)
