@@ -55,6 +55,7 @@ local SERVER_FILES = {
     "server/corpus_cargo_ammopool.lua",   -- the ammo belt IS the reserve pool (§16)
     "server/corpus_cargo_movement.lua",   -- weight -> walk/run speed application
     "server/corpus_cargo_containers.lua", -- world containers + transfer net
+    "server/corpus_cargo_weapon_weights.lua", -- real weights for captured weapons (GAMMA/EFT data)
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)
     "server/corpus_cargo_holster.lua",    -- STALKER weapon order + holster + default hands (#22/#4)
     "server/corpus_cargo_icons.lua",      -- icon cam/footprint override registry (ItemImages §4.3/§10)

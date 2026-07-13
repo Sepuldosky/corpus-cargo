@@ -105,7 +105,9 @@ local function RegisterAutogen(class, name, caliber)
     CARGO.Items.Register({
         id = "wpn_" .. class,
         name = name,
-        weight = 2.5, -- nominal: engine weapons declare no mass
+        -- real weight when the class is catalogued (GAMMA/EFT table, loaded
+        -- by the manifest right before this file); 2.5 kg nominal otherwise
+        weight = (CARGO.Capture.WeaponWeights or {})[class] or 2.5,
         class = "unique",
         category = AUTOGEN_MELEE[class] and "melee" or "weapons",
         weapon_class = class,

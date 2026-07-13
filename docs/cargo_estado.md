@@ -92,6 +92,11 @@ arquitectura y se borran las semillas de `dev/`.)
   5. **Regresión**: lanzar drena el ×N y la última granada quita el SWEP;
      equip/unequip/drop del stack; cinturón/espejo/unload de munición normal
      intactos; velocidad vanilla sin el mod.
+- **Entry 15 (assets ZONA + pesos GAMMA) — checklist en juego:** playermodels
+  "ZONA *" en el menú C; `cargo_dev_give` con íconos STALKER (addon opcional
+  `corpus_zona_assets`, junction desde `dev/`); armas EFT con peso real de la
+  base de datos GAMMA (tabla nueva `corpus_cargo_weapon_weights.lua`, fallback
+  2.5 kg); sin el addon, los dev items degradan a su modelo anterior/letra.
 - **Entry 14 (Bloque D) — checklist en juego:**
   1. **#30**: click del ícono de physgun/toolgun/camera en el spawnmenu →
      entra al grid; repetirlo avisa "You already have one."; el loadout de

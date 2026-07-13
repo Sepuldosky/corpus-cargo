@@ -11,10 +11,21 @@ local CARGO = Corpus.GetModule("cargo")
 -- Demo item kit (both realms: the client grid renders from defs too)
 -- ------------------------------------------------------------------
 
+-- STALKER prop models from the OPTIONAL corpus_zona_assets addon (recycled
+-- ZONA StalkerRP packs — see dev/zona_stalkerrp_contenido.md). The addon is
+-- personal/unpublishable (GSC assets), so nothing here may assume it:
+-- honest fallback to the previous model (or the letter placeholder) when
+-- the file is not mounted. file.Exists is realm-safe for GAME paths.
+local function ZonaModel(path, fallback)
+    if isstring(path) and file.Exists(path, "GAME") then return path end
+    return fallback
+end
+
 CARGO.Items.Register({
     id = "cargo_dev_helmet", name = "Sphere-08 Helmet (dev)",
     weight = 1.9, class = "unique", category = "helmets",
     size = { 3, 3 },
+    model = ZonaModel("models/stalker/outfit/hardhat.mdl"),
     has_condition = true,
     trivia = "Sealed military helmet with a standard front mount. Framework test item.",
 })
@@ -26,6 +37,8 @@ CARGO.Items.Register({
     id = "cargo_dev_nvg", name = "PNV-10T NVG (dev)",
     weight = 0.6, class = "unique", category = "optics",
     size = { 2, 1 },
+    -- stand-in: ZONA has no NVG prop; the dome mask reads as head optics
+    model = ZonaModel("models/stalker/outfit/dome_mask.mdl"),
     has_condition = true, effect_icon = "battery",
     trivia = "Test night vision goggles. Mount them on the helmet's optic sub-slot.",
 })
@@ -34,6 +47,8 @@ local devVest = CARGO.Items.Register({
     id = "cargo_dev_vest", name = "CS-3a Vest (dev)",
     weight = 6.8, class = "unique", category = "armor",
     size = { 3, 4 },
+    -- Clear Sky light suit: the CS-3a's actual STALKER counterpart
+    model = ZonaModel("models/stalker/outfit/cs_light.mdl"),
     condition_zones = { "torso", "stomach", "arms", "legs" },
     quick_slots = 3,
     trivia = "Test tactical vest with per-zone condition. Real mitigation lands with Caliber Block 3.",
@@ -51,6 +66,7 @@ CARGO.Items.Register({
     id = "cargo_dev_backpack", name = "Tri-Zip Backpack (dev)",
     weight = 2.4, class = "unique", category = "backpacks",
     size = { 3, 3 },
+    model = ZonaModel("models/hgn/srp/items/backpack-1.mdl"),
     has_condition = true, capacity_bonus = 18,
     trivia = "Three-zip assault pack, 40 L. Adds +18 kg of carry capacity while equipped on Back.",
 })
@@ -59,6 +75,8 @@ CARGO.Items.Register({
     id = "cargo_dev_plate", name = "Ceramic Plate IV (dev)",
     weight = 1.2, class = "stackable", category = "plates",
     size = { 2, 3 },
+    -- stand-in: flat textolite sheet, the closest plate-shaped ZONA prop
+    model = ZonaModel("models/materials_textolite.mdl"),
     has_condition = true, material = "Ceramic IV",
     trivia = "Test ballistic plate. What a plate does is Caliber's call; Cargo only stores and shows it.",
 })
@@ -67,7 +85,8 @@ CARGO.Items.Register({
     id = "cargo_dev_medkit", name = "Field Medkit (dev)",
     weight = 0.4, class = "stackable", category = "medical",
     size = { 2, 2 },
-    model = "models/items/healthkit.mdl",
+    model = ZonaModel("models/stalker/item/medical/medkit1.mdl",
+        "models/items/healthkit.mdl"),
     effect_icon = "hemostatic",
     trivia = "Test consumable for the onUse flow. Real medicine is Coagulant's domain.",
     -- onUse is the OWNER-module side of the contract (CORPUS_Architecture
@@ -83,7 +102,8 @@ CARGO.Items.Register({
     id = "cargo_dev_food", name = "Canned Food (dev)",
     weight = 0.3, class = "stackable", category = "food",
     size = { 2, 2 },
-    model = "models/props_junk/garbage_takeoutcarton001a.mdl",
+    model = ZonaModel("models/stalker/item/food/tuna.mdl",
+        "models/props_junk/garbage_takeoutcarton001a.mdl"),
     trivia = "Test food. Real hunger is Craving's domain.",
     onUse = function(ply)
         local cargoMod = Corpus.GetModule("cargo")
@@ -106,6 +126,7 @@ CARGO.Items.Register({
     id = "cargo_dev_ammo_9mm", name = "9x19 FMJ (dev)",
     weight = 0.012, class = "stackable", category = "ammo",
     size = { 2, 1 }, max_stack = 120,
+    model = ZonaModel("models/stalker/ammo/9x19.mdl"),
     ammo = { caliber = "9x19", hl2 = "Pistol", types = { "FMJ", "AP", "HP" } },
     trivia = "Test ammunition for caliber overlays and large stacks.",
 })
@@ -145,6 +166,7 @@ CARGO.Items.Register({
     id = "cargo_dev_pda", name = "Datapad (dev)",
     weight = 0.5, class = "unique", category = "accessories",
     size = { 2, 2 },
+    model = ZonaModel("models/stalker/item/handhelds/pda.mdl"),
     trivia = "Minor test accessory for the accessory slots.",
 })
 
@@ -152,6 +174,7 @@ CARGO.Items.Register({
     id = "cargo_dev_detector", name = "Scanner (dev)",
     weight = 0.4, class = "unique", category = "accessories",
     size = { 2, 1 },
+    model = ZonaModel("models/scanner_anomaly.mdl"),
     has_condition = true,
     trivia = "Minor test accessory for the accessory slots.",
 })

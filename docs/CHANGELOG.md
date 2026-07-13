@@ -1416,6 +1416,53 @@ ruta arreglada. Quedan **3 frentes abiertos**, diagnóstico y semilla en
 Los entries 13 y 14 siguen `[PENDIENTE]` hasta que estos tres cierren y el
 autor confirme la pasada limpia.
 
+## 15. Assets ZONA + pesos reales GAMMA para armas capturadas (roadmap #15 parcial) `[PENDIENTE]`
+
+Sesión paralela a los frentes #32-34 (2026-07-13), pedida por el autor: darle
+cuerpo STALKER a los ítems dev y peso real a las armas EFT. Dos piezas, una
+fuera del repo y otra adentro:
+
+1. **Addon opcional `corpus_zona_assets`** (vive en `dev/corpus_zona_assets/`,
+   FUERA de todo repo git — assets de GSC, no publicables; junction en
+   `garrysmod/addons/` como los seis repos). Contenido: los 122 props de ítem
+   de "zona stalker props" (Workshop 315505698) + los 27 playermodels y brazos
+   first-person de "zona stalkerrp content" (300746843), rutas verbatim (los
+   `.mdl` referencian materiales por ruta compilada), y
+   `lua/autorun/corpus_zona_playermodels.lua` — registro adaptado del lua de
+   Cluelesshobo (prefijo "ZONA" en el selector, fix del path de Seva Cadpat y
+   del typo "Heayv"). Créditos y política de retiro en su README.md; inventario
+   fuente en `dev/zona_stalkerrp_contenido.md`.
+2. **Modelos ZONA en el kit dev** (`corpus_cargo_dev.lua`): helper `ZonaModel`
+   (existencia vía `file.Exists` + fallback honesto — sin el addon montado los
+   defs quedan como estaban; contrato #9, detección nunca asunción). Asignados:
+   helmet→`hardhat`, nvg→`dome_mask` (stand-in), vest→`cs_light` (el gemelo
+   Clear Sky del "CS-3a"), backpack→`hgn/srp/backpack-1`,
+   plate→`materials_textolite` (stand-in), medkit→`medical/medkit1`,
+   food→`food/tuna`, ammo 9mm→`ammo/9x19`, pda→`handhelds/pda`,
+   detector→`scanner_anomaly`.
+3. **Pesos reales para autogen (`corpus_cargo_weapon_weights.lua`, nuevo,
+   server)**: tabla `CARGO.Capture.WeaponWeights` clase→kg con las ~100 armas
+   de los packs ARC9 EFT, poblada desde la **base de datos de STALKER GAMMA
+   0.9.5** (stalker-gamma-db.com, campo `st_prop_weight` de los JSON
+   `/data/gamma-0.9.5/<categoría>.json`, bajados 2026-07-13). Las clases que
+   GAMMA no tiene (MCX, Spear, AXMC, granadas M-series…) llevan valor EFT/real
+   aproximado, comentado `EFT approx`. Cuidado pagado: `arc9_eft_vss` mapea a
+   `wpn_vintorez` (el `wpn_vssk` de GAMMA es el VKS Vykhlop). También pesos
+   verosímiles para el arsenal HL2/sandbox (physgun 4.0, toolgun 2.0…).
+   `RegisterAutogen` consulta la tabla y cae a 2.5 kg nominal si la clase no
+   está; el manifest la carga justo antes de `capture.lua`, así el
+   re-registro de defs autogen persistidos re-pesa TODO lo ya capturado en el
+   próximo load. Sin migración: el peso vive en el def, no en los blobs.
+
+**Sin convars ni net nuevos.** Verificación previa: sintaxis 5/5 (luaparser);
+paths de modelo verificados contra el addon (13/13 existen).
+
+**Checklist en juego:** (a) menú C → playermodels "ZONA *" con brazos propios;
+(b) `cargo_dev_give` → helmet/vest/backpack/plate/medkit/food/ammo/pda/detector
+con ícono STALKER renderizado (no letra); (c) spawnear un arma EFT (p. ej.
+AK-74M) → tooltip pesa 3.4 kg y el footer de peso lo refleja; (d) desmontar el
+addon ZONA → los dev items vuelven a su modelo anterior/letra sin errores.
+
 ## 16. Frentes de la 2.ª pasada: taxonomía de granadas, hub ARC9 y compat de movimiento (roadmap #32 · #33 · #34) `[PENDIENTE]`
 
 Séptima tanda, arrancada de la semilla `dev/HANDOFF_cargo_pendientes_pasada2.md`
