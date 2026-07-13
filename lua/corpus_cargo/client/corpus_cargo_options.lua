@@ -45,6 +45,11 @@ local function BuildCargoTab(p)
     p:CheckBox("On-screen pickup feed (what you just picked up)", "cargo_pickup_feed")
     p:CheckBox("Demo bars (health/HL2 armor) on the status panel", "cargo_dev_bars")
 
+    p:CheckBox("Sandbox tool circles (physgun/toolgun/camera) in the inventory and wheel", "cargo_ui_tools")
+    local alignCombo = p:ComboBox("Tool circles alignment", "cargo_ui_tools_align")
+    alignCombo:AddChoice("left")
+    alignCombo:AddChoice("center")
+
     p:Help("Server (replicated convars; changing them needs server rights)")
     p:Help("cargo_capacity_base — base carry capacity in kg (54). cargo_quick_base — quick slots with no suit (2). cargo_arc9_bridge — ARC9 attachment bridge (1). cargo_capture_weapons — engine-given weapons go to the inventory (1).")
 

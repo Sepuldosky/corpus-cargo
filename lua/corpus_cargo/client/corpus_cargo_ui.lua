@@ -38,7 +38,16 @@ local cvKey = CreateClientConVar("cargo_key_inventory", tostring(KEY_I), true, f
 local cvQuickF = CreateClientConVar("cargo_quick_f", "1", true, false,
     "Intercept F1-F4 as Cargo quick slots")
 
+-- sandbox tool circles (§15.2 #21): the hide toggle is back (author call
+-- 2026-07-13 — it had been cut in game) and the alignment is configurable.
+-- The wheel's tool chips (#31) read the same show/hide convar.
+local cvTools = CreateClientConVar("cargo_ui_tools", "1", true, false,
+    "Show the sandbox tool circles (physgun/toolgun/camera) in the equipment column and the wheel")
+local cvToolsAlign = CreateClientConVar("cargo_ui_tools_align", "left", true, false,
+    "Sandbox tool circle alignment in the equipment column: left or center")
+
 local frame, grid, lootGrid, pendingOpen
+local BuildFrame -- forward: the tools hide chip (BuildEquipColumn) relayouts
 
 local function S() return CARGO.ClientState end
 
@@ -587,6 +596,23 @@ local function FindToolItem(class)
     return nil
 end
 
+-- Select or equip a sandbox tool — ONE behavior shared by the column
+-- circles and the wheel's tool chips (#31): equipped -> switch to it (the
+-- equip give already put the SWEP in hands); in the grid -> equip it into
+-- its dedicated slot.
+function CARGO.UI.SelectTool(tool)
+    if SlotEntryOf(tool.slotId) ~= nil then
+        local ply = LocalPlayer()
+        local wep = IsValid(ply) and ply:GetWeapon(tool.class) or nil
+        if IsValid(wep) then input.SelectWeapon(wep) end
+        return
+    end
+    local entry = FindToolItem(tool.class)
+    if entry and entry.uid then
+        SendEquip(CARGO.Grid.RefOf(entry), tool.slotId)
+    end
+end
+
 local function MakeToolCircle(parent, tool)
     local cell = vgui.Create("DButton", parent)
     cell:SetText("")
@@ -624,20 +650,7 @@ local function MakeToolCircle(parent, tool)
         if entry then CARGO.Tooltip.Show(self, entry) end
     end
 
-    cell.DoClick = function()
-        -- equipped: switch to it (the equip give put the SWEP in hands)
-        if SlotEntryOf(tool.slotId) ~= nil then
-            local ply = LocalPlayer()
-            local wep = IsValid(ply) and ply:GetWeapon(tool.class) or nil
-            if IsValid(wep) then input.SelectWeapon(wep) end
-            return
-        end
-        -- in the grid: place it into its own slot
-        local entry = FindToolItem(tool.class)
-        if entry and entry.uid then
-            SendEquip(CARGO.Grid.RefOf(entry), tool.slotId)
-        end
-    end
+    cell.DoClick = function() CARGO.UI.SelectTool(tool) end
 
     cell.DoRightClick = function()
         if SlotEntryOf(tool.slotId) == nil then return end
@@ -757,8 +770,6 @@ local function BuildEquipColumn(parent, s)
             slots = { "accessory1", "head", "accessory2" } },
         { h = math.Round(226 * s), tall = true,
             slots = { "secondary", "body", "primary" } },
-        { h = math.Round(108 * s), tall = false,
-            slots = { "sidearm", "back", "melee" } },
     }
 
     local y = PAD
@@ -771,6 +782,27 @@ local function BuildEquipColumn(parent, s)
         y = y + row.h + g8
     end
 
+    -- bottom row (§15.2 amendment — Clear Sky stacked variant, author pick
+    -- 2026-07-13): three columns stay; the THIRD splits vertically into
+    -- Throwable (small, on top — it reads as the minor slot it is) over
+    -- Melee, the reference's grenade-over-knife pattern. Sidearm and Back
+    -- keep their full width and height.
+    local hRow = math.Round(108 * s)
+    local g4 = math.Round(4 * s)
+    local hThrow = math.Round(42 * s)
+    for i, slotId in ipairs({ "sidearm", "back" }) do
+        local cell = MakeSlotCell(parent, CARGO.Slots.ById[slotId], false)
+        cell:SetPos(xs[i], y)
+        cell:SetSize(ws[i], hRow)
+    end
+    local throwCell = MakeSlotCell(parent, CARGO.Slots.ById.throwable, false)
+    throwCell:SetPos(xs[3], y)
+    throwCell:SetSize(ws[3], hThrow)
+    local meleeCell = MakeSlotCell(parent, CARGO.Slots.ById.melee, false)
+    meleeCell:SetPos(xs[3], y + hThrow + g4)
+    meleeCell:SetSize(ws[3], hRow - hThrow - g4)
+    y = y + hRow + g8
+
     -- quick slots F1-F4
     local wq = math.Round((innerW - g8 * 3) / 4)
     local hq = math.Round(64 * s)
@@ -781,18 +813,41 @@ local function BuildEquipColumn(parent, s)
     end
     y = y + hq + math.Round(10 * s)
 
-    -- sandbox tool circles (#21): the three dedicated tool slots, centered.
-    -- No hide toggle — hiding them is an admin concern for the future admin
-    -- sub-block (author call, first fullscreen pass).
+    -- sandbox tool circles (#21): hide toggle RESTORED (author call
+    -- 2026-07-13) + configurable alignment (cargo_ui_tools_align). Hidden,
+    -- the row collapses to the chip and the status panel takes the space.
     local ct = math.Round(50 * s)
-    local rowW = #CARGO.Slots.Tools * ct + (#CARGO.Slots.Tools - 1) * g8
-    local tx = PAD + math.floor((innerW - rowW) / 2)
-    for i, tool in ipairs(CARGO.Slots.Tools) do
-        local c = MakeToolCircle(parent, tool)
-        c:SetPos(tx + (i - 1) * (ct + g8), y)
-        c:SetSize(ct, ct)
+    local shown = cvTools:GetBool()
+    local rowH = shown and ct or math.Round(22 * s)
+    if shown then
+        local rowW = #CARGO.Slots.Tools * ct + (#CARGO.Slots.Tools - 1) * g8
+        local tx = cvToolsAlign:GetString() == "center"
+            and PAD + math.floor((innerW - rowW) / 2) or PAD
+        for i, tool in ipairs(CARGO.Slots.Tools) do
+            local c = MakeToolCircle(parent, tool)
+            c:SetPos(tx + (i - 1) * (ct + g8), y)
+            c:SetSize(ct, ct)
+        end
     end
-    y = y + ct + math.Round(10 * s)
+
+    -- hide/show chip, right edge with clear separation from the circles
+    local chipW, chipH = math.Round(42 * s), math.Round(20 * s)
+    local chip = vgui.Create("DButton", parent)
+    chip:SetText("")
+    chip:SetPos(PAD + innerW - chipW, y + math.floor((rowH - chipH) / 2))
+    chip:SetSize(chipW, chipH)
+    chip.Paint = function(self, w, h)
+        surface.SetDrawColor(self:IsHovered() and T.Colors.borderHi or T.Colors.border)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+        draw.SimpleText(shown and "hide" or "show", "CargoTiny", w / 2, h / 2,
+            self:IsHovered() and T.Colors.text or T.Colors.textDim,
+            TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+    chip.DoClick = function()
+        cvTools:SetBool(not shown)
+        BuildFrame(frame.cargoState) -- relayout: the row height changed
+    end
+    y = y + rowH + math.Round(10 * s)
 
     -- ammo belt: caption row + 6 stack slots (mock .beltwrap; the right
     -- caption died in the first pass — the belt explains itself)
@@ -813,10 +868,12 @@ local function BuildEquipColumn(parent, s)
     end
     y = y + hb + math.Round(10 * s)
 
+    -- status panel (§11): stretches to the BOTTOM of the column (author
+    -- call 2026-07-13) — modules will keep registering bars and the free
+    -- space is this panel's to grow into, not dead margin
     local status = CARGO.StatusPanel.Build(parent)
-    status:Dock(BOTTOM)
-    status:DockMargin(PAD, 0, PAD, PAD)
-    status:SetTall(math.Round(150 * s))
+    status:SetPos(PAD, y)
+    status:SetSize(innerW, math.max(parent:GetTall() - y - PAD, math.Round(60 * s)))
 
     return y, PAD, g8, innerW
 end
@@ -824,7 +881,8 @@ end
 -- state: "solo" (left column absent — world behind the scrim), "loot"
 -- (container in the left column, patch pending) or "trade" (reserved for
 -- the Cargo_Trade block). Center and right are identical in every state.
-local function BuildFrame(state)
+-- (local, forward-declared at the top of the file)
+function BuildFrame(state)
     if IsValid(frame) then frame:Remove() end
     state = state or "solo"
 
