@@ -7,7 +7,9 @@
 --                          returned sub-slot items; stacks merge ONLY on
 --                          equal condition (prevents wear laundering)
 --            unique entry: { id, uid } — blob lives in CARGO.Instances
---   equip  : { [slotId] = uid }
+--   equip  : { [slotId] = uid } — except STACK slots (throwable, §4
+--            amendment): their value is a stack entry table { id, count,
+--            condition? }. Every consumer of rec.equip branches on istable().
 --   quick  : { [1..4] = itemId } (bindings; JSON round-trip re-normalized)
 --   belt   : { [1..6] = stack entry } — ammo belt (§16). These stacks ARE the
 --            player's engine ammo reserve, mirrored per HL2 ammo type by
@@ -118,8 +120,9 @@ function CARGO.Inventory.TotalWeight(ply)
     for _, entry in ipairs(rec.items) do
         total = total + EntryWeight(entry)
     end
-    for _, uid in pairs(rec.equip) do
-        total = total + CARGO.Instances.WeightOf(uid)
+    for _, val in pairs(rec.equip) do
+        -- stack slot (throwable): the entry weighs like any grid stack
+        total = total + (istable(val) and EntryWeight(val) or CARGO.Instances.WeightOf(val))
     end
     -- belt stacks left the grid but not the player (§15.2: carry cost is
     -- weight, wherever the stack lives)
@@ -271,11 +274,14 @@ end
 
 -- Public contract: instance blob equipped in a slot (Cortex reads Body to
 -- resolve the apparent faction / disguise — Cargo_Architecture.md §6).
+-- Stack slots (throwable) have no instance: the stack entry itself comes
+-- back — it carries .id like a blob does, which is what consumers key on.
 function CARGO.Inventory.GetEquipped(ply, slotId)
     local rec = CARGO.Inventory.GetRecord(ply)
-    local uid = rec.equip[slotId]
-    if uid == nil then return nil end
-    return CARGO.Instances.Get(uid), uid
+    local val = rec.equip[slotId]
+    if val == nil then return nil end
+    if istable(val) then return val end
+    return CARGO.Instances.Get(val), val
 end
 
 -- ------------------------------------------------------------------
@@ -336,9 +342,15 @@ function CARGO.Inventory.BuildSnapshot(ply)
     for _, entry in ipairs(rec.items) do
         snap.items[#snap.items + 1] = EntrySnapshot(entry)
     end
-    for slotId, uid in pairs(rec.equip) do
-        local blob = CARGO.Instances.Get(uid)
-        if blob then snap.equip[slotId] = { id = blob.id, uid = uid, blob = blob } end
+    for slotId, val in pairs(rec.equip) do
+        if istable(val) then
+            -- stack slot (throwable): count rides for the ×N badge; no blob
+            snap.equip[slotId] = { id = val.id, count = val.count or 1,
+                condition = val.condition }
+        else
+            local blob = CARGO.Instances.Get(val)
+            if blob then snap.equip[slotId] = { id = blob.id, uid = val, blob = blob } end
+        end
     end
 
     -- defs auto-generated server-side (captured engine weapons) don't exist
@@ -479,12 +491,16 @@ end
 -- Equip / unequip
 -- ------------------------------------------------------------------
 
-local function GiveEquipWeapon(ply, def, blob)
+-- noAmmo: stack-slot (throwable) gives suppress the engine's default clip.
+-- Pool-fed SWEPs like weapon_frag put that free clip straight into the ammo
+-- POOL, and the §16 mirror would launder it onto the belt — ether. The stack
+-- itself is the reserve; the AmmoPool.Push after the equip loads it.
+local function GiveEquipWeapon(ply, def, blob, noAmmo)
     if isstring(def.weapon_class) and def.weapon_class ~= "" then
         -- flag lets the capture hook (corpus_cargo_capture.lua) tell OUR
         -- equip-give apart from engine/loadout gives it must intercept
         ply.CargoEquipGive = true
-        ply:Give(def.weapon_class)
+        ply:Give(def.weapon_class, noAmmo == true)
         ply.CargoEquipGive = nil
         -- the stored magazine beats the SWEP's DefaultClip (#18)
         CARGO.Inventory.RestoreClip(ply, def.weapon_class, blob)
@@ -506,6 +522,19 @@ function CARGO.Inventory.Unequip(ply, slotId)
     local uid = rec.equip[slotId]
     if uid == nil then return false end
 
+    -- stack slot (throwable): the stack returns to the grid, the SWEP goes
+    -- with it, and the reserve it mirrored leaves the pool (Push below)
+    if istable(uid) then
+        local entry = uid
+        rec.equip[slotId] = nil
+        local def = CARGO.Items.Get(entry.id)
+        if def then StripEquipWeapon(ply, def, nil) end
+        AddStack(rec, entry.id, entry.count or 1, entry.condition)
+        CARGO.Inventory.Touch(ply)
+        if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
+        return true
+    end
+
     local blob = CARGO.Instances.Get(uid)
     rec.equip[slotId] = nil
     rec.items[#rec.items + 1] = { id = blob and blob.id or "?", uid = uid }
@@ -526,7 +555,41 @@ end
 function CARGO.Inventory.Equip(ply, ref, slotId)
     local rec = CARGO.Inventory.GetRecord(ply)
     local idx, entry = FindEntry(rec, ref)
-    if entry == nil or entry.uid == nil then
+    if entry == nil then
+        CARGO.Inventory.Notice(ply, "That item is not in your inventory.")
+        return false
+    end
+
+    -- stack slot (throwable, §4 amendment): the WHOLE stack occupies the
+    -- slot — grid stacks already respect max_stack, so nothing re-splits
+    local slot = CARGO.Slots.ById[slotId]
+    if istable(slot) and slot.stack then
+        if entry.uid ~= nil then
+            CARGO.Inventory.Notice(ply, "That item does not fit that slot.")
+            return false
+        end
+        local def = CARGO.Items.Get(entry.id)
+        if def == nil or not CARGO.Slots.CanEquip(def, slotId) then
+            CARGO.Inventory.Notice(ply, "That item does not fit that slot.")
+            return false
+        end
+
+        -- previous occupant returns to the grid first (may merge into the
+        -- incoming stack under max_stack — refind after)
+        if rec.equip[slotId] ~= nil then CARGO.Inventory.Unequip(ply, slotId) end
+        local idx2, e2 = FindEntry(rec, ref)
+        if e2 == nil then return false end
+        table.remove(rec.items, idx2)
+        rec.equip[slotId] = { id = e2.id, count = e2.count or 1, condition = e2.condition }
+
+        -- noAmmo: the stack IS the reserve; the Push loads the pool from it
+        GiveEquipWeapon(ply, def, nil, true)
+        CARGO.Inventory.Touch(ply)
+        if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
+        return true
+    end
+
+    if entry.uid == nil then
         CARGO.Inventory.Notice(ply, "That item is not in your inventory.")
         return false
     end
@@ -987,13 +1050,15 @@ function CARGO.Inventory.WipeOnDeath(ply)
         CARGO.Instances.Delete(uid)
     end
 
-    for _, uid in pairs(rec.equip) do
-        local blob = CARGO.Instances.Get(uid)
-        local def = blob and CARGO.Items.Get(blob.id) or nil
+    for _, val in pairs(rec.equip) do
+        -- stack slot (throwable): no instance to purge, just take the SWEP
+        local id = istable(val) and val.id
+            or (CARGO.Instances.Get(val) or {}).id
+        local def = id and CARGO.Items.Get(id) or nil
         if def and isstring(def.weapon_class) and def.weapon_class ~= "" then
             ply:StripWeapon(def.weapon_class)
         end
-        purgeInstance(uid)
+        if isstring(val) then purgeInstance(val) end
     end
     for _, entry in ipairs(rec.items) do
         if entry.uid then purgeInstance(entry.uid) end
@@ -1030,10 +1095,17 @@ end)
 -- on PlayerDeath, so rec.equip is empty here and re-gives nothing).
 hook.Add("PlayerLoadout", "corpus_cargo_inv_loadout", function(ply)
     local rec = CARGO.Inventory.GetRecord(ply)
-    for _, uid in pairs(rec.equip) do
-        local blob = CARGO.Instances.Get(uid)
-        local def = blob and CARGO.Items.Get(blob.id) or nil
-        if def then GiveEquipWeapon(ply, def, blob) end
+    for _, val in pairs(rec.equip) do
+        if istable(val) then
+            -- stack slot: no blob, no default clip (its ammo is the stack —
+            -- the ammopool spawn Push reloads the pool from it)
+            local def = CARGO.Items.Get(val.id)
+            if def then GiveEquipWeapon(ply, def, nil, true) end
+        else
+            local blob = CARGO.Instances.Get(val)
+            local def = blob and CARGO.Items.Get(blob.id) or nil
+            if def then GiveEquipWeapon(ply, def, blob) end
+        end
     end
 
     -- Deferred reconcile (CHANGELOG #6): on spawn the gamemode loadout and
@@ -1046,12 +1118,12 @@ hook.Add("PlayerLoadout", "corpus_cargo_inv_loadout", function(ply)
     timer.Simple(0.1, function()
         if not IsValid(ply) then return end
         local rec2 = CARGO.Inventory.GetRecord(ply)
-        for _, uid in pairs(rec2.equip) do
-            local blob = CARGO.Instances.Get(uid)
+        for _, val in pairs(rec2.equip) do
+            local blob = istable(val) and val or CARGO.Instances.Get(val)
             local def = blob and CARGO.Items.Get(blob.id) or nil
             if def and isstring(def.weapon_class) and def.weapon_class ~= ""
                 and not ply:HasWeapon(def.weapon_class) then
-                GiveEquipWeapon(ply, def, blob)
+                GiveEquipWeapon(ply, def, istable(val) and nil or blob, istable(val))
             end
         end
     end)

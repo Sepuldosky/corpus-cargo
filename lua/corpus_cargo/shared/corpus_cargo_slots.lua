@@ -17,6 +17,13 @@ CARGO.Slots.List = {
     { id = "secondary", label = "Secondary", filter = "category:weapons" },
     { id = "sidearm",   label = "Sidearm",   filter = "category:weapons" },
     { id = "melee",      label = "Melee",       filter = "category:melee" },
+    -- throwable slot (§4 amendment, wheel design 2026-07-13): the ONE slot
+    -- that holds a STACK instead of an instance — grenades are stackables
+    -- with no wear, and the ×N count is the point. rec.equip.throwable is a
+    -- stack entry table, not a uid; every rec.equip consumer branches on
+    -- istable(). New slot, not a rename → no legacy remap.
+    { id = "throwable",  label = "Throwable",   filter = "category:throwables",
+        stack = true },
     -- generic accessory slots: PDA/Detector are STALKER furniture, Corpus is
     -- setting-agnostic (author call, first in-game pass 2026-07-10)
     { id = "accessory1", label = "Accessory 1", filter = "category:accessories" },
@@ -55,6 +62,15 @@ CARGO.Slots.Hotkeys = {
     [7] = "tool_camera",
 }
 
+-- Wheel-only intents (roadmap #31): slot numbers the radial menu sends over
+-- the same slotkey net message, for slots with NO number key of their own.
+-- The client hotkeys file never intercepts these (slot8 stays stock GMod);
+-- only the wheel commit emits them. Giving throwable a real key later means
+-- moving it into Hotkeys — extension, not redesign.
+CARGO.Slots.WheelSlots = {
+    [8] = "throwable",
+}
+
 CARGO.Slots.ById = {}
 for _, slot in ipairs(CARGO.Slots.List) do
     CARGO.Slots.ById[slot.id] = slot
@@ -83,12 +99,18 @@ function CARGO.Slots.QuickUnlocked(bodyDef)
 end
 
 -- Equip validation: slot filter + optional def.equip_slots narrowing.
--- Only unique items equip (a stack cannot occupy a slot); plates and other
--- stackables mount through sub-slots instead.
+-- Unique items equip everywhere except the stack slots (throwable), which
+-- take exactly the opposite: a whole stackable stack occupies the slot and
+-- the count renders as the ×N badge. Plates and other stackables still
+-- mount through sub-slots, never through regular slots.
 function CARGO.Slots.CanEquip(def, slotId)
     local slot = CARGO.Slots.ById[slotId]
     if slot == nil or not istable(def) then return false end
-    if def.class ~= "unique" then return false end
+    if slot.stack then
+        if def.class ~= "stackable" then return false end
+    elseif def.class ~= "unique" then
+        return false
+    end
     if not CARGO.Items.MatchesFilter(def, slot.filter) then return false end
 
     -- class-restricted slots (sandbox tool circles): exact SWEP class only

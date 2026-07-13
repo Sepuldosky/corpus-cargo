@@ -92,6 +92,21 @@ CARGO.Items.Register({
     end,
 })
 
+-- Throwable slot test item (§4 amendment, wheel block 2026-07-13). Category
+-- "throwables" is what the slot filter accepts; weapon_class is given/taken
+-- on equip/unequip like any weapon slot. The ammo.hl2 field is what makes the
+-- ×N badge REAL: the equipped stack joins the §16 pool mirror (it IS reserve,
+-- like a belt stack), so throwing a grenade drains the slot count itself.
+CARGO.Items.Register({
+    id = "cargo_dev_frag", name = "Frag Grenade (dev)",
+    weight = 0.4, class = "stackable", category = "throwables",
+    size = { 1, 2 }, max_stack = 4,
+    model = "models/weapons/w_grenade.mdl",
+    weapon_class = "weapon_frag",
+    ammo = { caliber = "Frag", hl2 = "Grenade" },
+    trivia = "Test grenade for the throwable slot. Equip the stack; the count is your reserve.",
+})
+
 -- Feeds the SAME engine pool as the real "Pistol Rounds" item (§16): a second
 -- item on one HL2 type is exactly the case the author raised (two weapons of
 -- "different" calibers that both eat HL2 pistol ammo), so keeping this dev
@@ -165,6 +180,7 @@ if SERVER then
         { "cargo_dev_ammo_9mm", 60 }, { "cargo_dev_smg" },
         { "cargo_dev_pistol" }, { "cargo_dev_melee" },
         { "cargo_dev_pda" }, { "cargo_dev_detector" },
+        { "cargo_dev_frag", 3 },
         -- real HL2 ammo (§16): enough to hang stacks on the belt and watch the
         -- reserve follow. cargo_ammo_pistol shares its pool with the dev 9mm.
         { "cargo_ammo_pistol", 120 }, { "cargo_ammo_smg1", 120 },
@@ -292,6 +308,17 @@ function CARGO._SelfTest()
     }, "tool_physgun"))
     check("la physgun sigue equipable en slots de arma",
         CARGO.Slots.CanEquip(pgDef, "secondary"))
+
+    -- throwable stack slot (§4 amendment, wheel block 2026-07-13): the ONE
+    -- slot that takes stackables — and only its own category
+    local frag = CARGO.Items.Get("cargo_dev_frag")
+    check("frag dev entra en throwable", CARGO.Slots.CanEquip(frag, "throwable"))
+    check("throwable rechaza uniques", not CARGO.Slots.CanEquip(pistol, "throwable"))
+    check("throwable rechaza stacks de otra categoría",
+        not CARGO.Slots.CanEquip(plate, "throwable"))
+    check("frag no entra en slots de arma", not CARGO.Slots.CanEquip(frag, "primary"))
+    check("intent 8 del wheel mapea a throwable",
+        CARGO.Slots.WheelSlots[8] == "throwable" and CARGO.Slots.ById.throwable ~= nil)
 
     -- STALKER weapon order (roadmap #22): keys 1-7, each naming a real slot
     local hkCount, hkOk = 0, true

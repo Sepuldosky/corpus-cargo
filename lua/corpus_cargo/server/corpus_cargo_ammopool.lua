@@ -67,6 +67,16 @@ local function BeltTotals(rec)
             totals[hl2] = (totals[hl2] or 0) + (entry.count or 1)
         end
     end
+    -- the equipped throwable stack IS reserve too (§4 amendment, wheel block):
+    -- its def carries ammo.hl2 exactly like a belt item, so the ×N badge on
+    -- the slot is the real count the engine will let the player throw
+    local eq = istable(rec.equip) and rec.equip.throwable or nil
+    if istable(eq) then
+        local hl2 = CARGO.Ammo.TypeOfDef(CARGO.Items.Get(eq.id))
+        if hl2 ~= nil then
+            totals[hl2] = (totals[hl2] or 0) + (eq.count or 1)
+        end
+    end
     return totals
 end
 
@@ -90,6 +100,29 @@ function CARGO.AmmoPool.Clear(ply)
     for _, hl2 in ipairs(CARGO.Ammo.TYPES) do
         ply:SetAmmo(0, hl2)
     end
+end
+
+-- The equipped throwable stack drains FIRST for its type: the grenade the
+-- player just threw is the one in his hand, not one hanging on the belt.
+-- Emptying the stack empties the slot and takes the SWEP with it — a thrown
+-- last grenade leaves no launcher shell behind. Returns what is still owed.
+local function DrainThrowable(ply, rec, hl2, amount)
+    if amount <= 0 then return amount end
+    local eq = istable(rec.equip) and rec.equip.throwable or nil
+    if not istable(eq) then return amount end
+    local def = CARGO.Items.Get(eq.id)
+    if CARGO.Ammo.TypeOfDef(def) ~= hl2 then return amount end
+
+    local take = math.min(eq.count or 1, amount)
+    eq.count = (eq.count or 1) - take
+    if eq.count <= 0 then
+        rec.equip.throwable = nil
+        if istable(def) and isstring(def.weapon_class) and def.weapon_class ~= ""
+            and IsValid(ply) then
+            ply:StripWeapon(def.weapon_class)
+        end
+    end
+    return amount - take
 end
 
 -- Drain order is belt slot order (1..6): predictable, and it is the order the
@@ -163,8 +196,9 @@ function CARGO.AmmoPool.Reconcile(ply)
         local belt = totals[hl2] or 0
 
         if pool < belt then
-            -- spent: loaded into a magazine, thrown, or fired straight from reserve
-            DrainType(rec, hl2, belt - pool)
+            -- spent: loaded into a magazine, thrown, or fired straight from
+            -- reserve. The equipped throwable stack pays first (see above).
+            DrainType(rec, hl2, DrainThrowable(ply, rec, hl2, belt - pool))
             dirty = true
 
         elseif pool > belt then

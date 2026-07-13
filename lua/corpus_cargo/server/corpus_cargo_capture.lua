@@ -191,6 +191,19 @@ end
 
 hook.Add("PlayerInitialSpawn", "corpus_cargo_capture_heal", HealOrphanDefs)
 
+-- def behind an equip value: uid string (instance) or stack entry table
+-- (throwable slot, §4 amendment) — both carry an item id to resolve
+local function EquippedDefOf(val)
+    local id
+    if isstring(val) then
+        local blob = CARGO.Instances.Get(val)
+        id = blob and blob.id or nil
+    elseif istable(val) then
+        id = val.id
+    end
+    return id and CARGO.Items.Get(id) or nil
+end
+
 -- dedup: one item per weapon class per player, counting grid AND equipped
 local function HasWeaponItem(ply, class)
     local rec = CARGO.Inventory.GetRecord(ply)
@@ -202,20 +215,21 @@ local function HasWeaponItem(ply, class)
     for _, entry in ipairs(rec.items) do
         if entry.uid and matches(entry.uid) then return true end
     end
-    for _, uid in pairs(rec.equip) do
-        if matches(uid) then return true end
+    for _, val in pairs(rec.equip) do
+        local def = EquippedDefOf(val)
+        if def ~= nil and def.weapon_class == class then return true end
     end
     return false
 end
 
 -- instances of `class` sitting in equip slots (the grid does not count:
--- only an EQUIPPED class claims the engine weapon as its own)
+-- only an EQUIPPED class claims the engine weapon as its own). The equipped
+-- throwable stack counts too: its give must land as "keep", never re-capture.
 local function EquippedClassCount(ply, class)
     local rec = CARGO.Inventory.GetRecord(ply)
     local n = 0
-    for _, uid in pairs(rec.equip) do
-        local blob = CARGO.Instances.Get(uid)
-        local def = blob and CARGO.Items.Get(blob.id) or nil
+    for _, val in pairs(rec.equip) do
+        local def = EquippedDefOf(val)
         if def ~= nil and def.weapon_class == class then n = n + 1 end
     end
     return n

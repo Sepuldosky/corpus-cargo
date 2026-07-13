@@ -47,6 +47,7 @@ CARGO.Items.RegisterCategory("armor",       "Armor",       71)
 CARGO.Items.RegisterCategory("backpacks",   "Backpacks",   72)
 CARGO.Items.RegisterCategory("melee",       "Melee",       73)
 CARGO.Items.RegisterCategory("accessories", "Accessories", 74)
+CARGO.Items.RegisterCategory("throwables",  "Throwables",  75)
 CARGO.Items.RegisterCategory("misc",        "Misc",        90)
 
 function CARGO.Items.GetCategories()

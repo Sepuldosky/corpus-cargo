@@ -120,8 +120,9 @@ local function OpenItemMenu(entry)
     local ref = CARGO.Grid.RefOf(entry)
     local menu = DermaMenu()
 
-    -- equip targets
-    if def.class == "unique" and entry.uid then
+    -- equip targets: uniques into regular slots, stackables into stack
+    -- slots (throwable) — CanEquip arbitrates both sides
+    if (def.class == "unique" and entry.uid) or def.class == "stackable" then
         local targets = {}
         for _, slot in ipairs(CARGO.Slots.List) do
             if CARGO.Slots.CanEquip(def, slot.id) then targets[#targets + 1] = slot end
@@ -308,6 +309,13 @@ local function MakeSlotCell(parent, slot, tall)
                 T.Colors.amber, TEXT_ALIGN_RIGHT)
         end
 
+        -- stack slots (throwable): the count IS the display — ×N badge,
+        -- same corner (a stack has no blob, so the badges never collide)
+        if entry.uid == nil and entry.count ~= nil then
+            draw.SimpleText("×" .. entry.count, "CargoTiny", w - 6, 4,
+                T.Colors.text, TEXT_ALIGN_RIGHT)
+        end
+
         local cond = T.ConditionOf(entry)
 
         -- bottom-up: segmented condition bar, name row, then the icon gets
@@ -378,7 +386,10 @@ local function MakeSlotCell(parent, slot, tall)
             end
         end
 
-        if entry.uid then SendEquip(CARGO.Grid.RefOf(entry), slot.id) end
+        -- stack slots (throwable) take whole stacks; the rest need a uid
+        if entry.uid or slot.stack then
+            SendEquip(CARGO.Grid.RefOf(entry), slot.id)
+        end
     end)
 
     -- dragging the slot itself back to the grid unequips (see grid receiver)
