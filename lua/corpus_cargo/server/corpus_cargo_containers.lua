@@ -50,6 +50,15 @@ function CARGO.Containers.Attach(ent, opts)
     if isstring(cont.persistKey) then
         local saved = Corpus.Data.Load("cargo", "cont_" .. cont.persistKey)
         if istable(saved) and istable(saved.items) then cont.items = saved.items end
+        -- legacy grenade faces -> canonical throwable (roadmap #32), same
+        -- remap the inventory loader applies — a persisted crate can carry
+        -- Bloque B stacks too, and an unknown id renders as a blank cell
+        local legacy = CARGO.Ammo and CARGO.Ammo.LegacyThrowIds or {}
+        for _, entry in ipairs(cont.items) do
+            if entry.uid == nil and legacy[entry.id or ""] then
+                entry.id = legacy[entry.id]
+            end
+        end
     end
 
     ent.CargoContainer = cont

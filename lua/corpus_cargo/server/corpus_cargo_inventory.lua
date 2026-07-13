@@ -92,6 +92,46 @@ function CARGO.Inventory.GetRecord(ply)
             rec.equip.accessory2 = rec.equip.detector
         end
         rec.equip.pda, rec.equip.detector = nil, nil
+
+        -- Legacy grenade faces -> canonical throwable (roadmap #32): Bloque B
+        -- persisted frags/SLAMs as belt ammunition and entry 13 as a dev item;
+        -- both ids died with the taxonomy. Stacks remap in place; a belt stack
+        -- MOVES to the grid (a throwable can no longer hang on the belt); a
+        -- pre-#32 autogen unique collapses to a 1-count stack and its blob dies.
+        local legacy = CARGO.Ammo and CARGO.Ammo.LegacyThrowIds or {}
+        for i = #rec.items, 1, -1 do
+            local e = rec.items[i]
+            local newId = legacy[e.id or ""]
+            if newId ~= nil then
+                if e.uid ~= nil then
+                    CARGO.Instances.Delete(e.uid)
+                    rec.items[i] = { id = newId, count = 1 }
+                else
+                    e.id = newId
+                end
+            end
+        end
+        for slotId, val in pairs(rec.equip) do
+            if istable(val) and legacy[val.id or ""] then
+                val.id = legacy[val.id]
+            elseif isstring(val) then
+                local blob = CARGO.Instances.Get(val)
+                local newId = istable(blob) and legacy[blob.id or ""] or nil
+                if newId ~= nil then
+                    rec.equip[slotId] = nil
+                    rec.items[#rec.items + 1] = { id = newId, count = 1 }
+                    CARGO.Instances.Delete(val)
+                end
+            end
+        end
+        for n, entry in pairs(rec.belt) do
+            local newId = legacy[entry.id or ""]
+            if newId ~= nil then
+                entry.id = newId
+                rec.items[#rec.items + 1] = entry
+                rec.belt[n] = nil
+            end
+        end
     end
 
     CARGO.Inventory._records[sid] = rec

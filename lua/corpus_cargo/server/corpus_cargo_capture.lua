@@ -123,16 +123,30 @@ end
 -- weapon_class }, re-registered at boot, saved on every new registration.
 local autogenDefs = Corpus.Data.Load("cargo", "autogen_defs") or {}
 
+-- throwable-faced classes (roadmap #32): frag/SLAM never autogen — their
+-- Cargo face is the canonical throwable stack (corpus_cargo_ammo.lua)
+local function ThrowableFace(class)
+    return CARGO.Ammo and istable(CARGO.Ammo.ThrowableClass)
+        and CARGO.Ammo.ThrowableClass[class] or nil
+end
+
+local autogenDirty = false
 for id, meta in pairs(autogenDefs) do
     -- engine names are localization tokens ("#HL2_Pistol") stored raw — the
     -- client resolves them when the def snapshot arrives, same as first time
-    if istable(meta) and isstring(meta.weapon_class) and meta.weapon_class ~= ""
+    if istable(meta) and ThrowableFace(meta.weapon_class or "") ~= nil then
+        -- dead face (roadmap #32): a pre-#32 capture minted wpn_weapon_frag;
+        -- re-registering it would resurrect the item-vs-stack conflict
+        autogenDefs[id] = nil
+        autogenDirty = true
+    elseif istable(meta) and isstring(meta.weapon_class) and meta.weapon_class ~= ""
         and CARGO.Items.Get(id) == nil then
         local name = isstring(meta.name) and meta.name ~= "" and meta.name
             or meta.weapon_class
         RegisterAutogen(meta.weapon_class, name)
     end
 end
+if autogenDirty then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs) end
 
 local function EnsureDef(class, wep)
     local id = "wpn_" .. class
@@ -177,7 +191,7 @@ local function HealOrphanDefs(ply)
         local blob = CARGO.Instances.Get(uid)
         if blob == nil or CARGO.Items.Get(blob.id or "") ~= nil then return end
         local class = string.match(blob.id or "", "^wpn_(.+)$")
-        if class == nil then return end
+        if class == nil or ThrowableFace(class) ~= nil then return end
         RegisterAutogen(class, class)
         autogenDefs[blob.id] = { name = class, weapon_class = class }
         healed = true
@@ -303,18 +317,27 @@ hook.Add("PlayerCanPickupWeapon", "corpus_cargo_world_gate", function(ply, wep)
     return false
 end)
 
--- Look at a world weapon — or a dropped Cargo item — and press USE
--- (PlayerUse repeats every tick while +USE is held: debounced per player).
--- Plain USE = HL2 carry; WALK+USE = deliberate take. For weapons that is a
--- one-shot grant + engine pickup (the capture hook converts it); for items
--- the hook steps aside and lets the engine reach ENT:Use, which the
--- `return false` otherwise blocks (roadmap #27 — the item entity used to
--- dodge this gate entirely, so plain USE hoovered dropped ammo).
+-- Look at a world weapon — or a dropped Cargo item, or a world ammo box —
+-- and press USE (PlayerUse repeats every tick while +USE is held: debounced
+-- per player). Plain USE = HL2 carry; WALK+USE = deliberate take. For
+-- weapons that is a one-shot grant + engine pickup (the capture hook
+-- converts it); for items the hook steps aside and lets the engine reach
+-- ENT:Use, which the `return false` otherwise blocks (roadmap #27 — the
+-- item entity used to dodge this gate entirely, so plain USE hoovered
+-- dropped ammo); for item_ammo_* boxes (roadmap #32) the give happens right
+-- here — their engine pickup is permanently vetoed by the ammopool hook, so
+-- there is no ENT:Use or engine grant to delegate to. ONE gate for the
+-- three shapes: same debounce, same carry, same WALK semantics.
 hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
     if not IsValid(ent) then return end
 
     local isItem = ent:GetClass() == "corpus_cargo_item"
+    local ammoSpec
     if not isItem then
+        ammoSpec = CARGO.AmmoPool and CARGO.AmmoPool.WorldAmmoSpec
+            and CARGO.AmmoPool.WorldAmmoSpec(ent:GetClass()) or nil
+    end
+    if not isItem and ammoSpec == nil then
         if not cvWorldGuns:GetBool() then return end
         if not ent:IsWeapon() then return end
         if IsValid(ent:GetOwner()) then return end   -- someone is holding it
@@ -338,6 +361,20 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
 
     if ply:KeyDown(IN_WALK) then
         if isItem then return end -- deliberate take: ENT:Use collects it
+        if ammoSpec ~= nil then
+            -- ammo box: the give is ours (no engine grant exists to convert).
+            -- The flag guards the frames until the delayed remove lands.
+            if ent.CargoAmmoTaken then return false end
+            if CARGO.Inventory.GiveItem(ply, ammoSpec.id, ammoSpec.count) then
+                ent.CargoAmmoTaken = true
+                CARGO.Inventory.NotifyPickup(ply, ammoSpec.id, ammoSpec.count)
+                SafeRemoveEntityDelayed(ent, 0)
+            else
+                -- too heavy: it stays on the floor, where he can come back for it
+                CARGO.Inventory.Notice(ply, "You can't carry that.")
+            end
+            return false
+        end
         ent.CargoUseTaken = true -- grant for the gate + "deliberate" marker
         if not ply:PickupWeapon(ent) then
             ent.CargoUseTaken = nil
@@ -378,8 +415,12 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
 
     local class = wep:GetClass()
     if CARGO.Capture.Ignore[class] then return end
+    -- throwable-faced class (roadmap #32): the frag/SLAM SWEP is never an
+    -- item of its own — no def is minted here (resurrecting the second face
+    -- is exactly the bug of this front). Its handling lives in the timer.
+    local throwFace = ThrowableFace(class)
     -- def cached while the entity is alive; the strip below invalidates it
-    local id = EnsureDef(class, wep)
+    local id = throwFace == nil and EnsureDef(class, wep) or nil
 
     -- world-drop context, read NOW: by the time the timer runs the entity
     -- is the held weapon (or gone) and these fields are the only trace
@@ -396,6 +437,18 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
         end
         if not IsValid(owner) or not owner:IsPlayer() then return end
         if owner.CargoEquipGive then return end
+
+        -- throwable-faced class (roadmap #32): an equipped stack claims the
+        -- entity as its own SWEP (same keep rule as any equipped class — the
+        -- entry-13 take-back of a dropped shell still lands here). Otherwise
+        -- the entity dies and the rounds the engine granted on pickup reach
+        -- the stack through the §16 mirror (AbsorbType tops the equipped ×N
+        -- or the reconciler overflow mints/merges the grid stack).
+        if throwFace ~= nil then
+            if EquippedClassCount(owner, class) > 0 then return end
+            if IsValid(wep) then wep:Remove() end
+            return
+        end
 
         -- spawnmenu mark (#30): consumed on class match, short window — an
         -- expired or mismatched mark proves nothing about THIS give

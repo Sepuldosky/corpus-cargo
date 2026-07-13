@@ -92,20 +92,11 @@ CARGO.Items.Register({
     end,
 })
 
--- Throwable slot test item (§4 amendment, wheel block 2026-07-13). Category
--- "throwables" is what the slot filter accepts; weapon_class is given/taken
--- on equip/unequip like any weapon slot. The ammo.hl2 field is what makes the
--- ×N badge REAL: the equipped stack joins the §16 pool mirror (it IS reserve,
--- like a belt stack), so throwing a grenade drains the slot count itself.
-CARGO.Items.Register({
-    id = "cargo_dev_frag", name = "Frag Grenade (dev)",
-    weight = 0.4, class = "stackable", category = "throwables",
-    size = { 1, 2 }, max_stack = 4,
-    model = "models/weapons/w_grenade.mdl",
-    weapon_class = "weapon_frag",
-    ammo = { caliber = "Frag", hl2 = "Grenade" },
-    trivia = "Test grenade for the throwable slot. Equip the stack; the count is your reserve.",
-})
+-- The throwable slot's test item WAS cargo_dev_frag (entry 13); roadmap #32
+-- made the frag a REAL item (cargo_throw_frag, corpus_cargo_ammo.lua — the
+-- canonical face of the HL2 "Grenade" type), so the kit hands that one out
+-- and the dev def is gone. Old persisted stacks remap on load
+-- (CARGO.Ammo.LegacyThrowIds).
 
 -- Feeds the SAME engine pool as the real "Pistol Rounds" item (§16): a second
 -- item on one HL2 type is exactly the case the author raised (two weapons of
@@ -180,7 +171,7 @@ if SERVER then
         { "cargo_dev_ammo_9mm", 60 }, { "cargo_dev_smg" },
         { "cargo_dev_pistol" }, { "cargo_dev_melee" },
         { "cargo_dev_pda" }, { "cargo_dev_detector" },
-        { "cargo_dev_frag", 3 },
+        { "cargo_throw_frag", 3 },
         -- real HL2 ammo (§16): enough to hang stacks on the belt and watch the
         -- reserve follow. cargo_ammo_pistol shares its pool with the dev 9mm.
         { "cargo_ammo_pistol", 120 }, { "cargo_ammo_smg1", 120 },
@@ -310,9 +301,10 @@ function CARGO._SelfTest()
         CARGO.Slots.CanEquip(pgDef, "secondary"))
 
     -- throwable stack slot (§4 amendment, wheel block 2026-07-13): the ONE
-    -- slot that takes stackables — and only its own category
-    local frag = CARGO.Items.Get("cargo_dev_frag")
-    check("frag dev entra en throwable", CARGO.Slots.CanEquip(frag, "throwable"))
+    -- slot that takes stackables — and only its own category. The frag is
+    -- the REAL item since roadmap #32 (canonical face of the "Grenade" type)
+    local frag = CARGO.Items.Get("cargo_throw_frag")
+    check("frag entra en throwable", CARGO.Slots.CanEquip(frag, "throwable"))
     check("throwable rechaza uniques", not CARGO.Slots.CanEquip(pistol, "throwable"))
     check("throwable rechaza stacks de otra categoría",
         not CARGO.Slots.CanEquip(plate, "throwable"))
@@ -449,12 +441,26 @@ function CARGO._SelfTest()
         check("ammo: dos ítems distintos comparten un pool",
             CARGO.Ammo.TypeOfDef(CARGO.Items.Get("cargo_dev_ammo_9mm")) == "Pistol")
 
+        -- grenade taxonomy (roadmap #32): the canonical face of "Grenade" and
+        -- "slam" is the THROWABLE, never belt ammo; SMG1_Grenade stays ammo
+        check("ammo: la cara canónica de Grenade es el lanzable",
+            CARGO.Ammo.ItemForType("Grenade") == "cargo_throw_frag")
+        check("ammo: la cara canónica de slam es el lanzable",
+            CARGO.Ammo.ItemForType("slam") == "cargo_throw_slam")
+        check("ammo: la granada del SMG1 sigue siendo munición",
+            (CARGO.Items.Get(CARGO.Ammo.ItemForType("SMG1_Grenade")) or {}).category == "ammo")
+        check("ammo: el mapa clase->throwable resuelve el weapon_frag",
+            CARGO.Ammo.ThrowableClass.weapon_frag == "cargo_throw_frag")
+
         local complete = true
         for _, hl2 in ipairs(CARGO.Ammo.TYPES) do
             local def = CARGO.Items.Get(CARGO.Ammo.ItemForType(hl2))
-            -- max_stack is what makes six belt slots a decision; a model is what
-            -- keeps the item off the letter-placeholder fallback
-            if not istable(def) or def.category ~= "ammo" or def.class ~= "stackable"
+            -- max_stack is what makes six belt slots a decision; a model is
+            -- what keeps the item off the letter-placeholder fallback. A
+            -- throwable face additionally needs its SWEP class (roadmap #32).
+            local okCat = istable(def) and (def.category == "ammo"
+                or (def.category == "throwables" and isstring(def.weapon_class)))
+            if not okCat or def.class ~= "stackable"
                 or not isnumber(def.max_stack) or not isstring(def.model) then
                 complete = false
             end

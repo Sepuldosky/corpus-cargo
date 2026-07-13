@@ -48,7 +48,7 @@ local cvPool = CreateConVar("cargo_ammo_pool", "1", FCVAR_ARCHIVE,
 local cvTakeover = CreateConVar("cargo_ammo_arc9_takeover", "1", FCVAR_ARCHIVE,
     "Force arc9_mult_defaultammo 0 on boot so ARC9 stops gifting free reserve ammo")
 local cvWorldAmmo = CreateConVar("cargo_ammo_world_pickup", "1", FCVAR_ARCHIVE,
-    "Map ammo pickups (item_ammo_*) become Cargo items in the grid instead of raw pool")
+    "World ammo boxes (item_ammo_*): no touch pickup — WALK+USE takes them to the grid, USE carries them (0 = raw engine touch pickup)")
 
 -- Players whose spawn Push has not run yet. Reconcile mirrors nothing for them:
 -- during the spawn window a weapon base may still be gifting reserve, and the
@@ -149,6 +149,25 @@ local function AbsorbType(rec, hl2, amount)
     local def = itemId and CARGO.Items.Get(itemId) or nil
     if def == nil then return amount end
     local maxStack = def.max_stack or math.huge
+
+    -- Throwable-faced type (roadmap #32): the frag is a LAUNCHABLE, not belt
+    -- ammunition — the belt filter rejects its category, so the only reserve
+    -- that can absorb rounds of its type is the EQUIPPED stack (top up under
+    -- max_stack: this is what makes the ×N badge move when the engine grants
+    -- a grenade). Whatever does not fit returns to the caller, whose overflow
+    -- path sends it to the grid AND drops the pool to the belt sum — a grid
+    -- grenade is storage, not reserve.
+    if def.category ~= "ammo" then
+        local eq = istable(rec.equip) and rec.equip.throwable or nil
+        if istable(eq) and eq.id == itemId and eq.condition == nil then
+            local put = math.min(maxStack - (eq.count or 1), amount)
+            if put > 0 then
+                eq.count = (eq.count or 1) + put
+                amount = amount - put
+            end
+        end
+        return amount
+    end
 
     -- Merged into the CANONICAL item only, never into some other stack that
     -- merely shares the engine type: an unloaded magazine says nothing about
@@ -371,6 +390,11 @@ end)
 -- and you decide how much of it to hang on your belt. It never becomes raw
 -- reserve behind your back. Amounts are HL2's own (hl2/item_ammo.cpp defaults).
 --
+-- CONTACT never takes (roadmap #32, 2nd pass 2026-07-13: spawned item_ammo_*
+-- boxes were hoovered by touch — Bloque B design, now unwanted). The hook
+-- below is a pure VETO; the actual take is WALK+USE through the SAME PlayerUse
+-- gate weapons and dropped items use (capture.lua), which reads WorldAmmoSpec.
+--
 -- Declared debt: ARC9's own pickup entities (arc9_ammo / arc9_ammo_big) give
 -- ammo through their own Touch, not through PlayerCanPickupItem, so they still
 -- land in the pool and the mirror absorbs them onto the BELT rather than the
@@ -395,27 +419,27 @@ local WORLD_AMMO = {
     item_ammo_ar2_altfire  = { "AR2AltFire",    1 },
 }
 
-hook.Add("PlayerCanPickupItem", "corpus_cargo_ammopool_world", function(ply, item)
-    if not cvPool:GetBool() or not cvWorldAmmo:GetBool() then return end
-    if not IsValid(item) or not IsValid(ply) then return end
-
-    local spec = WORLD_AMMO[item:GetClass()]
-    if spec == nil then return end
-
-    -- the engine pickup is ALWAYS vetoed for these: this ammo never becomes raw
-    -- pool. The flag guards the frames between the veto and the delayed remove,
-    -- during which the touch keeps firing (a double give would be free ammo).
-    if item.CargoAmmoTaken then return false end
-
+-- Class of a world ammo box -> { id, count } of the grid item a deliberate
+-- take delivers, or nil when the class is not ours / the convars turned the
+-- conversion off (0 restores the raw engine touch pickup). Consumed by the
+-- WALK+USE gate in capture.lua — one gate, never a second one.
+function CARGO.AmmoPool.WorldAmmoSpec(class)
+    if not cvPool:GetBool() or not cvWorldAmmo:GetBool() then return nil end
+    local spec = WORLD_AMMO[class or ""]
+    if spec == nil then return nil end
     local itemId = CARGO.Ammo.ItemForType(spec[1])
-    if itemId == nil then return false end
+    if itemId == nil then return nil end
+    return { id = itemId, count = spec[2] }
+end
 
-    if CARGO.Inventory.GiveItem(ply, itemId, spec[2]) then
-        item.CargoAmmoTaken = true
-        CARGO.Inventory.NotifyPickup(ply, itemId, spec[2])
-        SafeRemoveEntityDelayed(item, 0)
-    end
-    -- too heavy: it stays on the floor, where he can come back for it
+hook.Add("PlayerCanPickupItem", "corpus_cargo_ammopool_world", function(ply, item)
+    if not IsValid(item) or not IsValid(ply) then return end
+    if CARGO.AmmoPool.WorldAmmoSpec(item:GetClass()) == nil then return end
+
+    -- the engine pickup is ALWAYS vetoed for these: this ammo never becomes
+    -- raw pool and contact never takes (roadmap #32). The give lives in the
+    -- WALK+USE gate; this veto also covers the frames between that give and
+    -- the delayed remove, during which the touch keeps firing.
     return false
 end)
 

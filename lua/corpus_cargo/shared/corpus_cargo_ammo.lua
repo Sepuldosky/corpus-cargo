@@ -78,15 +78,27 @@ local AMMO = {
       model = "models/items/combine_rifle_ammo01.mdl",
       weight = 0.5, max_stack = 3,
       trivia = "Contained singularity. Carrying it is the second worst idea; firing it is the first." },
+}
 
-    { hl2 = "Grenade",      caliber = "Frag",  name = "Frag Grenades",
+-- THROWABLE-faced types (roadmap #32, in-game report 2026-07-13): the HL2
+-- "Grenade" and "slam" pools are still MANAGED types — throwing drains them
+-- through the same §16 mirror — but their canonical item is a THROWABLE for
+-- the equipment slot (§4 amendment), never belt ammunition. Bloque B had
+-- registered them as belt items and the mirror minted frags-as-ammo whenever
+-- the engine granted the type (spawnmenu give, death respawn). The SMG1
+-- launcher grenade stays in AMMO above: it feeds a weapon, you don't throw it.
+-- (SLAM rides the same call — the handoff's dirección, same conflict shape.)
+local THROWABLES = {
+    { hl2 = "Grenade", caliber = "Frag", id = "cargo_throw_frag",
+      name = "Frag Grenade", weapon_class = "weapon_frag",
       model = "models/weapons/w_grenade.mdl",
-      weight = 0.4, max_stack = 4,
-      trivia = "MK3A2 fragmentation grenade. Cook it too long and the belt is the least of your problems." },
+      weight = 0.4, max_stack = 4, size = { 1, 2 },
+      trivia = "MK3A2 fragmentation grenade. Equip the stack; the count is your reserve." },
 
-    { hl2 = "slam",         caliber = "SLAM",  name = "S.L.A.M.s",
+    { hl2 = "slam",    caliber = "SLAM", id = "cargo_throw_slam",
+      name = "S.L.A.M.", weapon_class = "weapon_slam",
       model = "models/weapons/w_slam.mdl",
-      weight = 1.2, max_stack = 3,
+      weight = 1.2, max_stack = 3, size = { 2, 1 },
       trivia = "Selectable Lightweight Attack Munition. Tripmine or remote charge, your call." },
 }
 
@@ -115,6 +127,43 @@ for _, a in ipairs(AMMO) do
     CARGO.Ammo.TYPES[#CARGO.Ammo.TYPES + 1] = a.hl2
     idByType[a.hl2:lower()] = id
 end
+
+-- weapon_class -> canonical throwable item id. The capture consults this so a
+-- frag/SLAM SWEP never mints a wpn_<class> autogen item (that would resurrect
+-- the second face this front kills); the mirror books the rounds instead.
+CARGO.Ammo.ThrowableClass = {}
+
+for _, t in ipairs(THROWABLES) do
+    CARGO.Items.Register({
+        id = t.id,
+        name = t.name,
+        weight = t.weight,
+        class = "stackable",
+        category = "throwables",
+        model = t.model,
+        max_stack = t.max_stack,
+        size = t.size,
+        weapon_class = t.weapon_class,
+        ammo = { caliber = t.caliber, hl2 = t.hl2 },
+        trivia = t.trivia,
+    })
+
+    CARGO.Ammo.TYPES[#CARGO.Ammo.TYPES + 1] = t.hl2
+    idByType[t.hl2:lower()] = t.id
+    CARGO.Ammo.ThrowableClass[t.weapon_class] = t.id
+end
+
+-- Dead ids -> canonical throwable. Consumed by the record/container loaders:
+-- Bloque B's belt faces and the entry-13 dev item persisted in real records
+-- (the author's own), and an unknown id renders as a blank cell.
+CARGO.Ammo.LegacyThrowIds = {
+    cargo_ammo_grenade = "cargo_throw_frag",
+    cargo_ammo_slam    = "cargo_throw_slam",
+    cargo_dev_frag     = "cargo_throw_frag",
+    -- autogen uniques a pre-#32 capture may have minted for these classes
+    wpn_weapon_frag    = "cargo_throw_frag",
+    wpn_weapon_slam    = "cargo_throw_slam",
+}
 
 -- Engine ammo type -> the Cargo item that carries it. nil for any type Cargo
 -- does not manage (another addon's custom ammo: not ours, not touched).
