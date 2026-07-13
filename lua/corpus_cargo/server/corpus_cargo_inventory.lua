@@ -40,6 +40,7 @@ local NET_SUB_ATT   = Corpus.Net.Register("cargo", "subslot_attach")
 local NET_SUB_DET   = Corpus.Net.Register("cargo", "subslot_detach")
 local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
 local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
+local NET_BELT_MOVE = Corpus.Net.Register("cargo", "belt_move")
 
 -- Lifecycle convars (server, archived):
 --   cargo_lose_on_death — death wipes the whole inventory + money (roadmap
@@ -688,6 +689,15 @@ end
 -- push after they mutate.
 -- ------------------------------------------------------------------
 
+-- Merge `moving` units into a belt occupant of equal id+condition, capped at
+-- max_stack. Returns how many units did not fit. Shared by BeltSet (grid ->
+-- belt) and BeltMove (belt -> belt) so the ceiling rule lives in one place.
+local function BeltMergeInto(occ, moving, maxStack)
+    local put = math.max(math.min(maxStack - (occ.count or 1), moving), 0)
+    occ.count = (occ.count or 1) + put
+    return moving - put
+end
+
 function CARGO.Inventory.BeltSet(ply, slotN, ref)
     if slotN < 1 or slotN > CARGO.Slots.BELT_COUNT then return end
     local rec = CARGO.Inventory.GetRecord(ply)
@@ -711,14 +721,12 @@ function CARGO.Inventory.BeltSet(ply, slotN, ref)
     local occ = rec.belt[slotN]
 
     if occ ~= nil and occ.id == entry.id and occ.condition == entry.condition then
-        local room = maxStack - (occ.count or 1)
-        if room <= 0 then
+        local left = BeltMergeInto(occ, moving, maxStack)
+        if left == moving then
             CARGO.Inventory.Notice(ply, "That belt slot is full.")
             return
         end
-        local put = math.min(room, moving)
-        occ.count = (occ.count or 1) + put
-        moving = moving - put
+        moving = left
     else
         if occ ~= nil then
             AddStack(rec, occ.id, occ.count or 1, occ.condition)
@@ -730,6 +738,41 @@ function CARGO.Inventory.BeltSet(ply, slotN, ref)
 
     table.remove(rec.items, idx)
     if moving > 0 then AddStack(rec, entry.id, moving, entry.condition) end
+
+    CARGO.Inventory.Touch(ply)
+    if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
+end
+
+-- Reorder: move a stack that already hangs on the belt to another belt slot
+-- (roadmap #25). Same id+condition merges under max_stack and the remainder
+-- stays in the SOURCE slot (nothing leaves the belt on a merge); a different
+-- occupant returns to the grid, same as BeltSet displacement (author call) —
+-- a move never silently loses a stack. The displaced occupant does leave the
+-- belt, so the pool mirror still needs the Push.
+function CARGO.Inventory.BeltMove(ply, fromN, toN)
+    if fromN < 1 or fromN > CARGO.Slots.BELT_COUNT then return end
+    if toN < 1 or toN > CARGO.Slots.BELT_COUNT or toN == fromN then return end
+    local rec = CARGO.Inventory.GetRecord(ply)
+
+    local entry = rec.belt[fromN]
+    if entry == nil then return end
+    local occ = rec.belt[toN]
+
+    if occ ~= nil and occ.id == entry.id and occ.condition == entry.condition then
+        local def = CARGO.Items.Get(entry.id)
+        local maxStack = istable(def) and def.max_stack or math.huge
+        local moving = entry.count or 1
+        local left = BeltMergeInto(occ, moving, maxStack)
+        if left == moving then
+            CARGO.Inventory.Notice(ply, "That belt slot is full.")
+            return
+        end
+        if left > 0 then entry.count = left else rec.belt[fromN] = nil end
+    else
+        rec.belt[toN] = entry
+        rec.belt[fromN] = nil
+        if occ ~= nil then AddStack(rec, occ.id, occ.count or 1, occ.condition) end
+    end
 
     CARGO.Inventory.Touch(ply)
     if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
@@ -891,6 +934,12 @@ end)
 
 net.Receive(NET_BELT_CLR, function(_, ply)
     CARGO.Inventory.BeltClear(ply, net.ReadUInt(4))
+end)
+
+net.Receive(NET_BELT_MOVE, function(_, ply)
+    local fromN = net.ReadUInt(4)
+    local toN = net.ReadUInt(4)
+    CARGO.Inventory.BeltMove(ply, fromN, toN)
 end)
 
 net.Receive(NET_AMMOGROUP, function(_, ply)

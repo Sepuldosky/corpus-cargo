@@ -1163,3 +1163,82 @@ bug del bloque, arreglado acá:
   el autor lo da por **aceptable por ahora** — los parches de coherencia exigirían
   depender de TODOS los mods EFT (las balas están dispersas entre ellos). Enlaza
   con el binding de ammo-atts (§16.6), que sigue pendiente y era esperado.
+
+---
+
+## 12. Bloque C: UX de munición (roadmap #25 · #26 · #27) `[APLICADO 2026-07-12]`
+
+Cuarta tanda del autor (2026-07-12), arrancada en chat nuevo desde la semilla
+`dev/HANDOFF_cargo_bloque_c_municion_ux.md`. El núcleo del Bloque B (entry 11)
+quedó confirmado; este bloque completa la UX que la pasada dejó anotada. Plan
+aprobado por el autor antes de codear: en el reorder el ocupante desplazado
+**vuelve al grid**; el unload se dispara **por menú contextual y por comando**.
+
+1. **Reordenar el cinturón (#25)** — belt→belt no existía como operación
+   (`BeltSet` solo acepta refs del grid). Nueva `Inventory.BeltMove(ply, from, to)`
+   + intent `belt_move`: destino vacío mueve; mismo id+condición **fusiona hasta
+   `max_stack` y el resto se queda en el slot ORIGEN** (nada sale del cinturón en
+   un merge); ocupante distinto **vuelve al grid** (decisión del autor, mismo
+   comportamiento que el desplazamiento de `BeltSet`). El paso "merge con tope"
+   se extrajo de `BeltSet` a un helper compartido (`BeltMergeInto`) — la regla
+   vive en un solo lugar. Cliente: la celda del cinturón ya era
+   `Droppable("cargo_item")`; su receiver gana la rama "el panel soltado es otra
+   celda del cinturón" (`cargoBeltSlot`).
+2. **Descargar el arma (#26)** — la mitad difícil ya existía (§16.3: el espejo
+   absorbe lo que vuelve de un cargador; cinturón → excedente al grid). Nuevo
+   disparador `AmmoPool.UnloadWeapon(ply)` sobre el **arma activa**, intent
+   `unload`: **ARC9 por SU API** (`SWEP:Unload(GetProcessedValue("Ammo"))`,
+   sh_reload.lua:199-205 verificado — COMPAT-RUNTIME, cero fork); no-ARC9 a mano
+   (`GiveAmmo(Clip1, game.GetAmmoName(...))` + `SetClip1(0)`). `Reconcile`
+   inmediato (sin esperar el poll de 250 ms) y `StoreClip` después: el cargador
+   vacío **persiste en el blob** (#18). **Gate de spawn**: denegado hasta que el
+   `Push` de spawn corrió (las balas morirían en el `StripAmmo`+`Push`).
+   **Animación**: ARC9 reproduce su anim de reload **solo si la entry no declara
+   `RestoreAmmo`** — ese flag re-llena el clip DESDE LA RESERVA en un timer
+   interno de `PlayAnimation` (sh_anim.lua:130-133 → `RestoreClip`) y desharía
+   el unload; se consulta por su propia API. Tercera persona: gesto de reload.
+   No-ARC9: `SendWeaponAnim(ACT_VM_RELOAD)` + gesto. Disparadores cliente:
+   opción **"Unload magazine"** en el menú contextual del slot equipado (solo si
+   esa arma está en la mano) + comando **`cargo_unload`** (bindeable).
+3. **Gate WALK+USE para ítems botados (#27)** — el `PlayerUse` de `capture.lua`
+   filtraba `ent:IsWeapon()` y el `ENT:Use` de `corpus_cargo_item` recogía
+   incondicionalmente (USE pelado aspiraba la munición dropeada). El hook ahora
+   cubre también `corpus_cargo_item`: USE pelado = carry de prop HL2 (el
+   `return false` bloquea el `ENT:Use`); WALK+USE = el hook se corre a un lado y
+   `ENT:Use` recoge como siempre. Se reusa el debounce (`CargoNextWorldUse`) y
+   la marca "USE de nuevo suelta" (`CargoCarryEnt`) que las armas ya pagaron.
+   La entidad no cambió (solo su comentario de header); el convar
+   `cargo_world_guns` sigue gateando solo la rama de armas.
+4. **Fix de duplicación latente en `Reconcile`** (encontrado al testear el #26):
+   cuando el excedente de un unload iba al grid **con éxito**, el pool no se
+   bajaba (`SetAmmo` solo corría en la rama de fallo) — el poll siguiente volvía
+   a ver `pool > belt` y **re-acuñaba el mismo excedente cada 250 ms**. Era
+   inalcanzable en la práctica en el Bloque B (sin unload, con el éter muerto);
+   el #26 lo volvía ruta ordinaria. Ahora el pool baja a la suma del cinturón
+   siempre que el excedente sale hacia el grid.
+
+**Sin convars nuevas.** Net nuevo: `belt_move`, `unload` (vía
+`Corpus.Net.Register`, como todo).
+
+**Verificación previa (2026-07-12):** sintaxis 5/5 (luaparser) + harness offline
+extendido (`dev/harness_cargo.py`): **110 checks, 0 fallas** (eran 80; +30 del
+bloque — reorder con merge/tope/swap-al-grid e inputs degenerados, intent de red,
+unload no-ARC9 y ARC9 con blob + cinturón lleno → grid, anti-dup del poll, gate
+de spawn, y el use-gate de ítems con debounce/carry/suelta). Selftest 40 (server)
+/ 47 (client) — sin regresión.
+
+**Pasada en juego (2026-07-12, autor): TODO CONFIRMADO — CERRADO.** Cinturón:
+fusión, belt→grid y reorden OK; el autor intentó además el **exploit** de
+recargar y rotar la munición rápido buscando reserva "gratis" y **no funcionó**
+(el espejo aguantó). Unload con ARC9 OK: **la animación corrió y el contador NO
+se re-llenó después** (el guard de `RestoreAmmo` hizo su trabajo). Munición
+botada: WALK+USE toma, USE pelado carga. Sin bugs del bloque.
+
+**Frentes que abrió la pasada — NO son de este entry** (van al roadmap
+**#28-#31**): falta **drop de armas equipadas** desde su slot; el **color de la
+UI** debe ser neutro estilo spawnmenu e integrarse con el preset del HUD DGL4
+del autor (PCV de Opposing Force / Foxtrot uniform; mod nuevo en `dev/other/`:
+"[dgl4] official presets pack"); los **íconos de armas del spawnmenu no llegan
+al inventario** al clickearlos (sin toolgun no hay forma de obtener
+physgun/toolgun/camera); falta un **wheel menu** (diseño pendiente en Claude
+Desktop).

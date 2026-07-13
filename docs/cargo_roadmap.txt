@@ -258,7 +258,9 @@ BLOQUE C — UX DE MUNICIÓN (hallazgos in-game 2026-07-12, 1.ª pasada del Bloq
 El NÚCLEO del #19 quedó confirmado en juego (el cinturón ES la reserva, ARC9 ya no
 regala munición del éter, la muerte limpia todo). Estos tres son lo que FALTA para
 que el sistema se sienta terminado. Semilla:
-../../dev/HANDOFF_cargo_bloque_c_municion_ux.md
+ESTADO: CERRADO — entry 12 [APLICADO 2026-07-12], confirmado en juego por el
+autor (incluido un intento de exploit de reserva "gratis" rotando munición:
+no pasó). La semilla de dev/ se borró al cerrar.
 
 25. REORDENAR EL CINTURÓN [Cargo UI + inventory] — SIN DISEÑAR.
     Reporte del autor: "tengo 30 balas de smg en el slot 3 y no puedo ponerlo en el
@@ -287,6 +289,37 @@ que el sistema se sienta terminado. Semilla:
     (ply:KeyDown(IN_WALK) -> tomar; USE pelado -> cargar como prop de HL2, igual que
     hacen las armas). Reusar el patrón de capture.lua, incluido el debounce
     (CargoNextWorldUse) y el "USE de nuevo suelta" (CargoCarryEnt).
+
+HALLAZGOS IN-GAME 2026-07-12 (pasada del Bloque C) — SIN DISEÑAR
+-----------------------------------------------------------------
+28. DROP DE ARMAS EQUIPADAS [Cargo UI + inventory]. Reporte del autor: "falta un
+    drop weapon de armas equipadas". Hoy el camino es unequip al grid y drop
+    desde ahí, o cargo_drop con el arma en la mano. Candidato natural: opción
+    "Drop" en el menú contextual del slot equipado, reusando la maquinaria de
+    DropEntry/SpawnWorldWeapon para que el arma salga como SU MISMA instancia
+    (#17) con el cargador persistido (#18).
+
+29. COLOR DE LA UI: NEUTRO ESTILO SPAWNMENU + INTEGRACIÓN DGL4 [Cargo UI].
+    Pedido del autor: el color base de Cargo debe ser el del spawnmenu/browser
+    de GMod — neutro, "listo para integrarse con cambios benignos sobre el
+    spawnmenu" — y con el HUD DGL4 montado la UI debería teñirse según su preset
+    activo (el autor usa el PCV de Opposing Force / Foxtrot uniform; mod nuevo
+    en dev/other/: "[dgl4] official presets pack"). COMPAT-RUNTIME: el color se
+    LEE de la API/convars de DGL4 en runtime, jamás se asume — consultar
+    ../dev/mods_workshop_mapa.md y el código vivo antes de diseñar. Toca
+    corpus_cargo_theme.lua (única fuente de estilo — el resto de la UI ya bebe
+    de ahí).
+
+30. SPAWNMENU: EL ÍCONO DE ARMA NO LLEGA AL INVENTARIO [Cargo capture].
+    Reporte del autor: sin el toolgun no hay forma de obtener physgun/toolgun/
+    camera; al clickear el ícono del arma en el spawnmenu, el arma no llega al
+    inventario. Sospecha (NO confirmada): el filtro de loadout de sandbox del
+    entry 8 (cargo_capture_sandbox_tools 0) o el flujo de give del spawnmenu
+    esquivan la captura — diagnosticar leyendo capture.lua ANTES de arreglar.
+
+31. WHEEL MENU [Cargo UI]. Falta un menú radial. El DISEÑO queda en Claude
+    Desktop (proyecto "Corpus Framework"); acá solo se implementa cuando el
+    diseño baje aprobado.
 
 =====================================================
 Diseño de referencia: Cargo_Architecture.md (inventario, Block 1 + §15 UI fullscreen),

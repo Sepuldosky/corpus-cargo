@@ -173,13 +173,18 @@ function CARGO.AmmoPool.Reconcile(ply)
 
             if left > 0 then
                 -- Belt is full. The rounds are NOT destroyed — they go to the
-                -- grid, which is what the grid is for.
+                -- grid, which is what the grid is for. Either way they are no
+                -- longer reserve, so the pool MUST drop to the belt sum: left
+                -- at the old count, the next poll would see pool > belt again
+                -- and mint the same rounds forever (dup at 4 Hz — latent in
+                -- Bloque B, reachable once #26 made "unload with a full belt"
+                -- an ordinary move).
                 local itemId = CARGO.Ammo.ItemForType(hl2)
                 local ok = itemId and CARGO.Inventory.GiveItem(ply, itemId, left) or false
+                ply:SetAmmo(pool - left, hl2)
                 if not ok then
                     -- nowhere left to carry them: the pool cannot hold rounds
                     -- the player has no room for, or the belt count would lie
-                    ply:SetAmmo(pool - left, hl2)
                     CARGO.Inventory.Notice(ply, "You cannot carry any more ammunition.")
                 end
             end
@@ -223,6 +228,106 @@ end)
 
 hook.Add("PlayerDisconnected", "corpus_cargo_ammopool_clean", function(ply)
     ready[ply] = nil
+end)
+
+-- ------------------------------------------------------------------
+-- Unload the held weapon (roadmap #26). The hard half already exists: the
+-- magazine goes back into the pool through the same route a reload came
+-- from, and the mirror absorbs it onto the belt — overflow to the grid
+-- (§16.3, harness-verified). This is only the TRIGGER, plus the emptied
+-- magazine persisting in the instance blob (#18).
+-- ------------------------------------------------------------------
+
+local NET_UNLOAD = Corpus.Net.Register("cargo", "unload")
+
+-- The Cargo instance embodied by an equipped weapon entity, if any: a weapon
+-- given by other means (admin, console) has no blob to persist.
+local function EquippedUidOf(ply, class)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    for _, uid in pairs(rec.equip) do
+        local blob = CARGO.Instances.Get(uid)
+        local def = istable(blob) and CARGO.Items.Get(blob.id) or nil
+        if istable(def) and def.weapon_class == class then return uid end
+    end
+    return nil
+end
+
+-- The reload animation the author asked for. ARC9's viewmodel anim is played
+-- ONLY when its animation entry does not declare RestoreAmmo: that flag
+-- re-fills the clip FROM THE RESERVE on a timer inside PlayAnimation
+-- (sh_anim.lua:130-133 -> RestoreClip, sh_reload.lua:298), which would undo
+-- the unload behind our back. Checked through ARC9's own API, never assumed
+-- (COMPAT-RUNTIME). DumpAmmo entries are fine: their second Unload finds an
+-- empty clip.
+local function PlayUnloadAnim(ply, wep)
+    if wep.ARC9 then
+        local entry
+        local okT, anim = pcall(wep.TranslateAnimation, wep, "reload")
+        if okT and isstring(anim) then
+            local okE, e = pcall(wep.GetAnimationEntry, wep, anim)
+            if okE and istable(e) then entry = e end
+        end
+        if entry ~= nil and not entry.RestoreAmmo then
+            pcall(wep.PlayAnimation, wep, "reload")
+        end
+        pcall(wep.DoPlayerAnimationEvent, wep, ACT_HL2MP_GESTURE_RELOAD_MAGIC)
+    else
+        pcall(wep.SendWeaponAnim, wep, ACT_VM_RELOAD)
+        if isfunction(ply.AnimRestartGesture) then
+            ply:AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD,
+                ACT_HL2MP_GESTURE_RELOAD_MAGIC, true)
+        end
+    end
+end
+
+function CARGO.AmmoPool.UnloadWeapon(ply)
+    if not cvPool:GetBool() then return end
+    if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
+    -- spawn window: rounds returned to the pool right now would die in the
+    -- StripAmmo+Push about to run — silent loss. Same gate as the reconciler.
+    if not ready[ply] then
+        CARGO.Inventory.Notice(ply, "You can't do that right now.")
+        return
+    end
+
+    local wep = ply:GetActiveWeapon()
+    if not IsValid(wep) then return end
+    local okC, clip = pcall(wep.Clip1, wep)
+    if not okC or not isnumber(clip) or clip <= 0 then
+        CARGO.Inventory.Notice(ply, "Nothing to unload.")
+        return
+    end
+
+    if wep.ARC9 then
+        -- the legitimate route: SWEP:Unload does GiveAmmo(Clip1) +
+        -- SetClip1(0) + SetLoadedRounds(0) (sh_reload.lua:199-205, verified)
+        local okA, ammoType = pcall(wep.GetProcessedValue, wep, "Ammo")
+        if not okA or not isstring(ammoType) or ammoType == "" then return end
+        if not pcall(wep.Unload, wep, ammoType) then return end
+    else
+        local ammoName = game.GetAmmoName(wep:GetPrimaryAmmoType())
+        if not isstring(ammoName) then
+            CARGO.Inventory.Notice(ply, "Nothing to unload.")
+            return
+        end
+        ply:GiveAmmo(clip, ammoName, true)
+        wep:SetClip1(0)
+    end
+
+    PlayUnloadAnim(ply, wep)
+
+    -- no waiting on the 4 Hz poll: the rounds land on the belt (grid when
+    -- the belt is full) in the same breath
+    CARGO.AmmoPool.Reconcile(ply)
+
+    -- the emptied magazine persists in the blob (#18): re-equipping from the
+    -- grid must not hand the rounds back
+    local uid = EquippedUidOf(ply, wep:GetClass())
+    if uid ~= nil then CARGO.Inventory.StoreClip(uid, wep) end
+end
+
+net.Receive(NET_UNLOAD, function(_, ply)
+    CARGO.AmmoPool.UnloadWeapon(ply)
 end)
 
 -- ------------------------------------------------------------------

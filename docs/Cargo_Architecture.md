@@ -293,7 +293,7 @@ Bloque de diseño de Cargo (inventario) cerrado y validado en sesión de diseño
 | Contrato de ítems, slots/sub-slots, peso, providers, grid, contenedores, tooltip, stat-bars | **Cerrado — este documento** |
 | Attachments de armas (UX + puente ARC9) | **Cerrado en diseño** — API exacta de ARC9 pendiente de verificación contra código |
 | UI fullscreen (forma) | **Cerrado — §15**; VGUI es bloque de implementación aparte; depende de Cargo_ItemImages |
-| Sistema de munición (el cinturón ES el pool) | **Cerrado — §16** (Bloque B, roadmap #19). Abierto: cargadores rellenables con toggle, y el binding de ammo-atts de EFT (§16.6) |
+| Sistema de munición (el cinturón ES el pool) | **Cerrado — §16** (Bloque B, roadmap #19). UX (reorder, unload, gate WALK+USE de ítems) **cerrada — §16.8** (Bloque C, roadmap #25 · #26 · #27). Abierto: cargadores rellenables con toggle, y el binding de ammo-atts de EFT (§16.6) |
 | Workbench (craft/reparación/desarme, upgrades pendiente) | Cerrado en su mayoría — ver documento aparte |
 | Efectos de armadura y escudos de jugador | Pendiente — Caliber Block 3 |
 | Crafting profundo (recetas de materiales, categorías) | Pendiente — diseño posterior |
@@ -372,8 +372,10 @@ equipadas viven en el cinturón, no en el grid.
 
 > **Frontera cerrada:** este bloque cerró la **forma** del cinturón (la fila de slots y que
 > la munición se mueva ahí). La **semántica** la cerró el Bloque B → **[§16](#16-sistema-de-munición-el-cinturón-es-el-pool)**:
-> el cinturón no almacena munición, **ES** la reserva real del jugador. Lo único que sigue
-> abierto de #19 es el sistema de cargadores rellenables con toggle (fuera del v1).
+> el cinturón no almacena munición, **ES** la reserva real del jugador. La **interacción** de
+> reordenar el cinturón (drag belt→belt, un slot ocupado a otro) la cerró el Bloque C →
+> **[§16.8](#168-ux-de-munición-bloque-c)**. Lo único que sigue abierto de #19 es el sistema
+> de cargadores rellenables con toggle (fuera del v1).
 
 ### 15.3 Botón de dinero en el header
 
@@ -461,6 +463,15 @@ El drenaje va **por orden de slot** (1→6): predecible, y es el orden que el ju
 mismo al colgar los stacks. La munición que vuelve de un cargador y no entra en el cinturón
 **no se destruye** — se va al grid.
 
+> **Fix de conservación (Bloque C, entry 12):** cuando el excedente que vuelve de un cargador
+> no cabe en el cinturón y se va al grid **con éxito**, el pool ahora **siempre** baja a la
+> suma del cinturón (`ply:SetAmmo(pool - left, hl2)`, sin condicionarlo a la rama de fallo).
+> Antes solo bajaba cuando el grid rechazaba el excedente (inventario lleno): con éxito el pool
+> quedaba en el valor viejo y el poll siguiente volvía a ver `pool > belt` y **re-acuñaba el
+> mismo excedente cada 250 ms** — duplicación latente desde el Bloque B, inalcanzable en la
+> práctica hasta que el unload (§16.8) volvió "descargar con el cinturón lleno" una ruta
+> ordinaria.
+
 ### 16.4 El éter (el bloqueante que este bloque existe para matar)
 
 > Reporte in-game del autor (2026-07-12): *"ARC9 EFT, cuando tomas un arma, te da munición del
@@ -523,3 +534,84 @@ fundación primero) — es el bloque siguiente.
 - **Cargadores rellenables con toggle** (lo único que queda abierto de #19).
 - **Binding de ammo-atts de EFT** (16.6) — bloque propio.
 - **Categorías fijas de tabs** (#23) y **retícula del grid** (#24): frentes ajenos.
+
+### 16.8 UX de munición (Bloque C)
+
+*(Bloque C, roadmap #25 · #26 · #27. Cierra la UX que la pasada en juego del Bloque B — entry
+11 — dejó anotada en su semilla `dev/HANDOFF_cargo_bloque_c_municion_ux.md`.)*
+
+#### Reordenar el cinturón (#25)
+
+`BeltSet` solo aceptaba refs del **grid**: no existía mover un stack que ya colgaba del
+cinturón a otro slot. Nueva
+[`CARGO.Inventory.BeltMove(ply, fromN, toN)`](../lua/corpus_cargo/server/corpus_cargo_inventory.lua)
+(server, ~línea 752), intent `belt_move` (`Corpus.Net.Register("cargo", "belt_move")`):
+
+- **Destino vacío:** el stack se mueve entero.
+- **Mismo id + condición idéntica:** fusiona hasta `max_stack` — el resto **se queda en el slot
+  ORIGEN** (nada sale del cinturón en un merge, a diferencia de un `BeltSet` desde el grid).
+- **Ocupante distinto:** vuelve al grid (swap; decisión del autor — mismo comportamiento que el
+  desplazamiento ya existente de `BeltSet`).
+
+La regla del tope (`max_stack`) se extrajo a un helper compartido,
+`BeltMergeInto(occ, moving, maxStack)` (~línea 695), usado tanto por `BeltSet` (grid → cinturón)
+como por `BeltMove` (cinturón → cinturón) — vive en un solo lugar. Cualquier movimiento que
+desplaza un ocupante llama a `Push` igual que antes: el espejo (§16.3) no se entera de la
+diferencia entre un `BeltSet` y un `BeltMove`.
+
+Cliente (`corpus_cargo_ui.lua`): la celda del cinturón (`MakeBeltCell`) ya era
+`Droppable("cargo_item")`; su `Receiver` gana la rama "el panel soltado es otra celda del
+cinturón" (`panels[1].cargoBeltSlot`) y manda `belt_move` en vez de `belt_set` cuando el origen
+es otro slot del cinturón.
+
+#### Descargar el arma (#26)
+
+La mitad difícil ya existía desde el Bloque B (§16.3: el espejo absorbe lo que vuelve de un
+cargador, con overflow al grid). Lo que faltaba era el **disparador**:
+`CARGO.AmmoPool.UnloadWeapon(ply)` (`server/corpus_cargo_ammopool.lua`) actúa sobre el **arma
+activa** (`ply:GetActiveWeapon()`):
+
+- **ARC9, por SU API** (COMPAT-RUNTIME, cero fork): `SWEP:Unload(GetProcessedValue("Ammo"))`
+  (`sh_reload.lua:199-205`, verificado contra la base) — hace `GiveAmmo(Clip1)` +
+  `SetClip1(0)` + `SetLoadedRounds(0)`.
+- **No-ARC9, a mano:** `ply:GiveAmmo(clip, ammoName, true)` + `wep:SetClip1(0)`.
+- **`Reconcile` corre en el acto** (sin esperar el poll de 4 Hz) para que las balas aparezcan en
+  el cinturón (o el grid, si está lleno) en el mismo instante.
+- **`StoreClip`** después: el cargador vacío **persiste en el blob de instancia** (#18) — un
+  re-equip desde el grid no debe devolver las balas.
+- **Gate de spawn:** denegado con aviso hasta que el `Push` de spawn del jugador corrió — el
+  mismo `ready[ply]` que suprime el reconciliador (§16.4); descargar durante la ventana de
+  spawn perdería las balas en el `StripAmmo`+`Push` que sigue.
+
+**La trampa de `RestoreAmmo`:** la animación de reload de ARC9 solo se reproduce
+(`wep:PlayAnimation("reload")`) si la animation entry de esa arma **NO** declara
+`RestoreAmmo` — ese flag re-llena el clip **desde la reserva** en un timer interno de
+`PlayAnimation` (`sh_anim.lua:130-133` → `RestoreClip`, `sh_reload.lua:298`), lo que desharía el
+unload por detrás. Se consulta la entry por la propia API de ARC9
+(`wep:TranslateAnimation`/`wep:GetAnimationEntry`), nunca se asume. **Verificado en juego:** la
+animación corrió y el contador **no** se re-llenó — el guard funcionó.
+
+Disparadores en cliente: opción **"Unload magazine"** en el menú contextual del slot equipado
+(`OpenSlotMenu`, `corpus_cargo_ui.lua`) — solo se ofrece si esa arma está efectivamente en la
+mano (`wep:GetClass() == def.weapon_class`) — y el comando `cargo_unload` (bindeable), ambos
+mandan el intent `unload` vía `SendUnload()`.
+
+#### Gate WALK+USE de ítems botados (#27)
+
+El hook `PlayerUse` de `corpus_cargo_capture.lua` (~línea 286) filtraba por `ent:IsWeapon()`; el
+`ENT:Use` de `corpus_cargo_item.lua` recogía **incondicionalmente**, así que un ítem de munición
+botado esquivaba el gate entero (USE pelado ya aspiraba la munición). El hook ahora cubre también
+`ent:GetClass() == "corpus_cargo_item"`:
+
+- **USE pelado:** carry de prop HL2 (`ply:PickupObject(ent)`) — el `return false` del hook
+  bloquea que `ENT:Use` corra.
+- **WALK+USE:** el hook se aparta (`return` sin valor para el caso ítem) y `ENT:Use` recoge como
+  siempre.
+
+Reusa el debounce por jugador (`ply.CargoNextWorldUse`) y la marca "USE de nuevo suelta"
+(`ply.CargoCarryEnt`) que el gate de armas de mundo (roadmap #16, entry 7) ya había pagado — sin
+duplicar lógica. La entidad `corpus_cargo_item.lua` no cambió (solo su comentario de header); el
+convar `cargo_world_guns` sigue gateando **solo** la rama de armas, no la de ítems.
+
+**Sin convars nuevas** en este bloque. Net nuevo: `belt_move`, `unload` (ambos vía
+`Corpus.Net.Register("cargo", …)`, como todo mensaje del módulo).

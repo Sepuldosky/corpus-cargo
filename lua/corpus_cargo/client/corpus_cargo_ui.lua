@@ -30,6 +30,8 @@ local NET_SUB_ATT   = Corpus.Net.Register("cargo", "subslot_attach")
 local NET_SUB_DET   = Corpus.Net.Register("cargo", "subslot_detach")
 local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
 local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
+local NET_BELT_MOVE = Corpus.Net.Register("cargo", "belt_move")
+local NET_UNLOAD    = Corpus.Net.Register("cargo", "unload")
 
 local cvKey = CreateClientConVar("cargo_key_inventory", tostring(KEY_I), true, false,
     "Key (KEY_* enum) that opens the Cargo inventory")
@@ -78,6 +80,12 @@ local function SendBeltSet(n, ref)
 end
 local function SendBeltClear(n)
     net.Start(NET_BELT_CLR) net.WriteUInt(n, 4) net.SendToServer()
+end
+local function SendBeltMove(fromN, toN)
+    net.Start(NET_BELT_MOVE) net.WriteUInt(fromN, 4) net.WriteUInt(toN, 4) net.SendToServer()
+end
+local function SendUnload()
+    net.Start(NET_UNLOAD) net.SendToServer()
 end
 
 -- ------------------------------------------------------------------
@@ -202,6 +210,16 @@ local function OpenSlotMenu(slotId)
     local menu = DermaMenu()
 
     menu:AddOption("Unequip", function() SendUnequip(slotId) end)
+
+    -- unload the held magazine back to the belt (roadmap #26) — only offered
+    -- for the weapon actually in hand: the server acts on the active weapon
+    if def and isstring(def.weapon_class) then
+        local ply = LocalPlayer()
+        local wep = IsValid(ply) and ply:GetActiveWeapon() or nil
+        if IsValid(wep) and wep:GetClass() == def.weapon_class then
+            menu:AddOption("Unload magazine", function() SendUnload() end)
+        end
+    end
 
     -- extract mounted sub-slot entries
     if def and istable(def.subslots) and slotEntry.blob and istable(slotEntry.blob.subslots) then
@@ -518,9 +536,15 @@ local function MakeBeltCell(parent, n)
     end
 
     -- drop an ammo stack from the grid to store it here (the server
-    -- rejects anything that is not category "ammo")
+    -- rejects anything that is not category "ammo"), or another belt cell
+    -- to reorder (roadmap #25 — the server validates the source slot)
     cell:Receiver("cargo_item", function(_, panels, dropped)
         if not dropped or not IsValid(panels[1]) then return end
+        local fromN = panels[1].cargoBeltSlot
+        if fromN ~= nil then
+            if fromN ~= n then SendBeltMove(fromN, n) end
+            return
+        end
         local entry = panels[1].cargoEntry
         if entry and entry.uid == nil then
             SendBeltSet(n, CARGO.Grid.RefOf(entry))
@@ -1169,6 +1193,11 @@ end)
 concommand.Add("cargo_inventory", function()
     CARGO.UI.Toggle()
 end, nil, "Opens/closes the Cargo inventory")
+
+-- bindable twin of the slot-menu option (roadmap #26)
+concommand.Add("cargo_unload", function()
+    SendUnload()
+end, nil, "Unloads the held weapon's magazine onto the ammo belt (grid if full)")
 
 -- Open key via input polling, NOT PlayerButtonDown: that hook does not fire
 -- client-side in singleplayer (engine quirk), which made the I key feel

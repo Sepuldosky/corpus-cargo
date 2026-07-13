@@ -276,13 +276,22 @@ hook.Add("PlayerCanPickupWeapon", "corpus_cargo_world_gate", function(ply, wep)
     return false
 end)
 
--- Look at a world weapon and press USE (PlayerUse repeats every tick while
--- +USE is held: debounced per player). Plain USE = HL2 carry; WALK+USE =
--- one-shot grant + engine pickup (the capture hook converts it).
+-- Look at a world weapon — or a dropped Cargo item — and press USE
+-- (PlayerUse repeats every tick while +USE is held: debounced per player).
+-- Plain USE = HL2 carry; WALK+USE = deliberate take. For weapons that is a
+-- one-shot grant + engine pickup (the capture hook converts it); for items
+-- the hook steps aside and lets the engine reach ENT:Use, which the
+-- `return false` otherwise blocks (roadmap #27 — the item entity used to
+-- dodge this gate entirely, so plain USE hoovered dropped ammo).
 hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
-    if not cvWorldGuns:GetBool() then return end
-    if not IsValid(ent) or not ent:IsWeapon() then return end
-    if IsValid(ent:GetOwner()) then return end   -- someone is holding it
+    if not IsValid(ent) then return end
+
+    local isItem = ent:GetClass() == "corpus_cargo_item"
+    if not isItem then
+        if not cvWorldGuns:GetBool() then return end
+        if not ent:IsWeapon() then return end
+        if IsValid(ent:GetOwner()) then return end   -- someone is holding it
+    end
 
     if (ply.CargoNextWorldUse or 0) > CurTime() then return false end
     ply.CargoNextWorldUse = CurTime() + 0.4
@@ -301,6 +310,7 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
     end
 
     if ply:KeyDown(IN_WALK) then
+        if isItem then return end -- deliberate take: ENT:Use collects it
         ent.CargoUseTaken = true -- grant for the gate + "deliberate" marker
         if not ply:PickupWeapon(ent) then
             ent.CargoUseTaken = nil

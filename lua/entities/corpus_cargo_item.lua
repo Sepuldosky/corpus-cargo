@@ -1,7 +1,10 @@
 -- corpus_cargo_item.lua — dropped item entity (SHARED single-file)
 -- Spawned by the drop action and by container/sub-slot ejection into the
--- world. Carries a single grid entry (stack or unique instance ref); USE
--- returns it to the activator's inventory.
+-- world. Carries a single grid entry (stack or unique instance ref).
+-- WALK+USE returns it to the activator's inventory; plain USE carries it
+-- like an HL2 prop. The gate lives in the PlayerUse hook of
+-- server/corpus_cargo_capture.lua (roadmap #27), which blocks the engine
+-- from reaching ENT:Use unless the take is deliberate.
 
 AddCSLuaFile()
 
