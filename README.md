@@ -20,12 +20,15 @@ módulo dueño posee el "qué hace". Cargo transporta blobs de instancia sin int
 - **UI fullscreen 3 columnas / 3 estados** (Solo/Loot/Trade reservado) + tooltip de
   inspección, feed de pickup y **wheel menu radial** (hold de G) sobre las teclas 1-7.
 - **Equipamiento estilo STALKER**: slots de arma por tecla 1-7, re-apretar enfunda (SWEP de
-  manos propio), quick slots F1-F4, spawn desarmado — la captura convierte las armas del
-  engine en ítems y los drops son el SWEP real en mundo.
+  manos propio), quick slots F1-F4, slot de granadas por stack (`×N`), drop directo desde el
+  slot, spawn desarmado — la captura convierte las armas del engine en ítems (incluidas las
+  herramientas del spawnmenu) y los drops son el SWEP real en mundo.
 - **El cinturón ES la reserva de munición**: los tipos de HL2 son ítems, espejo agnóstico de
   base (cero hooks de ARC9), armas del mismo tipo comparten reserva.
 - **Peso → velocidad** (curva pura, capacidad base + mochila), dinero con provider nativo,
   contenedores en mundo con transferencias.
+- **Theme con paletas runtime**: base neutra estilo spawnmenu que se tiñe en vivo con el
+  preset del HUD DGL4 si está montado; paleta GAMMA disponible por convar.
 - **Puente ARC9**: attachments viven en el inventario, stats en vivo vía `GetProcessedValue`,
   reconciliación con el menú C. Degrada con gracia si ARC9 no está.
 - **Persistencia completa** por SteamID64 vía `Corpus.Data` — inventario, equipadas,
@@ -37,7 +40,8 @@ En diseño / sin implementar: **Workbench** (craft/reparación/desarme) y **come
 ## Requisitos
 
 - **Corpus** (dependencia dura — sin él, Cargo no arranca).
-- Opcional: **ARC9** (attachments + stats en vivo). Cargo degrada con gracia si no está.
+- Opcional: **ARC9** (attachments + stats en vivo) y **DGL4** (la UI se tiñe con el preset
+  del HUD). Cargo degrada con gracia si no están.
 
 El idioma de cara al jugador (UI, ítems, menús) es **inglés**; docs y commits en español.
 
