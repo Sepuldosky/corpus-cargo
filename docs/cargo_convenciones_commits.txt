@@ -101,6 +101,11 @@ Para corpus-cargo/ (el módulo), los alcances definidos son:
   arc9:
     Puente de attachments/stats con ARC9 (corpus_cargo_arc9.lua).
 
+  ammo:
+    Sistema de munición: ítems de munición HL2, mapa de calibres y el espejo
+    cinturón <-> pool real del engine (corpus_cargo_ammo.lua en shared,
+    corpus_cargo_ammopool.lua en server). Ver §16 de Cargo_Architecture.md.
+
   ui:
     Todo el cliente visual: theme, grid, tooltip, panel de estado, frame
     principal, panel de transferencia, tab del menú Q

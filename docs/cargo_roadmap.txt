@@ -120,7 +120,10 @@ Espejado como cross-ref en caliber_roadmap.txt §2[5].
 
 Estado de diseño de este bloque tras la sesión 2026-07-11:
   - #21 (círculos de herramienta sandbox) -> DISEÑADO dentro de §15 (Cargo_Architecture.md).
-  - #19 (cinturón de munición) -> solo la FORMA diseñada en §15; la SEMÁNTICA sigue sin diseñar.
+  - #19 (cinturón de munición) -> FORMA en §15; SEMÁNTICA CERRADA en §16 e
+    IMPLEMENTADA (CHANGELOG #11, [PENDIENTE] verif. in-game): el cinturón ES la
+    reserva real. Queda abierto: cargadores rellenables con toggle + binding de
+    ammo-atts de EFT (§16.6).
   - #16 -> IMPLEMENTADO v1 (CHANGELOG #7, [PENDIENTE] verif. in-game): sin pickup
     por contacto; WALK+USE toma, USE agarra como prop; drops de armas = SWEP real.
     Convar cargo_weapon_world_pickup.
@@ -157,30 +160,39 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     capturar/botar/reequipar). El estado de munición viaja en el blob del ítem (Cargo
     transporta, el dueño interpreta — contrato §3). Prerequisito de 17.
 
-19. SISTEMA DE MUNICIÓN / CARGADORES [Caliber semántica + Cargo UI/inventario].
-    Posible sistema de cargadores que se llenan con munición, con TOGGLE (no a todos
-    les gusta llenar cargadores realistas). ARC9 EFT trae municiones custom propias
-    (ej. FMJ 9mm del menú en algunas armas) que se alimentan de munición HL2: abre la
-    posibilidad de "simular" que la munición custom de ARC9 es distinta a la de HL2
-    (plus gigante para ARC9). Necesita UI: llevar la munición cargada al EQUIPO (pasar
-    del inventario al equipo). Referencia del autor: STALKER Anomaly / Misery tienen
-    algo parecido. Toca el puente ARC9 (corpus_cargo_arc9) + la UI de equipamiento.
-    NOTA: la FORMA (cinturón de munición) ya está diseñada en §15 — es el punto de
-    anclaje visual que esta semántica va a llenar.
-    MODELO YA DECIDIDO con el autor (2026-07-12): CINTURÓN = POOL REAL POR CALIBRE
-    (ply:GiveAmmo/SetAmmo; las armas del mismo calibre HL2 comparten reserva, como
-    HL2 y STALKER); el grid es solo almacén en data; lo distinto POR ARMA es el
-    CARGADOR (Clip1), que ARC9 guarda por entidad y Cargo ya persiste en el blob
-    (#18, CHANGELOG #10). NO se hace reserva por-arma con swap.
-    *** BLOQUEANTE A RESOLVER EN ESTE BLOQUE (reporte in-game 2026-07-12): ARC9
-    REGALA MUNICIÓN DE RESERVA al entregar un arma — "la munición no puede aparecer
-    del éter" (autor). Es SWEP:InitialDefaultClip() (sh_deploy.lua:130-146),
-    disparado por un timer.Simple(0.4) desde su Initialize (sh_init.lua:80-86):
-    ply:GiveAmmo(ClipSize * arc9_mult_defaultammo). Contamina el pool que el
-    cinturón debe poseer. Opciones a evaluar: arc9_mult_defaultammo 0 / re-sincronizar
-    el pool desde el cinturón después de cada give. ***
-    SEMILLA COMPLETA (estado + modelo + investigación ARC9 con archivo:línea):
-    ../../dev/HANDOFF_cargo_bloque_b_municion.md
+19. SISTEMA DE MUNICIÓN / CARGADORES [Cargo].
+    [FUNDACIÓN IMPLEMENTADA — Bloque B, CHANGELOG #11, [PENDIENTE] verif. in-game.
+     Diseño cerrado en §16 de Cargo_Architecture.md]
+    MODELO (decidido con el autor 2026-07-12, ya construido): EL CINTURÓN ES LA
+    RESERVA REAL. Un stack colgado en el cinturón ES el pool nativo del engine para
+    su tipo HL2 (SetAmmo/GetAmmoCount); el grid es solo almacén. Las armas del mismo
+    TIPO HL2 comparten reserva (como HL2 y STALKER) — la clave del pool es el tipo de
+    engine (def.ammo.hl2), NO el calibre (que es etiqueta de display). Lo distinto POR
+    ARMA es el CARGADOR (Clip1), que ya persiste en el blob (#18). NO hay reserva
+    por-arma con swap. Los 11 tipos base de HL2 son ítems con modelo (verificado contra
+    los VPK), peso y max_stack. El espejo cinturón<->pool es un poll a 4 Hz, AGNÓSTICO
+    DE BASE: funciona sin un solo hook de ARC9.
+    EL ÉTER, MUERTO (era el bloqueante; "la munición no puede aparecer del éter"):
+    SWEP:InitialDefaultClip (sh_deploy.lua:130-146) regalaba reserva en cada entrega de
+    arma. Tres capas: arc9_mult_defaultammo forzado a 0 (su default es 2) + StripAmmo y
+    Push al spawn + reconciliador suprimido hasta ese Push.
+    *** HUECO DECLARADO, NO TAPADO (dato que la semilla NO traía): SWEP.ForceDefaultAmmo
+    SALTEA esa convar (sh_deploy.lua:140). Hoy ningún arma de los 5 packs instalados la
+    usa con valor != 0 (solo las granadas EFT, que la ponen en 0), así que la
+    neutralización es completa. Si un pack futuro la reabre, la ESCALACIÓN ANOTADA es un
+    ledger de conservación: pool + cargadores debe balancear, y todo excedente sin un
+    cargador que lo explique es éter y se clampea. ***
+    QUEDA ABIERTO (fuera del v1, confirmado con el autor):
+      a) CARGADORES RELLENABLES con TOGGLE (no a todos les gusta llenarlos a mano).
+      b) BINDING DE AMMO-ATTS DE EFT (§16.6): los tipos de bala de EFT (FMJ/AP/HP) son
+         attachments por calibre que NO cambian el tipo HL2 — solo la balística
+         (Penetration, DamageMax/Min, ArmorPiercing...). La palanca: que el stack ACTIVO
+         del cinturón decida qué ammo-att va montado en el arma. Da munición realmente
+         distinta sobre el mismo pool HL2 — el plus para ARC9 que pedía el autor. El
+         campo def.ammo.att ya está reservado en el schema. Referencia: STALKER
+         Anomaly / Misery.
+      c) Las entidades arc9_ammo/arc9_ammo_big reparten por su propio Touch (no por
+         PlayerCanPickupItem), así que el espejo las absorbe al CINTURÓN en vez del grid.
 
 20. CONDICIÓN / MANTENIMIENTO DEL ARMA [Caliber semántica + Cargo condición-blob].
     ARC9 EFT ya traba armas por calor / muchos disparos (sistema propio de ARC9 EFT):
@@ -239,6 +251,42 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     fue justo lo que el ajuste arregló — no regresarla). Ojo con la trampa VGUI ya
     documentada: DIconLayout con Dock(FILL) dentro de DScrollPanel colapsa.
     Toca corpus_cargo_grid.lua.
+
+
+BLOQUE C — UX DE MUNICIÓN (hallazgos in-game 2026-07-12, 1.ª pasada del Bloque B)
+---------------------------------------------------------------------------------
+El NÚCLEO del #19 quedó confirmado en juego (el cinturón ES la reserva, ARC9 ya no
+regala munición del éter, la muerte limpia todo). Estos tres son lo que FALTA para
+que el sistema se sienta terminado. Semilla:
+../../dev/HANDOFF_cargo_bloque_c_municion_ux.md
+
+25. REORDENAR EL CINTURÓN [Cargo UI + inventory] — SIN DISEÑAR.
+    Reporte del autor: "tengo 30 balas de smg en el slot 3 y no puedo ponerlo en el
+    ultimo slot del belt". HOY: Inventory.BeltSet solo acepta refs del GRID
+    (FindEntry busca en rec.items), así que mover un stack belt->belt no existe como
+    operación. La celda del cinturón YA es Droppable("cargo_item") — lo que falta es
+    el intent y el handler. Ojo: el swap sin pérdida y el merge con tope (max_stack)
+    ya están resueltos en BeltSet; hay que REUSAR esa lógica, no duplicarla.
+
+26. DESCARGAR EL ARMA (unload) [Cargo + base de arma] — SIN DISEÑAR.
+    Pedido del autor: poder quitarle la munición al cargador, ejecutando la animación
+    de reload. La munición va al CINTURÓN; si el cinturón está lleno, al inventario.
+    NOTA: el espejo del pool (§16.3) YA absorbe correctamente lo que vuelve de un
+    cargador (pool sube -> cinturón lo absorbe -> excedente al grid) — está verificado
+    en el harness. Lo que falta es el DISPARADOR: ARC9 ya trae SWEP:Unload
+    (sh_reload.lua:201, hace GiveAmmo(Clip1)); para armas no-ARC9 hay que hacerlo a
+    mano (SetClip1(0) + GiveAmmo). Sumar el StoreClip del blob (#18) para que el
+    cargador vacío persista.
+
+27. LOS ÍTEMS BOTADOS SE RECOGEN CON USE PELADO, NO CON WALK+USE [Cargo] — CAUSA YA
+    DIAGNOSTICADA. Reporte del autor: "smg rounds del inventario se toman
+    inmediatamente con use". El gate de WALK+USE del #16 vive en el hook PlayerUse de
+    corpus_cargo_capture.lua:282 y filtra por ent:IsWeapon() — SOLO cubre armas. El
+    ENT:Use de lua/entities/corpus_cargo_item.lua:49 recoge INCONDICIONALMENTE, así
+    que la entidad de ítem esquiva el gate entero. Arreglo: aplicarle la misma regla
+    (ply:KeyDown(IN_WALK) -> tomar; USE pelado -> cargar como prop de HL2, igual que
+    hacen las armas). Reusar el patrón de capture.lua, incluido el debounce
+    (CargoNextWorldUse) y el "USE de nuevo suelta" (CargoCarryEnt).
 
 =====================================================
 Diseño de referencia: Cargo_Architecture.md (inventario, Block 1 + §15 UI fullscreen),

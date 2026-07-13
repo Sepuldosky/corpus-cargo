@@ -1041,3 +1041,125 @@ Comida, persistencia y ausencia de errores de ARC9 ya venían confirmados de la
   propio `DIconLayout` (para que comparta origen con las celdas y scrollee con el
   contenido), así que su alto = alto del contenido: sin ítems no hay nada que
   pintar, y con pocos se corta en el último.
+
+---
+
+## 11. Bloque B: sistema de munición — el cinturón ES el pool (roadmap #19) `[APLICADO 2026-07-12]`
+
+Tercera tanda del autor (2026-07-12), arrancada en chat nuevo desde la semilla
+`dev/HANDOFF_cargo_bloque_b_municion.md`. Cierra la **semántica** del cinturón que
+el entry 8 (§15.2) había dejado como forma vacía. Diseño → **§16 nueva** de
+`Cargo_Architecture.md`. Suma **dos archivos** (tocan el manifest).
+
+**Modelo (decidido con el autor antes de codear):** el cinturón **no guarda**
+munición, **ES** la reserva real del jugador (`ply:SetAmmo`/`GetAmmoCount`); el
+grid es solo almacén. Las armas del mismo tipo HL2 **comparten** reserva (como HL2
+y como STALKER); lo distinto por arma es el **cargador** (`Clip1`), que ya persiste
+en el blob (#18, entry 10). **No** hay reserva por-arma con swap.
+
+1. **Ítems de munición HL2 + mapa de calibres** (nuevo
+   `shared/corpus_cargo_ammo.lua`): los **11 tipos base del engine** registrados como
+   ítems (`cargo_ammo_<tipo>`), cada uno con **modelo**, peso por unidad, descripción
+   y **`max_stack`** (el tope es lo que hace que los 6 slots del cinturón sean una
+   decisión y no decoración). El schema de `def.ammo` gana **`hl2`** — el tipo de
+   engine, que es **la clave del pool**; `caliber` queda como etiqueta de display
+   (es sobre lo que agrupa el badge A/B). En el def de un **arma**, `def.ammo` lleva
+   *solo* la etiqueta: el tipo real sale de la entidad. **Los 11 `.mdl` se verificaron
+   parseando los VPK reales** (`hl2_misc_dir.vpk` → 2 201 `.mdl`, `garrysmod_dir.vpk`),
+   no de memoria.
+2. **El espejo cinturón ↔ pool** (nuevo `server/corpus_cargo_ammopool.lua`).
+   Invariante: `GetAmmoCount(tipo) == suma de los stacks del cinturón de ese tipo`.
+   `Push()` (cinturón → pool) usa **`SetAmmo`, nunca `GiveAmmo`**: asigna, así que
+   empujar dos veces no infla nada. `Reconcile()` (pool → cinturón) es un **poll a
+   4 Hz**: el pool es la **verdad del consumo** (recargar lo drena, descargar el
+   cargador lo devuelve, granadas/cohetes lo gastan directo) y el cinturón lo sigue,
+   así que el `x<n>` de la celda **es** el conteo real — la UI no necesitó cambios.
+   **Poll y no hooks a propósito:** el pool lo muta la base de arma que el jugador
+   tenga en la mano (ARC9, HL2, TFA…); pollear es **agnóstico de base** y cuesta 11
+   lecturas de entero por jugador por tick. **El pool funciona sin un solo hook de
+   ARC9.** Drenaje **por orden de slot** (1→6). La munición que vuelve de un cargador
+   y no entra en el cinturón **no se destruye**: se va al grid.
+3. **Muerto el éter** (el bloqueante que el entry 10 dejó anotado; reporte del autor:
+   *"la munición no puede aparecer del éter"*). `SWEP:InitialDefaultClip`
+   (`Arc9 Base/.../sh_deploy.lua:130-146`) hace `GiveAmmo(ClipSize * arc9_mult_defaultammo)`
+   en **cada entrega de arma**, vía un `timer.Simple(0.4)` de su `Initialize`. Tres capas:
+   (a) **la fuente** — Cargo fuerza `arc9_mult_defaultammo` a **0** (su default es **2**)
+   al ready, mismo takeover que el puente de attachments ya hace con `arc9_free_atts`;
+   (b) **el spawn** — en cada `PlayerLoadout`, `StripAmmo()` y después `Push()`: la
+   reserva se reconstruye **del cinturón y de nada más**, diferido más allá de la
+   ventana de 0.4 s de ARC9; (c) **el gate** — el reconciliador queda **suprimido**
+   hasta que el `Push` de spawn del jugador corrió, así que nada de lo que una base de
+   arma regale en la ventana de spawn puede lavarse al cinturón por el espejo.
+   ⚠️ **Hueco declarado, no tapado:** `SWEP.ForceDefaultAmmo` **saltea la convar**
+   (`sh_deploy.lua:140`) — dato que la semilla NO traía. Hoy la neutralización es
+   **completa** para los 5 packs instalados (grep: ningún arma la usa con valor ≠ 0;
+   solo las granadas EFT, que la ponen en 0), pero un pack futuro reabriría el hueco.
+   **Escalación anotada:** ledger de conservación (pool + cargadores debe balancear).
+4. **Munición del mundo → el GRID** (decisión del autor): los `item_ammo_*` del mapa se
+   vetan al engine y entran como **ítem** al inventario, nunca como reserva a espaldas
+   del jugador. Convar `cargo_ammo_world_pickup`. *Deuda:* las entidades propias de ARC9
+   (`arc9_ammo`/`arc9_ammo_big`) reparten por su propio `Touch`, no por
+   `PlayerCanPickupItem`, así que el espejo las absorbe al **cinturón** en vez del grid
+   (no es éter — las balas están contadas — pero saltea el grid). Son props de sandbox:
+   deuda, no parche a ciegas.
+5. **Muerte + persistencia**: `WipeOnDeath` vacía **también el pool real** (el cinturón
+   *era* la reserva: borrarlo sin borrar el pool dejaba al cadáver respawneando armado).
+   El pool nativo no persiste, el cinturón sí → se re-siembra en cada spawn.
+6. **`max_stack` respetado en el cinturón**: `BeltSet` topea el slot y **el excedente se
+   queda en el grid** (antes fusionaba sin tope). El kit dev reparte munición real;
+   `cargo_dev_ammo_9mm` ahora declara `hl2 = "Pistol"` — comparte pool con
+   `cargo_ammo_pistol` **a propósito**: es el caso de prueba del punto 4 del autor (dos
+   ítems de "calibres" distintos comiendo un solo tipo HL2).
+
+**Convars nuevas:** `cargo_ammo_pool` (1), `cargo_ammo_arc9_takeover` (1),
+`cargo_ammo_world_pickup` (1).
+
+**Fuera de este bloque (confirmado con el autor):** cargadores rellenables con toggle;
+el **binding de ammo-atts de EFT** (§16.6 — el stack activo del cinturón decidiría qué
+attachment de bala va montado, dando balística realmente distinta sobre el mismo pool
+HL2; el campo `def.ammo.att` queda reservado en el schema). Ambos, bloque siguiente.
+
+**Verificación previa (2026-07-12):** sintaxis 6/6 (luaparser) + harness offline
+(lupa/LuaJIT 2.1, framework real de `corpus/` + módulo real, ambos realms): **80 checks,
+0 fallas**, de los cuales **22 nuevos del pool de munición** — el grid no es reserva, el
+cinturón sí; case-insensitive (ARC9 escribe `"pistol"`, HL2 `"Pistol"`); recargar drena y
+descargar devuelve; dos ítems distintos suman **una** reserva compartida; drenaje por orden
+de slot; `max_stack` topea y el excedente no se pierde; el respawn reconstruye la reserva
+**solo** del cinturón (el éter muere); la muerte vacía cinturón **y** pool; la caja del mapa
+entra al grid y **no** al pool; y el takeover de `arc9_mult_defaultammo` a 0 al ready.
+Selftest **40** (server) / **47** (client), era 31/38 — sin regresión. El harness ganó un
+flush de timers (`RunTimers`/`ClearTimers`) para poder ejercitar la ruta de spawn.
+
+**Falta:** verificación en juego (la corre el autor).
+
+**1.ª pasada en juego (2026-07-12, feedback del autor): el núcleo del bloque
+FUNCIONA.** Confirmado: la munición funciona, **ARC9 ya no entrega munición del
+"éter"**, la muerte limpia todo, y el pool anda bien con ARC9 **no-EFT**. Un solo
+bug del bloque, arreglado acá:
+
+7. **Modelos de AR2 cruzados** (`corpus_cargo_ammo.lua`, reporte del autor:
+   *"Dark energy rounds y Orb tienen los modelos cambiados"*). Los dos props de
+   AR2 son fáciles de cruzar y se cruzaron: el **cartridge** es el cargador del
+   rifle y la **ammo01** es la bola del alt-fire. Ahora `AR2` →
+   `combine_rifle_cartridge01.mdl` y `AR2AltFire` → `combine_rifle_ammo01.mdl`,
+   que es como los aparea HL2 en sus propios `item_ammo_ar2` /
+   `item_ammo_ar2_altfire`.
+
+**Frentes que abrió la pasada — NO son de este entry, van al bloque siguiente**
+(semilla: `dev/HANDOFF_cargo_bloque_c_municion_ux.md`):
+
+- **Reordenar el cinturón**: no se puede mover un stack que YA está en el
+  cinturón de un slot a otro (30 de SMG en el slot 3 no van al 6). `BeltSet` solo
+  acepta refs del **grid** — mover belt→belt no existe. → roadmap **#25**.
+- **Descargar el arma** (quitarle la munición al cargador, con animación de
+  reload): la munición va al cinturón, y si está lleno, al inventario. → roadmap
+  **#26**.
+- **Los ítems botados se recogen con USE pelado, no con WALK+USE**: el gate del
+  #16 vive en el hook `PlayerUse` de `corpus_cargo_capture.lua` y **solo cubre
+  armas** (`ent:IsWeapon()`); el `ENT:Use` de `corpus_cargo_item.lua:49` recoge
+  incondicionalmente, así que la entidad de ítem esquiva el gate entero. →
+  roadmap **#27**.
+- **Coherencia de calibres con EFT** (que un rifle ARC9 no coma "dark energy"):
+  el autor lo da por **aceptable por ahora** — los parches de coherencia exigirían
+  depender de TODOS los mods EFT (las balas están dispersas entre ellos). Enlaza
+  con el binding de ammo-atts (§16.6), que sigue pendiente y era esperado.

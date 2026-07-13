@@ -5,23 +5,14 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-12 (**Bloque A CERRADO** — entry 10
-`[APLICADO]`, confirmado en juego en 3 pasadas. Segunda tanda del autor, partida
-en dos bloques: (A) drop + muerte + modelos dev — este; (B) **munición =
-roadmap #19**, se arranca en **chat nuevo** con la semilla
-`../../dev/HANDOFF_cargo_bloque_b_municion.md`. Del Bloque A: drop nativo
-`cargo_drop` + **reconciliador universal de `PlayerDroppedWeapon`** (el arma
-botada deja de quedar fantasma en el equipo y vuelve como su misma instancia —
-verificado incluso con el mod "Drop Weapon" montado, que el autor igual dará de
-baja); `cargo_lose_on_death` (wipe total, dinero por provider) y
-`cargo_persistence`; **persistencia del cargador** en el blob (#18); modelos
-dev de comida/medkit + sonido. Tres bugs de terceros diagnosticados y resueltos
-del lado nuestro: los errores del revólver ARC9 (timer de recarga sin guard de
-dueño → `cargo_drop` no bota durante la recarga), el **cargador que se
-rellenaba solo** (ARC9 lo regala en su `PostModify` vía `AlreadyGaveAmmo` — se
-**reclama la bandera** en vez de correrle una carrera) y `util.IsValidModel`
-fallando **en silencio** con props montados sin precachear (→ `Items.ModelUsable`
-+ precache en `Register`). Commiteado, **sin push**)
+**Última actualización:** 2026-07-12 (**Bloque B CERRADO** — entry 11
+`[APLICADO]`, confirmado en juego: **el cinturón ES la reserva real**, ARC9 ya no
+regala munición del éter, la muerte limpia todo. Diseño en la **§16 nueva** de la
+arquitectura. La pasada dejó 3 frentes de **UX** que NO son del núcleo y van al
+**Bloque C** → roadmap **#25** (reordenar el cinturón), **#26** (descargar el
+arma) y **#27** (los ítems botados se recogen con USE pelado, no con WALK+USE).
+Semilla: `../../dev/HANDOFF_cargo_bloque_c_municion_ux.md`. Commiteado, **sin
+push**)
 
 ---
 
@@ -60,29 +51,57 @@ fallando **en silencio** con props montados sin precachear (→ `Items.ModelUsab
   muestreada en `EyePos` con piso, en `PreDrawViewModel`/`PreDrawPlayerHands`)
   confirmado in-game**, aplicó en vivo sin reiniciar. Queda remitir el fix a
   Twilight (acción del autor).
+- **Bloque A — entry 10 `[APLICADO 2026-07-12]`**: drop nativo `cargo_drop` +
+  **reconciliador universal de `PlayerDroppedWeapon`** (el arma botada deja de
+  quedar fantasma en el equipo y vuelve como su misma instancia),
+  `cargo_lose_on_death` + `cargo_persistence`, **persistencia del cargador** en
+  el blob (#18), modelos dev de comida/medkit. Confirmado en juego en 3 pasadas.
+- **Bloque B — munición, entry 11 `[APLICADO 2026-07-12]`** (§16 nueva): **el
+  cinturón ES la reserva real**, no un almacén. Los 11 tipos de HL2 son ítems
+  (modelo verificado contra los VPK, peso, `max_stack`); espejo a 4 Hz
+  `GetAmmoCount(tipo) == suma del cinturón`, **agnóstico de base** (cero hooks de
+  ARC9); armas del mismo tipo HL2 **comparten** reserva. **El éter murió**:
+  `arc9_mult_defaultammo` forzado a 0 + `StripAmmo`+`Push` al spawn + gate del
+  reconciliador. Munición del mapa → **grid**. Muerte vacía cinturón **y** pool.
+  Convars: `cargo_ammo_pool`, `cargo_ammo_arc9_takeover`,
+  `cargo_ammo_world_pickup`. **Confirmado en juego**; único bug de la pasada
+  (modelos de AR2 cruzados) arreglado dentro del entry.
 
 ## Pendiente de verificar
 
-- **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar —
-  el único frente suelto de rondas anteriores. El Bloque A (entry 10) cerró
-  completo.
+- **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar — el
+  frente suelto más viejo.
 
-## Frentes abiertos que dejó la 3.ª pasada (anotados, NO arreglados)
+## Frentes abiertos (anotados, NO arreglados)
 
-- **ARC9 regala munición de reserva al tomar un arma** (*"no puede aparecer del
-  éter"*): es `InitialDefaultClip` (`sh_deploy.lua:130`, vía un `timer.Simple(0.4)`
-  de su `Initialize`). **Es justo lo que contaminaría el "cinturón = pool real"**,
-  así que se resuelve dentro del **Bloque B** → roadmap #19 (opciones ya anotadas
-  en la semilla §3.5).
+- **Bloque C — UX de munición** (lo que dejó la pasada del Bloque B; el núcleo
+  quedó confirmado, esto es lo que falta para que se sienta terminado):
+  **#25** no se puede **reordenar el cinturón** (`BeltSet` solo acepta refs del
+  grid; belt→belt no existe); **#26** falta **descargar el arma** (el espejo ya
+  absorbe bien lo que vuelve de un cargador — falta el disparador + la animación);
+  **#27** los **ítems botados se recogen con USE pelado**, no con WALK+USE (el
+  gate del #16 filtra por `ent:IsWeapon()`, así que el `ENT:Use` de
+  `corpus_cargo_item.lua` lo esquiva). Semilla:
+  `../../dev/HANDOFF_cargo_bloque_c_municion_ux.md`.
 - **Retícula del grid**: se pierde con el inventario vacío y se corta en el último
   ítem cuando hay pocos → **roadmap #24** (causa probable ya diagnosticada: la
   dibuja el propio `DIconLayout`, cuyo alto es el del contenido).
+- **Categorías fijas de tabs** → **roadmap #23** (bloque propio, sin diseñar).
 
 ## Remanentes / deuda conocida
 
 - **Diseñado sin implementar:** comercio (`Cargo_Trade`) — siguiente bloque
-  cuando #8 cierre. La **semántica** del cinturón (alimentación, cargadores,
-  munición ARC9/EFT vs HL2) es roadmap #19, dueño a decidir con Caliber.
+  cuando #8 cierre.
+- **Munición, lo que el Bloque B dejó abierto a propósito:** (a) **cargadores
+  rellenables con toggle** (lo único que queda de #19); (b) **binding de
+  ammo-atts de EFT** (§16.6): los tipos de bala de EFT son attachments que **no**
+  cambian el tipo HL2, solo la balística — la palanca es que el stack activo del
+  cinturón decida qué ammo-att va montado, dando munición realmente distinta
+  sobre el mismo pool (`def.ammo.att` ya reservado en el schema); (c) **hueco del
+  éter declarado**: `SWEP.ForceDefaultAmmo` saltea la convar que forzamos —
+  ningún arma instalada lo usa, escalación anotada (ledger de conservación);
+  (d) las entidades `arc9_ammo` reparten por su propio `Touch` y el espejo las
+  absorbe al cinturón en vez del grid.
 - **El editor de íconos NO afecta la cámara de armas ARC9** (la foto de ARC9 es
   el encuadre; el override de tamaño sí aplica). **Fuente de íconos ARC9
   256² — deuda aceptada** (2.ª pasada 2026-07-12): ARC9 hornea su select icon
@@ -100,13 +119,10 @@ fallando **en silencio** con props montados sin precachear (→ `Items.ModelUsab
 
 ## Próximo paso
 
-1. **Bloque B — sistema de munición (roadmap #19).** **Se arranca en un chat
-   NUEVO** con la semilla `../../dev/HANDOFF_cargo_bloque_b_municion.md`, que
-   trae el estado, el modelo ya decidido (**cinturón = pool real por calibre**;
-   el cargador por-arma ya lo resuelven `Clip1` + el blob) y **toda la
-   investigación de ARC9 con archivo:línea** — incluida la trampa del **regalo
-   de reserva** (`InitialDefaultClip`) que este bloque **debe** neutralizar. El
-   harness offline quedó guardado en `../../dev/harness_cargo.py` (reusable).
+1. **Bloque C — UX de munición (#25 · #26 · #27).** Se arranca en un **chat
+   nuevo** con la semilla `../../dev/HANDOFF_cargo_bloque_c_municion_ux.md`, que
+   trae las tres causas ya diagnosticadas con `archivo:línea`. El harness offline
+   vive en `../../dev/harness_cargo.py` (reusable, ya cubre el pool).
 2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor: mod
    original Workshop 2792160770); si se cierra del todo el #22, matar las
    notificaciones de obtención de armas de GMod + verificar el 7.º slot contra
