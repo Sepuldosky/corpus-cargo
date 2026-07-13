@@ -34,3 +34,25 @@ end)
 concommand.Add("cargo_holster", function()
     SendSlotKey(0)
 end, nil, "Holsters the current weapon (Hands SWEP or nothing, per cargo_holster_hands)")
+
+-- Drop key (roadmap #17): a bindable key that drops the weapon in hand,
+-- same input-polling pattern as the inventory key (PlayerButtonDown does not
+-- fire client-side in singleplayer). Default 0 = unbound; set it with the
+-- binder in the Q tab or `bind <key> cargo_drop`. The command itself and the
+-- reconciliation live server-side (corpus_cargo_capture.lua).
+local cvDropKey = CreateClientConVar("cargo_key_drop", "0", true, false,
+    "Key (KEY_* enum) that drops the weapon in hand (0 = unbound; console: cargo_drop)")
+
+local dropKeyWasDown = false
+hook.Add("Think", "corpus_cargo_drop_key", function()
+    local key = cvDropKey:GetInt()
+    if key <= 0 then dropKeyWasDown = false return end
+
+    local down = input.IsButtonDown(key)
+    if down and not dropKeyWasDown
+        and not gui.IsGameUIVisible()
+        and vgui.GetKeyboardFocus() == nil then
+        RunConsoleCommand("cargo_drop")
+    end
+    dropKeyWasDown = down
+end)

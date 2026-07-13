@@ -26,6 +26,18 @@ local function BuildCargoTab(p)
     p:AddItem(binder)
     p:Help("Console alternative: bind <key> cargo_inventory")
 
+    -- drop the weapon in hand (roadmap #17); writes cargo_key_drop
+    p:Help("Drop weapon key:")
+    local dropBinder = vgui.Create("DBinder", p)
+    dropBinder:SetTall(30)
+    local cvDropKey = GetConVar("cargo_key_drop")
+    if cvDropKey then dropBinder:SetValue(cvDropKey:GetInt()) end
+    dropBinder.OnChange = function(_, num)
+        RunConsoleCommand("cargo_key_drop", tostring(num))
+    end
+    p:AddItem(dropBinder)
+    p:Help("Console alternative: bind <key> cargo_drop (the 'Drop Weapon' mod's +drop takes precedence if mounted)")
+
     p:CheckBox("Quick slots on F1-F4 (intercepts gm_showhelp/showteam/spare1/spare2)", "cargo_quick_f")
     p:CheckBox("STALKER weapon keys (1 melee, 2 sidearm, 3 primary, 4 secondary, 5-7 tools)", "cargo_weapon_slots")
     p:Help("Pressing the key of the weapon you are holding holsters it. Console: cargo_holster.")

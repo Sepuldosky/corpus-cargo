@@ -21,6 +21,12 @@
 -- loadout, our equip/reconcile) creates the entity and hands it over in the
 -- same breath and passes untouched, and a denial never strands a floating
 -- entity — the weapon was already lying on the ground on purpose.
+--
+-- The DROP side (roadmap #17, author request 2026-07-12) is the mirror: a
+-- single PlayerDroppedWeapon reconciler catches ANY drop path (the native
+-- cargo_drop, the "Drop Weapon" mod, or any other addon) — it empties the
+-- equipment slot and tags the dropped entity with the instance uid so the
+-- world gate and the take-back treat it as THAT item.
 
 local CARGO = Corpus.GetModule("cargo")
 
@@ -32,6 +38,8 @@ local cvWorldGuns = CreateConVar("cargo_weapon_world_pickup", "1", FCVAR_ARCHIVE
     "World weapons: no touch pickup — WALK+USE takes them, USE carries them; weapon drops spawn the real gun")
 local cvSandboxTools = CreateConVar("cargo_capture_sandbox_tools", "0", FCVAR_ARCHIVE,
     "Auto-capture the sandbox build tools (physgun/toolgun/camera) from the spawn loadout. 0 = drop them (the tool slots only hold one you ALREADY have — WALK+USE a world tool or a dev give)")
+local cvNativeDrop = CreateConVar("cargo_native_drop", "1", FCVAR_ARCHIVE,
+    "Provide Cargo's own 'drop weapon in hand' command (cargo_drop). The 'Drop Weapon' mod, if mounted, takes precedence — set 0 to use only the mod")
 
 -- The sandbox build tools: their equipment "slots" are the circles in §15.2.
 -- By default the engine loadout hands these out every spawn; auto-capturing
@@ -250,6 +258,9 @@ function CARGO.Capture.SpawnWorldWeapon(class, pos, uid)
     wep.CargoInstanceUid = isstring(uid) and uid or nil
     wep.CargoWorldSpawned = true -- our drops are NEVER taken by touch
     wep:Spawn()
+    -- a gun dropped straight out of the grid carries its stored magazine (#18);
+    -- a fresh SWEP would otherwise spawn with its DefaultClip
+    CARGO.Inventory.ApplyClipToEntity(wep, uid)
     return wep
 end
 
@@ -338,6 +349,10 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
         local action
         if blob ~= nil then
             action = "capture"
+            -- the world entity is about to be Removed below: harvest whatever
+            -- is left in its magazine into the blob first (#18), so re-equipping
+            -- from the grid does not hand back a free full clip
+            CARGO.Inventory.StoreClip(dropUid, wep)
         else
             action = CARGO.Capture.Decide(
                 EquippedClassCount(owner, class), HasWeaponItem(owner, class))
@@ -381,3 +396,72 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
         if IsValid(wep) then wep:Remove() end
     end)
 end)
+
+-- ------------------------------------------------------------------
+-- Dropping a weapon (roadmap #17, author request 2026-07-12): the mirror of
+-- the capture. A weapon leaving the player's hand must leave Cargo's
+-- equipment record too, and keep being ITS instance so a take-back restores
+-- the same blob. ONE universal reconciler on PlayerDroppedWeapon covers every
+-- drop path — the native cargo_drop below, the "Drop Weapon" mod (Workshop
+-- 946373028, whose +drop calls ply:DropWeapon) or any other addon. Author
+-- call: the Drop Weapon mod WINS over the native command (its behavior is
+-- left untouched; Cargo only reconciles). cargo_drop covers the no-mod case.
+-- ------------------------------------------------------------------
+
+hook.Add("PlayerDroppedWeapon", "corpus_cargo_drop_reconcile", function(ply, wep)
+    if not IsValid(ply) or not ply:IsPlayer() or not IsValid(wep) then return end
+    local class = wep:GetClass()
+
+    -- only an EQUIPPED Cargo weapon is "in hand"; find the slot holding it
+    local rec = CARGO.Inventory.GetRecord(ply)
+    local uid, slotId
+    for sid, u in pairs(rec.equip) do
+        local blob = CARGO.Instances.Get(u)
+        local def = blob and CARGO.Items.Get(blob.id) or nil
+        if def ~= nil and def.weapon_class == class then
+            uid, slotId = u, sid
+            break
+        end
+    end
+    if uid == nil then return end -- not a Cargo-equipped weapon: leave it alone
+
+    -- unequip WITHOUT returning to the grid — the item is going to the world,
+    -- not the backpack. Tag the entity so the world gate (no touch pickup) and
+    -- the take-back (WeaponEquip reads CargoInstanceUid) treat it as THIS
+    -- instance. The loaded magazine goes into the blob NOW (#18): the entity
+    -- keeps its own Clip1 while it lies there, but the take-back destroys it.
+    CARGO.Inventory.StoreClip(uid, wep)
+    rec.equip[slotId] = nil
+    wep.CargoInstanceUid = uid
+    wep.CargoWorldSpawned = true
+    CARGO.Inventory.Touch(ply)
+end)
+
+-- Native "drop the weapon in hand" — bindable exactly like the mod's +drop.
+-- Funnels through ply:DropWeapon so the reconciler above does the bookkeeping
+-- either way; the target position tosses it in front of the player.
+concommand.Add("cargo_drop", function(ply)
+    if not cvNativeDrop:GetBool() then return end
+    if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
+    local wep = ply:GetActiveWeapon()
+    if not IsValid(wep) then return end
+    if CARGO.Capture.Ignore[wep:GetClass()] then return end -- hands aren't gear
+
+    -- Third-party bug guard (in-game report 2026-07-12, ARC9 EFT revolver
+    -- cr200ds): its per-round reload arms one timer.Simple PER ROUND, and each
+    -- one reads swep:GetOwner():GetAmmoCount(...) guarding only IsValid(swep),
+    -- never the owner (arc9_eft_cr200ds.lua:406). Dropping mid-reload orphans
+    -- those timers and every one of them errors. ARC9 is COMPAT-RUNTIME — we
+    -- never fork it — so we simply refuse to drop until the reload finishes.
+    -- (An external drop mod calling ply:DropWeapon straight can still hit it;
+    -- that is the mod's and ARC9's business, not ours.)
+    if isfunction(wep.GetReloading) then
+        local okR, reloading = pcall(wep.GetReloading, wep)
+        if okR and reloading then
+            CARGO.Inventory.Notice(ply, "Finish the reload before dropping.")
+            return
+        end
+    end
+
+    ply:DropWeapon(wep, ply:GetShootPos() + ply:GetAimVector() * 48)
+end, nil, "Drop the weapon in hand into the world (keeps its Cargo instance)")

@@ -41,6 +41,18 @@ local NET_SUB_DET   = Corpus.Net.Register("cargo", "subslot_detach")
 local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
 local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
 
+-- Lifecycle convars (server, archived):
+--   cargo_lose_on_death — death wipes the whole inventory + money (roadmap
+--     #15). Default OFF: without it the inventory survives death, as before.
+--   cargo_persistence — persist records to disk across sessions. 0 keeps them
+--     session-only: the in-memory _records still survive respawn within a
+--     session, but nothing is written to / loaded from Corpus.Data (instance
+--     blobs still write — orphan-GC debt, roadmap #15).
+local cvLoseOnDeath = CreateConVar("cargo_lose_on_death", "0", FCVAR_ARCHIVE,
+    "On death, lose the entire inventory (items, equipment, quick, belt) and money")
+local cvPersist = CreateConVar("cargo_persistence", "1", FCVAR_ARCHIVE,
+    "Persist inventories to disk across sessions (0 = session-only, nothing written or loaded)")
+
 -- ------------------------------------------------------------------
 -- Records: load / save / normalize
 -- ------------------------------------------------------------------
@@ -55,7 +67,7 @@ function CARGO.Inventory.GetRecord(ply)
     local rec = CARGO.Inventory._records[sid]
     if rec ~= nil then return rec end
 
-    rec = Corpus.Data.Load("cargo", "inv_" .. sid)
+    rec = cvPersist:GetBool() and Corpus.Data.Load("cargo", "inv_" .. sid) or nil
     if rec == nil then
         rec = { items = {}, equip = {}, quick = {}, belt = {}, wallet = {} }
     else
@@ -83,6 +95,7 @@ function CARGO.Inventory.GetRecord(ply)
 end
 
 function CARGO.Inventory.SaveRecord(ply)
+    if not cvPersist:GetBool() then return end -- session-only mode: nothing hits disk
     local rec = CARGO.Inventory._records[SteamKey(ply)]
     if rec == nil then return end
     Corpus.Data.Save("cargo", "inv_" .. SteamKey(ply), rec)
@@ -389,21 +402,100 @@ function CARGO.Inventory.Sync(ply)
 end
 
 -- ------------------------------------------------------------------
+-- Magazine persistence (roadmap #18 — prerequisite of #17, in-game report
+-- 2026-07-12: a dropped ARC9 revolver came back with its 3 spent rounds
+-- refilled). A weapon that leaves the player is DESTROYED as an entity
+-- (strip on unequip, Remove on take-back) and comes back through ply:Give,
+-- which hands out the SWEP's DefaultClip — a free full magazine. So the
+-- loaded round count travels in the instance blob: Cargo TRANSPORTS the
+-- number, the weapon base owns what it means (contract §3).
+-- ------------------------------------------------------------------
+
+function CARGO.Inventory.StoreClip(uid, wep)
+    if not isstring(uid) or not IsValid(wep) then return end
+    local blob = CARGO.Instances.Get(uid)
+    if not istable(blob) then return end
+    local ok, clip = pcall(wep.Clip1, wep)
+    if ok and isnumber(clip) and clip >= 0 then
+        blob.clip1 = clip
+        CARGO.Instances.Save(uid)
+    end
+end
+
+-- ARC9 keeps the real magazine in the native Clip1 and MIRRORS it in its own
+-- LoadedRounds NetworkVar (verified against the base) — set both when the SWEP
+-- exposes it. Applied now AND one tick later: a weapon base fills the clip
+-- during its own Initialize/Deploy, after ply:Give returns.
+--
+-- AlreadyGaveAmmo is the load-bearing part (2nd in-game pass 2026-07-12: an
+-- AK-19 fired down to 15/30 still came back FULL, even with Clip1 restored).
+-- Verified against the live base, sh_attach.lua:147-155 — inside PostModify,
+-- server side, with a valid player owner:
+--
+--     timer.Simple(0, function()               -- runs after each att attaches
+--         if (ammo/clipsize changed) and self.AlreadyGaveAmmo then ...
+--         elseif !self.AlreadyGaveAmmo then
+--             self:SetClip1(self:GetProcessedValue("ClipSize"))  -- FREE FULL MAG
+--             self.AlreadyGaveAmmo = true
+--         end
+--     end)
+--
+-- Initialize seeds AlreadyGaveAmmo = false (sh_init.lua:44), and PostModify
+-- settles only once the attachments do — a net round-trip AFTER ply:Give, i.e.
+-- after every timer we could queue. So we do not race it: we CLAIM the flag.
+-- With it true, ARC9 takes neither branch and our magazine stands. A weapon
+-- with no stored magazine never reaches here (RestoreClip returns early), so a
+-- brand-new gun still gets its full clip from ARC9, exactly as intended.
+local function ApplyClip(wep, clip)
+    if not IsValid(wep) then return end
+    if wep.AlreadyGaveAmmo ~= nil then wep.AlreadyGaveAmmo = true end
+    wep:SetClip1(clip)
+    if isfunction(wep.SetLoadedRounds) then pcall(wep.SetLoadedRounds, wep, clip) end
+end
+
+function CARGO.Inventory.RestoreClip(ply, class, blob)
+    if not istable(blob) or not isnumber(blob.clip1) then return end
+    local clip = blob.clip1
+    local function apply()
+        if not IsValid(ply) then return end
+        ApplyClip(ply:GetWeapon(class), clip)
+    end
+    apply()
+    timer.Simple(0, apply)
+end
+
+-- world entities (a drop straight out of the grid) take the same treatment
+function CARGO.Inventory.ApplyClipToEntity(wep, uid)
+    if not IsValid(wep) or not isstring(uid) then return end
+    local blob = CARGO.Instances.Get(uid)
+    if not istable(blob) or not isnumber(blob.clip1) then return end
+    local clip = blob.clip1
+    ApplyClip(wep, clip)
+    timer.Simple(0, function() ApplyClip(wep, clip) end)
+end
+
+-- ------------------------------------------------------------------
 -- Equip / unequip
 -- ------------------------------------------------------------------
 
-local function GiveEquipWeapon(ply, def)
+local function GiveEquipWeapon(ply, def, blob)
     if isstring(def.weapon_class) and def.weapon_class ~= "" then
         -- flag lets the capture hook (corpus_cargo_capture.lua) tell OUR
         -- equip-give apart from engine/loadout gives it must intercept
         ply.CargoEquipGive = true
         ply:Give(def.weapon_class)
         ply.CargoEquipGive = nil
+        -- the stored magazine beats the SWEP's DefaultClip (#18)
+        CARGO.Inventory.RestoreClip(ply, def.weapon_class, blob)
     end
 end
 
-local function StripEquipWeapon(ply, def)
+-- uid: remember the loaded magazine before the SWEP entity dies (#18)
+local function StripEquipWeapon(ply, def, uid)
     if isstring(def.weapon_class) and def.weapon_class ~= "" then
+        if uid ~= nil then
+            CARGO.Inventory.StoreClip(uid, ply:GetWeapon(def.weapon_class))
+        end
         ply:StripWeapon(def.weapon_class)
     end
 end
@@ -419,7 +511,7 @@ function CARGO.Inventory.Unequip(ply, slotId)
 
     if blob then
         local def = CARGO.Items.Get(blob.id)
-        if def then StripEquipWeapon(ply, def) end
+        if def then StripEquipWeapon(ply, def, uid) end
     end
     if slotId == "body" then
         -- signal for Cortex (disguise resolution) — soft, fires into the void
@@ -453,7 +545,7 @@ function CARGO.Inventory.Equip(ply, ref, slotId)
     table.remove(rec.items, idx)
     rec.equip[slotId] = entry.uid
 
-    GiveEquipWeapon(ply, def)
+    GiveEquipWeapon(ply, def, blob)
     if slotId == "body" then
         hook.Run("Corpus_Cargo_BodyChanged", ply, def.id, blob)
     end
@@ -804,6 +896,51 @@ net.Receive(NET_SUB_DET, function(_, ply)
 end)
 
 -- ------------------------------------------------------------------
+-- Death wipe (roadmap #15, author call 2026-07-12): with cargo_lose_on_death
+-- the player loses EVERYTHING on death — grid, equipment, quick binds, belt
+-- and money. Not a loot drop: it is gone (loot-on-death is a Cortex-owned
+-- cross-module block). Runs on PlayerDeath so the empty equip is already in
+-- place when PlayerLoadout's reconcile re-give runs on respawn.
+-- ------------------------------------------------------------------
+
+function CARGO.Inventory.WipeOnDeath(ply)
+    local rec = CARGO.Inventory.GetRecord(ply)
+
+    -- destroy every reachable instance so no blob file is orphaned (the host
+    -- plus any uid'd sub-slot entry it carries)
+    local function purgeInstance(uid)
+        local blob = CARGO.Instances.Get(uid)
+        if istable(blob) and istable(blob.subslots) then
+            for _, entries in pairs(blob.subslots) do
+                for _, e in ipairs(entries) do
+                    if e.uid then CARGO.Instances.Delete(e.uid) end
+                end
+            end
+        end
+        CARGO.Instances.Delete(uid)
+    end
+
+    for _, uid in pairs(rec.equip) do
+        local blob = CARGO.Instances.Get(uid)
+        local def = blob and CARGO.Items.Get(blob.id) or nil
+        if def and isstring(def.weapon_class) and def.weapon_class ~= "" then
+            ply:StripWeapon(def.weapon_class)
+        end
+        purgeInstance(uid)
+    end
+    for _, entry in ipairs(rec.items) do
+        if entry.uid then purgeInstance(entry.uid) end
+    end
+
+    -- money goes through the active provider (respects DarkRP etc., §6)
+    local okBal, bal = pcall(CARGO.Money.Get, ply)
+    if okBal and isnumber(bal) and bal > 0 then pcall(CARGO.Money.Take, ply, bal) end
+
+    rec.items, rec.equip, rec.quick, rec.belt = {}, {}, {}, {}
+    CARGO.Inventory.Touch(ply)
+end
+
+-- ------------------------------------------------------------------
 -- Lifecycle
 -- ------------------------------------------------------------------
 
@@ -811,14 +948,19 @@ hook.Add("PlayerInitialSpawn", "corpus_cargo_inv_load", function(ply)
     CARGO.Inventory.GetRecord(ply)
 end)
 
--- Equipped weapon classes survive respawn (inventory persists through
--- death in this block; loot-on-death is future design).
+hook.Add("PlayerDeath", "corpus_cargo_inv_death", function(ply)
+    if cvLoseOnDeath:GetBool() then CARGO.Inventory.WipeOnDeath(ply) end
+end)
+
+-- Equipped weapon classes survive respawn. By default the inventory persists
+-- through death; cargo_lose_on_death wipes it instead (WipeOnDeath already ran
+-- on PlayerDeath, so rec.equip is empty here and re-gives nothing).
 hook.Add("PlayerLoadout", "corpus_cargo_inv_loadout", function(ply)
     local rec = CARGO.Inventory.GetRecord(ply)
     for _, uid in pairs(rec.equip) do
         local blob = CARGO.Instances.Get(uid)
         local def = blob and CARGO.Items.Get(blob.id) or nil
-        if def then GiveEquipWeapon(ply, def) end
+        if def then GiveEquipWeapon(ply, def, blob) end
     end
 
     -- Deferred reconcile (CHANGELOG #6): on spawn the gamemode loadout and
@@ -836,7 +978,7 @@ hook.Add("PlayerLoadout", "corpus_cargo_inv_loadout", function(ply)
             local def = blob and CARGO.Items.Get(blob.id) or nil
             if def and isstring(def.weapon_class) and def.weapon_class ~= ""
                 and not ply:HasWeapon(def.weapon_class) then
-                GiveEquipWeapon(ply, def)
+                GiveEquipWeapon(ply, def, blob)
             end
         end
     end)
