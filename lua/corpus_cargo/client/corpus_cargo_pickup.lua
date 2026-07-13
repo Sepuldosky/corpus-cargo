@@ -33,6 +33,24 @@ net.Receive(NET_PICKUP, function()
     while #feed > MAX_LINES do table.remove(feed, 1) end
 end)
 
+-- Stock GMod pickup history (roadmap #22): the base gamemode's right-edge
+-- feed (weapons/ammo/items, cl_hudpickup.lua) duplicates this feed's role
+-- and clutters the screen. Returning false from HUDDrawPickupHistory skips
+-- the stock drawer (same suppression DGL4's resourcehistory uses); the
+-- entries the gamemode keeps queuing are emptied so re-enabling the stock
+-- history does not replay a stale backlog.
+local cvHideStock = CreateClientConVar("cargo_hide_pickup_history", "1", true, false,
+    "Hide the stock GMod pickup history (weapons/ammo/items); Cargo's own feed replaces it")
+
+hook.Add("HUDDrawPickupHistory", "corpus_cargo_hide_pickup_history", function()
+    if not cvHideStock:GetBool() then return end
+    local gm = GAMEMODE
+    if gm and istable(gm.PickupHistory) and next(gm.PickupHistory) ~= nil then
+        table.Empty(gm.PickupHistory)
+    end
+    return false
+end)
+
 hook.Add("HUDPaint", "corpus_cargo_pickup_feed", function()
     if #feed == 0 or not cvFeed:GetBool() then return end
 

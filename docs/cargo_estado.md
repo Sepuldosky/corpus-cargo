@@ -5,11 +5,11 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (tanda de CIERRE ejecutada: entries
-**13/14/16 → `[APLICADO]`**, diseño bajado a la arquitectura (§4 throwable +
-taxonomía, §5 movecompat, §15.2 columna apilada, §15.5 paletas/DGL4, §16.9
-espejo, **§17 wheel** nueva), CLAUDE.md refrescado (mapa completo + trampas
-de HUD) y las cuatro semillas de `dev/` borradas.)
+**Última actualización:** 2026-07-13 (tanda de flecos: **resto del #22
+implementado** — entry 17 `[PENDIENTE]`: veto del historial stock de pickups
+(`cargo_hide_pickup_history`, alcance total decidido por el autor) +
+veredicto 7.º slot vs DGL4 por lectura del mod vivo (sin conflicto por
+construcción). Checklists de la tanda (15/17/4) entregados como artefacto.)
 
 ---
 
@@ -27,7 +27,7 @@ de HUD) y las cuatro semillas de `dev/` borradas.)
   drop de slot, #24 retícula, **#29 paletas runtime + teñido DGL4**) y los
   frentes de la 2.ª pasada (#32 taxonomía de granadas + cajas por WALK+USE,
   #33 hub ARC9 completo, #34 compat con mods de movimiento).
-- **Harness offline: 229 checks verdes en ambos realms** (con gate final: un
+- **Harness offline: 235 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 52 client / 45 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -45,6 +45,10 @@ de HUD) y las cuatro semillas de `dev/` borradas.)
   `cargo_dev_dump_weapons` ya se generó.
 - **CHANGELOG #4** (feed de pickup sin el mod L4D) sigue sin re-verificar —
   el frente suelto más viejo.
+- **Entry 17 (resto del #22)** — checklist del autor en juego: (a) historial
+  stock de pickups muerto con el feed propio vivo; (b) la convar lo revive;
+  (c) teclas 1-7 con DGL4 montado (7 = cámara, sin selector ajeno); (d)
+  `cargo_weapon_slots 0` devuelve las teclas a DGL4/stock.
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -64,22 +68,17 @@ de HUD) y las cuatro semillas de `dev/` borradas.)
 - **Íconos:** fuente ARC9 256² a 1080p (deuda aceptada, 2.ª pasada
   2026-07-12); el editor no afecta la cámara de armas ARC9; captura de armas
   de mundo sin bajar al spec de `Cargo_ItemImages_Arquitectura.md`.
-- **Resto del #22:** matar notificaciones de GMod + verificar 7.º slot vs
-  HUD DGL4. **Remitir el fix de brazos oscuros a Twilight** (ya confirmado,
-  acción del autor).
+- **Remitir el fix de brazos oscuros a Twilight** (ya confirmado, acción del
+  autor).
 - `Corpus.Data` sin `Delete`; peso nominal de attachments; instancias
   huérfanas sin GC; comandos dev sin gate admin; sin `addon.json`.
 
 ## Próximo paso
 
-1. **Tanda de flecos** (chat nuevo, semilla
-   `../../dev/HANDOFF_cargo_flecos_15_22_4.md`): flip del **entry 15**
-   (checklist del autor), resto del **#22** (matar notificaciones de GMod +
-   verificar 7.º slot vs HUD DGL4) y re-verificación del **#4** (feed de
-   pickup, el frente suelto más viejo). Los checklists in-game van con el
-   **workflow nuevo de verificación** (artefacto browser con tick/cross +
-   notas por ítem — en formalización en un chat paralelo; buscarlo antes
-   del PASO 4).
+1. **Pasada en juego de la tanda de flecos** (artefacto "Cargo —
+   Verificación en juego"): checklists de los entries **15**, **17** (resto
+   del #22) y **#4** (feed de pickup). Con el reporte del autor flipean los
+   tres y se borra la semilla `dev/HANDOFF_cargo_flecos_15_22_4.md`.
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 3. Después: **categorías fijas de tabs** (#23, exige sesión de diseño del set
    fijo) y **comercio** (`Cargo_Trade_Arquitectura.md`). El **#35**

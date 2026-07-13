@@ -70,6 +70,7 @@ local function BuildCargoTab(p)
     p:Help("Pressing the key of the weapon you are holding holsters it. Console: cargo_holster.")
     p:CheckBox("Holster to Hands (uncheck to holster to nothing at all)", "cargo_holster_hands")
     p:CheckBox("On-screen pickup feed (what you just picked up)", "cargo_pickup_feed")
+    p:CheckBox("Hide the stock GMod pickup history (weapons/ammo/items)", "cargo_hide_pickup_history")
     p:CheckBox("Demo bars (health/HL2 armor) on the status panel", "cargo_dev_bars")
 
     p:CheckBox("Sandbox tool circles (physgun/toolgun/camera) in the inventory and wheel", "cargo_ui_tools")

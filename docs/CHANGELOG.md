@@ -1568,3 +1568,58 @@ anterior (math.huge en `PlayerStepSoundTime`) queda como sospecha no
 confirmada. Es comportamiento del mod de movimiento (nuestra pata de compat
 no toca rutas de sonido), pero se anota como frente propio para investigarlo
 con el mod vivo en juego, no de memoria.
+
+---
+
+## 17. Resto del #22: muere el historial stock de pickups + veredicto 7.º slot vs DGL4 `[PENDIENTE]`
+
+Tanda de flecos (semilla `dev/HANDOFF_cargo_flecos_15_22_4.md`), 2026-07-13.
+Las dos mitades que el entry 9 dejó del roadmap #22:
+
+1. **Veto del historial stock de GMod** (`corpus_cargo_pickup.lua`). La
+   sospecha del handoff (`CHudHistoryResource`) era incorrecta a medias,
+   verificado contra el juego vivo: el historial de pickups NO es un elemento
+   del engine — lo dibuja Lua del gamemode base
+   (`gamemodes/base/gamemode/cl_hudpickup.lua`: `GM:HUDWeaponPickedUp/
+   HUDAmmoPickedUp/HUDItemPickedUp` acumulan en `GM.PickupHistory` y
+   `GM:HUDPaint` corre `hook.Run("HUDDrawPickupHistory")` sin gate de
+   `HUDShouldDraw` — `cl_init.lua:83`). El veto correcto es un hook
+   `HUDDrawPickupHistory` que devuelve `false` (la misma supresión que usa el
+   `resourcehistory.lua:920` de DGL4 — coexisten sin orden garantizado y con
+   el mismo efecto). Alcance decidido por el autor (preguntado, opción
+   recomendada): **todo el historial** — armas + munición + ítems HL2; el
+   feed propio queda como única señal de pickup. Convar cliente
+   `cargo_hide_pickup_history` (default 1, archive) + checkbox en el tab Q;
+   el veto además vacía el backlog de `GM.PickupHistory` para que
+   re-habilitar el historial no reproduzca pickups viejos. OJO con DGL4: sus
+   paneles "WEAPON ACQUIRED" son su elemento `resourcehistory`, NO el
+   historial de GMod — si molestan se apagan en el menú de DGL4
+   (COMPAT-RUNTIME, no es territorio nuestro).
+2. **7.º slot vs HUD DGL4 — veredicto por lectura del mod vivo: no hay
+   conflicto por construcción.** DGL4 escucha las teclas vía
+   `UnintrusiveBindPress` (DyaMetR, `modules/bind_press.lua`), que NO usa
+   `hook.Add`: reemplaza `GAMEMODE.PlayerBindPress` — y el hook de Cargo
+   (`corpus_cargo_hotkeys.lua`, `hook.Add("PlayerBindPress")`) corre ANTES
+   que la función del gamemode y la corta al devolver `true`. Es decir: con
+   `cargo_weapon_slots 1`, las teclas 1-7 mandan el intent de Cargo y el
+   selector de DGL4 nunca ve el bind (diseño deliberado de la librería:
+   "giving priority to any other addon"). Además DGL4 solo rastrea 6 slots
+   (`HOLOHUD2.WeaponSelectionSlots = 6`, `weaponselection.lua:7`) y su
+   handler ignora `slot7` aunque le llegue (`weaponselection.lua:669`); su
+   selector sigue operable por rueda del mouse (`invnext`/`invprev`, que
+   Cargo no intercepta). Con `cargo_weapon_slots 0` el hook de Cargo se corre
+   a un lado y DGL4 recupera las teclas 1-6: exactamente su comportamiento
+   stock. Cero código — queda solo la confirmación visual en juego.
+
+**Sin net nuevo; sin migración** (el veto es client puro). Verificación
+offline: `luaparser` limpio en lo tocado; harness extendido con el bloque del
+veto (devuelve false con la convar puesta, vacía el backlog, se corre a un
+lado en 0, degrada sin `GAMEMODE`, no toca el feed propio) — **235 checks
+verdes en ambos realms**.
+
+**Checklist en juego (artefacto de la tanda):** (a) recoger un arma/munición/
+ítem HL2 → NO aparece el historial stock (esquina derecha) y el feed propio
+sí señala; (b) `cargo_hide_pickup_history 0` → el historial stock vuelve;
+(c) con DGL4 montado: teclas 1-7 mandan los intents de Cargo (7 = cámara),
+sin selector DGL4 abierto ni errores; la rueda del mouse sigue abriendo el
+selector DGL4; (d) `cargo_weapon_slots 0` → las teclas vuelven a DGL4/stock.
