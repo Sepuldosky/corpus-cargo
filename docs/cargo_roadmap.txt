@@ -332,6 +332,11 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 ../../dev/HANDOFF_cargo_pendientes_pasada2.md
 -----------------------------------------------------------------
 32. TAXONOMÍA DE GRANADAS + GATE DE CAJAS DE MUNICIÓN [Cargo ammo/items].
+    [IMPLEMENTADO — CHANGELOG #16, [PENDIENTE] verif. in-game: la cara
+    canónica de Grenade/slam es el lanzable (cargo_throw_frag/slam), el
+    espejo absorbe al slot/grid, la captura no acuña wpn_weapon_frag, ids
+    viejos remapean, y las cajas item_ammo_* van por WALK+USE en el gate
+    único de capture.lua.]
     Reporte del autor: el frag de HL2 se genera como ítem de MUNICIÓN
     (cargo_ammo_grenade, cara canónica del tipo "Grenade" desde el Bloque B)
     al morir/spawnearlo — debería ser LANZABLE (categoría throwables, slot);
@@ -341,13 +346,21 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     click medio se toman por CONTACTO (diseño del Bloque B en
     PlayerCanPickupItem, ammopool.lua) — el autor quiere WALK+USE también
     ahí; reusar el patrón del gate de capture.lua.
-33. HUB ARC9 INCOMPLETO EN EL WHEEL [Cargo UI]. Muestra "Auto · Group A":
+33. HUB ARC9 INCOMPLETO EN EL WHEEL [Cargo UI].
+    [IMPLEMENTADO — CHANGELOG #16, [PENDIENTE] verif. in-game: AmmoInfo con
+    la ruta del Ammo1 de ARC9 + fallbacks SWEP.Ammo/GetLoadedRounds; defs
+    autogen con def.ammo.caliber (etiqueta del pool) + derivación runtime.]
+    Muestra "Auto · Group A":
     falta el calibre (defs autogen wpn_<clase> sin def.ammo — poblarlo al
     capturar o leer de ARC9 en runtime) y cargador/reserva (AmmoInfo de
     corpus_cargo_wheel.lua devuelve nil con SWEP válido; FiremodeOf sí
     responde — diagnosticar contra el ARC9 vivo qué devuelven Clip1 /
     GetProcessedValue("Ammo") / GetPrimaryAmmoType client-side).
 34. VELOCIDAD PISADA POR EL MOD DE MOVIMIENTO [Cargo movement, COMPAT].
+    [IMPLEMENTADO — CHANGELOG #16, [PENDIENTE] verif. in-game: hook Move
+    shared (corpus_cargo_movecompat.lua) que escala el MaxSpeed del move
+    data con el mult publicado por NW2Float; gated por sv_bm_enabled y
+    cargo_movement_compat; vanilla intacto sin el mod.]
     Identificado por el autor: "better movement v2 with sprint step time"
     (dev/other/) sobreescribe walk/run y anula la curva peso→velocidad.
     El footer muestra bien. Leer el mod vivo y decidir la palanca

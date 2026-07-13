@@ -5,16 +5,16 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (entries 13 y 14 implementados y con
-**DOS pasadas in-game del autor**: 46 OK en la 2.ª — wheel, throwable,
-columna, #30, #28, #24 y #29 confirmados funcionando; el fix `dfeafcc`
-cerró el touch-hoover del spawnmenu y revivió hub/chips del wheel. Quedan
-**3 frentes reales** → roadmap **#32** (frag debe ser lanzable, no munición
-de cinturón + WALK+USE para cajas item_ammo_*), **#33** (hub ARC9 sin
-calibre ni cargador/reserva) y **#34** (el mod de movimiento pisa la curva
-peso→velocidad). Semilla del próximo chat:
-`../../dev/HANDOFF_cargo_pendientes_pasada2.md`. Los entries siguen
-`[PENDIENTE]` hasta cerrar esos tres.)
+**Última actualización:** 2026-07-13 (los 3 frentes de la 2.ª pasada están
+**implementados** — entry 16 `[PENDIENTE]`: **#32** frag/SLAM son LANZABLES
+(cara canónica `cargo_throw_frag/slam`, remap de ids viejos al cargar) y las
+cajas `item_ammo_*` se toman con WALK+USE, no por contacto; **#33** el hub
+del wheel completa calibre y cargador/reserva ARC9 (fallbacks verificados
+contra la base viva); **#34** la curva peso→velocidad sobrevive a better
+movement v2 (hook Move shared + NW2Float). Harness: 220 checks verdes en
+ambos realms. Falta SOLO la pasada corta del autor (checklist abajo); los
+entries **13/14/16 cierran juntos** y recién ahí baja el diseño a la
+arquitectura y se borran las semillas de `dev/`.)
 
 ---
 
@@ -71,6 +71,27 @@ peso→velocidad). Semilla del próximo chat:
 
 ## Pendiente de verificar
 
+- **Entry 16 (frentes #32-34) — checklist en juego, CORTO:**
+  1. **#32 granadas**: spawnear `weapon_frag` (click medio) → NO se toma por
+     contacto; WALK+USE lo suma como lanzable (al ×N del slot si está
+     equipado, si no al grid como "Frag Grenade") — nunca más frags-munición
+     en el cinturón; morir y re-spawnear armas no acuña `Frag Grenades`; un
+     record viejo carga con granadas/SLAM remapeados al lanzable y el
+     cinturón limpio.
+  2. **#32 cajas**: spawnear `item_ammo_*` (click medio) → pisarlas NO las
+     toma; USE pelado carga como prop (USE de nuevo suelta); WALK+USE al
+     grid con feed de pickup (sobrepeso avisa y la deja en el piso);
+     `cargo_ammo_world_pickup 0` restaura el touch del engine.
+  3. **#33 hub**: wheel sobre arma ARC9 → `calibre · modo · Group` y
+     `cargador / reserva` coinciden con el HUD, también con el arma NO en
+     mano; armas HL2 muestran cargador/reserva; capturar un arma nueva deja
+     su calibre en el tooltip.
+  4. **#34 velocidad**: con better movement v2 activo, cargarse de peso
+     frena walk/run de verdad; `sv_bm_enabled 0` → vanilla puro con la curva
+     de siempre; `cargo_movement_compat 0` → vuelve el comportamiento pisado.
+  5. **Regresión**: lanzar drena el ×N y la última granada quita el SWEP;
+     equip/unequip/drop del stack; cinturón/espejo/unload de munición normal
+     intactos; velocidad vanilla sin el mod.
 - **Entry 14 (Bloque D) — checklist en juego:**
   1. **#30**: click del ícono de physgun/toolgun/camera en el spawnmenu →
      entra al grid; repetirlo avisa "You already have one."; el loadout de
@@ -146,12 +167,12 @@ peso→velocidad). Semilla del próximo chat:
 
 ## Próximo paso
 
-1. **Roadmap #32 · #33 · #34** (hallazgos de la 2.ª pasada) en un chat
-   nuevo con la semilla `../../dev/HANDOFF_cargo_pendientes_pasada2.md` —
-   trae el diagnóstico parcial de cada uno y las reglas de modo auto. Al
-   cerrar los tres: entries 13/14 → `[APLICADO]`, bajar el diseño a la
-   arquitectura (§4, §15.2, §17 wheel, teñido — §8 del prompt semilla del
-   wheel) y borrar las TRES semillas de `dev/`.
+1. **Pasada corta del autor** (checklist del entry 16, arriba). Al pasar:
+   entries 13/14/16 → `[APLICADO]`, bajar el diseño a la arquitectura (§4
+   throwable + taxonomía de granadas, §15.2, §17 wheel, teñido — §8 del
+   prompt semilla del wheel), refrescar el `CLAUDE.md` (mapa:
+   `corpus_cargo_wheel.lua` + `corpus_cargo_movecompat.lua`; trampas
+   nuevas) y borrar las TRES semillas de `dev/`.
 2. **Remitir el fix de brazos oscuros a Twilight** (acción del autor); resto
    del #22 (notificaciones de GMod + 7.º slot vs HUD DGL4).
 3. Después: **categorías fijas de tabs** (#23, bloque propio, exige sesión de

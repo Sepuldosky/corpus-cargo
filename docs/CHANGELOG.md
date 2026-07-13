@@ -1415,3 +1415,64 @@ ruta arreglada. Quedan **3 frentes abiertos**, diagnóstico y semilla en
 
 Los entries 13 y 14 siguen `[PENDIENTE]` hasta que estos tres cierren y el
 autor confirme la pasada limpia.
+
+## 16. Frentes de la 2.ª pasada: taxonomía de granadas, hub ARC9 y compat de movimiento (roadmap #32 · #33 · #34) `[PENDIENTE]`
+
+Séptima tanda, arrancada de la semilla `dev/HANDOFF_cargo_pendientes_pasada2.md`
+(los tres frentes que dejó la 2.ª pasada in-game de los entries 13/14) y
+ejecutada en modo auto. Un commit por frente; los entries **13 y 14 siguen
+`[PENDIENTE]`** hasta que el autor confirme estos tres en juego.
+
+1. **Taxonomía de granadas + gate de cajas de munición (#32)** (`4d5d43b`) —
+   la cara canónica de los tipos HL2 `Grenade`/`slam` deja de ser munición de
+   cinturón: `cargo_throw_frag` / `cargo_throw_slam` (categoría `throwables`,
+   slot de stack §4) viven en `corpus_cargo_ammo.lua` junto al resto de los
+   tipos manejados — el SLAM va con el frag por dirección del handoff (misma
+   forma del conflicto); la granada del SMG1 sigue siendo munición. El espejo
+   §16 aprende la cara: `AbsorbType` tope el stack EQUIPADO bajo max_stack (el
+   ×N se mueve cuando el engine regala una granada — el reporte de la ronda 1)
+   y el excedente cae al grid clampeando el pool (el grid es almacén, no
+   reserva; decisión conservadora: nunca auto-equipa el slot vacío). La
+   captura ya no acuña `wpn_weapon_frag`: la entidad del give muere y el
+   espejo contabiliza; con el stack equipado la clase es suya (keep — el
+   take-back del entry 13 intacto). Ids muertos (`cargo_ammo_grenade/slam`,
+   `cargo_dev_frag`, `wpn_weapon_frag/slam` → `CARGO.Ammo.LegacyThrowIds`)
+   remapean al cargar records y contenedores; el stack legacy del cinturón
+   baja al grid. `cargo_dev_frag` sale del kit dev (entra el real). ADEMÁS:
+   las cajas `item_ammo_*` ya no se toman por contacto — `PlayerCanPickupItem`
+   pasa a veto puro y la toma es WALK+USE en el MISMO gate de `PlayerUse` de
+   `capture.lua` (USE pelado carga como prop; `cargo_ammo_world_pickup 0`
+   restaura el pickup crudo del engine), leyendo `AmmoPool.WorldAmmoSpec`.
+2. **Hub ARC9 del wheel (#33)** (`f458a08`) — diagnóstico contra el ARC9 vivo:
+   `GetPrimaryAmmoType` no es confiable en ARC9 (el `Primary.Ammo` de clase es
+   `""` — `shared.lua:334` — y solo `Initialize` lo corrige por instancia) y
+   un `Clip1` de -1 delata local weapon data sin networkear. `AmmoInfo` sigue
+   ahora la ruta del propio `Ammo1()` de ARC9 (`GetProcessedValue("Ammo")`,
+   `sh_reload.lua:578`) con respaldo en el campo plano `SWEP.Ammo` (dato
+   estático de clase: `"smg1"/"ar2"/"357"` en los packs EFT) y recién después
+   `GetPrimaryAmmoType`; el clip cae al espejo `GetLoadedRounds` (NetworkVar
+   broadcast, `shared.lua:1592`) cuando `Clip1` responde -1. El calibre: los
+   defs autogen nacen/upgradean con `def.ammo.caliber` resuelto del arma viva
+   y persistido en el registro; la etiqueta es LA DEL POOL de Cargo (la misma
+   con que agrupa el cinturón — el calibre EFT real solo existe como token de
+   trivia sin API, decisión anotada), y el hub la deriva en runtime cuando el
+   def no la trae (`CARGO.Wheel.CaliberOf`). El tooltip gana la fila de ammo
+   en capturadas gratis.
+3. **Velocidad vs mod de movimiento (#34)** (`9b48dc2`) — leído contra el mod
+   vivo: el `SetupMove` de better movement v2 reescribe `SetWalkSpeed/
+   SetRunSpeed` CADA tick desde sus convars (`sh_bm_main.lua:455-457`) — las
+   bases capturadas mueren al tick siguiente. Palanca elegida (la menos
+   invasiva del handoff): hook `Move` propio y SHARED
+   (`corpus_cargo_movecompat.lua`, nuevo en el manifest) que corre DESPUÉS de
+   `SetupMove` y escala el `MaxSpeed` del move data con el mult de la curva,
+   publicado por `Movement.Refresh` en un NW2Float; piso absoluto 30. No toca
+   al mod ni realimenta su matemática; sin el mod o con `sv_bm_enabled 0` la
+   pata no corre (vanilla intacto); `cargo_movement_compat 0` la apaga. Borde
+   cosmético declarado: los pasos del mod se timean con SU velocidad lerpeada.
+
+**Verificación offline:** `luaparser` limpio en todo lo tocado; harness
+`dev/harness_cargo.py` extendido por frente (taxonomía/absorción/captura/remap
+del #32, stub ARC9 frío y sano + calibre en captura del #33, decisión pura +
+escala/piso/toggles del #34) — **220 checks verdes en ambos realms**; selftest
+actualizado a la cara canónica (`cargo_throw_frag`, mapa clase→throwable).
+Checklist en juego (corto, solo #32-34 + regresión) en `cargo_estado.md`.
