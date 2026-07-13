@@ -5,18 +5,17 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (reporte de la ronda 1 de flecos:
-**entry 4 → `[APLICADO]`**; 15 confirmado a-c (queda solo la degradación
-sin addon, 15d); 17 confirmado a/c/d (el 17b estaba mal redactado: DGL4
-también veta el historial stock — re-check con su resourcehistory apagado).
-Frentes nuevos anotados: **#36** slot HL2 alineado, **#37** drop VJ que
-vuelve solo, **#38** trivia real. Artefacto actualizado a ronda 2.)
+**Última actualización:** 2026-07-13 (tanda de flecos CERRADA con la ronda
+2 del autor: **entries 4, 15 y 17 → `[APLICADO]`** — roadmap #22 cerrado
+entero. Frentes nuevos que dejó la pasada: **#36** slot HL2 alineado,
+**#37** drop VJ que vuelve solo, **#38** trivia real. Semilla del handoff
+borrada de `dev/`.)
 
 ---
 
 ## Qué existe hoy
 
-- **Todo el arco de entries 1-14 y 16 `[APLICADO]` y confirmado en juego.**
+- **Todo el arco de entries 1-17 `[APLICADO]` y confirmado en juego.**
   En orden: Block 1 (inventario: contrato de ítems, slots/sub-slots, peso,
   providers, contenedores), captura de armas del engine, imágenes de ítems
   (render a RT + editor), persistencia completa de equipadas, armas de mundo
@@ -34,15 +33,9 @@ vuelve solo, **#38** trivia real. Artefacto actualizado a ronda 2.)
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
   MIT y el rename `corpus_stalker` en el kit dev).
 
-## Pendiente de verificar (ronda 2, artefacto)
+## Pendiente de verificar
 
-- **Entry 15 — solo el (d):** desmontar `corpus_stalker` → los dev items
-  degradan a modelo anterior/letra sin errores (a-c ya confirmados; el
-  autor lo dejó pendiente por tiempo).
-- **Entry 17 — solo el (b), corregido:** con el elemento `resourcehistory`
-  de DGL4 APAGADO (o DGL4 desmontado), `cargo_hide_pickup_history 0`
-  revive el historial stock (a/c/d ya confirmados; el ✗ de la ronda 1 era
-  el veto propio de DGL4, no bug de Cargo).
+- Nada — todo el CHANGELOG está `[APLICADO]` y confirmado.
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -76,13 +69,11 @@ vuelve solo, **#38** trivia real. Artefacto actualizado a ronda 2.)
 
 ## Próximo paso
 
-1. **Ronda 2 del artefacto** (dos checks): 15d (degradación sin addon) y
-   17b corregido (resourcehistory de DGL4 apagado). Con ese reporte flipean
-   15 y 17 y se borra la semilla `dev/HANDOFF_cargo_flecos_15_22_4.md`.
+1. **Categorías fijas de tabs** (#23, exige sesión de diseño del set fijo)
+   y después **comercio** (`Cargo_Trade_Arquitectura.md`, el bloque grande).
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
-3. Después: **categorías fijas de tabs** (#23, exige sesión de diseño del set
-   fijo) y **comercio** (`Cargo_Trade_Arquitectura.md`). El **#35**
-   (footsteps) se investiga con el mod vivo cuando el autor lo priorice.
+3. Cuando se prioricen: **#36** (slot HL2 alineado), **#37** (drop VJ,
+   diagnóstico contra el mod vivo), **#35** (footsteps), **#38** (trivia).
 
 ---
 

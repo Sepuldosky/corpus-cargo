@@ -1427,7 +1427,7 @@ ruta arreglada. Quedan **3 frentes abiertos**, diagnóstico y semilla en
 Los entries 13 y 14 siguen `[PENDIENTE]` hasta que estos tres cierren y el
 autor confirme la pasada limpia.
 
-## 15. Assets ZONA + pesos reales GAMMA para armas capturadas (roadmap #15 parcial) `[PENDIENTE]`
+## 15. Assets ZONA + pesos reales GAMMA para armas capturadas (roadmap #15 parcial) `[APLICADO 2026-07-13]`
 
 Sesión paralela a los frentes #32-34 (2026-07-13), pedida por el autor: darle
 cuerpo STALKER a los ítems dev y peso real a las armas EFT. Dos piezas, una
@@ -1490,6 +1490,11 @@ el "autocaptured" del footer del tooltip a la trivia estilo ARC9, y/o
 generar trivias reales para el arsenal EFT del volcado. **(d) sin probar**
 (por tiempo, decisión del autor) — el entry queda `[PENDIENTE]` SOLO por la
 degradación sin addon; todo lo demás confirmado.
+
+### Addendum 2 — ronda 2 (2026-07-13): FLIP
+
+**(d) ✓** — con `corpus_stalker` desmontado los dev items degradaron sin
+errores. Entry completo.
 
 ## 16. Frentes de la 2.ª pasada: taxonomía de granadas, hub ARC9 y compat de movimiento (roadmap #32 · #33 · #34) `[APLICADO 2026-07-13]`
 
@@ -1599,7 +1604,7 @@ con el mod vivo en juego, no de memoria.
 
 ---
 
-## 17. Resto del #22: muere el historial stock de pickups + veredicto 7.º slot vs DGL4 `[PENDIENTE]`
+## 17. Resto del #22: muere el historial stock de pickups + veredicto 7.º slot vs DGL4 `[APLICADO 2026-07-13]`
 
 Tanda de flecos (semilla `dev/HANDOFF_cargo_flecos_15_22_4.md`), 2026-07-13.
 Las dos mitades que el entry 9 dejó del roadmap #22:
@@ -1666,3 +1671,13 @@ re-check. ADEMÁS, pedido nuevo del autor desde el (c) → roadmap #36: alinear
 el slot del MENÚ HL2 del arma con el slot Cargo equipado (ej. la RPD de EFT
 declara Slot 4 de engine — equipada como primary debería vivir en el bucket
 3 de la rueda del mouse, coherente con la tecla 3).
+
+### Addendum 2 — ronda 2 (2026-07-13): FLIP
+
+**(b) ✓** — con DGL4 desmontado, `cargo_hide_pickup_history 0/1` revive y
+mata el historial stock como corresponde. Con DGL4 montado su panel de
+"weapon acquired" sigue apareciendo independiente de la convar —
+**esperado y fuera de alcance**: es el elemento `resourcehistory` propio de
+DGL4 (se desactiva en SU menú de configuración; COMPAT-RUNTIME, nuestra
+convar gobierna solo el historial del gamemode base). Entry completo; el
+roadmap #22 cierra entero.

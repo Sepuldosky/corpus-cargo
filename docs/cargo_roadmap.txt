@@ -136,10 +136,10 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     nativa; el arma botada ya no queda fantasma en el equipo) + comando nativo
     cargo_drop (bota al frente, conserva la instancia). Antes: PARCIAL (CHANGELOG
     #7, el arma dropeada conservaba su uid; faltaba la tecla de drop).
-  - #22 -> COMPLETO (CHANGELOG #9 aplicado + #17 [PENDIENTE] verif.
-    in-game, 2026-07-13): orden 1-7 + holster + manos default; veto del
-    historial stock de pickups (cargo_hide_pickup_history); 7.º slot vs
-    HUD D/GL4 sin conflicto por construcción (lectura del mod vivo).
+  - #22 -> CERRADO (CHANGELOG #9 y #17 APLICADOS, confirmado in-game
+    2026-07-13): orden 1-7 + holster + manos default; veto del historial
+    stock de pickups (cargo_hide_pickup_history); 7.º slot vs HUD D/GL4
+    sin conflicto por construcción. Derivó el #36.
   - #18, #20 -> SIN diseñar.
 
 16. PICKUP POR MIRAR + USE, no por contacto [Cargo]. Hoy, sin el mod L4D, un arma
@@ -213,10 +213,10 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     del sandbox. Toggleable con "hide" en el inventario. -> DISEÑADO en §15.
 
 22. ORDEN DE ARMAS ESTILO STALKER + HOLSTER + matar notificaciones de GMod
-    [IMPLEMENTADO COMPLETO 2026-07-13 -> CHANGELOG #9 (orden 1-7 + holster,
-    APLICADO) y #17 ([PENDIENTE] verif. in-game: veto del historial stock
-    de pickups con cargo_hide_pickup_history + veredicto DGL4 por lectura
-    del mod vivo — sin conflicto por construcción, falta solo el visual)]
+    [CERRADO — CHANGELOG #9 y #17, APLICADOS (confirmado in-game
+    2026-07-13): orden 1-7 + holster + manos default; veto del historial
+    stock (cargo_hide_pickup_history); 7.º slot vs DGL4 sin conflicto.
+    Derivó el #36 (alinear slot HL2 con slot Cargo).]
     [Cargo UI/quickslots + compat HUD]. Reordenar las armas de GMod (toggleable):
     1=melee, 2=sidearm, 3=primary, 4=secondary, 5/6/7=physgun/toolgun/camera (el autor
     vio que se puede un 7º slot; verificar compat con el HUD objetivo). Holster
