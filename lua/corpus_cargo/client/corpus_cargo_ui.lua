@@ -47,7 +47,7 @@ local cvTools = CreateClientConVar("cargo_ui_tools", "1", true, false,
 local cvToolsAlign = CreateClientConVar("cargo_ui_tools_align", "left", true, false,
     "Sandbox tool circle alignment in the equipment column: left or center")
 
-local frame, grid, lootGrid, pendingOpen
+local frame, grid, lootGrid, tradeLeft, pendingOpen
 local BuildFrame -- forward: the tools hide chip (BuildEquipColumn) relayouts
 
 local function S() return CARGO.ClientState end
@@ -942,13 +942,22 @@ function BuildFrame(state)
     frame.OnClose = function(self)
         CARGO.Tooltip.Hide()
         if self.cargoState == "loot" then CARGO.Transfer.NotifyClosed() end
+        -- closing the frame IS cancelling the deal: the basket is intent, it
+        -- holds nothing (Cargo_Trade §3), so nothing is lost by dropping it
+        if self.cargoState == "trade" then CARGO.Trade.NotifyClosed() end
         surface.PlaySound("backpack/inv_close.wav")
     end
 
     -- ---------------- left column: contextual (§15.1) ----------------
     -- solo: absent (world behind the scrim). loot: container. trade: the
-    -- Cargo_Trade block builds its stock/basket here.
-    if state == "loot" then
+    -- trader's stock + the Buy strip (corpus_cargo_trade.lua owns those panels).
+    if state == "trade" then
+        tradeLeft = vgui.Create("DPanel", frame)
+        tradeLeft:SetPos(x0, y0)
+        tradeLeft:SetSize(colL, colH)
+        tradeLeft.Paint = function(_, w, h) T.PaintPanel(w, h) end
+        CARGO.Trade.BuildStockColumn(tradeLeft)
+    elseif state == "loot" then
         local left = vgui.Create("DPanel", frame)
         left:SetPos(x0, y0)
         left:SetSize(colL, colH)
@@ -1078,9 +1087,9 @@ function BuildFrame(state)
     avatar:SetSize(40, 40)
     avatar:SetPlayer(LocalPlayer(), 64)
 
-    -- money button (§15.3): the trigger is Cargo's; the mechanics (drop-
-    -- money entity in Solo, basket line in Trade) belong to the Cargo_Trade
-    -- block and hook in via CARGO.Trade.MoneyButton when that block lands.
+    -- money button (§15.3): the trigger is Cargo's; the mechanics (drop-money
+    -- entity in Solo, money-only basket line in Trade) are Cargo_Trade §7 —
+    -- SLICE 2 of the trade block, which hooks in via CARGO.Trade.MoneyButton.
     local moneyBtn = vgui.Create("DButton", header)
     moneyBtn:Dock(RIGHT)
     moneyBtn:SetWide(36)
@@ -1101,7 +1110,7 @@ function BuildFrame(state)
             return
         end
         chat.AddText(T.Colors.amber, "[Cargo] ", T.Colors.text,
-            "Money actions arrive with the trade block.")
+            "Dropping and offering cash arrives with the next trade slice.")
     end
 
     tabsBar = vgui.Create("Panel", right)
@@ -1138,22 +1147,39 @@ function BuildFrame(state)
         draw.SimpleText(rest, "CargoText", rightEdge - restW, 10, T.Colors.textDim)
     end
 
+    -- Sell strip + net + Cancel/Confirm. Docked BOTTOM *before* the grid takes
+    -- FILL: a FILL sibling created first would eat the space (Derma docks in
+    -- creation order).
+    if state == "trade" then
+        CARGO.Trade.BuildDealBar(right)
+    end
+
     grid = CARGO.Grid.Create(right, {
         getEntries = function()
             local snap = S()
             return snap and snap.items or {}
         end,
         dragSource = "own",
+        -- trade: the own grid shows what the trader WOULD PAY for each item
+        -- (buyMult) and marks whatever is already pending in the basket
+        priceOf = state == "trade"
+            and function(entry) return CARGO.Trade.CellPrice("sell", entry) end or nil,
+        basketOf = state == "trade"
+            and function(entry) return CARGO.Trade.BasketCount("sell", entry) end or nil,
         -- while looting, clicks transfer (old side-by-side panel behavior);
-        -- solo keeps the full item context menu
+        -- while trading they load the basket; solo keeps the item context menu
         onLeftClick = function(entry)
             if state == "loot" then
                 CARGO.Transfer.Send("put", CARGO.Grid.RefOf(entry), entry.count or 1)
+            elseif state == "trade" then
+                CARGO.Trade.BasketAdd("sell", entry, 1)
             end
         end,
         onRightClick = function(entry)
             if state == "loot" then
                 CARGO.Transfer.Menu("put", entry)
+            elseif state == "trade" then
+                CARGO.Trade.AmountMenu("sell", entry)
             else
                 OpenItemMenu(entry)
             end
@@ -1194,6 +1220,7 @@ function BuildFrame(state)
 
     BuildTabs(tabsBar)
     grid.Refresh()
+    if state == "trade" then CARGO.Trade.RefreshStrips(tradeLeft) end
     surface.PlaySound("backpack/inv_open.wav")
 end
 
@@ -1203,8 +1230,13 @@ end
 
 function CARGO.UI.RefreshAll()
     if not IsValid(frame) then return end
+    -- the inventory changed under an open basket (a sale went through, an
+    -- item was used elsewhere): whatever the basket promised and no longer
+    -- exists leaves it now, before anything repaints (Cargo_Trade §3)
+    if frame.cargoState == "trade" then CARGO.Trade.PruneBasket() end
     BuildTabs(tabsBar)
     grid.Refresh()
+    if frame.cargoState == "trade" then CARGO.Trade.RefreshStrips(tradeLeft) end
     -- equipment/quick/header/footer paint straight from the snapshot
 end
 
@@ -1218,6 +1250,22 @@ function CARGO.UI.RefreshLoot()
     if IsValid(frame) and frame.cargoState == "loot" and lootGrid then
         lootGrid.Refresh()
     end
+end
+
+-- trader opened (corpus_cargo_trade.lua): same frame, Trade state
+function CARGO.UI.OpenTrade()
+    BuildFrame("trade")
+end
+
+-- trader stock or basket changed: stock grid, own grid (basket marks) and
+-- both strips repaint from the same snapshot + basket
+function CARGO.UI.RefreshTrade()
+    if not IsValid(frame) or frame.cargoState ~= "trade" then return end
+    if IsValid(tradeLeft) and tradeLeft.cargoStockGrid then
+        tradeLeft.cargoStockGrid.Refresh()
+    end
+    if grid then grid.Refresh() end
+    CARGO.Trade.RefreshStrips(tradeLeft)
 end
 
 function CARGO.UI.Toggle()

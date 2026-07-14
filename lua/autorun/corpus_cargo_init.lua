@@ -27,6 +27,13 @@
 --   CARGO.Money.RegisterProvider(name, iface) -- iface: get/add/take/format
 --   CARGO.Money.Get/Add/Take/Format           -- delegate to the active provider
 --   CARGO.Containers.Attach(ent, opts)        -- turn any entity into a container
+--   CARGO.Trade.AttachTrader(ent, opts)       -- SERVER: container + price layer
+--                                                (name/buy_mult/sell_mult/money/
+--                                                stock/persistKey). Cortex calls
+--                                                this on its own trader entities.
+--   CARGO.Trade.OpenFor(ply, ent)             -- SERVER: opens the trade session
+--   def.value                                 -- base price; NO value => the item
+--                                                is not tradeable (Cargo_Trade §4)
 --   CARGO.StatusPanel.RegisterBar(module, spec)  -- CLIENT: status panel bars
 --   CARGO.Icons.Get(defid) -> IMaterial | nil -- CLIENT: item icon (nil =>
 --                                                letter placeholder/error)
@@ -43,6 +50,7 @@
 local SHARED = {
     "shared/corpus_cargo_util.lua",     -- net blob helpers, misc pure utils
     "shared/corpus_cargo_items.lua",    -- item contract + sub-slot primitive
+    "shared/corpus_cargo_trade.lua",    -- pure price math (value x condition x spread)
     "shared/corpus_cargo_slots.lua",    -- equipment slot table (data, no UI)
     "shared/corpus_cargo_weight.lua",   -- pure weight -> speed curve
     "shared/corpus_cargo_movecompat.lua", -- curve vs speed-stomping movement mods (#34)
@@ -57,7 +65,9 @@ local SERVER_FILES = {
     "server/corpus_cargo_ammopool.lua",   -- the ammo belt IS the reserve pool (§16)
     "server/corpus_cargo_movement.lua",   -- weight -> walk/run speed application
     "server/corpus_cargo_containers.lua", -- world containers + transfer net
+    "server/corpus_cargo_trade.lua",      -- traders (container + spread) + atomic basket
     "server/corpus_cargo_weapon_weights.lua", -- real weights for captured weapons (GAMMA/EFT data)
+    "server/corpus_cargo_weapon_prices.lua",  -- base value for captured weapons (same class keys)
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)
     "server/corpus_cargo_holster.lua",    -- STALKER weapon order + holster + default hands (#22/#4)
     "server/corpus_cargo_icons.lua",      -- icon cam/footprint override registry (ItemImages §4.3/§10)
@@ -72,6 +82,7 @@ local CLIENT_FILES = {
     "client/corpus_cargo_grid.lua",        -- reusable grid + cell overlays (§7)
     "client/corpus_cargo_ui.lua",          -- main inventory frame + binds
     "client/corpus_cargo_transfer.lua",    -- container transfer panel (§8)
+    "client/corpus_cargo_trade.lua",       -- trade session, basket and its panels
     "client/corpus_cargo_hotkeys.lua",     -- STALKER weapon keys 1-7 (#22)
     "client/corpus_cargo_wheel.lua",       -- radial weapon wheel (#31)
     "client/corpus_cargo_options.lua",     -- Corpus.UI.RegisterTab entry

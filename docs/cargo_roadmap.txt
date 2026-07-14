@@ -29,6 +29,14 @@ SIGUIENTES BLOQUES
        inventario-en-entidad, basket con confirm, precio value×condición×spread
        configurable por-NPC/por-jugador, jugador-trader con doble confirm,
        entidad de dinero + traspaso P2P, NPC trader de ejemplo).
+       [EN CURSO — corte de 3 slices validado con el autor 2026-07-13:
+        (1) comercio con NPC: precio + spread + trader + estado Trade + basket
+            atómico  -> CHANGELOG #20, PENDIENTE de la pasada en juego.
+        (2) dinero como entidad (botar / línea de solo-dinero en el basket).
+        (3) jugador-trader con doble confirm (incluye el traspaso P2P).
+        Estado por slice en Cargo_Trade_Arquitectura.md §12.bis. El primitivo
+        inventario-en-entidad de §2 NO se construyó de nuevo: es
+        Containers.Attach; el trader es ese contenedor + capa de precio.]
    PREREQUISITO DURO: #5 (imágenes) — las gradas no valen con fallback de letra.
    La implementación VGUI es un bloque aparte, DESPUÉS de #5.
 

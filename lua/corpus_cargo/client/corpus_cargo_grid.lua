@@ -61,15 +61,36 @@ local function PaintCellOver(self, w, h)
     local def = self.cargoDef
     if entry == nil or def == nil then return end
 
+    -- trade only (Cargo_Trade §8): unit price top-left, and the amber basket
+    -- frame + count for what is already pending in the deal. Both come from
+    -- the controller's callbacks, so the solo/loot grids draw neither.
+    local price = isfunction(self.cargoPriceOf) and self.cargoPriceOf(entry) or nil
+    local pricedW = 0
+    if price ~= nil then
+        local txt = CARGO.Trade.FormatMoney(price)
+        surface.SetFont("CargoTiny")
+        pricedW = surface.GetTextSize(txt) + 4
+        draw.SimpleText(txt, "CargoTiny", 4, 3, T.Colors.money)
+    end
+
+    local inBasket = isfunction(self.cargoBasketOf) and self.cargoBasketOf(entry) or 0
+    if inBasket > 0 then
+        surface.SetDrawColor(T.Colors.amber)
+        surface.DrawOutlinedRect(0, 0, w, h, 2)
+        draw.SimpleText("·" .. inBasket, "CargoTiny", w - 4, h / 2 - 6,
+            T.Colors.amber, TEXT_ALIGN_RIGHT)
+    end
+
     -- stack count, top-right
     if (entry.count or 1) > 1 then
         draw.SimpleText("x" .. entry.count, "CargoTiny", w - 4, 3,
             T.Colors.text, TEXT_ALIGN_RIGHT)
     end
 
-    -- bound ammo group (unique weapons), top-left — mock badge "A"/"B"
+    -- bound ammo group (unique weapons), top-left — mock badge "A"/"B".
+    -- Shifted right of the price tag when both share the corner (trade).
     if entry.blob and entry.blob.ammo_group ~= nil then
-        draw.SimpleText(entry.blob.ammo_group, "CargoTiny", 4, 3, T.Colors.amber)
+        draw.SimpleText(entry.blob.ammo_group, "CargoTiny", 4 + pricedW, 3, T.Colors.amber)
     end
 
     -- condition: bar hugging the bottom edge + % above it, bottom-right
@@ -94,8 +115,10 @@ end
 --   getEntries    function() -> array of snapshot entries
 --   onLeftClick   function(entry, cell)?
 --   onRightClick  function(entry, cell)?
---   dragSource    string tag stored on cells ("own"/"cont"), nil = no drag
+--   dragSource    string tag stored on cells ("own"/"cont"/"stock"), nil = no drag
 --   onReceiveDrop function(droppedCell)? — makes the canvas a drop target
+--   priceOf       function(entry) -> number|nil — trade: unit price tag
+--   basketOf      function(entry) -> n — trade: units pending in the basket
 -- ------------------------------------------------------------------
 
 function CARGO.Grid.Create(parent, opts)
@@ -192,6 +215,8 @@ function CARGO.Grid.Create(parent, opts)
                 cell.cargoEntry = entry
                 cell.cargoDef = def
                 cell.cargoSource = opts.dragSource
+                cell.cargoPriceOf = opts.priceOf
+                cell.cargoBasketOf = opts.basketOf
                 cell.Paint = PaintCell
                 cell.PaintOver = PaintCellOver
 

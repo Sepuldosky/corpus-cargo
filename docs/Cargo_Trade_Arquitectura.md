@@ -262,6 +262,34 @@ reporta su facción/rango); degradación honesta a "Trader" genérico si no.
 
 ---
 
+## 12.bis Estado de implementación (se actualiza por slice)
+
+El bloque se implementa en **3 vertical slices** (corte validado con el autor
+2026-07-13). Diseño intacto: lo de abajo dice qué de este documento ya es código.
+
+| Slice | Alcance | Estado |
+|---|---|---|
+| **1 — comercio con NPC** | `def.value` + curva de condición + spread (§4/§5), trader = contenedor + capa de precio (§2), entidad `corpus_cargo_trader` con stock demo (§10), estado **Trade** del frame (§8), **basket con confirm atómico** (§3) | **CHANGELOG #20** |
+| **2 — dinero como entidad** | entidad cash, botón $ en Solo (botar) y en Trade (línea de solo-dinero) (§7) | pendiente |
+| **3 — jugador-trader** | sesión P2P, doble confirm, máquina de estados, spread por-jugador, traspaso P2P (§6/§7) | pendiente |
+
+**Decisión de implementación (slice 1):** §2 pedía un primitivo genérico de
+inventario-en-entidad. **Ya existía**: `Containers.Attach` (§8 de
+`Cargo_Architecture.md`) — items en la entidad, capacidad, persistencia por
+clave, derrame al removerse. El trader **es** ese contenedor con `buy_mult`,
+`sell_mult` y wallet encima; el net de transferencia del contenedor
+**deliberadamente no se cablea** a un trader: nada cruza salvo por `Confirm`.
+Cuando Cortex traiga traders reales o cadáveres looteables, hereda un único
+primitivo, no dos.
+
+**Deuda declarada del slice 1:** los `value` (tabla `weapon_prices` + defs) son
+números de arranque, a calibrar en juego (§11 ya lo declaraba); el trader demo es
+de sesión (no persiste entre mapas, a propósito); el cliente formatea el dinero
+con el shape del provider nativo USD (un provider externo con otro formato solo
+afecta la decoración de las etiquetas, no los números).
+
+---
+
 ## 12. Estado del documento
 
 Bloque de diseño cerrado en sesión (Opus) y ratificado por el autor antes de este

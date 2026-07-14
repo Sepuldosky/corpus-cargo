@@ -24,7 +24,7 @@ end
 CARGO.Items.Register({
     id = "cargo_dev_helmet", name = "Sphere-08 Helmet (dev)",
     weight = 1.9, class = "unique", category = "helmets",
-    size = { 3, 3 },
+    size = { 3, 3 }, value = 2600,
     model = ZonaModel("models/stalker/outfit/hardhat.mdl"),
     has_condition = true,
     trivia = "Sealed military helmet with a standard front mount. Framework test item.",
@@ -36,7 +36,7 @@ CARGO.Items.DeclareSubSlot("cargo_dev_helmet", {
 CARGO.Items.Register({
     id = "cargo_dev_nvg", name = "PNV-10T NVG (dev)",
     weight = 0.6, class = "unique", category = "optics",
-    size = { 2, 1 },
+    size = { 2, 1 }, value = 9000,
     -- stand-in: ZONA has no NVG prop; the dome mask reads as head optics
     model = ZonaModel("models/stalker/outfit/dome_mask.mdl"),
     has_condition = true, effect_icon = "battery",
@@ -46,7 +46,7 @@ CARGO.Items.Register({
 local devVest = CARGO.Items.Register({
     id = "cargo_dev_vest", name = "CS-3a Vest (dev)",
     weight = 6.8, class = "unique", category = "armor",
-    size = { 3, 4 },
+    size = { 3, 4 }, value = 4800,
     -- Clear Sky light suit: the CS-3a's actual STALKER counterpart
     model = ZonaModel("models/stalker/outfit/cs_light.mdl"),
     condition_zones = { "torso", "stomach", "arms", "legs" },
@@ -65,7 +65,7 @@ CARGO.Items.DeclareSubSlot(devVest, {
 CARGO.Items.Register({
     id = "cargo_dev_backpack", name = "Tri-Zip Backpack (dev)",
     weight = 2.4, class = "unique", category = "backpacks",
-    size = { 3, 3 },
+    size = { 3, 3 }, value = 2200,
     model = ZonaModel("models/hgn/srp/items/backpack-1.mdl"),
     has_condition = true, capacity_bonus = 18,
     trivia = "Three-zip assault pack, 40 L. Adds +18 kg of carry capacity while equipped on Back.",
@@ -74,7 +74,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_plate", name = "Ceramic Plate IV (dev)",
     weight = 1.2, class = "stackable", category = "plates",
-    size = { 2, 3 },
+    size = { 2, 3 }, value = 1500,
     -- stand-in: flat textolite sheet, the closest plate-shaped ZONA prop
     model = ZonaModel("models/materials_textolite.mdl"),
     has_condition = true, material = "Ceramic IV",
@@ -84,7 +84,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_medkit", name = "Field Medkit (dev)",
     weight = 0.4, class = "stackable", category = "medical",
-    size = { 2, 2 },
+    size = { 2, 2 }, value = 700,
     model = ZonaModel("models/stalker/item/medical/medkit1.mdl",
         "models/items/healthkit.mdl"),
     effect_icon = "hemostatic",
@@ -101,7 +101,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_food", name = "Canned Food (dev)",
     weight = 0.3, class = "stackable", category = "food",
-    size = { 2, 2 },
+    size = { 2, 2 }, value = 180,
     model = ZonaModel("models/stalker/item/food/tuna.mdl",
         "models/props_junk/garbage_takeoutcarton001a.mdl"),
     trivia = "Test food. Real hunger is Craving's domain.",
@@ -125,7 +125,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_ammo_9mm", name = "9x19 FMJ (dev)",
     weight = 0.012, class = "stackable", category = "ammo",
-    size = { 2, 1 }, max_stack = 120,
+    size = { 2, 1 }, max_stack = 120, value = 8,
     model = ZonaModel("models/stalker/ammo/9x19.mdl"),
     ammo = { caliber = "9x19", hl2 = "Pistol", types = { "FMJ", "AP", "HP" } },
     trivia = "Test ammunition for caliber overlays and large stacks.",
@@ -134,7 +134,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_smg", name = "Tactical SMG (dev)",
     weight = 3.0, class = "unique", category = "weapons",
-    size = { 4, 2 },
+    size = { 4, 2 }, value = 1100,
     weapon_class = "weapon_smg1", equip_slots = { "primary", "secondary" },
     has_condition = true,
     ammo = { caliber = "4.6x30", types = { "FMJ" } },
@@ -145,7 +145,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_pistol", name = "Service Pistol (dev)",
     weight = 0.9, class = "unique", category = "weapons",
-    size = { 3, 2 },
+    size = { 3, 2 }, value = 300,
     weapon_class = "weapon_pistol", equip_slots = { "sidearm" },
     has_condition = true,
     ammo = { caliber = "9x19", types = { "FMJ" } },
@@ -155,7 +155,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_melee", name = "Crowbar (dev)",
     weight = 2.5, class = "unique", category = "melee",
-    size = { 3, 1 },
+    size = { 3, 1 }, value = 60,
     weapon_class = "weapon_crowbar",
     trivia = "Test melee weapon (HL2 crowbar).",
 })
@@ -165,7 +165,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_pda", name = "Datapad (dev)",
     weight = 0.5, class = "unique", category = "accessories",
-    size = { 2, 2 },
+    size = { 2, 2 }, value = 1200,
     model = ZonaModel("models/stalker/item/handhelds/pda.mdl"),
     trivia = "Minor test accessory for the accessory slots.",
 })
@@ -173,7 +173,7 @@ CARGO.Items.Register({
 CARGO.Items.Register({
     id = "cargo_dev_detector", name = "Scanner (dev)",
     weight = 0.4, class = "unique", category = "accessories",
-    size = { 2, 1 },
+    size = { 2, 1 }, value = 900,
     model = ZonaModel("models/scanner_anomaly.mdl"),
     has_condition = true,
     trivia = "Minor test accessory for the accessory slots.",
@@ -367,6 +367,32 @@ function CARGO._SelfTest()
     check("los filtros de categoría siguen intactos (el tab no es categoría)",
         CARGO.Items.MatchesFilter(plate, "category:plates")
             and not CARGO.Items.MatchesFilter(plate, "category:gear"))
+
+    -- precio de comercio (Cargo_Trade §4): value x condición x spread
+    local Tr = CARGO.Trade
+    check("sin value no es comerciable",
+        not Tr.IsTradeable({ id = "x", value = nil })
+            and not Tr.IsTradeable({ id = "x", value = 0 }))
+    check("con value es comerciable", Tr.IsTradeable(plate))
+    check("condición 100% (o sin condición) no descuenta",
+        Tr.ConditionMult(100) == 1 and Tr.ConditionMult(nil) == 1)
+    check("condición 0% cae al piso, no a cero",
+        Tr.ConditionMult(0) == Tr.CONDITION_FLOOR and Tr.CONDITION_FLOOR > 0)
+    check("la curva de condición es monótona",
+        Tr.ConditionMult(50) > Tr.ConditionMult(0)
+            and Tr.ConditionMult(50) < Tr.ConditionMult(100))
+    check("precio a value completo (sell_mult 1.0)",
+        Tr.UnitPrice(plate, nil, 1.0) == plate.value)
+    check("el trader compra por menos de lo que vende",
+        Tr.UnitPrice(plate, nil, Tr.DEFAULT_BUY_MULT)
+            < Tr.UnitPrice(plate, nil, Tr.DEFAULT_SELL_MULT))
+    check("un ítem gastado vale menos que uno nuevo",
+        Tr.UnitPrice(plate, 40, 1.0) < Tr.UnitPrice(plate, 100, 1.0))
+    check("el precio nunca cae a 0 (piso 1)",
+        Tr.UnitPrice({ id = "cheap", value = 1 }, 0, 0.1) == 1)
+    check("RefKey distingue unique de stack",
+        Tr.RefKey({ uid = "abc" }) ~= Tr.RefKey({ id = "abc" })
+            and Tr.RefKey({ id = "p", condition = 50 }) ~= Tr.RefKey({ id = "p" }))
 
     -- sub-slot primitive declared once, queried back
     check("sub-slot placas declarado", CARGO.Items.GetSubSlot(vest, "plates") ~= nil)

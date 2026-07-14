@@ -5,12 +5,11 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (**roadmap #23 cerrado**: sesión de
-diseño con el autor → set FIJO de 8 tabs de display sobre las categorías
-internas → entry **19 `[PENDIENTE]`**. Sigue abierto el **18**
-(`Inventory.HasItem`, lo confirma el re-test G4 de Coagulant). Frentes que
-dejó la pasada anterior: **#36**, **#37**, **#38**. Lo próximo es el bloque
-grande de **comercio**.)
+**Última actualización:** 2026-07-13 (**arrancó el bloque de COMERCIO**, corte
+de 3 slices: el **slice 1** —trader NPC, precio con spread, estado Trade y
+basket atómico— es la entry **20 `[PENDIENTE]`**. Antes cerró el **#23**
+(tabs fijas, entry **19 `[PENDIENTE]`**) y el **18** (`Inventory.HasItem`)
+quedó `[APLICADO]` con la ronda 4 de Coagulant.)
 
 ---
 
@@ -32,19 +31,29 @@ grande de **comercio**.)
   Ammo · Gear · Mods · Meds · Food · Misc` — agrupación sobre las categorías
   internas, que quedan intactas para el grammar `"category:a,b"`. La fila se
   dibuja siempre entera y lo no mapeado cae en Misc (§7.1).
-- **Harness offline: 279 checks verdes en ambos realms** (con gate final: un
-  FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 66 client / 59 server.
+- **`Inventory.HasItem(ply, id)`** (entry 18): presencia sobre **ambas** clases
+  de ítem. `CountItem`/`TakeItem` son de stacks — un `unique` (`{id, uid}`) no
+  existe para ellos. Los módulos que solo preguntan "¿lleva uno?" (Coagulant
+  con su torniquete) van por acá.
+- **Comercio, slice 1** (entry 20, `Cargo_Trade` §2-§5/§8/§10): `def.value` +
+  curva de condición + spread; **el trader ES un contenedor** (`Containers.Attach`)
+  con capa de precio — el primitivo inventario-en-entidad de §2 no se construyó
+  de nuevo; entidad demo `corpus_cargo_trader`; **estado Trade** del frame con
+  basket, strips Buy/Sell y neto; **`Confirm` atómico** en server (valida dinero,
+  peso y existencia, y recién ahí mueve). El basket del cliente es intent puro.
+- **Harness offline: 310 checks verdes en ambos realms** (con gate final: un
+  FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 76 client / 69 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
   MIT y el rename `corpus_stalker` en el kit dev).
 
 ## Pendiente de verificar
 
+- **Entry 20 (comercio, slice 1):** spawnear el trader demo (Entities →
+  Corpus) → E abre el estado Trade; precios en las celdas, basket, neto,
+  Confirm/Cancel; que un basket que no entra falle ENTERO.
 - **Entry 19 (tabs fijas, #23):** fila en UNA línea con las 8 tabs siempre
   presentes (vacías atenuadas), cada ítem bajo su tab, sub-slots intactos.
-- **Entry 18 (`Inventory.HasItem`):** lo confirma el re-test G4 de la ronda 4
-  de Coagulant (torniquete `unique` desde la UI — el resto del CHANGELOG está
-  `[APLICADO]` y confirmado).
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -61,7 +70,11 @@ grande de **comercio**.)
 
 ## Remanentes / deuda conocida
 
-- **Diseñado sin implementar:** comercio (`Cargo_Trade`) — siguiente bloque.
+- **Comercio:** faltan los slices **2** (dinero como entidad: botar / línea de
+  solo-dinero en el basket) y **3** (jugador-trader con doble confirm, que
+  incluye el traspaso P2P) — `Cargo_Trade` §12.bis. Los `value` son números de
+  arranque, a calibrar en juego; el trader demo no persiste entre mapas; el
+  cliente formatea el dinero con el shape del provider nativo USD.
 - **Munición (§16.6/§16.7):** cargadores rellenables con toggle; binding de
   ammo-atts de EFT (`def.ammo.att` reservado en el schema); hueco
   `SWEP.ForceDefaultAmmo` declarado (escalación anotada: ledger de
@@ -77,10 +90,10 @@ grande de **comercio**.)
 
 ## Próximo paso
 
-1. **Comercio** (`Cargo_Trade_Arquitectura.md`, diseño cerrado §1-12) — el
-   bloque grande: implementarlo por vertical slices, reusando el primitivo de
-   contenedores (§8) y la interfaz de dinero (§6). Semilla:
-   [`../../dev/HANDOFF_cargo_23_comercio.md`](../../dev/HANDOFF_cargo_23_comercio.md) §3.2.
+1. **Pasada en juego de los entries 19 y 20** (checklist en el artifact) y,
+   con eso confirmado, **slice 2 del comercio**: el dinero como entidad
+   (`Cargo_Trade` §7 — botar efectivo desde el botón $, línea de solo-dinero
+   en el basket). Después el slice 3 (jugador-trader).
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 3. Cuando se prioricen: **#36** (slot HL2 alineado), **#37** (drop VJ,
    diagnóstico contra el mod vivo), **#35** (footsteps), **#38** (trivia).

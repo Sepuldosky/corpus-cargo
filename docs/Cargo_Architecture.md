@@ -415,7 +415,7 @@ entre estados es qué muestra la **columna izquierda** (contextual):
 |---|---|---|---|
 | **Solo** | tecla de inventario | vacía (mundo visible detrás) | §15 |
 | **Loot** | usar contenedor en mundo | inventario del contenedor + Take all | §8 |
-| **Trade** | interactuar con trader (NPC o jugador) | stock del trader / inventario del otro jugador + strips Buy/Sell | `Cargo_Trade_Arquitectura.md` |
+| **Trade** | interactuar con trader (NPC o jugador) | stock del trader + strips Buy/Sell + deal bar (neto, Cancel/Confirm) — **implementado, slice 1**; el inventario del otro JUGADOR llega con el slice 3 | `Cargo_Trade_Arquitectura.md` §12.bis |
 
 - **Centro (equipamiento)** y **derecha (inventario propio)** son idénticos en los
   tres estados. La columna izquierda se muestra/oculta y cambia de contenido — no hay

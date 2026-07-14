@@ -1682,7 +1682,7 @@ DGL4 (se desactiva en SU menú de configuración; COMPAT-RUNTIME, nuestra
 convar gobierna solo el historial del gamemode base). Entry completo; el
 roadmap #22 cierra entero.
 
-## 18. `Inventory.HasItem`: presencia honesta de ítems `unique` (fix G4 de Coagulant) `[PENDIENTE]`
+## 18. `Inventory.HasItem`: presencia honesta de ítems `unique` (fix G4 de Coagulant) `[APLICADO 2026-07-13]`
 
 **Contexto (reporte del autor — ronda 3 de Coagulant, 2026-07-13):** el
 torniquete de Coagulant (clase `unique`) respondía "No tourniquet in
@@ -1706,9 +1706,11 @@ primer consumidor (su sesión "Fix G4").
 primera vez el inventario REAL de Cargo (items/weight/instances/inventory
 sobre el framework real): GiveItem de un unique → CountItem 0 pero HasItem
 true; TakeItem sobre el unique sigue devolviendo false; flujo completo del
-torniquete verde (23 checks + selftest de Coagulant 68 OK). **En juego:** lo
-confirma el re-test G4 de la ronda 4 de Coagulant (torniquete desde la UI
-arranca, aplica y no se consume).
+torniquete verde (23 checks + selftest de Coagulant 68 OK).
+
+**En juego (2026-07-13, ronda 4 de Coagulant): ✓** — el torniquete `unique` se
+pone desde la UI de Cargo y el motor médico lo ve en el inventario (antes del
+fix respondía "No tourniquet in inventory" con el ítem en el grid).
 
 ---
 
@@ -1748,3 +1750,70 @@ Misc/All, y el id de tab `gear` **no** matchea `"category:gear"` en el filtro de
 sub-slots). `cargo_selftest` **66 client / 59 server** (+10 checks de tabs).
 **En juego:** pendiente de confirmación del autor (fila en una línea, tabs vacías
 atenuadas, cada ítem en su tab, sub-slots sin romperse).
+
+---
+
+## 20. Comercio slice 1: trader NPC, precio con spread y basket atómico (`Cargo_Trade` §2-§5, §8, §10) `[PENDIENTE]`
+
+**Contexto:** primer slice del bloque de comercio (corte de 3 validado con el autor
+2026-07-13: NPC → dinero-entidad → jugador-trader). El diseño ya estaba cerrado en
+`Cargo_Trade_Arquitectura.md`; esto lo baja a código sin re-discutirlo.
+
+**El primitivo NO es nuevo (decisión de implementación).** §2 del doc pide un
+"inventario-en-entidad" genérico. Ya existía y está probado: `Containers.Attach`
+(§8 de `Cargo_Architecture.md`) — items colgados de la entidad, capacidad,
+persistencia por clave, derrame al removerse. **Un trader es ese contenedor más una
+capa de precio**, no un inventario paralelo: construir un segundo habría dejado al
+loot de cadáveres (Cortex, §9) eligiendo entre dos primitivos. El net de
+transferencia del contenedor **no se cablea** a un trader — nada cruza salvo por
+`Confirm`.
+
+**Cambio (shared, `corpus_cargo_trade.lua` nuevo):** matemática pura de precio —
+`Trade.UnitPrice(def, condition, mult)` = `value × condición × spread`, con
+`ConditionMult` lineal desde `CONDITION_FLOOR` (0.25: una ruina todavía vale algo,
+pero un ítem sin valor sería un servicio de basura gratis) y piso de 1 en el redondeo.
+Spread default 0.5 / 1.0 (§5). `IsTradeable(def)` = tiene `value` > 0. Shared porque
+el cliente pinta los mismos números que el server recomputa.
+
+**Cambio (schema, `corpus_cargo_items.lua`):** campo nuevo **`def.value`** — precio
+base. **Sin `value` un ítem no se comercia**: no muestra precio y el server rechaza
+moverlo. La ausencia es el default honesto ("no está a la venta", no "gratis").
+
+**Cambio (server, `corpus_cargo_trade.lua` nuevo):** `Trade.AttachTrader(ent, opts)`
+(nombre, `buy_mult`/`sell_mult`, wallet finito o `nil` = sin fondo, stock semilla,
+`persistKey`), sesión con su propio canal de net, y el **`Confirm` atómico**: resuelve
+cada línea del basket contra la fuente viva, la re-precia, y valida **dinero + peso +
+existencia** ANTES de mover nada. No hay ruta de rollback porque no hay mutación antes
+de la validación. Errores con voz de interfaz ("Not enough money: you're $340 short",
+"Too heavy: you're 4.2 kg over the limit", "The trader can't afford that"). Las compras
+salen del stock **antes** de que entren las ventas (si no, un basket que vende 30
+balas y compra 30 podría recomprar las suyas).
+
+**Cambio (server, `corpus_cargo_weapon_prices.lua` nuevo):** tabla gemela de
+`weapon_weights` — clase → `value` para las armas autogeneradas por la captura (ARC9
+EFT + HL2). **Sin fallback a propósito:** una clase sin entrada queda sin precio, o
+sea no comerciable; las tools del sandbox (physgun, toolgun, cámara) viven en ese
+hueco deliberadamente.
+
+**Cambio (client, `corpus_cargo_trade.lua` nuevo + `ui.lua` + `grid.lua`):** el
+**estado Trade** del frame fullscreen, que estaba reservado desde §15.1, ya existe:
+columna izquierda = stock del trader (con su spread escrito: "Buys at 50% · sells at
+100%") + strip **Buy**; columna derecha = inventario propio con el precio que el
+trader **pagaría** por cada ítem + strip **Sell**; deal bar con el **neto** ("You pay
+$X" / "You get $X") y **Cancel/Confirm**. El basket es **intent puro**: no mueve nada,
+marca las celdas con borde ámbar y su cuenta. Un confirm exitoso lo vacía; uno
+rechazado lo deja **intacto** (§3) y solo poda lo que se volvió obsoleto.
+
+**Cambio (entidad, `corpus_cargo_trader.lua` nuevo):** trader demo spawnable
+(Entities → Corpus), con stock del kit dev y wallet de $50 000 (finito: se lo puede
+drenar). Sin IA — el comercio no le debe nada al comportamiento; cuando Cortex traiga
+un trader con cerebro, llama al mismo `AttachTrader`.
+
+**Verificación offline:** harness **310 checks verdes** en ambos realms (eran 279:
+bloque de comercio nuevo — trader = contenedor, precio con spread y condición, compra,
+venta con desgaste que descuenta, ítem sin `value` rechazado, **rollback sin dinero**,
+**rollback por peso** (el basket falla entero, nunca a la mitad), trader sin fondos que
+rechaza en vez de imprimir dinero, basket mixto con neto correcto, líneas duplicadas
+rechazadas y **el server ignorando el precio que manda el cliente**). `cargo_selftest`
+**76 client / 69 server** (+10 checks de precio). **En juego:** pendiente de
+confirmación del autor.

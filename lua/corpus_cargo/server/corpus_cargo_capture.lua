@@ -108,6 +108,11 @@ local function RegisterAutogen(class, name, caliber)
         -- real weight when the class is catalogued (GAMMA/EFT table, loaded
         -- by the manifest right before this file); 2.5 kg nominal otherwise
         weight = (CARGO.Capture.WeaponWeights or {})[class] or 2.5,
+        -- base price from the twin table. NO fallback on purpose: an uncatalogued
+        -- class ends up with no value, and no value means not tradeable
+        -- (Cargo_Trade §4) — better an honest hole in the economy than a made-up
+        -- price for a gun nobody priced. The sandbox tools live in that hole.
+        value = (CARGO.Capture.WeaponValues or {})[class],
         class = "unique",
         category = AUTOGEN_MELEE[class] and "melee" or "weapons",
         weapon_class = class,

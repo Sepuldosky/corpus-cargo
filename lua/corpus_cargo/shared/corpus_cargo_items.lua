@@ -138,6 +138,11 @@ end
 --   class    "stackable" | "unique"
 --   category string (auto-registered if unknown)
 --   icon     optional material path
+--   value    optional number — BASE PRICE in the active money provider's
+--            currency (Cargo_Trade §4: price = value x condition x spread).
+--            An item WITHOUT value is not tradeable: it shows no price tag and
+--            the server refuses to move it across a trade. Absence is the
+--            honest default — it is not "free", it is "not for sale".
 --   display_stats  optional { <statKey> = signedPercent } — manual fallback
 --                  when ARC9 is absent (§9); values ARE the deltas shown
 --   trivia   optional string

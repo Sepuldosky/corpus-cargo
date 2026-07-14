@@ -30,15 +30,18 @@ CARGO.Ammo = CARGO.Ammo or {}
 -- ceiling, one bottomless slot per caliber would be enough and the other five
 -- would be decoration; with a ceiling, how much of which caliber you hang on
 -- the belt is a choice you pay for in slots and in weight (STALKER's bargain).
+-- `value` is the price of ONE round (Cargo_Trade §4: the price of a stack is
+-- count x value x spread). Starting numbers, calibrated in play: common brass is
+-- pocket change, Combine ordnance is a small fortune — scarcity IS the price.
 local AMMO = {
     { hl2 = "Pistol",       caliber = "9x19",  name = "Pistol Rounds",
       model = "models/items/boxsrounds.mdl",
-      weight = 0.012, max_stack = 120,
+      weight = 0.012, max_stack = 120, value = 8,
       trivia = "Standard 9x19mm pistol cartridge. The most common round there is." },
 
     { hl2 = "SMG1",         caliber = "4.6x30", name = "SMG Rounds",
       model = "models/items/boxmrounds.mdl",
-      weight = 0.012, max_stack = 120,
+      weight = 0.012, max_stack = 120, value = 9,
       trivia = "Submachine gun ammunition. Cheap, plentiful, and gone before you notice." },
 
     -- the two AR2 models are easy to cross (in-game report 2026-07-12: they were):
@@ -46,37 +49,37 @@ local AMMO = {
     -- HL2's own item_ammo_ar2 / item_ammo_ar2_altfire pair them this way.
     { hl2 = "AR2",          caliber = "Dark Energy", name = "Pulse Rounds",
       model = "models/items/combine_rifle_cartridge01.mdl",
-      weight = 0.02, max_stack = 60,
+      weight = 0.02, max_stack = 60, value = 45,
       trivia = "Overwatch pulse ammunition. Not manufactured by anything human." },
 
     { hl2 = "Buckshot",     caliber = "12ga",  name = "Shotgun Shells",
       model = "models/items/boxbuckshot.mdl",
-      weight = 0.05, max_stack = 40,
+      weight = 0.05, max_stack = 40, value = 14,
       trivia = "12 gauge buckshot. Heavy for what it is; devastating up close." },
 
     { hl2 = "357",          caliber = ".357",  name = ".357 Rounds",
       model = "models/items/357ammo.mdl",
-      weight = 0.02, max_stack = 24,
+      weight = 0.02, max_stack = 24, value = 30,
       trivia = "Magnum revolver ammunition. Few rounds, no complaints." },
 
     { hl2 = "XBowBolt",     caliber = "Bolt",  name = "Crossbow Bolts",
       model = "models/items/crossbowrounds.mdl",
-      weight = 0.15, max_stack = 12,
+      weight = 0.15, max_stack = 12, value = 40,
       trivia = "Rebar cut to length and heated red. Silent, and usually enough." },
 
     { hl2 = "RPG_Round",    caliber = "84mm",  name = "RPG Rockets",
       model = "models/weapons/w_missile_closed.mdl",
-      weight = 3.0, max_stack = 2,
+      weight = 3.0, max_stack = 2, value = 900,
       trivia = "Laser-guided rocket. You will feel every one of these in your back." },
 
     { hl2 = "SMG1_Grenade", caliber = "40mm",  name = "SMG Grenades",
       model = "models/items/ar2_grenade.mdl",
-      weight = 0.25, max_stack = 5,
+      weight = 0.25, max_stack = 5, value = 250,
       trivia = "Underslung launcher grenade. Arcs further than it looks like it should." },
 
     { hl2 = "AR2AltFire",   caliber = "Orb",   name = "Dark Energy Orbs",
       model = "models/items/combine_rifle_ammo01.mdl",
-      weight = 0.5, max_stack = 3,
+      weight = 0.5, max_stack = 3, value = 600,
       trivia = "Contained singularity. Carrying it is the second worst idea; firing it is the first." },
 }
 
@@ -92,13 +95,13 @@ local THROWABLES = {
     { hl2 = "Grenade", caliber = "Frag", id = "cargo_throw_frag",
       name = "Frag Grenade", weapon_class = "weapon_frag",
       model = "models/weapons/w_grenade.mdl",
-      weight = 0.4, max_stack = 4, size = { 1, 2 },
+      weight = 0.4, max_stack = 4, size = { 1, 2 }, value = 160,
       trivia = "MK3A2 fragmentation grenade. Equip the stack; the count is your reserve." },
 
     { hl2 = "slam",    caliber = "SLAM", id = "cargo_throw_slam",
       name = "S.L.A.M.", weapon_class = "weapon_slam",
       model = "models/weapons/w_slam.mdl",
-      weight = 1.2, max_stack = 3, size = { 2, 1 },
+      weight = 1.2, max_stack = 3, size = { 2, 1 }, value = 250,
       trivia = "Selectable Lightweight Attack Munition. Tripmine or remote charge, your call." },
 }
 
@@ -121,6 +124,7 @@ for _, a in ipairs(AMMO) do
         max_stack = a.max_stack,
         size = { 2, 1 },  -- the ammo category ceiling (Cargo_ItemImages §5)
         ammo = { caliber = a.caliber, hl2 = a.hl2 },
+        value = a.value,  -- per ROUND (Cargo_Trade §4): the stack price is count x this
         trivia = a.trivia,
     })
 
@@ -145,6 +149,7 @@ for _, t in ipairs(THROWABLES) do
         size = t.size,
         weapon_class = t.weapon_class,
         ammo = { caliber = t.caliber, hl2 = t.hl2 },
+        value = t.value,  -- per grenade
         trivia = t.trivia,
     })
 
