@@ -1714,7 +1714,7 @@ fix respondía "No tourniquet in inventory" con el ítem en el grid).
 
 ---
 
-## 19. Tabs de display: set FIJO de 8, la fila deja de crecer sola (roadmap #23) `[PENDIENTE]`
+## 19. Tabs de display: set FIJO de 8, la fila deja de crecer sola (roadmap #23) `[APLICADO 2026-07-14]`
 
 **Contexto (reporte del autor, 2026-07-12):** el set de **categorías** de ítem es
 ABIERTO — `Items.RegisterCategory` auto-registra cualquier categoría que un def
@@ -1753,7 +1753,7 @@ atenuadas, cada ítem en su tab, sub-slots sin romperse).
 
 ---
 
-## 20. Comercio slice 1: trader NPC, precio con spread y basket atómico (`Cargo_Trade` §2-§5, §8, §10) `[PENDIENTE]`
+## 20. Comercio slice 1: trader NPC, precio con spread y basket atómico (`Cargo_Trade` §2-§5, §8, §10) `[APLICADO 2026-07-14]`
 
 **Contexto:** primer slice del bloque de comercio (corte de 3 validado con el autor
 2026-07-13: NPC → dinero-entidad → jugador-trader). El diseño ya estaba cerrado en
@@ -1815,5 +1815,44 @@ venta con desgaste que descuenta, ítem sin `value` rechazado, **rollback sin di
 **rollback por peso** (el basket falla entero, nunca a la mitad), trader sin fondos que
 rechaza en vez de imprimir dinero, basket mixto con neto correcto, líneas duplicadas
 rechazadas y **el server ignorando el precio que manda el cliente**). `cargo_selftest`
-**76 client / 69 server** (+10 checks de precio). **En juego:** pendiente de
-confirmación del autor.
+**76 client / 69 server** (+10 checks de precio). **En juego:** confirmado por el autor
+(2026-07-14, 8/8 ✓). Dos pedidos de la pasada, ambos de diseño y no bugs → **entry 21**:
+el click debe llevarse el stack entero, y el peso no debe bloquear una transacción (el
+`rollback por peso` verificado acá queda **derogado** por esa enmienda).
+
+---
+
+## 21. Enmiendas de la 1.ª pasada del comercio: click = stack entero, y el peso deja de ser gate `[PENDIENTE]`
+
+**Reporte del autor (2026-07-14, pasada del entry 20 — los 8 checks pasaron):** dos
+pedidos de diseño sobre el comercio ya funcionando.
+
+**(a) Click izquierdo = el stack ENTERO** (reporte 20c). El click agregaba **1 unidad**
+al basket (lo correcto según el código, confirmado con el autor: la celda ámbar marcaba
+todo el stack y por eso *parecía* que se llevaba todo). Pero cargar 120 balas de a una
+es una tarea, no una decisión: **el click ahora se lleva el stack entero**, como hace
+STALKER y como ya hacía el click del loot. La cantidad parcial sigue estando, en el
+**click derecho** (`1` / `amount...` / `all`).
+
+**(b) El peso deja de bloquear la transacción** (reporte 20g — enmienda a §3 de
+`Cargo_Trade_Arquitectura.md`, que lo listaba como validación). Comprar es un acto
+deliberado: negarle el trato al jugador porque saldría sobrecargado convierte al trader
+en una niñera. **Ahora puede comprar por encima de su capacidad y salir sobrecargado** —
+y la curva de peso (§5 de `Cargo_Architecture.md`) ya se lo cobra en velocidad. El
+límite de carga **sigue vigente para lo que se recoge del suelo**: lo que uno paga es su
+problema. Dinero, existencia y stock siguen siendo las validaciones atómicas.
+
+**Cambio (client):** `onLeftClick` de ambos grids del estado Trade pasa
+`Trade.Available(entry)` (stack completo; un `unique` sigue siendo 1).
+**Cambio (server, `Trade.Confirm`):** cae la validación de peso; `GiveEntry` con
+`skipCap` deja de ser una optimización y pasa a ser lo que sostiene la regla atómica (sin
+él la línea se rechazaría y el trato se ejecutaría a medias).
+
+**No se toca (reporte 19f):** a 800×600 la fila de tabs colapsa en dos filas en vez de
+recortar — la red de seguridad del wrap haciendo su trabajo. Decisión del autor: se deja
+así.
+
+**Verificación offline:** harness **312 checks verdes** en ambos realms (el check de
+"rollback por peso" se dio vuelta: ahora comprar sobrecargado **se permite**, el jugador
+queda por encima de la capacidad y `GiveItem` —lo que se recoge del suelo— **sigue**
+rechazando por peso). **En juego:** pendiente de confirmación del autor.

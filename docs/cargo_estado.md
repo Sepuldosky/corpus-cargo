@@ -5,11 +5,11 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (**arrancó el bloque de COMERCIO**, corte
-de 3 slices: el **slice 1** —trader NPC, precio con spread, estado Trade y
-basket atómico— es la entry **20 `[PENDIENTE]`**. Antes cerró el **#23**
-(tabs fijas, entry **19 `[PENDIENTE]`**) y el **18** (`Inventory.HasItem`)
-quedó `[APLICADO]` con la ronda 4 de Coagulant.)
+**Última actualización:** 2026-07-14 (**el slice 1 del COMERCIO está confirmado
+en juego**: entries **19** (tabs fijas) y **20** (trader NPC, precio con spread,
+estado Trade, basket atómico) → `[APLICADO]`, 14/14 ✓. La pasada dejó dos
+pedidos de diseño → entry **21 `[PENDIENTE]`**: click = stack entero, y el
+**peso deja de bloquear** una transacción.)
 
 ---
 
@@ -41,7 +41,11 @@ quedó `[APLICADO]` con la ronda 4 de Coagulant.)
   de nuevo; entidad demo `corpus_cargo_trader`; **estado Trade** del frame con
   basket, strips Buy/Sell y neto; **`Confirm` atómico** en server (valida dinero,
   peso y existencia, y recién ahí mueve). El basket del cliente es intent puro.
-- **Harness offline: 310 checks verdes en ambos realms** (con gate final: un
+  **El peso NO bloquea una transacción** (enmienda del autor, entry 21): se puede
+  comprar sobrecargado — la curva de peso lo cobra en velocidad; el límite sigue
+  vigente para lo que se recoge del suelo. Click = stack entero; parcial con click
+  derecho.
+- **Harness offline: 312 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 76 client / 69 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -49,11 +53,9 @@ quedó `[APLICADO]` con la ronda 4 de Coagulant.)
 
 ## Pendiente de verificar
 
-- **Entry 20 (comercio, slice 1):** spawnear el trader demo (Entities →
-  Corpus) → E abre el estado Trade; precios en las celdas, basket, neto,
-  Confirm/Cancel; que un basket que no entra falle ENTERO.
-- **Entry 19 (tabs fijas, #23):** fila en UNA línea con las 8 tabs siempre
-  presentes (vacías atenuadas), cada ítem bajo su tab, sub-slots intactos.
+- **Entry 21 (enmiendas del comercio):** un click en un stack se lo lleva
+  entero (parcial por click derecho) y una compra que te deja sobrecargado
+  **se permite** (y te frena al caminar).
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -90,10 +92,10 @@ quedó `[APLICADO]` con la ronda 4 de Coagulant.)
 
 ## Próximo paso
 
-1. **Pasada en juego de los entries 19 y 20** (checklist en el artifact) y,
-   con eso confirmado, **slice 2 del comercio**: el dinero como entidad
-   (`Cargo_Trade` §7 — botar efectivo desde el botón $, línea de solo-dinero
-   en el basket). Después el slice 3 (jugador-trader).
+1. **Slice 2 del comercio**: el dinero como entidad (`Cargo_Trade` §7 — botar
+   efectivo desde el botón $, línea de solo-dinero en el basket). Después el
+   slice 3 (jugador-trader con doble confirm). La entry 21 se confirma de paso
+   en esa misma pasada (checklist en el artifact).
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 3. Cuando se prioricen: **#36** (slot HL2 alineado), **#37** (drop VJ,
    diagnóstico contra el mod vivo), **#35** (footsteps), **#38** (trivia).

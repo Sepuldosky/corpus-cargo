@@ -80,7 +80,9 @@ cadáver son el mismo mecanismo.
 ### Flujo
 
 1. Mover un ítem del inventario propio al lado **Sell** (o del stock al lado
-   **Buy**) lo agrega al **basket** — no ejecuta nada todavía.
+   **Buy**) lo agrega al **basket** — no ejecuta nada todavía. **Click izquierdo =
+   el stack ENTERO** (enmienda 2026-07-14, como STALKER); la cantidad parcial vive
+   en el click derecho.
 2. El ítem en basket queda **bloqueado**: no se puede usar, equipar ni mover a otro
    lado mientras pende. Visualmente marcado (borde ámbar en el mock).
 3. Los strips **Buy** y **Sell** acumulan el total de cada lado; el footer muestra
@@ -94,9 +96,13 @@ Todo o nada, en un solo paso:
 
 - **Dinero suficiente:** el neto no deja el wallet en negativo (provider, §6 de
   `Cargo_Architecture.md`).
-- **Peso resultante:** lo que el jugador se lleva no excede su capacidad (§5 de
-  `Cargo_Architecture.md`). Si excede, la transacción falla completa — no se parte a
-  la mitad.
+- ~~**Peso resultante:** lo que el jugador se lleva no excede su capacidad.~~
+  **DEROGADO — enmienda 2026-07-14 (decisión del autor, 1.ª pasada en juego del slice 1,
+  CHANGELOG #21).** El peso **no** valida una transacción: comprar es un acto deliberado
+  y negarle el trato al jugador porque saldría sobrecargado convierte al trader en una
+  niñera. **Puede comprar por encima de su capacidad y salir sobrecargado**, y la curva
+  de peso (§5 de `Cargo_Architecture.md`) ya se lo cobra en velocidad. El límite de carga
+  sigue vigente **para lo que se recoge del suelo**.
 - **Stock/propiedad:** el trader todavía tiene lo que se le compra; el jugador
   todavía tiene lo que vende (relevante en multiplayer / jugador-trader).
 
@@ -269,7 +275,7 @@ El bloque se implementa en **3 vertical slices** (corte validado con el autor
 
 | Slice | Alcance | Estado |
 |---|---|---|
-| **1 — comercio con NPC** | `def.value` + curva de condición + spread (§4/§5), trader = contenedor + capa de precio (§2), entidad `corpus_cargo_trader` con stock demo (§10), estado **Trade** del frame (§8), **basket con confirm atómico** (§3) | **CHANGELOG #20** |
+| **1 — comercio con NPC** | `def.value` + curva de condición + spread (§4/§5), trader = contenedor + capa de precio (§2), entidad `corpus_cargo_trader` con stock demo (§10), estado **Trade** del frame (§8), **basket con confirm atómico** (§3) | **CHANGELOG #20 — APLICADO 2026-07-14** (+ enmiendas de la pasada: **#21**, click = stack entero y el peso deja de ser gate) |
 | **2 — dinero como entidad** | entidad cash, botón $ en Solo (botar) y en Trade (línea de solo-dinero) (§7) | pendiente |
 | **3 — jugador-trader** | sesión P2P, doble confirm, máquina de estados, spread por-jugador, traspaso P2P (§6/§7) | pendiente |
 

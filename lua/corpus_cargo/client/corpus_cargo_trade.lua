@@ -40,11 +40,13 @@ function CARGO.Trade.BasketCount(side, entry)
     return line and line.count or 0
 end
 
--- how many units of this entry are still free to add (a stack already half in
--- the basket can only put its remainder in)
+-- how many units of this entry exist to add (a stack already half in the basket
+-- can only put its remainder in — BasketAdd clamps against what is pending)
 local function Available(entry)
     return entry.uid and 1 or (entry.count or 1)
 end
+
+CARGO.Trade.Available = Available -- the own grid (corpus_cargo_ui.lua) needs it too
 
 function CARGO.Trade.BasketAdd(side, entry, count)
     if tradeState == nil then return end
@@ -255,7 +257,10 @@ function CARGO.Trade.BuildStockColumn(left)
         dragSource = "stock",
         priceOf = function(entry) return CARGO.Trade.CellPrice("buy", entry) end,
         basketOf = function(entry) return CARGO.Trade.BasketCount("buy", entry) end,
-        onLeftClick = function(entry) CARGO.Trade.BasketAdd("buy", entry, 1) end,
+        -- left click takes the WHOLE stack (author call, 1st in-game pass: it is
+        -- what STALKER does, and one round at a time is a chore). Right click is
+        -- the way to a partial amount.
+        onLeftClick = function(entry) CARGO.Trade.BasketAdd("buy", entry, Available(entry)) end,
         onRightClick = function(entry) CARGO.Trade.AmountMenu("buy", entry) end,
     })
     stockGrid.panel:Dock(FILL)

@@ -1172,7 +1172,9 @@ function BuildFrame(state)
             if state == "loot" then
                 CARGO.Transfer.Send("put", CARGO.Grid.RefOf(entry), entry.count or 1)
             elseif state == "trade" then
-                CARGO.Trade.BasketAdd("sell", entry, 1)
+                -- whole stack, like the loot click and like STALKER (author call,
+                -- 1st in-game pass); right click opens the partial-amount menu
+                CARGO.Trade.BasketAdd("sell", entry, CARGO.Trade.Available(entry))
             end
         end,
         onRightClick = function(entry)

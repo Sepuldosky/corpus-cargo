@@ -308,16 +308,15 @@ function CARGO.Trade.Confirm(ply, trader, basket)
             .. CARGO.Money.Format(trader.money) .. "."
     end
 
-    -- weight: what you walk away with has to fit. The whole transaction
-    -- fails, it is never split in half (§3).
-    local delta = weightIn - weightOut
-    if delta > 0 then
-        local cap = CARGO.Inventory.Capacity(ply) * CARGO.Weight.MAX_FRACTION
-        local over = CARGO.Inventory.TotalWeight(ply) + delta - cap
-        if over > 0 then
-            return false, string.format("Too heavy: you're %.1f kg over the limit.", over)
-        end
-    end
+    -- WEIGHT IS NOT A GATE HERE (author call, 1st in-game pass 2026-07-14 —
+    -- amends §3, which listed it as a validation). Buying is a deliberate act:
+    -- refusing the deal because the player would walk out overloaded turns the
+    -- trader into a nanny. He CAN buy past his capacity and leave overloaded —
+    -- and the weight curve (§5 of Cargo_Architecture) already charges him for
+    -- it in movement speed. The carry limit still governs what he PICKS UP off
+    -- the floor; what he pays for is his problem.
+    -- (weightIn/weightOut stay resolved above: the money and stock checks are
+    -- the atomic ones, and slice 2's cash lines will read them.)
 
     -- ---------------- everything validated: now it moves ----------------
 
@@ -332,9 +331,9 @@ function CARGO.Trade.Confirm(ply, trader, basket)
             CARGO.Inventory.GiveEntry(ply, { id = entry.id, uid = entry.uid }, true)
         else
             entry.count = (entry.count or 1) - line.count
-            -- skipCap: the weight of the WHOLE basket was validated above.
-            -- Re-checking per item would fail an over-capacity-then-lightened
-            -- basket purely on the order the lines happen to move.
+            -- skipCap: weight is not a gate on a purchase (see above). Without
+            -- it, GiveEntry would refuse the line and the deal would silently
+            -- half-execute — exactly what the atomic rule forbids.
             CARGO.Inventory.GiveEntry(ply,
                 { id = entry.id, count = line.count, condition = entry.condition }, true)
         end
