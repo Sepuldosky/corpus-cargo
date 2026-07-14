@@ -199,7 +199,7 @@ Mismo patrón en ambos casos — Cargo (o el módulo dueño del dato) define una
 - **Grid uniforme**: 1 celda = 1 ítem, auto-sort por categoría, sin gestión espacial ni rotación.
 - **Overlays estándar por celda**: stack count (arriba-derecha), condición % (abajo-derecha, solo ítems con condición), icono de efecto (abajo-izquierda: hemostático, radiactividad, batería), calibre (abajo-izquierda, solo munición).
 - **Header de perfil**: identidad (Steam), facción/rango (provider Cortex), dinero (provider), retrato.
-- **Filtro por categoría**: fila de tabs sobre el grid (todo, armas, munición, médico, comida, misc...).
+- **Filtro por tab**: fila de tabs sobre el grid — **set fijo de 8**, agrupación de display sobre las categorías (§7.1).
 - **Footer de peso**: barra + valor actual/máximo + desglose base/mochila.
 
 > **Enmienda 2026-07-11 (bloque UI fullscreen).** La **forma** de la UI cambia a
@@ -217,6 +217,44 @@ Mismo patrón en ambos casos — Cargo (o el módulo dueño del dato) define una
 > - **Prerequisito duro:** las gradas dependen del sistema de imágenes
 >   (`Cargo_ItemImages_Arquitectura.md`). Con el fallback de letra, un footprint 6×2 se
 >   ve peor que el grid uniforme. Ese bloque se implementa **antes o junto** con este.
+
+### 7.1 Tabs de display: set FIJO sobre categorías abiertas (roadmap #23)
+
+**El problema.** El set de **categorías** de ítem es y sigue siendo **abierto**:
+`Items.RegisterCategory` auto-registra cualquier categoría que un def mencione, para
+que los módulos hermanos (Coagulant, Craving, Cortex) traigan las suyas sin pedir
+permiso. La fila de tabs se poblaba **desde ese set**, así que crecía sola: con
+"Backpacks" registrada ya hacía **wrap** a una segunda línea.
+
+**La decisión (con el autor, 2026-07-13).** La fila de tabs deja de ser un espejo de
+las categorías y pasa a ser una **capa de AGRUPACIÓN de display**, con un set
+**fijo y cerrado** de 8 tabs. No es un renombre ni un recorte: las categorías internas
+quedan intactas y siguen sirviendo al grammar `"category:a,b"` de slots y sub-slots
+(contrato #3) — **el id de un tab jamás es una categoría válida en ese filtro.**
+
+| Tab | Categorías internas que agrupa |
+|---|---|
+| **All** | (no filtra) |
+| **Weapons** | `weapons`, `melee`, `throwables` |
+| **Ammo** | `ammo` |
+| **Gear** | `helmets`, `armor`, `plates`, `backpacks`, `accessories` |
+| **Mods** | `attachments`, `optics` |
+| **Meds** | `medical` |
+| **Food** | `food` |
+| **Misc** | `misc` + **toda categoría no mapeada** (paraguas) |
+
+Reglas de la fila:
+
+- **Se dibuja SIEMPRE entera**, tenga o no ítems: las tabs no se mueven bajo el cursor
+  al cambiar el inventario. Una tab sin nada se pinta **atenuada** (sigue filtrando, a
+  un grid vacío).
+- **Nunca vuelve a crecer.** Una categoría ajena (`artifacts`, digamos) se auto-registra
+  como siempre y su ítem es visible bajo **Misc** y bajo **All**, pero **no acuña tab**.
+- Una entrada **sin def** (id desconocido) cae también en Misc — nunca se vuelve
+  invisible en todas las tabs menos All.
+- Superficie shared: `Items.GetTabs()`, `Items.TabOf(category)`, `Items.MatchesTab(def, tabId)`
+  (`corpus_cargo_items.lua`). El grid filtra por **tab**, no por categoría; el orden de
+  auto-sort sigue siendo el `order` de la **categoría** (grano fino dentro del tab).
 
 ---
 
@@ -618,7 +656,8 @@ fundación primero) — es el bloque siguiente.
 
 - **Cargadores rellenables con toggle** (lo único que queda abierto de #19).
 - **Binding de ammo-atts de EFT** (16.6) — bloque propio.
-- **Categorías fijas de tabs** (#23) y **retícula del grid** (#24): frentes ajenos.
+- **Categorías fijas de tabs** (#23, cerrado aparte en §7.1) y **retícula del grid**
+  (#24): frentes ajenos a este bloque.
 
 ### 16.8 UX de munición (Bloque C)
 

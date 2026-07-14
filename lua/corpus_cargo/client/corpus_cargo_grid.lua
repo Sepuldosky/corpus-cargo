@@ -178,8 +178,9 @@ function CARGO.Grid.Create(parent, opts)
 
         for _, entry in ipairs(sorted) do
             local def = CARGO.Items.Get(entry.id)
-            local visible = controller.filter == "all"
-                or (def and def.category == controller.filter)
+            -- the filter is a DISPLAY tab, not an internal category (#23):
+            -- one tab groups several categories, unmapped ones fall to Misc
+            local visible = CARGO.Items.MatchesTab(def, controller.filter)
             if visible then
                 local cell = layout:Add("DButton")
                 -- tiered tile: footprint w×h cells, gaps included so tile

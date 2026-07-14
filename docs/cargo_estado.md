@@ -5,11 +5,12 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-13 (tanda de flecos CERRADA con la ronda
-2 del autor: **entries 4, 15 y 17 → `[APLICADO]`** — roadmap #22 cerrado
-entero. Frentes nuevos que dejó la pasada: **#36** slot HL2 alineado,
-**#37** drop VJ que vuelve solo, **#38** trivia real. Semilla del handoff
-borrada de `dev/`.)
+**Última actualización:** 2026-07-13 (**roadmap #23 cerrado**: sesión de
+diseño con el autor → set FIJO de 8 tabs de display sobre las categorías
+internas → entry **19 `[PENDIENTE]`**. Sigue abierto el **18**
+(`Inventory.HasItem`, lo confirma el re-test G4 de Coagulant). Frentes que
+dejó la pasada anterior: **#36**, **#37**, **#38**. Lo próximo es el bloque
+grande de **comercio**.)
 
 ---
 
@@ -27,15 +28,23 @@ borrada de `dev/`.)
   drop de slot, #24 retícula, **#29 paletas runtime + teñido DGL4**) y los
   frentes de la 2.ª pasada (#32 taxonomía de granadas + cajas por WALK+USE,
   #33 hub ARC9 completo, #34 compat con mods de movimiento).
-- **Harness offline: 235 checks verdes en ambos realms** (con gate final: un
-  FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 52 client / 45 server.
+- **Tabs de display con set FIJO de 8** (#23, entry 19): `All · Weapons ·
+  Ammo · Gear · Mods · Meds · Food · Misc` — agrupación sobre las categorías
+  internas, que quedan intactas para el grammar `"category:a,b"`. La fila se
+  dibuja siempre entera y lo no mapeado cae en Misc (§7.1).
+- **Harness offline: 279 checks verdes en ambos realms** (con gate final: un
+  FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 66 client / 59 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
   MIT y el rename `corpus_stalker` en el kit dev).
 
 ## Pendiente de verificar
 
-- Nada — todo el CHANGELOG está `[APLICADO]` y confirmado.
+- **Entry 19 (tabs fijas, #23):** fila en UNA línea con las 8 tabs siempre
+  presentes (vacías atenuadas), cada ítem bajo su tab, sub-slots intactos.
+- **Entry 18 (`Inventory.HasItem`):** lo confirma el re-test G4 de la ronda 4
+  de Coagulant (torniquete `unique` desde la UI — el resto del CHANGELOG está
+  `[APLICADO]` y confirmado).
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -49,7 +58,6 @@ borrada de `dev/`.)
 - **Footsteps mudos al togglear `sv_bm_enabled`** → **roadmap #35** (lado
   mod: better movement v2; el remedio `sv_bm_slow_footsteps 0` NO funcionó —
   la sospecha del math.huge queda sin confirmar; investigar con el mod vivo).
-- **Categorías fijas de tabs** → **roadmap #23** (bloque propio, sin diseñar).
 
 ## Remanentes / deuda conocida
 
@@ -69,10 +77,10 @@ borrada de `dev/`.)
 
 ## Próximo paso
 
-1. **Categorías fijas de tabs** (#23, exige sesión de diseño del set fijo con
-   el autor) y después **comercio** (`Cargo_Trade_Arquitectura.md`, el bloque
-   grande) — semilla del chat nuevo:
-   [`../../dev/HANDOFF_cargo_23_comercio.md`](../../dev/HANDOFF_cargo_23_comercio.md).
+1. **Comercio** (`Cargo_Trade_Arquitectura.md`, diseño cerrado §1-12) — el
+   bloque grande: implementarlo por vertical slices, reusando el primitivo de
+   contenedores (§8) y la interfaz de dinero (§6). Semilla:
+   [`../../dev/HANDOFF_cargo_23_comercio.md`](../../dev/HANDOFF_cargo_23_comercio.md) §3.2.
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 3. Cuando se prioricen: **#36** (slot HL2 alineado), **#37** (drop VJ,
    diagnóstico contra el mod vivo), **#35** (footsteps), **#38** (trivia).

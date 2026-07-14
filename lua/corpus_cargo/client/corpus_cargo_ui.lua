@@ -702,38 +702,36 @@ local function BuildTabs(bar)
     local snap = S()
     if snap == nil then return end
 
-    -- tabs = Todo + categories present in the current grid, in category order
+    -- FIXED row (#23): the tab set is closed (Items.GetTabs) and always drawn
+    -- WHOLE, so a tab never moves under the cursor as the inventory changes.
+    -- The row no longer follows the open category set — that is what made it
+    -- grow a second line. Only the dimming is dynamic: a tab with nothing in
+    -- the grid paints faded (it still filters, to an empty grid).
     local present = {}
     for _, entry in ipairs(snap.items or {}) do
         local def = CARGO.Items.Get(entry.id)
-        if def then present[def.category] = true end
+        present[CARGO.Items.TabOf(def and def.category)] = true
     end
 
-    local tabs = { { id = "all", label = "All" } }
-    for _, cat in ipairs(CARGO.Items.GetCategories()) do
-        if present[cat.id] then tabs[#tabs + 1] = cat end
-    end
-
-    -- wrap into rows (mock .tabs flex-wraps): the category list outgrew one
-    -- row on the first in-game pass ("Backpacks" clipped). Docked width is
-    -- not laid out yet when the frame builds, so BuildFrame stamps the
-    -- usable width on the bar.
+    -- The fixed set fits one row at every aspect we ship; the wrap stays as a
+    -- safety net (tiny resolutions) instead of clipping the last tab.
     local barW = bar.cargoWide or bar:GetWide()
     local x, rowY = 0, 2
-    for _, cat in ipairs(tabs) do
+    for _, tab in ipairs(CARGO.Items.GetTabs()) do
         surface.SetFont("CargoSmall")
-        local tw = surface.GetTextSize(cat.label)
+        local tw = surface.GetTextSize(tab.label)
         local bw = tw + 22
         if x > 0 and x + bw > barW then
             x, rowY = 0, rowY + 26
         end
+        local hasItems = tab.id == "all" or present[tab.id] == true
         local btn = vgui.Create("DButton", bar)
         btn:SetText("")
         btn:SetPos(x, rowY)
         btn:SetSize(bw, 24)
-        -- mock .tabs: flat text, active gets the green tint + thin border
+        -- mock .tabs: flat text, active gets the accent tint + thin border
         btn.Paint = function(self, w, h)
-            local activeTab = grid and grid.filter == cat.id
+            local activeTab = grid and grid.filter == tab.id
             if activeTab then
                 surface.SetDrawColor(T.Colors.accent.r, T.Colors.accent.g,
                     T.Colors.accent.b, 16)
@@ -741,13 +739,22 @@ local function BuildTabs(bar)
                 surface.SetDrawColor(T.Colors.accentDim)
                 surface.DrawOutlinedRect(0, 0, w, h, 1)
             end
-            draw.SimpleText(cat.label, "CargoSmall", w / 2, h / 2,
-                activeTab and T.Colors.accent
-                    or (self:IsHovered() and T.Colors.text or T.Colors.textDim),
+            local col
+            if activeTab then
+                col = T.Colors.accent
+            elseif not hasItems then
+                local d = T.Colors.textDim
+                col = Color(d.r, d.g, d.b, 90)
+            elseif self:IsHovered() then
+                col = T.Colors.text
+            else
+                col = T.Colors.textDim
+            end
+            draw.SimpleText(tab.label, "CargoSmall", w / 2, h / 2, col,
                 TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
         btn.DoClick = function()
-            if grid then grid.SetFilter(cat.id) end
+            if grid then grid.SetFilter(tab.id) end
         end
         x = x + bw + 6
     end

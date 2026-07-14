@@ -1709,3 +1709,42 @@ true; TakeItem sobre el unique sigue devolviendo false; flujo completo del
 torniquete verde (23 checks + selftest de Coagulant 68 OK). **En juego:** lo
 confirma el re-test G4 de la ronda 4 de Coagulant (torniquete desde la UI
 arranca, aplica y no se consume).
+
+---
+
+## 19. Tabs de display: set FIJO de 8, la fila deja de crecer sola (roadmap #23) `[PENDIENTE]`
+
+**Contexto (reporte del autor, 2026-07-12):** el set de **categorías** de ítem es
+ABIERTO — `Items.RegisterCategory` auto-registra cualquier categoría que un def
+mencione — y la fila de tabs se poblaba **desde ese set**. Con 14 categorías + "All"
+la fila hacía **wrap**: "Backpacks" caía a una segunda línea. Cada módulo hermano que
+registre lo suyo (Coagulant, Craving, Cortex) la habría hecho crecer más.
+
+**Sesión de diseño con el autor (2026-07-13) — el set cerrado:** la fila pasa a ser
+una **capa de AGRUPACIÓN de display** sobre las categorías, con un set **fijo de 8**:
+`All · Weapons · Ammo · Gear · Mods · Meds · Food · Misc`. No es un renombre ni un
+recorte: las **categorías internas quedan intactas** y siguen sirviendo al grammar
+`"category:a,b"` de slots y sub-slots (contrato #3). Decisiones del autor: la fila se
+dibuja **siempre entera** (tabs vacías atenuadas, posiciones estables) y toda categoría
+**no mapeada cae al paraguas Misc** — la fila no vuelve a crecer nunca. Bajado a
+`Cargo_Architecture.md` §7.1 (mapeo completo tab ← categorías).
+
+**Cambio (shared, `corpus_cargo_items.lua`):** superficie nueva `Items.GetTabs()`
+(set fijo, copias frescas), `Items.TabOf(category)` (categoría → tab, con fallback
+a `misc`) y `Items.MatchesTab(def, tabId)` (lo que pregunta el grid por celda; `all`
+acepta todo y una entrada **sin def** cae en Misc en vez de volverse invisible en
+todas las tabs menos All).
+
+**Cambio (client):** `corpus_cargo_grid.lua` filtra por **tab** en vez de comparar
+`def.category` con el filtro; `corpus_cargo_ui.lua::BuildTabs` deja de poblarse desde
+`GetCategories()` y dibuja el set fijo entero, atenuando las tabs sin ítems (el wrap
+queda solo como red de seguridad para resoluciones diminutas, en vez de recortar la
+última tab).
+
+**Verificación offline:** harness `dev/harness_cargo.py` **279 checks verdes** en ambos
+realms (eran 235: bloque #23 nuevo — las 14 categorías base caen cada una en un tab del
+set fijo, una categoría ajena se auto-registra pero NO acuña tab y su ítem se ve bajo
+Misc/All, y el id de tab `gear` **no** matchea `"category:gear"` en el filtro de
+sub-slots). `cargo_selftest` **66 client / 59 server** (+10 checks de tabs).
+**En juego:** pendiente de confirmación del autor (fila en una línea, tabs vacías
+atenuadas, cada ítem en su tab, sub-slots sin romperse).

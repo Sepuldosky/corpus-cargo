@@ -228,7 +228,14 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     3459525275, GPL-3.0, COMPAT-RUNTIME — mapa §2); verificar que el 7º slot no rompa
     ese HUD.
 
-23. CATEGORÍAS FIJAS PARA LA FILA DE TABS DEL GRID [Cargo UI] — SIN DISEÑAR.
+23. CATEGORÍAS FIJAS PARA LA FILA DE TABS DEL GRID [Cargo UI].
+    [CERRADO — CHANGELOG #19, PENDIENTE de confirmación en juego: set fijo de 8
+    tabs decidido con el autor (All · Weapons · Ammo · Gear · Mods · Meds · Food ·
+    Misc), capa de AGRUPACIÓN de display sobre las categorías internas (que quedan
+    intactas y siguen sirviendo al grammar "category:a,b"). La fila se dibuja
+    siempre entera (tabs vacías atenuadas) y toda categoría no mapeada cae al
+    paraguas Misc: nunca vuelve a crecer. Superficie: Items.GetTabs/TabOf/
+    MatchesTab. Mapeo completo en Cargo_Architecture.md §7.1.]
     Pedido del autor (2026-07-12, pasada del Bloque A). HOY: el set de
     categorías es ABIERTO — Items.RegisterCategory auto-registra cualquier
     categoría que un def mencione (corpus_cargo_items.lua), así que la fila de

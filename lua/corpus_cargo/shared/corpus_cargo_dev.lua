@@ -340,6 +340,34 @@ function CARGO._SelfTest()
     check("filtro rechaza categoría ajena", not CARGO.Items.MatchesFilter(plate, "category:optics"))
     check("filtro multi-categoría", CARGO.Items.MatchesFilter(plate, "category:optics,plates"))
 
+    -- display tabs (#23): fixed set, grouping layer OVER the open categories
+    local tabs = CARGO.Items.GetTabs()
+    check("set de tabs fijo (8, All primero, Misc último)",
+        #tabs == 8 and tabs[1].id == "all" and tabs[#tabs].id == "misc")
+    check("melee y throwables caen en Weapons",
+        CARGO.Items.TabOf("melee") == "weapons"
+            and CARGO.Items.TabOf("throwables") == "weapons")
+    check("helmets, armor, plates y backpacks caen en Gear",
+        CARGO.Items.TabOf("helmets") == "gear" and CARGO.Items.TabOf("armor") == "gear"
+            and CARGO.Items.TabOf("plates") == "gear"
+            and CARGO.Items.TabOf("backpacks") == "gear")
+    check("attachments y optics caen en Mods",
+        CARGO.Items.TabOf("attachments") == "mods"
+            and CARGO.Items.TabOf("optics") == "mods")
+    check("categoría ajena cae en el paraguas Misc",
+        CARGO.Items.TabOf("artifacts") == "misc")
+    check("def sin categoría cae en Misc", CARGO.Items.TabOf(nil) == "misc")
+    check("MatchesTab: la placa está bajo Gear y no bajo Weapons",
+        CARGO.Items.MatchesTab(plate, "gear")
+            and not CARGO.Items.MatchesTab(plate, "weapons"))
+    check("MatchesTab: All acepta todo", CARGO.Items.MatchesTab(plate, "all"))
+    check("MatchesTab: entrada sin def cae en Misc",
+        CARGO.Items.MatchesTab(nil, "misc") and not CARGO.Items.MatchesTab(nil, "gear"))
+    -- la capa de tabs NO se filtra al grammar de slots/sub-slots (contrato #3)
+    check("los filtros de categoría siguen intactos (el tab no es categoría)",
+        CARGO.Items.MatchesFilter(plate, "category:plates")
+            and not CARGO.Items.MatchesFilter(plate, "category:gear"))
+
     -- sub-slot primitive declared once, queried back
     check("sub-slot placas declarado", CARGO.Items.GetSubSlot(vest, "plates") ~= nil)
     check("sub-slot inexistente es nil", CARGO.Items.GetSubSlot(vest, "nope") == nil)

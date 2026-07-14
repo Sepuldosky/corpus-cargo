@@ -61,6 +61,74 @@ function CARGO.Items.GetCategories()
 end
 
 -- ------------------------------------------------------------------
+-- Display tabs (roadmap #23, set closed with the author 2026-07-13).
+--
+-- The CATEGORY set above stays OPEN and untouched: the "category:a,b"
+-- filter grammar of equipment slots and sub-slots (contract #3) leans on
+-- it. What is CLOSED is the DISPLAY layer on top of it — a FIXED row of
+-- tabs the UI never populates dynamically, so it can no longer grow a
+-- second line (the tab row wrapped once "Backpacks" was registered).
+--
+-- Grouping only, never renaming: several internal categories fold into one
+-- tab, and a category NOT mapped here (a sibling module registering, say,
+-- "artifacts") falls into the "misc" umbrella. An item is therefore always
+-- reachable — under All and under its tab — but a foreign category can
+-- never mint a tab of its own.
+-- ------------------------------------------------------------------
+
+CARGO.Items.TAB_MISC = "misc"
+
+local TABS = {
+    { id = "all",     label = "All" },
+    { id = "weapons", label = "Weapons" },
+    { id = "ammo",    label = "Ammo" },
+    { id = "gear",    label = "Gear" },
+    { id = "mods",    label = "Mods" },
+    { id = "meds",    label = "Meds" },
+    { id = "food",    label = "Food" },
+    { id = "misc",    label = "Misc" },
+}
+
+local CATEGORY_TAB = {
+    weapons     = "weapons",
+    melee       = "weapons",
+    throwables  = "weapons",
+    ammo        = "ammo",
+    helmets     = "gear",
+    armor       = "gear",
+    plates      = "gear",
+    backpacks   = "gear",
+    accessories = "gear",
+    attachments = "mods",
+    optics      = "mods",
+    medical     = "meds",
+    food        = "food",
+    misc        = "misc",
+}
+
+-- fixed row, in row order (fresh copies: the UI must not mutate the set)
+function CARGO.Items.GetTabs()
+    local out = {}
+    for i, tab in ipairs(TABS) do
+        out[i] = { id = tab.id, label = tab.label }
+    end
+    return out
+end
+
+function CARGO.Items.TabOf(category)
+    if not isstring(category) then return CARGO.Items.TAB_MISC end
+    return CATEGORY_TAB[category] or CARGO.Items.TAB_MISC
+end
+
+-- "all" takes everything; an entry with no def at all still shows under Misc
+-- rather than vanishing from every tab but All
+function CARGO.Items.MatchesTab(def, tabId)
+    if tabId == nil or tabId == "all" then return true end
+    if not istable(def) then return tabId == CARGO.Items.TAB_MISC end
+    return CARGO.Items.TabOf(def.category) == tabId
+end
+
+-- ------------------------------------------------------------------
 -- Item registration.
 --
 -- Base schema (Cargo owns — Cargo_Architecture.md §3):
