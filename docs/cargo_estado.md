@@ -5,12 +5,13 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-14 (**slice 1 del COMERCIO confirmado en
-juego**: entries **19** y **20** → `[APLICADO]`. De las dos pasadas siguientes
-quedan **21** y **22** `[PENDIENTE]`: el peso deja de bloquear una transacción,
-la línea del basket es un **agregado sobre todos los stacks** del ítem (bug
-real: el stack gemelo era inalcanzable) y el click carga 25% del `max_stack`,
-con **SHIFT+click = todo**.)
+**Última actualización:** 2026-07-14 (**entries 23 y 24 confirmadas en juego**
+→ las armas **se describen solas** (#38) y **cada arma sabe a qué slot va**
+(#39). Quedan `[PENDIENTE]` **21** y **22** —el peso deja de bloquear una
+transacción, la línea del basket es un **agregado sobre todos los stacks** y el
+click carga 25% del `max_stack`, con **SHIFT+click = todo**— y la **25**: el
+**arsenal real del autor** pesado y precificado (#40; el M60E4 ya no pesa
+2,5 kg).)
 
 ---
 
@@ -46,7 +47,32 @@ con **SHIFT+click = todo**.)
   comprar sobrecargado — la curva de peso lo cobra en velocidad; el límite sigue
   vigente para lo que se recoge del suelo. Click = stack entero; parcial con click
   derecho.
-- **Harness offline: 318 checks verdes en ambos realms** (con gate final: un
+- **Trivia de armas: la pone el SWEP, no una tabla** (entry 23, roadmap #38).
+  La captura lee `SWEP.Description` y el bloque `SWEP.Trivia` de
+  `weapons.Get(class)` (ya heredados por la cadena `SWEP.Base`) → `def.trivia`
+  + `def.trivia_rows`; el tooltip pinta **"Specs"** bajo los stats, sin exigir
+  el arma en la mano. **Cualquier pack ARC9 que se monte después queda cubierto
+  solo.** `corpus_cargo_weapon_trivia.lua` es la *excepción* (36 entradas):
+  huecos del pack, herencias mentirosas (el M16A1 hereda de `arc9_eft_m4a1`) y
+  las armas HL2, que no son SWEPs. **ARC9MW: las 87 clases** con peso y precio
+  — los pesos los **declara el propio pack** en su `SWEP.Trivia` (54/87
+  transcritos; el resto `real approx`).
+- **Cada arma sabe a qué slot va** (entry 24, roadmap #39). Los tres slots de
+  arma filtran por `category:weapons`, así que **cualquier** arma entraba en
+  cualquiera (un RPG en Sidearm). El def autogen ahora setea `equip_slots`,
+  **derivándolo del propio SWEP** (`SWEP.Class` por arma, `SubCategory` por
+  pack, ambos resueltos por herencia): pistolas → Sidearm, largas →
+  Primary/Secondary, melee → categoría `melee`, sin clasificar → libre.
+  `SWEP.Slot` **no** es la señal (inconsistente entre packs). Lo ya equipado en
+  un slot ilegal se reconcilia al spawn.
+- **El arsenal real del autor, pesado y precificado** (entry 25, roadmap #40).
+  Su volcado (`cargo_dev_dump_weapons`) tenía **369 SWEPs y 184 sin peso**:
+  packs EFT que no están en `dev/other/` (SMG, escopetas, LMG, melee, gear,
+  `makeshift`), el pack entero de **CS:GO** (`arc9_go`) y `arc9_wtt`. El volcado
+  alcanzó para catalogarlos **sin tener el pack**. Hoy: **360 armas vivas, las
+  360 con peso Y precio, cero huecos** (sin `value` no se comercian, y ese
+  hueco era el mismo). El M60E4 pesa **10,5 kg**.
+- **Harness offline: 351 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 76 client / 69 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -58,6 +84,10 @@ con **SHIFT+click = todo**.)
   click = 25% del `max_stack`, SHIFT+click = todo, click derecho = cantidad
   exacta; y una línea del basket abarca **todos** los stacks de ese ítem (vender
   240 balas que viven como 2×120 se lleva las 240).
+- **Entry 25 (arsenal pesado y precificado):** que el **M60E4 pese 10,5 kg** (no
+  2,5); que **ninguna** arma quede en el nominal — un `cargo_dev_dump_weapons`
+  nuevo no debería marcar un solo `MISSING`; y que las armas de CS:GO y de los
+  packs EFT nuevos tengan precio en el trader.
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -99,8 +129,13 @@ con **SHIFT+click = todo**.)
    slice 3 (jugador-trader con doble confirm). La entry 21 se confirma de paso
    en esa misma pasada (checklist en el artifact).
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
-3. Cuando se prioricen: **#36** (slot HL2 alineado), **#37** (drop VJ,
-   diagnóstico contra el mod vivo), **#35** (footsteps), **#38** (trivia).
+3. **#41 — explosivos ARC9 como stack throwable** (bloque propio, pedido del
+   autor): hoy las granadas de EFT/CS:GO/MW2019 se equipan en Primary. El
+   clasificador ya las etiqueta `thrown`; falta el destino (son `unique` y el
+   slot Throwable pide un **stack**). Enlaza con el #32.
+4. Cuando se prioricen: **#42** (el lanzagranadas capturado no dispara — perdió
+   su attachment de munición; sospecha: el puente ARC9 §10), **#36** (slot HL2
+   alineado), **#37** (drop VJ), **#35** (footsteps).
 
 ---
 

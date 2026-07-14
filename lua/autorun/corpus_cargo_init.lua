@@ -66,8 +66,9 @@ local SERVER_FILES = {
     "server/corpus_cargo_movement.lua",   -- weight -> walk/run speed application
     "server/corpus_cargo_containers.lua", -- world containers + transfer net
     "server/corpus_cargo_trade.lua",      -- traders (container + spread) + atomic basket
-    "server/corpus_cargo_weapon_weights.lua", -- real weights for captured weapons (GAMMA/EFT data)
+    "server/corpus_cargo_weapon_weights.lua", -- real weights for captured weapons (GAMMA/EFT/MW data)
     "server/corpus_cargo_weapon_prices.lua",  -- base value for captured weapons (same class keys)
+    "server/corpus_cargo_weapon_trivia.lua",  -- trivia overrides where ARC9 describes nothing (same class keys)
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)
     "server/corpus_cargo_holster.lua",    -- STALKER weapon order + holster + default hands (#22/#4)
     "server/corpus_cargo_icons.lua",      -- icon cam/footprint override registry (ItemImages §4.3/§10)

@@ -57,7 +57,8 @@ Un **manifest de carga explícito** (`corpus_cargo_init.lua`, único archivo en 
 | [`lua/corpus_cargo/server/corpus_cargo_inventory.lua`](lua/corpus_cargo/server/corpus_cargo_inventory.lua) | server | Inventario por SteamID64: stacks, equip, quick, cinturón (§15.2, solo forma), eyección obligatoria, net |
 | [`lua/corpus_cargo/server/corpus_cargo_movement.lua`](lua/corpus_cargo/server/corpus_cargo_movement.lua) | server | Aplica la curva a walk/run + lazy-check Coagulant + publica el mult (NW2Float) para movecompat |
 | [`lua/corpus_cargo/server/corpus_cargo_ammopool.lua`](lua/corpus_cargo/server/corpus_cargo_ammopool.lua) | server | Espejo cinturón↔pool a 4 Hz (§16.3-16.5, §16.9: el stack throwable equipado cuenta y paga primero), unload (#26), `WorldAmmoSpec` + veto puro de `item_ammo_*` |
-| [`lua/corpus_cargo/server/corpus_cargo_weapon_weights.lua`](lua/corpus_cargo/server/corpus_cargo_weapon_weights.lua) | server | Pesos reales clase→kg para defs autogen (GAMMA DB 0.9.5 / `EFT approx`; fallback 2.5 kg). El manifest la carga **antes** de `capture.lua`: el re-registro al boot re-pesa lo ya capturado |
+| [`lua/corpus_cargo/server/corpus_cargo_weapon_weights.lua`](lua/corpus_cargo/server/corpus_cargo_weapon_weights.lua) | server | Pesos reales clase→kg para defs autogen (GAMMA DB 0.9.5 / `EFT approx` / **peso declarado por el propio ARC9MW**; fallback 2.5 kg). El manifest la carga **antes** de `capture.lua`: el re-registro al boot re-pesa lo ya capturado |
+| [`lua/corpus_cargo/server/corpus_cargo_weapon_trivia.lua`](lua/corpus_cargo/server/corpus_cargo_weapon_trivia.lua) | server | **Excepciones** de trivia, no la fuente: la trivia sale de `SWEP.Description`/`SWEP.Trivia` del propio SWEP (ver contrato #12). Acá viven los huecos que el pack no escribió, las herencias mentirosas y las armas HL2 (que no son SWEPs) |
 | [`lua/corpus_cargo/server/corpus_cargo_icons.lua`](lua/corpus_cargo/server/corpus_cargo_icons.lua) | server | Registro de overrides de cámara/footprint de íconos (def-level, persiste en `Corpus.Data` y viaja en el snapshot de defs) — ItemImages §4.3/§10 |
 | [`lua/corpus_cargo/server/corpus_cargo_containers.lua`](lua/corpus_cargo/server/corpus_cargo_containers.lua) | server | Contenedores en mundo, transferencias, Take/Move all (§8) — **es el primitivo inventario-en-entidad** que reusa el trader |
 | [`lua/corpus_cargo/server/corpus_cargo_trade.lua`](lua/corpus_cargo/server/corpus_cargo_trade.lua) | server | Traders (`AttachTrader` = contenedor + spread + wallet), sesión y **basket atómico**: valida TODO y recién ahí mueve (`Cargo_Trade` §2/§3) |
@@ -95,7 +96,14 @@ Un **manifest de carga explícito** (`corpus_cargo_init.lua`, único archivo en 
 9. **Detección, nunca asunción.** Cortex (facción), Coagulant (stamina) y ARC9 se consultan con lazy-check + pcall; sin ellos el header omite facción, la penalización queda en velocidad y el puente se apaga — degradación honesta, jamás crash.
 10. **Prefijo de archivo por módulo:** `corpus_cargo_*.lua` en todo lo que cargue el engine.
 11. **Un solo inventario-en-entidad.** Contenedor, trader (y mañana el cadáver de Cortex) son **el mismo primitivo**: `Containers.Attach`. Un trader es ese contenedor **+ una capa de precio** (`Trade.AttachTrader`), nunca un inventario paralelo.
-12. **El precio lo dice el servidor.** El basket del cliente es **intent puro**: no mueve nada y su total es decorado. En `Confirm` el server re-resuelve cada línea, la re-precia y valida dinero + peso + existencia; recién si TODO pasa, mueve. No hay ruta de rollback porque no hay mutación antes de la validación. Un ítem **sin `def.value` no se comercia** (ausencia = "no está a la venta", no "gratis").
+12. **La trivia la pone el SWEP, no una tabla.** Un arma capturada se describe con su
+    propio `SWEP.Description` + `SWEP.Trivia`, leídos de `weapons.Get(class)` (que ya
+    resuelve la herencia por `SWEP.Base`). `Capture.WeaponTrivia` es la **excepción**
+    —huecos del pack, herencias mentirosas, armas HL2 sin SWEP—, jamás la ruta normal:
+    catalogar a mano cada arma de cada pack ARC9 es exactamente el trabajo que este
+    diseño evita. Ni `trivia` ni `trivia_rows` se persisten: se re-derivan en cada boot,
+    así que un pack nuevo cubre solo a las armas ya capturadas.
+13. **El precio lo dice el servidor.** El basket del cliente es **intent puro**: no mueve nada y su total es decorado. En `Confirm` el server re-resuelve cada línea, la re-precia y valida dinero + peso + existencia; recién si TODO pasa, mueve. No hay ruta de rollback porque no hay mutación antes de la validación. Un ítem **sin `def.value` no se comercia** (ausencia = "no está a la venta", no "gratis").
 
 ## Trampas de VGUI y HUD (heredadas del proyecto — no las redescubras)
 

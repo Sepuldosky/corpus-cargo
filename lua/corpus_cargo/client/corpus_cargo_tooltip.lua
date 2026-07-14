@@ -215,6 +215,17 @@ function CARGO.Tooltip.Show(cell, entry)
         end
     end
 
+    -- spec rows the SWEP declares about itself (manufacturer, caliber, action,
+    -- country, year): resolved and ordered server-side at capture, so this only
+    -- paints. Unlike the stats above they do NOT need the weapon in hand — an
+    -- ARC9 gun sitting in the grid still tells you who made it.
+    if istable(def.trivia_rows) and #def.trivia_rows > 0 then
+        y = y + AddSection(tip, "Specs")
+        for _, row in ipairs(def.trivia_rows) do
+            y = y + AddValueRow(tip, row.label, row.value)
+        end
+    end
+
     if istable(def.ammo) then
         y = y + AddAmmoRow(tip, def.ammo)
     end

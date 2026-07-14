@@ -442,9 +442,80 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     dropeada" del reconciliador (capture.lua/holster.lua) y por qué no cubre
     la ruta VJ. Diagnóstico primero, archivo:línea, después arreglo.
 
-38. TRIVIA REAL PARA ARMAS CAPTURADAS [Cargo UI, idea] — SIN DISEÑAR.
+38. TRIVIA REAL PARA ARMAS CAPTURADAS [Cargo UI] — HECHO (entry 23 del
+    CHANGELOG, 2026-07-14; pendiente de confirmación en juego).
     Idea del autor (2026-07-13, pasada del entry 15c): el "autocaptured" del
     footer del tooltip podría moverse a la trivia estilo ARC9, y/o generarse
     trivias con datos reales (EFT/GAMMA) para el arsenal del volcado de
-    cargo_dev_dump_weapons. Baja prioridad; decidir fuente y formato con el
-    autor cuando se priorice.
+    cargo_dev_dump_weapons.
+    RESUELTO sin tabla: la FUENTE es el SWEP mismo. ARC9 escribe SWEP.Description
+    (string ya localizado al cargar el archivo) y un bloque SWEP.Trivia
+    (fabricante/calibre/acción/país/año), y weapons.Get(class) los entrega ya
+    heredados por la cadena SWEP.Base. La captura los lee y los pone en
+    def.trivia + def.trivia_rows; el tooltip pinta una sección "Specs" bajo los
+    stats. Cualquier pack ARC9 que se monte después queda cubierto solo.
+    corpus_cargo_weapon_trivia.lua es la EXCEPCIÓN (36 entradas): huecos que el
+    pack no escribió, herencias mentirosas (el M16A1 hereda de arc9_eft_m4a1 y
+    se presentaría como un M4A1) y las armas HL2, que no son SWEPs.
+
+39. SLOT POR TIPO DE ARMA [Cargo capture/slots] — HECHO (entry 24 del
+    CHANGELOG, 2026-07-14; pendiente de confirmación en juego).
+    Reporte del autor (pasada de la entry 23): un RPG podía equiparse en
+    Sidearm. Los tres slots de arma filtran por category:weapons, así que
+    cualquier arma entraba en cualquiera; def.equip_slots (el gancho para
+    estrechar) existía desde el Block 1 y el def autogen nunca lo usaba.
+    RESUELTO derivando del propio SWEP (no catalogando): SWEP.Class es por arma
+    y SWEP.SubCategory por pack, y weapons.Get() resuelve ambos por la cadena
+    SWEP.Base — un pack que nunca vimos se clasifica solo. Pistolas -> sidearm;
+    largas (fusil/SMG/escopeta/LMG/sniper/lanzador) -> primary+secondary; melee
+    -> categoría melee; sin clasificar -> libre (degrada, nunca inequipable).
+    ReconcileEquipSlots saca al spawn lo que quedó en un slot que ya no lo
+    acepta.
+    DIFERIDO dentro de este frente (decisión del autor 2026-07-14: "dejarlas
+    como están por ahora"): las GRANADAS de ARC9 quedan clasificadas ("thrown")
+    pero SIN restringir — son ítems unique y el slot Throwable pide un stack de
+    stackable (§4), así que siguen equipándose en Primary/Secondary. Convertirlas
+    es territorio del #32. El clasificador ya las etiqueta: accionarlo es una
+    línea en KIND_SLOTS, no un rediseño.
+
+40. PESOS QUE CAEN AL NOMINAL DE 2,5 KG [Cargo capture, datos] — HECHO
+    (entry 25 del CHANGELOG, 2026-07-14; pendiente de confirmación en juego).
+    El volcado del autor tenía 369 SWEPs y 184 sin peso: packs EFT que no
+    están en dev/other/ (SMG, escopetas, LMG, melee, gear, makeshift), el pack
+    entero de CS:GO (arc9_go) y el Scorpion de arc9_wtt. El volcado alcanzó
+    para catalogarlos SIN tener el pack (trae clase/nombre/tipo/munición/
+    cargador). Resultado: 360 armas vivas, las 360 con peso Y precio, cero
+    huecos. El M60E4 pesa 10,5 kg. Las clases BASE no se catalogan (son
+    plantillas de SWEP, no armas). Registro original del frente abajo.
+    Reporte del autor (2026-07-14): el M60E4 pesa 2,5 kg. Es de un pack ARC9
+    que NO está en dev/other/, así que no entró en weapon_weights. No es un bug
+    de código: es un hueco de datos, y el fallback funcionó como se diseñó.
+    Herramienta de diagnóstico ya existente: cargo_dev_dump_weapons vuelca
+    clase/nombre/tipo/munición/cargador/peso a data/corpus/cargo/weapon_dump.txt
+    y marca cada hueco como "MISSING (2.5 nominal)". Falta el volcado del
+    arsenal real del autor para poblar weapon_weights + weapon_prices.
+
+41. EXPLOSIVOS ARC9 COMO STACK THROWABLE [Cargo items/slots] — ABIERTO,
+    bloque propio (decisión del autor 2026-07-14: "amerita hacer un bloque
+    especial para mejorarlo, pero eso después").
+    Hoy las granadas de EFT, CS:GO y MW2019 se equipan en Primary/Secondary
+    como si fueran armas largas. El clasificador del #39 YA las etiqueta
+    "thrown"; lo que falta es el destino: son ítems unique con su propia
+    entidad SWEP, y el slot Throwable toma un STACK de un stackable (§4,
+    enmienda del wheel), con su ×N y su espejo al cinturón (§16).
+    Convertirlas toca: clase del def (unique -> stackable), el pool de
+    munición, el cinturón y el commit del wheel. Enlaza con el #32 (la
+    taxonomía de throwables que ya cubre frag/SLAM de HL2).
+    Cuando se accione, el gancho ya está: una línea en KIND_SLOTS.
+
+42. LANZAGRANADAS CAPTURADO SIN ATTACHMENT DE MUNICIÓN [Cargo arc9, bug]
+    — ABIERTO. Reporte del autor (check 4 de la entry 24, 2026-07-14): el
+    M32A1 se equipa bien en Primary pero NO puede disparar; "el attachment de
+    ammo del arma se perdió". Dejado como anotación, no como bloqueo.
+    Sospecha: el puente ARC9 (§10). Cargo es el almacén de attachments y
+    fuerza arc9_free_atts 0 (takeover), así que un arma que NACE con un att
+    de munición integral se queda sin él: el att no está en el inventario del
+    jugador, y PlayerGetAtts responde 0. Diagnosticar contra el mod vivo:
+    ver si el GL declara su ammo como att Free (que el puente ya excluye) o
+    como att normal, y si el default loadout del SWEP lo instala por fuera de
+    los hooks de inventario.

@@ -66,6 +66,8 @@ CARGO.Capture.Ignore = {
     -- original mod, in case it is mounted alongside
     ["corpus_cargo_hands"] = true,
     ["apexswep"] = true,
+    -- ARC9 MW2019 fists: same rule — an unarmed state is not gear
+    ["arc9_cod2019_me_fist"] = true,
 }
 
 -- Known engine/sandbox silhouettes: footprint {w, h} declared at the def
@@ -93,15 +95,207 @@ local AUTOGEN_SIZES = {
     weapon_stunstick  = { 3, 1 },
 }
 
--- Engine melee classes: their autogen def lands in the "melee" category so
--- the captured item equips into the Melee slot (STALKER key 1, roadmap
--- #22). Everything else stays generic "weapons" (primary/secondary/sidearm).
-local AUTOGEN_MELEE = {
-    weapon_crowbar   = true,
-    weapon_stunstick = true,
+-- ------------------------------------------------------------------
+-- Weapon KIND -> which equipment slots accept it (roadmap #39, author report
+-- from the in-game pass of entry 23, 2026-07-14: "un RPG no puede ir a
+-- Sidearm, obviamente"). It could, because `primary`, `secondary` and
+-- `sidearm` all filter `category:weapons` (corpus_cargo_slots.lua) — so ANY
+-- captured gun fit ANY of the three. The narrowing hook already existed
+-- (`def.equip_slots`, honoured by Slots.CanEquip); the autogen def simply
+-- never set it.
+--
+-- DERIVED, not catalogued — the same lesson the trivia paid for. Every ARC9
+-- SWEP declares its own type: SWEP.Class is per-weapon ("Handgun", "Hand
+-- Grenade", "Grenade launcher", "Submachine Gun") and SWEP.SubCategory is
+-- per-pack ("LMGs", "7Pistols"). weapons.Get() resolves BOTH up the SWEP.Base
+-- chain, which is how the akimbo pistols and the EFT variants that declare
+-- neither still classify. A pack we have never seen classifies itself.
+--
+-- SWEP.Slot is NOT the signal, tempting as it looks: measured across the live
+-- packs (2026-07-14) it is inconsistent — LMGs sit at 2 AND 3, shotguns share
+-- 3 with snipers, and a third of the EFT guns declare no Slot at all. It is
+-- the same unreliability roadmap #36 is about.
+-- ------------------------------------------------------------------
+
+-- FIRST match wins and the order is LOAD-BEARING: "Grenade launcher" contains
+-- "grenade", and MW2019's "Throwing Knife" is Class = "Lethal", not melee.
+local KIND_RULES = {
+    { kind = "long",    words = { "launcher" } },
+    { kind = "thrown",  words = { "grenade", "lethal", "tactical", "explosive", "mine" } },
+    { kind = "melee",   words = { "melee", "knife", "shield", "bayonet", "machete", "axe" } },
+    { kind = "sidearm", words = { "pistol", "handgun", "revolver", "sidearm" } },
+    { kind = "long",    words = { "rifle", "carbine", "shotgun", "smg", "submachine",
+                                  "machine gun", "lmg", "sniper", "marksman", "dmr",
+                                  "assault", "battle" } },
 }
 
+local KIND_SLOTS = {
+    sidearm = { "sidearm" },
+    long    = { "primary", "secondary" },
+    -- melee needs no equip_slots: its def lands in the "melee" CATEGORY and the
+    -- Melee slot's own filter does the work (STALKER key 1, roadmap #22).
+    -- `thrown` deliberately has NO entry: an ARC9 grenade is still a unique
+    -- weapon item, and the Throwable slot takes a stackable STACK (§4
+    -- amendment). Restricting it to a slot it cannot enter would make it
+    -- unequippable — so it keeps today's behaviour until the throwable
+    -- taxonomy of roadmap #32 grows to cover ARC9 grenades. Classified, not
+    -- yet acted on.
+}
+
+-- Escape hatch + the engine weapons, which are not SWEPs at all: weapons.Get()
+-- returns nil for them, so they have no type to declare. An entry here beats
+-- everything the SWEP says.
+CARGO.Capture.WeaponSlotKinds = {
+    weapon_pistol     = "sidearm",
+    weapon_357        = "sidearm",
+    weapon_smg1       = "long",
+    weapon_ar2        = "long",
+    weapon_shotgun    = "long",
+    weapon_crossbow   = "long",
+    weapon_rpg        = "long",
+    weapon_annabelle  = "long",
+    weapon_crowbar    = "melee",
+    weapon_stunstick  = "melee",
+    weapon_slam       = "thrown",
+    weapon_bugbait    = "thrown",
+    -- the sandbox tools own their three class-restricted circle slots
+    -- (Slots.Tools); they must NOT be narrowed to primary/secondary here
+}
+
+local function MatchKind(text)
+    if not isstring(text) or text == "" then return nil end
+    local hay = string.lower(text)
+    for _, rule in ipairs(KIND_RULES) do
+        for _, word in ipairs(rule.words) do
+            if hay:find(word, 1, true) ~= nil then return rule.kind end
+        end
+    end
+    return nil
+end
+
+local function WeaponKind(class)
+    local override = CARGO.Capture.WeaponSlotKinds[class]
+    if isstring(override) then return override end
+
+    local swep = weapons.Get(class)
+    if not istable(swep) then return nil end
+
+    -- SWEP.Class ALONE first, and only then SubCategory. They must NOT be
+    -- matched as one haystack: EFT files its hand grenades under the
+    -- SubCategory "Grenades & Grenade launchers", which contains "launcher" —
+    -- concatenating the two turns an F-1 into a long gun (caught by the offline
+    -- harness before it ever shipped). SWEP.Class is the per-WEAPON truth
+    -- ("Hand Grenade" vs "Grenade launcher"); SubCategory is only the per-PACK
+    -- shelf it sits on, and it is a fallback, not a peer.
+    -- ARC9's base default Class is "Unclassified Weapon": it matches no rule and
+    -- correctly falls through to SubCategory.
+    return MatchKind(swep.Class) or MatchKind(swep.SubCategory)
+end
+
+-- ------------------------------------------------------------------
+-- Trivia (roadmap #38, author request 2026-07-14). The autogen def used to
+-- carry a placeholder ("Auto-captured weapon (<class>)") that said nothing;
+-- every captured gun in the game showed the same line. It does not need a
+-- table: ARC9 SWEPs describe THEMSELVES, and weapons.Get(class) hands us the
+-- whole SWEP table — including everything inherited up the SWEP.Base chain,
+-- since weapons.Get() runs table.Inherit (that is how the akimbo pistols get
+-- their base gun's text for free). Verified against the live code of ARC9 base
+-- + Darsu EFT + ARC9MW, dev/other/, 2026-07-14:
+--
+--   * SWEP.Description — a PLAIN STRING by the time we read it: the packs call
+--     ARC9:GetPhrase at SWEP-file load, so the localization is already done and
+--     the server's copy is the English one (which is the mod's language anyway).
+--   * SWEP.Trivia — { [labelKey] = valueKey }: manufacturer, caliber, action,
+--     country, year. The two packs disagree on the key format and BOTH need
+--     work (see ResolveTriviaRows).
+--
+-- weapons.Get() also means engine weapons (weapon_pistol et al.) return nil —
+-- they are not scripted. Their text comes from Capture.WeaponTrivia, same as
+-- the ARC9 classes whose pack forgot to write a description.
+-- ------------------------------------------------------------------
+
+-- EFT keys the trivia block with phrase keys its own pack never localized
+-- ("eft_trivia_manuf1" has no entry in eft_en.lua), and ARC9's de-numbering is
+-- dead code: cl_customize_ui_trivia.lua:127 does `title[#title]`, which indexes
+-- a STRING with [] — always nil in Lua, so the order digit is never stripped
+-- and ARC9's own menu literally prints "eft trivia manuf1". We do it properly:
+-- resolve what ARC9 can resolve, then map the known stems.
+local TRIVIA_STEMS = {
+    manuf   = "Manufacturer",
+    cal     = "Caliber",
+    act     = "Action",
+    country = "Country",
+    year    = "Year",
+    weight  = "Weight",
+}
+
+local function Phrase(str)
+    if not isstring(str) or str == "" then return nil end
+    if ARC9 == nil or not isfunction(ARC9.GetPhrase) then return str end
+    local ok, resolved = pcall(ARC9.GetPhrase, ARC9, str)
+    if ok and isstring(resolved) and resolved ~= "" then return resolved end
+    return str -- GetPhrase returns nil for anything not in the table
+end
+
+-- MW2019 keys with a resolved label ("Country"); EFT with a raw phrase key
+-- carrying a trailing order digit ("eft_trivia_manuf1"). One cleaner for both.
+local function TriviaLabel(key)
+    local label = Phrase(key) or key
+    local order = tonumber(label:match("(%d)$")) or 0
+    label = label:gsub("%d+$", "")
+    local stem = label:match("trivia_(%a+)$")
+    if stem ~= nil and TRIVIA_STEMS[stem] ~= nil then
+        return TRIVIA_STEMS[stem], order
+    end
+    return (label:gsub("_", " ")), order
+end
+
+local function ResolveTriviaRows(class)
+    local swep = weapons.Get(class)
+    if not istable(swep) or not istable(swep.Trivia) then return nil end
+
+    local rows = {}
+    for key, value in pairs(swep.Trivia) do
+        if isstring(key) and key ~= "BaseClass" then
+            local text = Phrase(value)
+            if text ~= nil then
+                local label, order = TriviaLabel(key)
+                rows[#rows + 1] = { label = label, value = text, order = order }
+            end
+        end
+    end
+    if #rows == 0 then return nil end
+
+    -- pairs() order is not stable across boots and the rows would shuffle every
+    -- map load. The digit the packs encode in the key IS the intended order;
+    -- the label breaks ties for the packs that write no digit (MW2019).
+    table.sort(rows, function(a, b)
+        if a.order ~= b.order then return a.order < b.order end
+        return a.label < b.label
+    end)
+    for _, row in ipairs(rows) do row.order = nil end
+    return rows
+end
+
+-- An entry in WeaponTrivia always WINS: it exists to fill the gaps the packs
+-- left AND to correct the descriptions table.Inherit hands down from the wrong
+-- parent (the M16A1's Base is arc9_eft_m4a1 — without an override it would
+-- introduce itself as an M4A1).
+local function ResolveTrivia(class)
+    local override = (CARGO.Capture.WeaponTrivia or {})[class]
+    if isstring(override) and override ~= "" then return override end
+
+    local swep = weapons.Get(class)
+    if istable(swep) and isstring(swep.Description) and swep.Description ~= "" then
+        return swep.Description
+    end
+    -- no description anywhere: no paragraph. Better an honest blank than the
+    -- old "Auto-captured weapon (...)" noise on every gun in the game.
+    return nil
+end
+
 local function RegisterAutogen(class, name, caliber)
+    local kind = WeaponKind(class)
     CARGO.Items.Register({
         id = "wpn_" .. class,
         name = name,
@@ -114,7 +308,11 @@ local function RegisterAutogen(class, name, caliber)
         -- price for a gun nobody priced. The sandbox tools live in that hole.
         value = (CARGO.Capture.WeaponValues or {})[class],
         class = "unique",
-        category = AUTOGEN_MELEE[class] and "melee" or "weapons",
+        category = (kind == "melee") and "melee" or "weapons",
+        -- which of primary/secondary/sidearm accept it (Slots.CanEquip). nil =
+        -- unrestricted, which is what melee (its category does the work),
+        -- thrown and unclassified guns get
+        equip_slots = KIND_SLOTS[kind or ""],
         weapon_class = class,
         size = AUTOGEN_SIZES[class],
         -- display label only (schema rule §3: a weapon's REAL type comes from
@@ -122,7 +320,11 @@ local function RegisterAutogen(class, name, caliber)
         -- ammo row read it (roadmap #33)
         ammo = isstring(caliber) and { caliber = caliber } or nil,
         autogen = true,
-        trivia = "Auto-captured weapon (" .. class .. ").",
+        -- both re-derived from the SWEP on every boot, so they are NOT
+        -- persisted in autogen_defs: mount a new ARC9 pack and the guns you
+        -- already captured describe themselves on the next map load
+        trivia = ResolveTrivia(class),
+        trivia_rows = ResolveTriviaRows(class),
     })
 end
 
@@ -247,7 +449,34 @@ local function HealOrphanDefs(ply)
     if healed then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs) end
 end
 
-hook.Add("PlayerInitialSpawn", "corpus_cargo_capture_heal", HealOrphanDefs)
+-- The slot narrowing above is applied at REGISTRATION, so it only governs new
+-- equips: an RPG the player had already parked in Sidearm before roadmap #39
+-- would sit there forever, illegal and invisible to the rule. Kick anything
+-- whose slot no longer accepts it back into the grid, once, at spawn. This is
+-- also the general repair path for the day a def's equip_slots change again.
+local function ReconcileEquipSlots(ply)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    for slotId, val in pairs(rec.equip) do
+        -- stack slots (throwable) hold an entry table, not a uid; their defs
+        -- are not autogen and are out of scope here
+        if isstring(val) then
+            local blob = CARGO.Instances.Get(val)
+            local def = blob and CARGO.Items.Get(blob.id) or nil
+            if def ~= nil and not CARGO.Slots.CanEquip(def, slotId) then
+                CARGO.Inventory.Unequip(ply, slotId)
+                CARGO.Inventory.Notice(ply,
+                    def.name .. " no longer fits that slot. Moved to your bag.")
+                Corpus.Log("cargo", "reconcile de slots: " .. tostring(def.id)
+                    .. " sacado de '" .. tostring(slotId) .. "' (ya no lo acepta)")
+            end
+        end
+    end
+end
+
+hook.Add("PlayerInitialSpawn", "corpus_cargo_capture_heal", function(ply)
+    HealOrphanDefs(ply)
+    ReconcileEquipSlots(ply)
+end)
 
 -- def behind an equip value: uid string (instance) or stack entry table
 -- (throwable slot, §4 amendment) — both carry an item id to resolve

@@ -1894,3 +1894,195 @@ decir a partir de dónde — el defecto era del texto, no del código.
 como dos stacks; venderlas cruza ambos y cobra por las 240, no por 120; entran al stock
 del trader como dos stacks de 120 respetando `max_stack`; y una compra de 240 vacía los
 dos stacks del stock). **En juego:** pendiente de confirmación del autor.
+
+---
+
+## 23. Las armas se presentan solas: trivia del SWEP + ARC9MW pesado y precificado `[APLICADO 2026-07-14]`
+
+**Pedido del autor (2026-07-14):** poblar pesos/trivia de las armas ARC9 y que el tooltip
+muestre la trivia en vez del "Arma autogenerada" que salía al tomar **cualquier** arma
+fuera del kit dev.
+
+**El hallazgo que cambió el plan:** la trivia **no necesitaba una tabla**. Los SWEPs de
+ARC9 se describen a sí mismos y `weapons.Get(class)` nos entrega la tabla entera —
+incluido lo heredado por la cadena `SWEP.Base`, porque `weapons.Get()` corre
+`table.Inherit` (así los akimbos de MW2019 heredan gratis el texto de su pistola base).
+Verificado contra el código vivo de ARC9 base + Darsu EFT + ARC9MW (`dev/other/`):
+
+- **`SWEP.Description`** — ya es un **string plano** cuando lo leemos: los packs llaman
+  `ARC9:GetPhrase` al cargar el archivo del SWEP, así que la localización ya ocurrió.
+- **`SWEP.Trivia`** — `{ [claveEtiqueta] = claveValor }`: fabricante, calibre, acción,
+  país, año.
+
+**Cambio (server, `corpus_cargo_capture.lua`):** `RegisterAutogen` resuelve `def.trivia`
+(override a mano → `SWEP.Description` → **nada**, nunca más el placeholder) y `def.trivia_rows`
+(las specs del bloque `SWEP.Trivia`). Ninguno de los dos se persiste en `autogen_defs`: se
+re-derivan del SWEP en cada boot, así que **montar un pack ARC9 nuevo hace que las armas ya
+capturadas se describan solas en la siguiente carga de mapa**, sin catalogar una sola clase.
+
+**Dos trampas de ARC9 que hubo que sortear** (ambas anotadas en el header del archivo):
+
+1. **Las etiquetas de EFT no están localizadas.** `eft_trivia_manuf1` no existe en
+   `eft_en.lua`, así que `GetPhrase` devuelve `nil` y queda la clave cruda.
+2. **El des-numerado de ARC9 es código muerto.** `cl_customize_ui_trivia.lua:127` hace
+   `title[#title]` — indexar un **string** con `[]`, que en Lua **siempre** da `nil`. El
+   dígito de orden nunca se quita: el propio menú de ARC9 imprime literalmente
+   "eft trivia manuf1". Nosotros lo hacemos bien (resolver → quitar el dígito → mapear el
+   stem conocido) y además **usamos el dígito para ordenar** las filas, que es para lo que
+   estaba puesto. `pairs()` no tiene orden estable: sin esto las filas se barajaban en cada
+   carga de mapa.
+
+**Tabla a mano (`corpus_cargo_weapon_trivia.lua`, nueva, server):** la **excepción**, no la
+regla — 36 entradas. Existe por dos motivos distintos: (a) **huecos** (SWEPs que piden una
+phrase que su pack nunca escribió: las granadas de MW2019, el minigun, 9 clases de EFT), y
+(b) **herencias mentirosas** — sin override, el **M16A1** (`Base = arc9_eft_m4a1`) se
+presentaría como un M4A1. Un override **siempre gana** sobre la `Description` del SWEP. Las
+armas HL2 viven acá enteras: no son SWEPs, `weapons.Get` no tiene nada que leer para ellas.
+
+**Cambio (client, `corpus_cargo_tooltip.lua`):** sección **"Specs"** bajo los stats con las
+`trivia_rows`. A diferencia de los stats ARC9, **no exige el arma en la mano**: un fusil
+guardado en la grilla igual te dice quién lo fabricó.
+
+**Cambio (server, `weapon_weights` + `weapon_prices`):** las **87 clases de ARC9MW**. Los
+pesos **no se inventaron**: el pack declara la masa real de cada arma en su propio bloque
+`SWEP.Trivia` (`mw19_weight` → 4.79 kg para el AK-47) y **54 de 87** salieron transcritas de
+ahí; las 33 restantes (lanzadores, granadas, melee, akimbos) van con cifras reales, tagueadas
+`real approx`. Se **hornean** en vez de parsearse en runtime porque lo que ARC9 guarda es un
+string de display ya formateado ("4.79 kg / 10.54 lbs") — raspar kg de prosa localizada en
+cada boot es un contrato frágil con un mod que no controlamos. Los precios sí son nuestros:
+MW2019 no tiene economía que copiar.
+
+**Adyacente, mismo criterio que ya existía:** los puños de MW2019 (`arc9_cod2019_me_fist`)
+entran a `Capture.Ignore` — son el estado desarmado, no equipo, igual que `weapon_fists`; y
+el cuchillo/escudo de MW2019 entran a `AUTOGEN_MELEE`, porque un cuchillo que se equipa en
+el slot Primary es un bug, no una build.
+
+**Verificación offline:** harness **333 checks verdes** (15 nuevos: la trivia sale del SWEP y
+no del placeholder; `BaseClass` no cuela una fila fantasma; la clave cruda `eft_trivia_manuf1`
+se limpia a "Manufacturer" y su valor se resuelve; el dígito ordena las 5 filas de EFT; las
+claves ya resueltas de MW2019 ordenan alfabéticamente y son estables entre boots; el override
+gana sobre la herencia; un arma del engine sin SWEP cae a la tabla a mano; sin descripción en
+ningún lado **no hay párrafo**; y el def autogen de una clase MW2019 nace con su peso (4.79) y
+su precio reales). **En juego:** pendiente de confirmación del autor.
+
+---
+
+## 24. Cada arma sabe a qué slot va: un RPG deja de entrar en Sidearm (roadmap #39) `[APLICADO 2026-07-14]`
+
+**Reporte del autor (pasada en juego de la entry 23, 2026-07-14):** *"un RPG no puede ir a
+Side-arm obviamente"*.
+
+**Causa raíz:** `primary`, `secondary` y `sidearm` **filtran los tres por `category:weapons`**
+(`corpus_cargo_slots.lua`), así que **cualquier** arma capturada entraba en **cualquiera** de
+los tres. El gancho para estrechar ya existía —`def.equip_slots`, que `Slots.CanEquip` honra
+desde el Block 1— y el def autogen simplemente nunca lo seteaba.
+
+**Arreglo — derivado, no catalogado** (la misma lección que ya pagó la trivia): cada SWEP de
+ARC9 **declara su propio tipo**. `SWEP.Class` es por arma (`"Handgun"`, `"Hand Grenade"`,
+`"Grenade launcher"`, `"Submachine Gun"`) y `SWEP.SubCategory` es por pack (`"LMGs"`,
+`"7Pistols"`); `weapons.Get()` resuelve **ambos** por la cadena `SWEP.Base`, que es como
+clasifican también los akimbos y las variantes EFT que no declaran ninguno. **Un pack que
+nunca vimos —el del M60E4 del autor— se clasifica solo.** El mapeo:
+
+- **pistola / revólver / machine pistol** → `{ sidearm }`
+- **fusil / carabina / SMG / escopeta / LMG / sniper / marksman / lanzador** → `{ primary, secondary }`
+- **melee** → categoría `melee` (su slot ya filtra por ahí; no necesita `equip_slots`)
+- **granada de mano** → clasificada pero **sin restringir** (ver abajo)
+- **sin clasificar** → **libre**, como hoy. Degrada; jamás produce un arma que nadie puede equipar.
+
+**`SWEP.Slot` NO es la señal**, por tentador que parezca: medido contra los packs vivos
+(2026-07-14) es inconsistente —los LMG están en 2 **y** en 3, las escopetas comparten el 3 con
+los snipers, y un tercio de las EFT no declaran Slot—. Es la misma falta de fiabilidad de la
+que habla el roadmap #36.
+
+**Trampa que cazó el harness antes de llegar al juego:** la primera versión concatenaba
+`Class .. SubCategory` en un solo string a matchear. EFT archiva sus **granadas de mano** bajo
+la SubCategory `"Grenades & Grenade launchers"` — que contiene **"launcher"** —, así que una
+F-1 se clasificaba como **arma larga**. `SWEP.Class` es la verdad **por arma** y se evalúa
+**sola**; `SubCategory` es solo el estante del pack, y es *fallback*, no par. (El orden de las
+reglas también es carga: `"Grenade launcher"` contiene `"grenade"`, y el cuchillo **arrojadizo**
+de MW2019 es `Class = "Lethal"`, no melee.)
+
+**Granadas ARC9: clasificadas, todavía no accionadas** (decisión del autor, 2026-07-14:
+*"dejarlas como están por ahora"*). Una granada de ARC9 sigue siendo un ítem `unique`, y el
+slot **Throwable** toma un **stack** de un `stackable` (§4, enmienda del wheel). Restringirla a
+un slot en el que no puede entrar la volvería **inequipable**, así que conserva el
+comportamiento de hoy —equipable en Primary/Secondary— hasta que la taxonomía de throwables del
+roadmap #32 crezca para cubrirlas. El clasificador ya las etiqueta `thrown`: el día que se
+accione, es una línea en `KIND_SLOTS`, no un rediseño.
+
+**Remanente reconciliado:** el estrechamiento se aplica al **registrar** el def, o sea gobierna
+los equipamientos nuevos. Un RPG que el jugador ya tenía **parkeado en Sidearm** seguiría ahí,
+ilegal e invisible a la regla. `ReconcileEquipSlots` (en `PlayerInitialSpawn`, junto al heal de
+defs huérfanos) lo saca a la mochila una vez, con aviso. Es también la ruta de reparación
+general para el día que un `equip_slots` vuelva a cambiar.
+
+**Verificación offline:** harness **346 checks verdes** (13 nuevos: `CanEquip` rechaza el RPG
+en Sidearm y lo sigue aceptando en Primary; la pistola ARC9 y su akimbo —que hereda el
+`"Handgun"` del padre— van a Sidearm; fusil/LMG/SMG/sniper son largas; el **lanza**granadas es
+larga porque la regla `launcher` corre antes que `grenade`; el cuchillo ARC9 cae en `melee` y
+**no** entra en Primary; el cuchillo arrojadizo de MW2019 **no** cae en melee; la granada de
+mano queda sin restringir; un arma que ARC9 no clasifica queda libre; la physgun sigue entrando
+en su círculo de tool; y un RPG ya equipado en Sidearm se reconcilia al spawn). **En juego:**
+pendiente de confirmación del autor.
+
+**Deuda abierta que este entry NO cierra:** los **pesos que caen al nominal de 2,5 kg** en los
+packs ARC9 que no están en `dev/other/` (reporte del autor: el **M60E4**). El diagnóstico ya
+tiene herramienta: `cargo_dev_dump_weapons` vuelca clase/nombre/tipo/munición/cargador/peso a
+`data/corpus/cargo/weapon_dump.txt` y marca cada hueco como `MISSING (2.5 nominal)`. Falta el
+volcado del arsenal real del autor para poblar `weapon_weights`/`weapon_prices`.
+
+---
+
+## 25. El arsenal real del autor: 184 pesos y precios que faltaban (roadmap #40) `[PENDIENTE]`
+
+**Reporte del autor (2026-07-14):** *"hay algunas armas que tienen el fall-back a 2.5 kg, una
+de ellas es el M60E4, indudablemente debería pesar muchísimo más"*.
+
+**No era un bug: era un hueco de datos**, y el fallback hizo exactamente lo que se diseñó. El
+M60E4 vive en un pack ARC9 que **no está en `dev/other/`**, así que nunca pudo entrar en
+`weapon_weights`. El diagnóstico ya tenía herramienta desde el entry 15: `cargo_dev_dump_weapons`.
+
+**El volcado del autor (`dev/weapon_dump.txt`): 369 SWEPs montados, 184 sin peso.** Los packs
+que faltaban:
+
+| Familia | Huecos | Qué es |
+|---|---|---|
+| `arc9_eft` | 107 | Packs EFT que no tengo: SMGs, escopetas, LMG, **melee** (24), gear, `makeshift`, carabinas |
+| `arc9_go` | 71 | Pack de **CS:GO** entero — nunca lo había visto |
+| `arc9_cod2019` | 3 | bases + puños |
+| `arc9_wtt` | 1 | Scorpion EVO 3 |
+
+**Lo importante: el volcado alcanza para catalogar sin tener el pack.** Trae clase, nombre,
+tipo, munición y cargador de cada arma — suficiente para pesarla y precificarla con cifras
+reales, igual que se hizo con las EFT contra la DB de GAMMA. **Resultado: 360 armas vivas del
+volcado, las 360 con peso y precio, cero huecos.** El M60E4 pesa **10,5 kg**.
+
+**Precios también, no solo pesos** (el autor pidió pesos; el hueco de `value` era el mismo y es
+peor): **sin `def.value` un arma no se comercia** (`Cargo_Trade` §4 — ausencia significa "no
+está a la venta"). Los 184 huecos de peso eran 184 armas fuera de la economía.
+
+**Las clases BASE no se catalogan, a propósito.** El volcado lista todos los SWEPs registrados,
+incluidas las plantillas (`arc9_base`, `arc9_eft_base`, `arc9_go_base`, `*_base_nade`,
+`*_melee_base`). No son armas que el jugador pueda recibir; catalogarlas sería ruido con forma
+de dato.
+
+**Los duales pesan dos veces su arma base** — el Dual Desert Eagle son 3,80 kg porque son dos
+Desert Eagle de 1,90 y las cargás las dos. Anclado con un check.
+
+**Verificación offline:** harness **351 checks verdes** (5 nuevos, todos anclados al volcado
+real: el M60E4 pesa 10,5 y es comerciable; PKM/AWP/Negev pesan como pesadas; las pistolas y los
+cuchillos de los packs nuevos pesan como tales; un dual pesa exactamente 2× su base; y las
+clases BASE **no** están en la tabla). Verificado además contra el volcado: **0 armas vivas sin
+peso, 0 sin precio, 0 claves duplicadas**. **En juego:** pendiente de confirmación del autor.
+
+### Frentes que este entry NO cierra (reportados en la misma pasada)
+
+- **Los explosivos de EFT y CS:GO se equipan en Primary, no en Throwable.** El clasificador del
+  #39 ya los etiqueta `thrown`, pero siguen siendo ítems `unique` y el slot Throwable pide un
+  **stack**. El autor lo confirmó como bloque aparte: *"todo eso amerita hacer un bloque
+  especial para mejorarlo, pero eso después"*. → **roadmap #41**.
+- **Un lanzagranadas capturado no dispara: perdió su attachment de munición.** Nota del autor en
+  el check 4 de la entry 24, dejada explícitamente como anotación, no como bloqueo. Huele al
+  puente ARC9 (§10: Cargo es el almacén de attachments y `arc9_free_atts` queda en 0) — el
+  arma nace sin su att de munición y no hay de dónde sacarlo. → **roadmap #42**.

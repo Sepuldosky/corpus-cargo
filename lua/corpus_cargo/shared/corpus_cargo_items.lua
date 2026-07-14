@@ -145,7 +145,12 @@ end
 --            honest default — it is not "free", it is "not for sale".
 --   display_stats  optional { <statKey> = signedPercent } — manual fallback
 --                  when ARC9 is absent (§9); values ARE the deltas shown
---   trivia   optional string
+--   trivia   optional string — the flavour paragraph. For a captured weapon it
+--            is the SWEP's own SWEP.Description (ARC9 packs write one per gun);
+--            Capture.WeaponTrivia overrides it where the pack wrote none.
+--   trivia_rows  optional { { label = "Caliber", value = "5.45x39mm" }, ... } —
+--            ordered spec rows under the stats. Read off the SWEP's SWEP.Trivia
+--            block; the order is the one the pack declares, not pairs() order.
 --
 -- Extended optional fields transported by Cargo (owner module semantics):
 --   model          world model for drops (default cardboard box)
