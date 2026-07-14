@@ -2119,7 +2119,7 @@ el propio comando es la verificación — un `cargo_dev_dump_weapons` nuevo debe
 
 ---
 
-## 26. Hands: son puños, no un finisher de Apex — daño, quiebre de animación y mano por botón `[PENDIENTE]`
+## 26. Hands: son puños, no un finisher de Apex — daño, quiebre de animación y mano por botón `[APLICADO 2026-07-14]`
 
 Tres reportes del autor sobre el SWEP **Hands** (2026-07-14), y el hilo que los conecta: el port
 heredó del mod original (Workshop 2792160770) **dos lecturas de animación equivocadas**, y una de
@@ -2185,6 +2185,44 @@ solo se escriben cuando cambian.
    (RMB), con su propio daño y su empujón — antes esto no pasaba nunca. Agachado: uppercut.
 5. Ojo con el knockback ahora que **vive**: si un NPC moribundo sale volando de más para el tono
    del mod, el número a bajar son los `SetDamageForce` (no el daño).
+
+### Addendum — pasada del autor (2026-07-14): OK, y la 3.ª persona NO es un bug
+
+**Reporte:** *"parece solucionar el salto abrupto entre animaciones de idle y golpear, good. El
+daño está bien"* → checks 1-3 verdes, entry **FLIP**. Los finishers de combo y el knockback
+recién resucitado quedan a la vista en la próxima pasada (no se buscaron a propósito).
+
+**Pregunta abierta del autor:** *"la animación en tercera persona de golpear yo supongo que
+debería funcionar: si golpeo con la izquierda, la animación golpea con la izquierda. ¿O la
+animación de golpear de GMod tiene problemas con la alternancia?"*.
+
+**Veredicto: es un techo de GMod, no un defecto del port — y no se toca.** La 3.ª persona no la
+elige el SWEP. `SetAnimation(PLAYER_ATTACK1)` termina en `ACT_MP_ATTACK_STAND_PRIMARYFIRE`, que
+el `weapon_base` traduce por hold type en
+`gamemodes/base/entities/weapons/weapon_base/sh_anim.lua`:
+
+```lua
+[ "fist" ] = ACT_HL2MP_IDLE_FIST,
+...
+self.ActivityTranslate[ ACT_MP_ATTACK_STAND_PRIMARYFIRE ]  = index + 5
+self.ActivityTranslate[ ACT_MP_ATTACK_CROUCH_PRIMARYFIRE ] = index + 5
+```
+
+**Una sola** actividad de ataque por hold type (`ACT_HL2MP_GESTURE_RANGE_ATTACK_FIST`) — no
+distingue ni de pie de agachado, menos aún mano izquierda de derecha. El set de animaciones de
+jugador de HL2MP, compartido por **todos** los playermodels, no tiene gesto de puñetazo
+izquierdo: no existe la animación que habría que reproducir.
+
+**Lo cierra el propio Valve:** el `weapon_fists` de GMod hace exactamente lo mismo —
+`SecondaryAttack()` llama a `PrimaryAttack(true)` (LMB izquierda, RMB derecha, el mismo mapeo que
+eligió el autor) y en 3.ª persona reproduce el mismo gesto único para ambas. **La alternancia
+nunca existió fuera del viewmodel**, ni en Fists ni en el mod de Apex. (El mod original traía un
+`models/player/apex_player_animations.mdl`, pero **ningún Lua suyo lo referencia**: asset muerto,
+no era la salida.)
+
+Tenerlo de verdad exigiría animaciones de jugador nuevas (gesto de puño izquierdo + su actividad),
+o sea pisar el set de anims compartido por todos los playermodels — invasivo y territorio de
+choque con otros addons. **Se acepta el comportamiento de GMod.**
 
 ---
 

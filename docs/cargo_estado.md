@@ -135,8 +135,9 @@ strips Buy/Sell parejos, **Sidorovich** como trader demo y **N armas iguales**
 
 1. **Slice 2 del comercio**: el dinero como entidad (`Cargo_Trade` §7 — botar
    efectivo desde el botón $, línea de solo-dinero en el basket). Después el
-   slice 3 (jugador-trader con doble confirm). La entry 21 se confirma de paso
-   en esa misma pasada (checklist en el artifact).
+   slice 3 (jugador-trader con doble confirm). Semilla del chat nuevo:
+   [`../../dev/HANDOFF_cargo_trade_slice2.md`](../../dev/HANDOFF_cargo_trade_slice2.md).
+   La entry 27 se confirma de paso en esa pasada (checklist en el artifact).
 2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 3. **#41 — explosivos ARC9 como stack throwable** (bloque propio, pedido del
    autor): hoy las granadas de EFT/CS:GO/MW2019 se equipan en Primary. El
