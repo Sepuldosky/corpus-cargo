@@ -8,10 +8,10 @@
 **Última actualización:** 2026-07-14 (**entries 21 y 22 confirmadas**: el basket
 es un agregado sobre todos los stacks, el click carga 25% del `max_stack` con
 **SHIFT+click = todo**, y el peso no bloquea una compra. Antes cerraron 23/24/25
-(armas que se describen solas, saben a qué slot van y pesan de verdad). Quedan
-`[PENDIENTE]` la **26** (Hands deja de pegar como Apex) y la nueva **27**:
-strips Buy/Sell parejos, **Sidorovich** como trader demo y **N armas iguales**
-(el dedup queda solo para el give anónimo del engine).)
+(armas que se describen solas, saben a qué slot van y pesan de verdad) y la **26**
+(Hands deja de pegar como Apex). Queda `[PENDIENTE]` solo la **27**: strips
+Buy/Sell parejos, **Sidorovich** como trader demo y **N armas iguales** (el dedup
+queda solo para el give anónimo del engine).)
 
 ---
 
@@ -76,6 +76,14 @@ strips Buy/Sell parejos, **Sidorovich** como trader demo y **N armas iguales**
   ya **no grita lobo**: las plantillas de SWEP y las clases de `Capture.Ignore`
   salen `n/a`, no `MISSING`, y trae **columna de precio** + resumen de huecos
   reales.
+- **Hands pega como puños** (entry 26, confirmado en juego): puñetazo **3-4** dmg
+  (era 37-47) y se acabó el tirón al volver a `idle` — el port medía la duración
+  de la secuencia **equivocada** (`SequenceDuration()` sin argumento, leída
+  después de pedir el cambio). LMB = mano izquierda, RMB = derecha. **En 3.ª
+  persona no alterna, y no es un defecto:** el hold type `fist` tiene **una sola**
+  actividad de ataque (`sh_anim.lua`: `ACT_MP_ATTACK_STAND_PRIMARYFIRE` →
+  `index + 5`), no existe gesto de puño izquierdo en el set de anims de jugador —
+  el `weapon_fists` de Valve tiene exactamente la misma limitación. Aceptado.
 - **Harness offline: 355 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 76 client / 69 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
@@ -91,12 +99,11 @@ strips Buy/Sell parejos, **Sidorovich** como trader demo y **N armas iguales**
 - **Addendum de la entry 25 (el dump deja de gritar lobo):** un
   `cargo_dev_dump_weapons` nuevo debe encabezar con `sin peso: 0 | sin precio: 0`,
   y las plantillas de SWEP deben salir `n/a`, no `MISSING`.
-- **Entry 26 (Hands):** el puñetazo pasa de 37-47 a **3-4** dmg; la vuelta a
-  `idle` deja de dar el tirón (el port medía la duración de la secuencia
-  **equivocada**); y el uppercut / codazo / uppercut agachado **existen por
-  primera vez** — la rama por animación era código muerto (se leía un índice del
-  viewmodel contra el modelo del arma, que es `""`). Ojo al knockback, que ahora
-  **sí** se aplica.
+- **Entry 26, lo que la pasada NO buscó:** los finishers de combo (uppercut /
+  codazo / uppercut agachado) **existen por primera vez** — su rama era código
+  muerto — y con ellos revive el **knockback**, que jamás se había aplicado. Si un
+  NPC moribundo sale volando de más, el número a bajar son los `SetDamageForce`,
+  no el daño.
 
 ## Frentes abiertos (anotados, NO arreglados)
 
