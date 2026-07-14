@@ -2224,6 +2224,29 @@ Tenerlo de verdad exigiría animaciones de jugador nuevas (gesto de puño izquie
 o sea pisar el set de anims compartido por todos los playermodels — invasivo y territorio de
 choque con otros addons. **Se acepta el comportamiento de GMod.**
 
+### Addendum 2 — el NPC salió volando `[PENDIENTE]`
+
+**Reporte:** *"si un NPC salió volando. Literalmente…"*. Lo advertía el check 5, y era la
+consecuencia directa de resucitar las ramas por animación: las fuerzas se dejaron **verbatim**
+—son la tuning de los autores originales— pero esa tuning es para golpes de **37-115** de daño,
+no de 3. Sobre un ragdoll de ~85 kg: un jab (`GetForward() * 12998`) lo empuja a **~150 u/s**, y
+el uppercut agachado (`GetUp() * 25158`) lo lanza **hacia arriba a ~300 u/s**. Eso no es un
+empujón: es un despegue.
+
+**Arreglo:** una sola perilla, `FORCE_SCALE = 0.2`, aplicada a **todas** las fuerzas de
+personaje (`kb = phys_pushscale * FORCE_SCALE`). Escalar el conjunto en vez de reescribir seis
+vectores conserva la **forma relativa** de la tuning original —el uppercut sigue siendo el que
+más levanta, el jab el que menos— y deja un único número que mover si hace falta re-calibrar. El
+jab pasa a ~30 u/s (un tropezón) y el uppercut agachado a ~60 u/s hacia arriba (un salto, no un
+lanzamiento).
+
+El empujón de **props** (`phys:ApplyForceOffset`, más abajo) **no** se toca: usa el `scale` crudo,
+siempre estuvo activo y nadie se quejó de un bidón que se mueve al recibir un puñetazo.
+
+**Verificación en juego:** golpear a un NPC hasta matarlo — el cadáver debe **trastabillar**, no
+salir despedido. Encadenar 3 golpes (combo) y probar el uppercut agachado: sigue siendo el más
+espectacular de los tres, pero dentro del planeta.
+
 ---
 
 ## 27. Comercio 2.ª pasada: Sidorovich en persona, strips parejos y el fin del dedup de armas `[PENDIENTE]`

@@ -273,6 +273,15 @@ local DAMAGE = {
 }
 local DAMAGE_DEFAULT = {3, 4}
 
+-- Knockback scale. The forces below are the original authors' numbers ("yes we
+-- need those specific numbers") and they are tuned for 37-115 damage Apex
+-- punches: a jab pushes a ~85 kg ragdoll at ~150 u/s and the crouched uppercut
+-- throws it UP at ~300 u/s. Reviving the per-animation branches (see ANIM
+-- SOURCE FIX) applied them for the first time and an NPC literally took off
+-- (author repro 2026-07-14). One knob, applied to all of them, so the relative
+-- shape of that tuning survives: a fist staggers, it does not launch.
+local FORCE_SCALE = 0.2
+
 function SWEP:SetupDataTables()
     self:NetworkVar("Float", 0, "AnimationTime")
     self:NetworkVar("Float", 1, "NextMeleeAttack")
@@ -489,6 +498,10 @@ function SWEP:DealDamage()
 
     local hit = false
     local scale = phys_pushscale:GetFloat()
+    -- knockback on a character: the original tuning, brought down to fist size.
+    -- The prop shove further down keeps the raw `scale` — that one always ran
+    -- and nobody complained about a punched barrel moving.
+    local kb = scale * FORCE_SCALE
 
     if SERVER and IsValid(tr.Entity) and (tr.Entity:IsNPC() or tr.Entity:IsPlayer() or tr.Entity:Health() > 0) then
         local dmginfo = DamageInfo()
@@ -502,20 +515,20 @@ function SWEP:DealDamage()
         local dmg = DAMAGE[anim] or DAMAGE_DEFAULT
         dmginfo:SetDamage(math.random(dmg[1], dmg[2]))
 
-        -- "yes we need those specific numbers" (original comment) — punch
-        -- knockback forces tuned by the original authors, kept verbatim
+        -- "yes we need those specific numbers" (original comment) — the shape of
+        -- the original authors' tuning, through FORCE_SCALE
         if anim == "fists_left" then
-            dmginfo:SetDamageForce(self.Owner:GetRight() * 5912 * scale + self.Owner:GetForward() * 12998 * scale)
+            dmginfo:SetDamageForce(self.Owner:GetRight() * 5912 * kb + self.Owner:GetForward() * 12998 * kb)
         elseif anim == "fists_right" then
-            dmginfo:SetDamageForce(self.Owner:GetRight() * -5912 * scale + self.Owner:GetForward() * 12989 * scale)
+            dmginfo:SetDamageForce(self.Owner:GetRight() * -5912 * kb + self.Owner:GetForward() * 12989 * kb)
         elseif anim == "fists_uppercut" then
-            dmginfo:SetDamageForce(self.Owner:GetUp() * 3158 * scale + self.Owner:GetForward() * 15012 * scale)
+            dmginfo:SetDamageForce(self.Owner:GetUp() * 3158 * kb + self.Owner:GetForward() * 15012 * kb)
         elseif anim == "fists_uppercut2" then
-            dmginfo:SetDamageForce(self.Owner:GetUp() * 25158 * scale + self.Owner:GetForward() * 15012 * scale + self.Owner:GetRight() * 8912 * scale)
+            dmginfo:SetDamageForce(self.Owner:GetUp() * 25158 * kb + self.Owner:GetForward() * 15012 * kb + self.Owner:GetRight() * 8912 * kb)
         elseif anim == "fists_uppercut2_alt" then
-            dmginfo:SetDamageForce(self.Owner:GetUp() * 25158 * scale + self.Owner:GetForward() * 15012 * scale + self.Owner:GetRight() * -8912 * scale)
+            dmginfo:SetDamageForce(self.Owner:GetUp() * 25158 * kb + self.Owner:GetForward() * 15012 * kb + self.Owner:GetRight() * -8912 * kb)
         elseif anim == "fists_elbowstrike" then
-            dmginfo:SetDamageForce(self.Owner:GetUp() * 3158 * scale + self.Owner:GetForward() * 11012 * scale)
+            dmginfo:SetDamageForce(self.Owner:GetUp() * 3158 * kb + self.Owner:GetForward() * 11012 * kb)
         end
 
         SuppressHostEvents(NULL) -- let breakable gibs spawn client-side in multiplayer

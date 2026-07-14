@@ -99,11 +99,12 @@ queda solo para el give anónimo del engine).)
 - **Addendum de la entry 25 (el dump deja de gritar lobo):** un
   `cargo_dev_dump_weapons` nuevo debe encabezar con `sin peso: 0 | sin precio: 0`,
   y las plantillas de SWEP deben salir `n/a`, no `MISSING`.
-- **Entry 26, lo que la pasada NO buscó:** los finishers de combo (uppercut /
-  codazo / uppercut agachado) **existen por primera vez** — su rama era código
-  muerto — y con ellos revive el **knockback**, que jamás se había aplicado. Si un
-  NPC moribundo sale volando de más, el número a bajar son los `SetDamageForce`,
-  no el daño.
+- **Addendum 2 de la entry 26 (el NPC salió volando):** las fuerzas revividas
+  eran para golpes de 37-115 dmg, no de 3 — un jab lanzaba un ragdoll a ~150 u/s
+  y el uppercut agachado lo mandaba **hacia arriba** a ~300. Ahora pasan por una
+  sola perilla, `FORCE_SCALE = 0.2`, que conserva la forma relativa de la tuning
+  original. Un cadáver debe **trastabillar**, no despegar. (Los finishers de
+  combo, que existen por primera vez, se ven en la misma pasada.)
 
 ## Frentes abiertos (anotados, NO arreglados)
 
