@@ -313,6 +313,19 @@ function CARGO.Inventory.CountItem(ply, id)
     return n
 end
 
+-- Presence across BOTH classes: "does the player carry at least one <id>?".
+-- CountItem deliberately counts stack units only (its result feeds TakeItem's
+-- stack drain), so unique items — stored as { id, uid } — are invisible to it.
+-- Consumers checking presence of a unique (Coagulant's tourniquet, paid
+-- in-game 2026-07-13) must ask here, not CountItem.
+function CARGO.Inventory.HasItem(ply, id)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    for _, entry in ipairs(rec.items) do
+        if entry.id == id then return true end
+    end
+    return false
+end
+
 -- Public contract: instance blob equipped in a slot (Cortex reads Body to
 -- resolve the apparent faction / disguise — Cargo_Architecture.md §6).
 -- Stack slots (throwable) have no instance: the stack entry itself comes

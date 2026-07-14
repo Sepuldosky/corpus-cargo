@@ -19,7 +19,9 @@
 --   CARGO.Items.Get(id) -> def | nil
 --   CARGO.Inventory.GiveItem(ply, id, count | blob) -> ok, err|uid
 --   CARGO.Inventory.TakeItem(ply, id, count) -> ok
---   CARGO.Inventory.CountItem(ply, id) -> n
+--   CARGO.Inventory.CountItem(ply, id) -> n  -- stack units ONLY (uniques are
+--                                                invisible here; see HasItem)
+--   CARGO.Inventory.HasItem(ply, id) -> bool  -- presence across BOTH classes
 --   CARGO.Inventory.GetEquipped(ply, slotId) -> instance blob | nil
 --                                             -- (Cortex reads Body for disguise)
 --   CARGO.Money.RegisterProvider(name, iface) -- iface: get/add/take/format

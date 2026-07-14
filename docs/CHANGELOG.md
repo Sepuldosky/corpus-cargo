@@ -1681,3 +1681,31 @@ mata el historial stock como corresponde. Con DGL4 montado su panel de
 DGL4 (se desactiva en SU menú de configuración; COMPAT-RUNTIME, nuestra
 convar gobierna solo el historial del gamemode base). Entry completo; el
 roadmap #22 cierra entero.
+
+## 18. `Inventory.HasItem`: presencia honesta de ítems `unique` (fix G4 de Coagulant) `[PENDIENTE]`
+
+**Contexto (reporte del autor — ronda 3 de Coagulant, 2026-07-13):** el
+torniquete de Coagulant (clase `unique`) respondía "No tourniquet in
+inventory" con el ítem visible en el grid. Causa raíz: `Inventory.CountItem`
+cuenta **solo stacks** (`entry.uid == nil`) — correcto para su rol (su
+resultado alimenta el drenaje de `TakeItem`, que también es de stacks), pero
+no existía superficie pública para preguntar "¿lleva al menos un X?"
+cubriendo las dos clases de ítem: los `unique` viven como `{id, uid}` y
+CountItem siempre los cuenta 0.
+
+**Cambio (server, `corpus_cargo_inventory.lua`):** nueva
+`CARGO.Inventory.HasItem(ply, id) -> bool` — presencia por id sobre
+`rec.items`, stacks Y uniques. Lectura pura: **cero cambios de semántica en
+CountItem/TakeItem** (sus callers — el guard de TakeItem, QuickUse, el puente
+ARC9 — son todos de stacks; hacer que CountItem viera uniques habría vuelto
+mentiroso el `return true` de TakeItem sobre un id unique). El bloque
+CONTRACT del init documenta la trampa y la superficie nueva. Coagulant es el
+primer consumidor (su sesión "Fix G4").
+
+**Verificación offline:** luaparser limpio; el harness de Coagulant cargó por
+primera vez el inventario REAL de Cargo (items/weight/instances/inventory
+sobre el framework real): GiveItem de un unique → CountItem 0 pero HasItem
+true; TakeItem sobre el unique sigue devolviendo false; flujo completo del
+torniquete verde (23 checks + selftest de Coagulant 68 OK). **En juego:** lo
+confirma el re-test G4 de la ronda 4 de Coagulant (torniquete desde la UI
+arranca, aplica y no se consume).
