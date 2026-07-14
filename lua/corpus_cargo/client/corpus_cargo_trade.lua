@@ -19,6 +19,10 @@ local NET_TRADE_SYNC    = Corpus.Net.Register("cargo", "trade_sync")
 local NET_TRADE_CLOSE   = Corpus.Net.Register("cargo", "trade_close")
 local NET_TRADE_CONFIRM = Corpus.Net.Register("cargo", "trade_confirm")
 
+-- Height of the basket strip on BOTH sides: the trader's Buy panel and the
+-- player's Sell panel (which also carries the net + Cancel/Confirm row).
+CARGO.Trade.STRIP_TALL = 134
+
 local tradeState          -- the trader snapshot (nil = no session)
 local basket = { buy = {}, sell = {} } -- keyed by RefKey -> { ref, count, entry }
 local dealBar             -- repainted from the basket every frame
@@ -261,10 +265,13 @@ function CARGO.Trade.BuildStockColumn(left)
         end
     end
 
-    -- Buy strip: what you are taking from him (mock: the left total)
+    -- Buy strip: what you are taking from him (mock: the left total). Same
+    -- height as the Sell block on the player side (author call, 2nd in-game
+    -- pass): the two strips read as one row across the screen — hence the
+    -- shared STRIP_TALL, not two hand-tuned numbers that drift apart.
     local strip = vgui.Create("DPanel", left)
     strip:Dock(BOTTOM)
-    strip:SetTall(96)
+    strip:SetTall(CARGO.Trade.STRIP_TALL)
     strip:DockMargin(0, 8, 0, 0)
     strip:DockPadding(6, 22, 6, 6)
     strip.Paint = function(_, w, h)
@@ -307,7 +314,7 @@ end
 function CARGO.Trade.BuildDealBar(right)
     local bar = vgui.Create("DPanel", right)
     bar:Dock(BOTTOM)
-    bar:SetTall(134)
+    bar:SetTall(CARGO.Trade.STRIP_TALL)
     bar:DockMargin(0, 8, 0, 0)
     bar:DockPadding(6, 22, 6, 6)
     bar.Paint = function(_, w, h)

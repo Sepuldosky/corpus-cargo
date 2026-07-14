@@ -108,9 +108,12 @@ INTEGRACIONES / DEUDA PROPIA
 13. Corpus.Data.Delete como primitiva del framework (hoy file.Delete
     directo en Instances.Delete, deuda declarada).
 14. addon.json + empaquetado Workshop (deuda compartida del ecosistema).
-15. Loot on death / GC de instancias huérfanas — diseño posterior; incluye
-    la segunda arma de mundo de una clase ya poseída (hoy la captura la
-    absorbe, dedup v1). Enlaza con loot de cadáveres (Trade §9, cruce Cortex).
+15. Loot on death / GC de instancias huérfanas — diseño posterior.
+    [La segunda arma de una clase ya poseída YA NO se absorbe — CHANGELOG #27,
+     pedido del autor 2026-07-14: cada arma capturada es su propia instancia, y
+     el dedup quedó acotado al give ANÓNIMO del engine (el loadout, que si no
+     stockearía una copia por respawn). Una toma deliberada captura la N-ésima.]
+    Enlaza con loot de cadáveres (Trade §9, cruce Cortex).
     PARCIAL (CHANGELOG #10, [PENDIENTE] verif.): variante WIPE lista
     (cargo_lose_on_death borra todo + dinero al morir; cargo_persistence 0 =
     sesión en memoria). La variante LOOT (todo cae recuperable) y el GC de

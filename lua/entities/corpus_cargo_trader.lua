@@ -33,8 +33,20 @@ if SERVER then
         { id = "cargo_dev_ammo_9mm", count = 120 },
     }
 
+    -- Sidorovich in the flesh when the content addon is mounted, a citizen when
+    -- it is not. The model is a ValveBiped rig with the HL2 male anim includes
+    -- (male_shared/gestures/postures — read out of the .mdl), so the idle below
+    -- plays on either one. DETECTION, never assumption: Cargo is generic and
+    -- must not hard-depend on corpus_stalker content (rule of the ecosystem).
+    local TRADER_MODEL = "models/rashkinsk/sidor.mdl"
+    local FALLBACK_MODEL = "models/humans/group01/male_07.mdl"
+
     function ENT:Initialize()
-        self:SetModel("models/humans/group01/male_07.mdl")
+        local model = file.Exists(TRADER_MODEL, "GAME") and TRADER_MODEL or FALLBACK_MODEL
+        -- a model the map never used is NOT in the precache table (same trap the
+        -- item defs pay in Items.Register): precaching also networks it
+        util.PrecacheModel(model)
+        self:SetModel(model)
         self:PhysicsInit(SOLID_BBOX)
         self:SetMoveType(MOVETYPE_NONE)
         self:SetSolid(SOLID_BBOX)

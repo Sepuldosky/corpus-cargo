@@ -5,14 +5,13 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-14 (**entries 23, 24 y 25 confirmadas en
-juego** → las armas **se describen solas** (#38), **saben a qué slot van** (#39)
-y **pesan de verdad** (#40; el arsenal completo del autor, el M60E4 en 10,5 kg).
-Su addendum arregla el propio dump, que marcaba `MISSING` las plantillas de
-SWEP. Quedan `[PENDIENTE]` **21** y **22** — el peso deja de bloquear una
-transacción, la línea del basket es un **agregado sobre todos los stacks** y el
-click carga 25% del `max_stack`, con **SHIFT+click = todo** — y la nueva **26**:
-**Hands** deja de pegar como una leyenda de Apex.)
+**Última actualización:** 2026-07-14 (**entries 21 y 22 confirmadas**: el basket
+es un agregado sobre todos los stacks, el click carga 25% del `max_stack` con
+**SHIFT+click = todo**, y el peso no bloquea una compra. Antes cerraron 23/24/25
+(armas que se describen solas, saben a qué slot van y pesan de verdad). Quedan
+`[PENDIENTE]` la **26** (Hands deja de pegar como Apex) y la nueva **27**:
+strips Buy/Sell parejos, **Sidorovich** como trader demo y **N armas iguales**
+(el dedup queda solo para el give anónimo del engine).)
 
 ---
 
@@ -44,10 +43,11 @@ click carga 25% del `max_stack`, con **SHIFT+click = todo** — y la nueva **26*
   de nuevo; entidad demo `corpus_cargo_trader`; **estado Trade** del frame con
   basket, strips Buy/Sell y neto; **`Confirm` atómico** en server (valida dinero,
   peso y existencia, y recién ahí mueve). El basket del cliente es intent puro.
-  **El peso NO bloquea una transacción** (enmienda del autor, entry 21): se puede
-  comprar sobrecargado — la curva de peso lo cobra en velocidad; el límite sigue
-  vigente para lo que se recoge del suelo. Click = stack entero; parcial con click
-  derecho.
+  **El peso NO bloquea una transacción** (entry 21): se puede comprar sobrecargado
+  — la curva de peso lo cobra en velocidad; el límite sigue vigente para lo que se
+  recoge del suelo (techo duro: **2× la capacidad**). Una línea del basket es un
+  **agregado sobre todos los stacks** del ítem (entry 22); click = 25% del
+  `max_stack`, **SHIFT+click = todo**, click derecho = cantidad exacta.
 - **Trivia de armas: la pone el SWEP, no una tabla** (entry 23, roadmap #38).
   La captura lee `SWEP.Description` y el bloque `SWEP.Trivia` de
   `weapons.Get(class)` (ya heredados por la cadena `SWEP.Base`) → `def.trivia`
@@ -84,10 +84,10 @@ click carga 25% del `max_stack`, con **SHIFT+click = todo** — y la nueva **26*
 
 ## Pendiente de verificar
 
-- **Entries 21 y 22 (enmiendas del comercio):** el peso no bloquea una compra;
-  click = 25% del `max_stack`, SHIFT+click = todo, click derecho = cantidad
-  exacta; y una línea del basket abarca **todos** los stacks de ese ítem (vender
-  240 balas que viven como 2×120 se lleva las 240).
+- **Entry 27 (2.ª pasada del comercio):** los strips Buy/Sell miden lo mismo;
+  el trader demo es **Sidorovich** (`models/rashkinsk/sidor.mdl`, desde
+  `corpus-stalker`; sin el addon cae al ciudadano de HL2); y **se pueden tomar
+  N armas iguales** — el dedup quedó acotado al give anónimo del engine.
 - **Addendum de la entry 25 (el dump deja de gritar lobo):** un
   `cargo_dev_dump_weapons` nuevo debe encabezar con `sin peso: 0 | sin precio: 0`,
   y las plantillas de SWEP deben salir `n/a`, no `MISSING`.

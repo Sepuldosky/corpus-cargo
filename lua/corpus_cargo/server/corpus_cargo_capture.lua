@@ -530,9 +530,20 @@ end
 -- correctness mechanism: the flag is set/cleared synchronously around
 -- ply:Give, but on spawn WeaponEquip can fire DEFERRED and miss it
 -- (CHANGELOG #6) — the flag below survives only as a fast-path skip.
-function CARGO.Capture.Decide(equippedCount, hasItem)
+--
+-- DEDUP, AND WHY IT SURVIVES ONLY FOR ANONYMOUS GIVES (author call, in-game
+-- 2026-07-14: "no puedo tomar dos M60E4… comprar sí, lo que es raro"). Every
+-- captured weapon is its own INSTANCE (own uid, own condition, own magazine),
+-- so two M60E4 are two different items and the trade block already sells them
+-- as such. What the dedup actually protects against is the ENGINE HANDOUT: the
+-- gamemode loadout re-gives its classes on every respawn, and capturing those
+-- blindly would mint a fresh pistol item each time you died. So the rule is now
+-- scoped to exactly that: an ANONYMOUS give of a class already owned is dropped;
+-- a DELIBERATE one (WALK+USE take, spawnmenu click, a dropped Cargo instance)
+-- captures — you can carry N identical guns.
+function CARGO.Capture.Decide(equippedCount, hasItem, deliberate)
     if (tonumber(equippedCount) or 0) > 0 then return "keep" end
-    if hasItem then return "remove" end
+    if hasItem and not deliberate then return "remove" end
     return "capture"
 end
 
@@ -744,7 +755,8 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
             CARGO.Inventory.StoreClip(dropUid, wep)
         else
             action = CARGO.Capture.Decide(
-                EquippedClassCount(owner, class), HasWeaponItem(owner, class))
+                EquippedClassCount(owner, class), HasWeaponItem(owner, class),
+                deliberate)
         end
 
         -- "keep": this entity IS the equipped weapon (one per class) — hands
@@ -778,13 +790,9 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
                 CARGO.Inventory.Notice(owner, "You can't carry that.")
             end
         end
-        -- the dedup still rules (one item per class): a deliberate give of a
-        -- class already owned is removed like any duplicate, but AUDIBLY —
-        -- silently eating a spawnmenu click reads as a bug (#30). The rule
-        -- itself does not change.
-        if action == "remove" and deliberate then
-            CARGO.Inventory.Notice(owner, "You already have one.")
-        end
+        -- "remove" now only reaches ANONYMOUS gives (see Decide): the engine
+        -- loadout re-giving a class the player already carries. Nothing to say
+        -- about it — a deliberate take of a second identical gun captures.
 
         -- capture/remove: take out ONLY the entity the engine just gave,
         -- never StripWeapon(class) — that strips every weapon of the class

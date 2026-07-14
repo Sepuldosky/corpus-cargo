@@ -1822,7 +1822,7 @@ el click debe llevarse el stack entero, y el peso no debe bloquear una transacci
 
 ---
 
-## 21. Enmiendas de la 1.ª pasada del comercio: click = stack entero, y el peso deja de ser gate `[PENDIENTE]`
+## 21. Enmiendas de la 1.ª pasada del comercio: click = stack entero, y el peso deja de ser gate `[APLICADO 2026-07-14]`
 
 **Reporte del autor (2026-07-14, pasada del entry 20 — los 8 checks pasaron):** dos
 pedidos de diseño sobre el comercio ya funcionando.
@@ -1861,7 +1861,7 @@ rechazando por peso). **En juego:** la pasada del autor (2026-07-14) devolvió e
 
 ---
 
-## 22. Basket: la línea es un AGREGADO sobre todos los stacks + click 25% / SHIFT = todo `[PENDIENTE]`
+## 22. Basket: la línea es un AGREGADO sobre todos los stacks + click 25% / SHIFT = todo `[APLICADO 2026-07-14]`
 
 **Bug real (reporte del autor 2026-07-14, checks 21a/21b):** al clickear munición "se
 pintaban todos los stacks en ámbar pero solo entraba uno", y con un stack ya en el
@@ -2185,3 +2185,39 @@ solo se escriben cuando cambian.
    (RMB), con su propio daño y su empujón — antes esto no pasaba nunca. Agachado: uppercut.
 5. Ojo con el knockback ahora que **vive**: si un NPC moribundo sale volando de más para el tono
    del mod, el número a bajar son los `SetDamageForce` (no el daño).
+
+---
+
+## 27. Comercio 2.ª pasada: Sidorovich en persona, strips parejos y el fin del dedup de armas `[PENDIENTE]`
+
+**Reporte del autor (2026-07-14, ronda de las entries 21/22 — 4/5 ✓):** el basket agregado
+y el click 25% / SHIFT quedaron confirmados (entries 21 y 22 → `[APLICADO]`). Lo que dejó
+la pasada:
+
+**(a) Los dos strips del basket ahora miden lo mismo.** El panel **BUY** del trader
+(96 px) era más bajo que el bloque **SELL** del jugador (134 px, que además carga el neto
+y Cancel/Confirm), y la fila se veía desalineada de lado a lado. Ambos leen ahora de un
+único `Trade.STRIP_TALL` — un número compartido, no dos afinados a mano que se separan.
+
+**(b) El trader demo es Sidorovich.** `models/rashkinsk/sidor.mdl` (pack `stalker rp
+content #2`, material `act_stalker_trader_1`) es un rig **ValveBiped con los includes de
+animación del ciudadano HL2** (`male_shared`/`gestures`/`postures`, leídos del propio
+`.mdl`), así que la idle del NPC le corre tal cual. Copiado a **`corpus-stalker`** con
+**rutas verbatim** (assets gitignoreados, manifiesto en su `docs/ASSETS.md`). Cargo NO
+hard-depende de él: **detección, nunca asunción** — sin el addon montado, el trader cae al
+ciudadano de HL2.
+
+**(c) El dedup de armas se levanta para las tomas DELIBERADAS** (reporte 22e: "no puedo
+tomar dos M60E4… comprar sí, lo que es raro"). Cada arma capturada es su **propia
+instancia** (uid, condición y cargador propios), y el comercio ya las vendía como tales;
+la regla "un ítem por clase" contradecía eso. **Pero no se puede levantar entera:** lo que
+el dedup protege de verdad es el **give ANÓNIMO del engine** — el loadout del gamemode
+re-entrega sus clases en cada respawn, y capturarlas a ciegas mintería una pistola nueva
+cada vez que morís. Así que la regla queda **acotada a eso**: give anónimo de una clase ya
+poseída → se descarta; give **deliberado** (WALK+USE, click del spawnmenu, instancia
+dropeada que vuelve) → **captura**. Podés cargar N armas iguales. Cierra la parte de
+"segunda arma de mundo de una clase ya poseída" del roadmap #15.
+
+**Verificación offline:** harness **355 checks verdes** (el check del dedup se dio vuelta:
+un give deliberado de una clase ya poseída ahora captura la segunda, y el anónimo sigue
+descartándose — que es lo que impide el stockeo por respawn). **En juego:** pendiente.
