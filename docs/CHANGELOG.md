@@ -2116,3 +2116,72 @@ resumen: `# N SWEPs, N capturables | sin peso: N | sin precio: N`.
 reales, no plantillas; y una clase sin `value` sale marcada como no comerciable). **En juego:**
 el propio comando es la verificación — un `cargo_dev_dump_weapons` nuevo debe encabezar con
 `sin peso: 0 | sin precio: 0`.
+
+---
+
+## 26. Hands: son puños, no un finisher de Apex — daño, quiebre de animación y mano por botón `[PENDIENTE]`
+
+Tres reportes del autor sobre el SWEP **Hands** (2026-07-14), y el hilo que los conecta: el port
+heredó del mod original (Workshop 2792160770) **dos lecturas de animación equivocadas**, y una de
+ellas mantenía media lógica del arma muerta sin que se notara.
+
+**(a) El daño.** Reporte: *"si al final son puñetazos, menos de 5 dmg debería hacer"*. Hoy un
+puñetazo hace `math.random(37, 47)` — casi el 50% de un jugador. La escalera del original
+(37-47 base, hasta 115 en el uppercut agachado) es la de una leyenda de Apex partiendo un
+escudo. Se **escala ~1/10** manteniendo el peso relativo de los finishers de combo, en una tabla
+`DAMAGE` indexada por animación (antes eran literales dispersos en el `if`):
+
+| Animación | Antes | Ahora |
+|---|---|---|
+| `fists_left` / `fists_right` | 37-47 | **3-4** |
+| `fists_uppercut` (combo, LMB) | 55-65 | **5-7** |
+| `fists_elbowstrike` (combo, RMB) | 55-65 | **5-7** |
+| `fists_uppercut2(_alt)` (agachado) | 65-115 | **7-12** |
+
+Las **fuerzas de knockback no se escalan**: son la tuning de los autores originales
+(*"yes we need those specific numbers"*) y solo muerden sobre un objetivo que muere.
+
+**(b) El quiebre de animación al pasar de golpe a idle — y la lógica muerta.** Dos bugs
+distintos, ambos por preguntarle al objeto equivocado:
+
+1. **`SetAnim`/`Deploy` medían mal la duración.** Pedían `vm:SequenceDuration()` **sin
+   argumento** —"cuánto dura la secuencia que estés reproduciendo ahora mismo"— justo después de
+   pedirle al viewmodel que cambiara de secuencia. Si esa lectura cae sobre la secuencia
+   **vieja**, el tiempo que `AnimationTime` registra no es el del golpe: `Think` devuelve a
+   `idle1` **a destiempo** — o cortando el swing por la mitad, o segundos tarde. Es exactamente
+   el quiebre reportado. Ahora ambos piden la duración de **la secuencia que están arrancando**
+   (`vm:SequenceDuration(seq)`), con guardas para `seq < 0` (secuencia inexistente: no se pisa el
+   estado) y `playbackRate <= 0` (división que producía `inf`/`nan`). `Deploy` de paso deja de
+   medir el deploy **antes** de arrancarlo — solo funcionaba porque un `SetWeaponModel` recién
+   puesto deja sonando la secuencia 0, que en este modelo **casualmente** es `Deploy`.
+2. **`DealDamage` leía el nombre de la animación contra el modelo del ARMA.**
+   `self:GetSequenceName(vm:GetSequence())`: un índice de secuencia **del viewmodel** resuelto
+   contra la entidad del arma, cuyo `WorldModel` es `""`. Nunca resolvía → **todas las ramas por
+   animación eran código muerto**: cada golpe hacía el daño base y **jamás se aplicó una sola
+   fuerza direccional**. Ahora lee `GetCurrentAnim()`, el nombre que `SetAnim` ya networkea. Con
+   esto el uppercut, el codazo y el uppercut agachado **existen por primera vez** (daño propio +
+   knockback), que es lo que el mod siempre quiso decir.
+
+**(c) Mano por botón.** Reporte: *"¿podría golpear alternadamente, que golpear con izquierda sea
+realmente la animación de mano izquierda?"*. El modelo `c_arms_apex.mdl` **sí trae las dos
+secuencias** (`fists_left` y `fists_right` — verificado sobre el .mdl, no de memoria), y el
+código **ya** mapeaba LMB→izquierda y RMB→derecha. Decisión del autor: **botón = mano, fijo**
+(sin alternancia automática estilo Fists de GMod). Único cambio: se borra el parámetro
+`PrimaryAttack(right)` — el engine **nunca** pasa argumento a `PrimaryAttack`, así que era `nil`
+siempre y la rama `if right` era decorado. Si en juego seguía viéndose una sola mano, el
+sospechoso es (b1), no la selección de animación.
+
+**De paso (churn de `Think`):** `SetCombo(0)` y `SetHoldType("normal")` se reescribían **cada
+tick** una vez pasado el cooldown — un int networkeado y un hold type moviéndose para nada. Ahora
+solo se escriben cuando cambian.
+
+**Verificación offline:** sintaxis OK (luaparser). **En juego** (la corre el autor):
+
+1. Equipar Hands. Golpear a un NPC con vida: debe morir en **muchos** golpes, no en dos
+   (`developer 1` muestra el daño).
+2. LMB → animación de **mano izquierda**; RMB → **mano derecha**.
+3. Golpear repetido y soltar: la vuelta a `idle` **no debe dar el tirón** ni cortar el swing.
+4. Encadenar 3 golpes seguidos (combo ≥ 2): el 3.º debe ser **uppercut** (LMB) / **codazo**
+   (RMB), con su propio daño y su empujón — antes esto no pasaba nunca. Agachado: uppercut.
+5. Ojo con el knockback ahora que **vive**: si un NPC moribundo sale volando de más para el tono
+   del mod, el número a bajar son los `SetDamageForce` (no el daño).

@@ -9,9 +9,10 @@
 juego** → las armas **se describen solas** (#38), **saben a qué slot van** (#39)
 y **pesan de verdad** (#40; el arsenal completo del autor, el M60E4 en 10,5 kg).
 Su addendum arregla el propio dump, que marcaba `MISSING` las plantillas de
-SWEP. Quedan `[PENDIENTE]` solo **21** y **22**: el peso deja de bloquear una
+SWEP. Quedan `[PENDIENTE]` **21** y **22** — el peso deja de bloquear una
 transacción, la línea del basket es un **agregado sobre todos los stacks** y el
-click carga 25% del `max_stack`, con **SHIFT+click = todo**.)
+click carga 25% del `max_stack`, con **SHIFT+click = todo** — y la nueva **26**:
+**Hands** deja de pegar como una leyenda de Apex.)
 
 ---
 
@@ -90,6 +91,12 @@ click carga 25% del `max_stack`, con **SHIFT+click = todo**.)
 - **Addendum de la entry 25 (el dump deja de gritar lobo):** un
   `cargo_dev_dump_weapons` nuevo debe encabezar con `sin peso: 0 | sin precio: 0`,
   y las plantillas de SWEP deben salir `n/a`, no `MISSING`.
+- **Entry 26 (Hands):** el puñetazo pasa de 37-47 a **3-4** dmg; la vuelta a
+  `idle` deja de dar el tirón (el port medía la duración de la secuencia
+  **equivocada**); y el uppercut / codazo / uppercut agachado **existen por
+  primera vez** — la rama por animación era código muerto (se leía un índice del
+  viewmodel contra el modelo del arma, que es `""`). Ojo al knockback, que ahora
+  **sí** se aplica.
 
 ## Frentes abiertos (anotados, NO arreglados)
 

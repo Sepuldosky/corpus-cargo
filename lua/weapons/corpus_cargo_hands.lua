@@ -34,6 +34,21 @@
 --   * melee_swing sound.Add: the original declared the `sound` key twice
 --     (left hook overwritten by right hook — Lua keeps the last); both sets
 --     are merged here, which is what the code visibly intended.
+--   * ANIM SOURCE FIX: DealDamage read the animation name with
+--     self:GetSequenceName(vm:GetSequence()) — a VIEWMODEL sequence index
+--     looked up against the WEAPON entity's model, whose WorldModel is "".
+--     It never resolved, so every per-animation branch was dead code: all
+--     punches dealt the base damage and no directional knockback ever applied.
+--     It now reads GetCurrentAnim(), the networked name SetAnim maintains.
+--   * ANIM TIMING FIX: SetAnim/Deploy asked the viewmodel for
+--     SequenceDuration() with no argument ("however long the sequence you are
+--     playing right now lasts"), read right after telling it to switch. When
+--     that lands on the old sequence the tracked time is wrong and Think
+--     swaps back to idle1 either mid-swing or seconds late — the visible break
+--     on punch -> idle (author repro 2026-07-14). Both now ask for the
+--     duration of the exact sequence being started.
+--   * Damage rebalanced for the Corpus context: these are bare fists, not an
+--     Apex finisher. See the DAMAGE table.
 
 AddCSLuaFile()
 
@@ -242,6 +257,22 @@ local MetalHitSound   = Sound("corpus_hands.melee_hit_metal")
 local ConcreteHitSound = Sound("corpus_hands.melee_hit_concrete")
 local InspectSound    = Sound("corpus_hands.inspect")
 
+-- Damage per animation, keyed by the name SetAnim networks in CurrentAnim.
+-- The original ladder (37-47 base, up to 115 on the crouched uppercut) is an
+-- Apex legend punching through a shield; these are bare fists in a survival
+-- context, so the whole ladder is scaled ~1/10 and only the relative weight of
+-- the combo finishers is kept. The knockback forces below are NOT scaled: they
+-- are the original authors' tuning and only bite on a dying target.
+local DAMAGE = {
+    fists_left          = {3, 4},
+    fists_right         = {3, 4},
+    fists_uppercut      = {5, 7},   -- combo finisher (primary)
+    fists_elbowstrike   = {5, 7},   -- combo finisher (secondary)
+    fists_uppercut2     = {7, 12},  -- crouched
+    fists_uppercut2_alt = {7, 12},  -- crouched
+}
+local DAMAGE_DEFAULT = {3, 4}
+
 function SWEP:SetupDataTables()
     self:NetworkVar("Float", 0, "AnimationTime")
     self:NetworkVar("Float", 1, "NextMeleeAttack")
@@ -262,9 +293,19 @@ function SWEP:SetAnim(anim, forceplay, animpriority)
     -- if idle, or forced with enough priority, play the given animation
     if self:IsIdle() or (forceplay and self:GetAnimPriority() <= animpriority) then
         local vm = self.Owner:GetViewModel()
+        if not IsValid(vm) then return end
+
+        -- see ANIM TIMING FIX in the header: the duration is asked for THIS
+        -- sequence, not for "whatever the viewmodel happens to be playing"
+        local seq = vm:LookupSequence(anim)
+        if seq < 0 then return end -- unknown sequence: leave the state alone
+
+        local rate = vm:GetPlaybackRate()
+        if rate <= 0 then rate = 1 end
+
         self:SetCurrentAnim(anim)
-        vm:SendViewModelMatchingSequence(vm:LookupSequence(anim))
-        self:SetAnimationTime(CurTime() + vm:SequenceDuration() / vm:GetPlaybackRate())
+        vm:SendViewModelMatchingSequence(seq)
+        self:SetAnimationTime(CurTime() + vm:SequenceDuration(seq) / rate)
         self:SetAnimPriority(animpriority)
     end
 end
@@ -292,9 +333,16 @@ function SWEP:Deploy()
     vm:SetWeaponModel("models/weapons/c_arms_apex.mdl", self)
     vm:SetPlaybackRate(speed)
 
-    self:SetNextPrimaryFire(CurTime() + vm:SequenceDuration() / speed)
-    self:SetNextSecondaryFire(CurTime() + vm:SequenceDuration() / speed)
     self:SetAnim("deploy", true, 1)
+
+    -- gate both attacks behind the deploy animation we just started. The
+    -- original measured it BEFORE starting it (same SequenceDuration() footgun
+    -- as SetAnim) and only got away with it because a freshly set weapon model
+    -- leaves sequence 0 — "Deploy" — playing. SetAnim already tracked the
+    -- honest end time; reuse it.
+    local ready = self:GetAnimationTime()
+    self:SetNextPrimaryFire(ready)
+    self:SetNextSecondaryFire(ready)
 
     if SERVER then
         self:SetCombo(0)
@@ -357,14 +405,15 @@ if CLIENT then
     end
 end
 
-function SWEP:PrimaryAttack(right)
+-- Button = hand, fixed: primary is the LEFT fist, secondary the RIGHT one (the
+-- model ships both sequences). The original declared PrimaryAttack(right), but
+-- the engine never passes an argument to PrimaryAttack — the parameter was dead
+-- and always nil, so it is dropped and the intent stated outright.
+function SWEP:PrimaryAttack()
     self:SetHoldType("fist")
     self.Owner:SetAnimation(PLAYER_ATTACK1)
 
     local anim = "fists_left"
-    if right then
-        anim = "fists_right"
-    end
 
     timer.Simple(0.1, function()
         if not IsValid(self) then return end
@@ -396,7 +445,10 @@ end
 
 local phys_pushscale = GetConVar("phys_pushscale")
 function SWEP:DealDamage()
-    local anim = self:GetSequenceName(self.Owner:GetViewModel():GetSequence())
+    -- see ANIM SOURCE FIX in the header: the swing that landed is the one
+    -- SetAnim networked, not a viewmodel sequence index read against the
+    -- weapon entity's (empty) world model
+    local anim = self:GetCurrentAnim()
 
     self.Owner:LagCompensation(true)
 
@@ -446,7 +498,9 @@ function SWEP:DealDamage()
         dmginfo:SetAttacker(attacker)
 
         dmginfo:SetInflictor(self)
-        dmginfo:SetDamage(math.random(37, 47))
+
+        local dmg = DAMAGE[anim] or DAMAGE_DEFAULT
+        dmginfo:SetDamage(math.random(dmg[1], dmg[2]))
 
         -- "yes we need those specific numbers" (original comment) — punch
         -- knockback forces tuned by the original authors, kept verbatim
@@ -456,16 +510,12 @@ function SWEP:DealDamage()
             dmginfo:SetDamageForce(self.Owner:GetRight() * -5912 * scale + self.Owner:GetForward() * 12989 * scale)
         elseif anim == "fists_uppercut" then
             dmginfo:SetDamageForce(self.Owner:GetUp() * 3158 * scale + self.Owner:GetForward() * 15012 * scale)
-            dmginfo:SetDamage(math.random(55, 65))
         elseif anim == "fists_uppercut2" then
             dmginfo:SetDamageForce(self.Owner:GetUp() * 25158 * scale + self.Owner:GetForward() * 15012 * scale + self.Owner:GetRight() * 8912 * scale)
-            dmginfo:SetDamage(math.random(65, 115))
         elseif anim == "fists_uppercut2_alt" then
             dmginfo:SetDamageForce(self.Owner:GetUp() * 25158 * scale + self.Owner:GetForward() * 15012 * scale + self.Owner:GetRight() * -8912 * scale)
-            dmginfo:SetDamage(math.random(65, 115))
         elseif anim == "fists_elbowstrike" then
             dmginfo:SetDamageForce(self.Owner:GetUp() * 3158 * scale + self.Owner:GetForward() * 11012 * scale)
-            dmginfo:SetDamage(math.random(55, 65))
         end
 
         SuppressHostEvents(NULL) -- let breakable gibs spawn client-side in multiplayer
@@ -557,10 +607,13 @@ function SWEP:Think()
         self:SetNextMeleeAttack(0)
     end
 
-    if SERVER and CurTime() > self:GetNextPrimaryFire() + 0.1 then
+    -- both of these used to be rewritten on EVERY tick once the cooldown was
+    -- over: a networked int and a hold type churning for nothing. Only write
+    -- them when they actually change.
+    if SERVER and CurTime() > self:GetNextPrimaryFire() + 0.1 and self:GetCombo() ~= 0 then
         self:SetCombo(0)
     end
-    if SERVER and CurTime() > self:GetNextPrimaryFire() then
+    if SERVER and CurTime() > self:GetNextPrimaryFire() and self:GetHoldType() ~= "normal" then
         self:SetHoldType("normal")
     end
 
