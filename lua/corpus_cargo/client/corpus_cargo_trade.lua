@@ -40,13 +40,43 @@ function CARGO.Trade.BasketCount(side, entry)
     return line and line.count or 0
 end
 
--- how many units of this entry exist to add (a stack already half in the basket
--- can only put its remainder in — BasketAdd clamps against what is pending)
-local function Available(entry)
-    return entry.uid and 1 or (entry.count or 1)
+-- The source list behind each side: the trader's stock, or the player's grid.
+local function SourceItems(side)
+    if side == "buy" then return tradeState and tradeState.items or {} end
+    return CARGO.ClientState and CARGO.ClientState.items or {}
+end
+
+-- How many units of this ITEM exist on that side — NOT of the clicked cell.
+-- max_stack splits 240 rounds into two entries of 120 and both answer to the
+-- same ref, so a basket line is an aggregate over all of them (in-game report
+-- 2026-07-14: selling "all" of one stack left the twin stack unreachable).
+local function Available(side, entry)
+    local key = CARGO.Trade.RefKey(entry)
+    local total = 0
+    for _, e in ipairs(SourceItems(side)) do
+        if CARGO.Trade.RefKey(e) == key then
+            total = total + (e.uid and 1 or (e.count or 1))
+        end
+    end
+    return total
 end
 
 CARGO.Trade.Available = Available -- the own grid (corpus_cargo_ui.lua) needs it too
+
+-- What ONE left click loads (author call, 2nd in-game pass 2026-07-14): a
+-- QUARTER of the item's stack ceiling, repeatable — and SHIFT+click loads
+-- everything, the convention of every trade screen the author plays. A unique
+-- is always 1.
+function CARGO.Trade.ClickAmount(side, entry)
+    if entry.uid then return 1 end
+    if input.IsKeyDown(KEY_LSHIFT) or input.IsKeyDown(KEY_RSHIFT) then
+        return Available(side, entry)
+    end
+    local def = CARGO.Items.Get(entry.id)
+    local ceiling = istable(def) and isnumber(def.max_stack) and def.max_stack
+        or Available(side, entry)
+    return math.max(1, math.floor(ceiling * 0.25))
+end
 
 function CARGO.Trade.BasketAdd(side, entry, count)
     if tradeState == nil then return end
@@ -61,7 +91,7 @@ function CARGO.Trade.BasketAdd(side, entry, count)
     local key = CARGO.Trade.RefKey(entry)
     local line = lines[key]
     local have = line and line.count or 0
-    local room = Available(entry) - have
+    local room = Available(side, entry) - have
     if room <= 0 then return end
 
     local add = math.Clamp(math.floor(count or 1), 1, room)
@@ -155,22 +185,22 @@ end
 -- lists; whatever is gone leaves the basket instead of lingering as a ghost
 -- line the server would reject forever.
 local function PruneBasket()
-    local function prune(lines, source)
+    local function prune(lines, side)
         for key, line in pairs(lines) do
             local found
-            for _, entry in ipairs(source or {}) do
+            for _, entry in ipairs(SourceItems(side)) do
                 if CARGO.Trade.RefKey(entry) == key then found = entry break end
             end
             if found == nil then
                 lines[key] = nil
             else
                 line.entry = found
-                line.count = math.min(line.count, Available(found))
+                line.count = math.min(line.count, Available(side, found))
             end
         end
     end
-    prune(basket.buy, tradeState and tradeState.items)
-    prune(basket.sell, CARGO.ClientState and CARGO.ClientState.items)
+    prune(basket.buy, "buy")
+    prune(basket.sell, "sell")
 end
 
 CARGO.Trade.PruneBasket = PruneBasket
@@ -257,10 +287,10 @@ function CARGO.Trade.BuildStockColumn(left)
         dragSource = "stock",
         priceOf = function(entry) return CARGO.Trade.CellPrice("buy", entry) end,
         basketOf = function(entry) return CARGO.Trade.BasketCount("buy", entry) end,
-        -- left click takes the WHOLE stack (author call, 1st in-game pass: it is
-        -- what STALKER does, and one round at a time is a chore). Right click is
-        -- the way to a partial amount.
-        onLeftClick = function(entry) CARGO.Trade.BasketAdd("buy", entry, Available(entry)) end,
+        -- click = a quarter of the stack ceiling, SHIFT+click = all of it
+        onLeftClick = function(entry)
+            CARGO.Trade.BasketAdd("buy", entry, CARGO.Trade.ClickAmount("buy", entry))
+        end,
         onRightClick = function(entry) CARGO.Trade.AmountMenu("buy", entry) end,
     })
     stockGrid.panel:Dock(FILL)
@@ -357,7 +387,7 @@ end
 
 -- right-click on a stack: how many units into the basket
 function CARGO.Trade.AmountMenu(side, entry)
-    local avail = Available(entry) - CARGO.Trade.BasketCount(side, entry)
+    local avail = Available(side, entry) - CARGO.Trade.BasketCount(side, entry)
     if avail <= 1 then
         CARGO.Trade.BasketAdd(side, entry, 1)
         return

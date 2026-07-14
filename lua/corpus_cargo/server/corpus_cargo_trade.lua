@@ -185,20 +185,6 @@ local function MatchesRef(entry, ref)
     return entry.uid == nil and entry.id == ref.id and entry.condition == ref.condition
 end
 
-local function FindStock(trader, ref)
-    for i, entry in ipairs(trader.cont.items) do
-        if MatchesRef(entry, ref) then return i, entry end
-    end
-    return nil
-end
-
-local function FindOwn(rec, ref)
-    for i, entry in ipairs(rec.items) do
-        if MatchesRef(entry, ref) then return i, entry end
-    end
-    return nil
-end
-
 -- Removal is BY IDENTITY, never by a stored index: the moment one line is
 -- removed every later index in that list shifts, and a two-unique basket
 -- would then delete the wrong entry (or nil).
@@ -234,12 +220,31 @@ local function EntryUnitWeight(entry)
     return istable(def) and def.weight or 0
 end
 
+-- A stack ref (id + condition) does NOT name one entry: `max_stack` splits a
+-- pile of 240 SMG rounds into TWO entries of 120, and both answer to the same
+-- ref. In-game report 2026-07-14: the basket could only ever take one of them
+-- ("Sell all" on 120 left the other 120 unreachable). So a stack LINE is an
+-- AGGREGATE over every entry that matches the ref — that is the logical item
+-- the player sees, and the cells all light amber together because they are one
+-- line, not several.
+local function MatchingEntries(list, ref)
+    local out, total = {}, 0
+    for _, entry in ipairs(list) do
+        if MatchesRef(entry, ref) then
+            out[#out + 1] = entry
+            total = total + (entry.uid and 1 or (entry.count or 1))
+        end
+    end
+    return out, total
+end
+
 -- Resolves one side of the basket into concrete, priced, weighed lines.
 -- Returns lines, total, weight or nil, error — the error is the player-facing
 -- reason (voice of interface, §3: "the trader no longer has that", not "nil").
-local function ResolveSide(lines, findFn, source, mult)
+local function ResolveSide(lines, listOf, source, mult)
     local out, total, weight = {}, 0, 0
     local seen = {}
+    local list = listOf(source)
 
     for _, line in ipairs(lines or {}) do
         local ref = line.ref
@@ -249,25 +254,33 @@ local function ResolveSide(lines, findFn, source, mult)
         if seen[key] then return nil, "Duplicate line in the basket." end
         seen[key] = true
 
-        local idx, entry = findFn(source, ref)
-        if entry == nil then return nil, "An item in the basket is gone." end
+        local entries, available = MatchingEntries(list, ref)
+        if #entries == 0 then return nil, "An item in the basket is gone." end
 
-        local def = CARGO.Items.Get(entry.id)
-        if not CARGO.Trade.IsTradeable(def) then
-            return nil, (def and def.name or entry.id) .. " cannot be traded."
+        local first = entries[1]
+        local def = CARGO.Items.Get(first.id)
+        local unit = CARGO.Trade.IsTradeable(def) and CARGO.Trade.UnitPrice(def,
+            CARGO.Trade.ConditionOfEntry(Priceable(first)), mult) or nil
+        if unit == nil then
+            return nil, (def and def.name or first.id) .. " cannot be traded."
         end
 
-        local count = entry.uid and 1
-            or math.Clamp(math.floor(line.count or 1), 1, entry.count or 1)
-        local unit = CARGO.Trade.UnitPrice(def,
-            CARGO.Trade.ConditionOfEntry(Priceable(entry)), mult)
-        if unit == nil then
-            return nil, (def and def.name or entry.id) .. " cannot be traded."
+        -- what actually moves, spread across the entries that back the line
+        local count = math.Clamp(math.floor(line.count or 1), 1, available)
+        local parts, left = {}, count
+        for _, entry in ipairs(entries) do
+            if left <= 0 then break end
+            local take = entry.uid and 1 or math.min(entry.count or 1, left)
+            parts[#parts + 1] = { entry = entry, take = take }
+            left = left - take
         end
 
         total = total + unit * count
-        weight = weight + EntryUnitWeight(entry) * count
-        out[#out + 1] = { idx = idx, entry = entry, count = count, unit = unit }
+        weight = weight + EntryUnitWeight(first) * count
+        out[#out + 1] = {
+            id = first.id, condition = first.condition,
+            uid = first.uid, parts = parts, count = count, unit = unit,
+        }
     end
 
     return out, total, weight
@@ -281,11 +294,13 @@ function CARGO.Trade.Confirm(ply, trader, basket)
     local rec = CARGO.Inventory.GetRecord(ply)
 
     -- BUY: what the player takes from the stock, priced with the trader's sell_mult
-    local buys, cost, weightIn = ResolveSide(basket.buy, FindStock, trader, trader.sellMult)
+    local buys, cost = ResolveSide(basket.buy,
+        function(t) return t.cont.items end, trader, trader.sellMult)
     if buys == nil then return false, cost end
 
     -- SELL: what the player hands over, priced with the trader's buy_mult
-    local sells, gain, weightOut = ResolveSide(basket.sell, FindOwn, rec, trader.buyMult)
+    local sells, gain = ResolveSide(basket.sell,
+        function(r) return r.items end, rec, trader.buyMult)
     if sells == nil then return false, gain end
 
     if #buys == 0 and #sells == 0 then return false, "The basket is empty." end
@@ -325,17 +340,20 @@ function CARGO.Trade.Confirm(ply, trader, basket)
     -- could buy back the very rounds it just sold (the sold stack merges into
     -- the stock line the buy resolved against).
     for _, line in ipairs(buys) do
-        local entry = line.entry
-        if entry.uid then
-            RemoveEntry(trader.cont.items, entry)
-            CARGO.Inventory.GiveEntry(ply, { id = entry.id, uid = entry.uid }, true)
+        if line.uid then
+            RemoveEntry(trader.cont.items, line.parts[1].entry)
+            CARGO.Inventory.GiveEntry(ply, { id = line.id, uid = line.uid }, true)
         else
-            entry.count = (entry.count or 1) - line.count
+            -- the line may be backed by SEVERAL stock stacks (max_stack splits
+            -- them): drain each of them by its share
+            for _, part in ipairs(line.parts) do
+                part.entry.count = (part.entry.count or 1) - part.take
+            end
             -- skipCap: weight is not a gate on a purchase (see above). Without
             -- it, GiveEntry would refuse the line and the deal would silently
             -- half-execute — exactly what the atomic rule forbids.
             CARGO.Inventory.GiveEntry(ply,
-                { id = entry.id, count = line.count, condition = entry.condition }, true)
+                { id = line.id, count = line.count, condition = line.condition }, true)
         end
     end
     DropEmptyStacks(trader.cont.items)
@@ -343,25 +361,34 @@ function CARGO.Trade.Confirm(ply, trader, basket)
     -- sold items leave the player and land in the stock (a trader RESELLS what
     -- he buys — that is what makes the spread readable in play)
     for _, line in ipairs(sells) do
-        local entry = line.entry
-        if entry.uid then
-            RemoveEntry(rec.items, entry)
-            trader.cont.items[#trader.cont.items + 1] = { id = entry.id, uid = entry.uid }
+        if line.uid then
+            RemoveEntry(rec.items, line.parts[1].entry)
+            trader.cont.items[#trader.cont.items + 1] = { id = line.id, uid = line.uid }
         else
-            entry.count = (entry.count or 1) - line.count
-            local merged = false
+            for _, part in ipairs(line.parts) do
+                part.entry.count = (part.entry.count or 1) - part.take
+            end
+            local left = line.count
+            local maxStack = (CARGO.Items.Get(line.id) or {}).max_stack or math.huge
+            -- top up the stock's own stacks first, then spill into new ones:
+            -- the trader's list obeys the same max_stack the inventory does
             for _, stock in ipairs(trader.cont.items) do
-                if stock.uid == nil and stock.id == entry.id
-                    and stock.condition == entry.condition then
-                    stock.count = (stock.count or 1) + line.count
-                    merged = true
-                    break
+                if left <= 0 then break end
+                if stock.uid == nil and stock.id == line.id
+                    and stock.condition == line.condition
+                    and (stock.count or 1) < maxStack then
+                    local room = maxStack - (stock.count or 1)
+                    local put = math.min(room, left)
+                    stock.count = (stock.count or 1) + put
+                    left = left - put
                 end
             end
-            if not merged then
+            while left > 0 do
+                local put = math.min(left, maxStack)
                 trader.cont.items[#trader.cont.items + 1] = {
-                    id = entry.id, count = line.count, condition = entry.condition,
+                    id = line.id, count = put, condition = line.condition,
                 }
+                left = left - put
             end
         end
     end

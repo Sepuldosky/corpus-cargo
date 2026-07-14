@@ -1855,4 +1855,42 @@ así.
 **Verificación offline:** harness **312 checks verdes** en ambos realms (el check de
 "rollback por peso" se dio vuelta: ahora comprar sobrecargado **se permite**, el jugador
 queda por encima de la capacidad y `GiveItem` —lo que se recoge del suelo— **sigue**
-rechazando por peso). **En juego:** pendiente de confirmación del autor.
+rechazando por peso). **En juego:** la pasada del autor (2026-07-14) devolvió el peso
+✓ pero **corrigió el click**: ver entry 22, que lo reemplaza antes de que este llegara a
+`[APLICADO]`.
+
+---
+
+## 22. Basket: la línea es un AGREGADO sobre todos los stacks + click 25% / SHIFT = todo `[PENDIENTE]`
+
+**Bug real (reporte del autor 2026-07-14, checks 21a/21b):** al clickear munición "se
+pintaban todos los stacks en ámbar pero solo entraba uno", y con un stack ya en el
+basket **no se podían agregar los otros stacks de la misma munición**. Causa raíz: el
+ref de un stack es `id + condición`, pero **`max_stack` parte 240 balas en DOS entries de
+120** — y ambas responden al mismo ref. La línea del basket resolvía contra la *primera*
+que encontraba: el stack gemelo era inalcanzable, y el ámbar (que se pinta por ref) los
+marcaba a todos.
+
+**Arreglo:** una línea de stack es un **AGREGADO** sobre **todas** las entries que
+matchean el ref — que es exactamente el ítem lógico que el jugador ve. El server la
+resuelve contra todas (y drena cada una por su parte, respetando `max_stack` al
+devolverlas al stock); el cliente calcula el disponible sumando todas. El ámbar sobre
+todas las celdas ahora es correcto: **son una sola línea**, no varias.
+
+**Cantidad por click (decisión del autor, 2.ª pasada — reemplaza la regla del entry 21):**
+- **Click izquierdo** = **25% del `max_stack`** del ítem (30 balas de 120), repetible.
+- **SHIFT + click** = **todo** lo que haya de ese ítem — la convención de las pantallas de
+  trade que el autor juega.
+- **Click derecho** = cantidad exacta (`1` / `amount…` / `all`), sin cambios.
+- Un `unique` siempre es 1.
+
+**No era un bug (check 21d):** recoger munición del suelo con 77,1 kg sobre 54 kg de
+capacidad **debía** funcionar. El techo duro de carga es **2× la capacidad**
+(`Weight.MAX_FRACTION = 2.0`, regla del Block 1: entre 1× y 2× te movés, dolorosamente;
+recién pasado 2× no levantás nada). El checklist decía "sigue rechazando por peso" sin
+decir a partir de dónde — el defecto era del texto, no del código.
+
+**Verificación offline:** harness **318 checks verdes** (bloque nuevo: 240 balas viven
+como dos stacks; venderlas cruza ambos y cobra por las 240, no por 120; entran al stock
+del trader como dos stacks de 120 respetando `max_stack`; y una compra de 240 vacía los
+dos stacks del stock). **En juego:** pendiente de confirmación del autor.

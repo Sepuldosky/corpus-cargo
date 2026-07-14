@@ -80,9 +80,11 @@ cadáver son el mismo mecanismo.
 ### Flujo
 
 1. Mover un ítem del inventario propio al lado **Sell** (o del stock al lado
-   **Buy**) lo agrega al **basket** — no ejecuta nada todavía. **Click izquierdo =
-   el stack ENTERO** (enmienda 2026-07-14, como STALKER); la cantidad parcial vive
-   en el click derecho.
+   **Buy**) lo agrega al **basket** — no ejecuta nada todavía. Cantidad por click
+   (enmienda 2026-07-14, CHANGELOG #22): **click = 25% del `max_stack`**,
+   **SHIFT+click = todo**, **click derecho = cantidad exacta**. Una línea de stack
+   es un **agregado** sobre todas las entries del mismo `id + condición` (`max_stack`
+   parte un pilón en varias) — el ítem lógico, no la celda.
 2. El ítem en basket queda **bloqueado**: no se puede usar, equipar ni mover a otro
    lado mientras pende. Visualmente marcado (borde ámbar en el mock).
 3. Los strips **Buy** y **Sell** acumulan el total de cada lado; el footer muestra

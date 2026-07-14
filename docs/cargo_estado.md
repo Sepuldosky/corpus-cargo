@@ -5,11 +5,12 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-14 (**el slice 1 del COMERCIO está confirmado
-en juego**: entries **19** (tabs fijas) y **20** (trader NPC, precio con spread,
-estado Trade, basket atómico) → `[APLICADO]`, 14/14 ✓. La pasada dejó dos
-pedidos de diseño → entry **21 `[PENDIENTE]`**: click = stack entero, y el
-**peso deja de bloquear** una transacción.)
+**Última actualización:** 2026-07-14 (**slice 1 del COMERCIO confirmado en
+juego**: entries **19** y **20** → `[APLICADO]`. De las dos pasadas siguientes
+quedan **21** y **22** `[PENDIENTE]`: el peso deja de bloquear una transacción,
+la línea del basket es un **agregado sobre todos los stacks** del ítem (bug
+real: el stack gemelo era inalcanzable) y el click carga 25% del `max_stack`,
+con **SHIFT+click = todo**.)
 
 ---
 
@@ -45,7 +46,7 @@ pedidos de diseño → entry **21 `[PENDIENTE]`**: click = stack entero, y el
   comprar sobrecargado — la curva de peso lo cobra en velocidad; el límite sigue
   vigente para lo que se recoge del suelo. Click = stack entero; parcial con click
   derecho.
-- **Harness offline: 312 checks verdes en ambos realms** (con gate final: un
+- **Harness offline: 318 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 76 client / 69 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -53,9 +54,10 @@ pedidos de diseño → entry **21 `[PENDIENTE]`**: click = stack entero, y el
 
 ## Pendiente de verificar
 
-- **Entry 21 (enmiendas del comercio):** un click en un stack se lo lleva
-  entero (parcial por click derecho) y una compra que te deja sobrecargado
-  **se permite** (y te frena al caminar).
+- **Entries 21 y 22 (enmiendas del comercio):** el peso no bloquea una compra;
+  click = 25% del `max_stack`, SHIFT+click = todo, click derecho = cantidad
+  exacta; y una línea del basket abarca **todos** los stacks de ese ítem (vender
+  240 balas que viven como 2×120 se lleva las 240).
 
 ## Frentes abiertos (anotados, NO arreglados)
 

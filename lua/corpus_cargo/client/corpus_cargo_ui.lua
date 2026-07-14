@@ -1172,9 +1172,10 @@ function BuildFrame(state)
             if state == "loot" then
                 CARGO.Transfer.Send("put", CARGO.Grid.RefOf(entry), entry.count or 1)
             elseif state == "trade" then
-                -- whole stack, like the loot click and like STALKER (author call,
-                -- 1st in-game pass); right click opens the partial-amount menu
-                CARGO.Trade.BasketAdd("sell", entry, CARGO.Trade.Available(entry))
+                -- a quarter of the stack ceiling per click; SHIFT+click loads it
+                -- all (author call, 2nd in-game pass). Exact amounts: right click.
+                CARGO.Trade.BasketAdd("sell", entry,
+                    CARGO.Trade.ClickAmount("sell", entry))
             end
         end,
         onRightClick = function(entry)
