@@ -5,13 +5,13 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-14 (**entries 23 y 24 confirmadas en juego**
-→ las armas **se describen solas** (#38) y **cada arma sabe a qué slot va**
-(#39). Quedan `[PENDIENTE]` **21** y **22** —el peso deja de bloquear una
+**Última actualización:** 2026-07-14 (**entries 23, 24 y 25 confirmadas en
+juego** → las armas **se describen solas** (#38), **saben a qué slot van** (#39)
+y **pesan de verdad** (#40; el arsenal completo del autor, el M60E4 en 10,5 kg).
+Su addendum arregla el propio dump, que marcaba `MISSING` las plantillas de
+SWEP. Quedan `[PENDIENTE]` solo **21** y **22**: el peso deja de bloquear una
 transacción, la línea del basket es un **agregado sobre todos los stacks** y el
-click carga 25% del `max_stack`, con **SHIFT+click = todo**— y la **25**: el
-**arsenal real del autor** pesado y precificado (#40; el M60E4 ya no pesa
-2,5 kg).)
+click carga 25% del `max_stack`, con **SHIFT+click = todo**.)
 
 ---
 
@@ -71,8 +71,11 @@ click carga 25% del `max_stack`, con **SHIFT+click = todo**— y la **25**: el
   `makeshift`), el pack entero de **CS:GO** (`arc9_go`) y `arc9_wtt`. El volcado
   alcanzó para catalogarlos **sin tener el pack**. Hoy: **360 armas vivas, las
   360 con peso Y precio, cero huecos** (sin `value` no se comercian, y ese
-  hueco era el mismo). El M60E4 pesa **10,5 kg**.
-- **Harness offline: 351 checks verdes en ambos realms** (con gate final: un
+  hueco era el mismo). El M60E4 pesa **10,5 kg**. El propio `cargo_dev_dump_weapons`
+  ya **no grita lobo**: las plantillas de SWEP y las clases de `Capture.Ignore`
+  salen `n/a`, no `MISSING`, y trae **columna de precio** + resumen de huecos
+  reales.
+- **Harness offline: 355 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 76 client / 69 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -84,10 +87,9 @@ click carga 25% del `max_stack`, con **SHIFT+click = todo**— y la **25**: el
   click = 25% del `max_stack`, SHIFT+click = todo, click derecho = cantidad
   exacta; y una línea del basket abarca **todos** los stacks de ese ítem (vender
   240 balas que viven como 2×120 se lleva las 240).
-- **Entry 25 (arsenal pesado y precificado):** que el **M60E4 pese 10,5 kg** (no
-  2,5); que **ninguna** arma quede en el nominal — un `cargo_dev_dump_weapons`
-  nuevo no debería marcar un solo `MISSING`; y que las armas de CS:GO y de los
-  packs EFT nuevos tengan precio en el trader.
+- **Addendum de la entry 25 (el dump deja de gritar lobo):** un
+  `cargo_dev_dump_weapons` nuevo debe encabezar con `sin peso: 0 | sin precio: 0`,
+  y las plantillas de SWEP deben salir `n/a`, no `MISSING`.
 
 ## Frentes abiertos (anotados, NO arreglados)
 

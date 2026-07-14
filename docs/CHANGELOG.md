@@ -2034,7 +2034,7 @@ volcado del arsenal real del autor para poblar `weapon_weights`/`weapon_prices`.
 
 ---
 
-## 25. El arsenal real del autor: 184 pesos y precios que faltaban (roadmap #40) `[PENDIENTE]`
+## 25. El arsenal real del autor: 184 pesos y precios que faltaban (roadmap #40) `[APLICADO 2026-07-14]`
 
 **Reporte del autor (2026-07-14):** *"hay algunas armas que tienen el fall-back a 2.5 kg, una
 de ellas es el M60E4, indudablemente debería pesar muchísimo más"*.
@@ -2086,3 +2086,33 @@ peso, 0 sin precio, 0 claves duplicadas**. **En juego:** pendiente de confirmaci
   el check 4 de la entry 24, dejada explícitamente como anotación, no como bloqueo. Huele al
   puente ARC9 (§10: Cargo es el almacén de attachments y `arc9_free_atts` queda en 0) — el
   arma nace sin su att de munición y no hay de dónde sacarlo. → **roadmap #42**.
+
+### Addendum — pasada del autor (2026-07-14): el dump gritaba lobo
+
+**Reporte:** *"parece estar todo bien en general, aunque he visto uno que otro missing del
+dump"*. El volcado nuevo trae **9 `MISSING`**… y los 9 son los que se excluyeron **a
+propósito**: 8 **plantillas de SWEP** (`arc9_base`, `arc9_eft_base`, `arc9_go_base`,
+`arc9_eft_grenade_base`, `arc9_eft_melee_base`, los `*_base_nade`) y los **puños de MW2019**,
+que viven en `Capture.Ignore`. Ninguna es un arma que el juego pueda darle al jugador: no son
+huecos, y las tablas están completas.
+
+**Pero el defecto es real y es del instrumento.** `cargo_dev_dump_weapons` es la herramienta
+con la que se *diagnostica*; una falsa alarma ahí cuesta una búsqueda de verdad, y el autor la
+pagó. Un SWEP que la captura no puede entregar **no es un hueco en la tabla** y no debe
+marcarse como tal.
+
+**Arreglo (`corpus_cargo_dev.lua`):** dos exclusiones, ambas honestas —
+`Spawnable ~= true` (es una plantilla: nada la spawnea) y `Capture.Ignore` (jamás es un ítem)—.
+Siguen **apareciendo** en el volcado (esconderlas sería otra mentira), pero como `n/a (base)` /
+`n/a (ignored)`, y **no cuentan** en el conteo de huecos.
+
+**De paso, el hueco gemelo se vuelve visible:** el volcado ahora trae también la **columna de
+precio**. Sin `def.value` un arma **no se comercia** (`Cargo_Trade` §4), o sea un arma sin
+precio está tan rota como una sin peso — y hasta hoy el dump no lo mostraba. Encabeza con un
+resumen: `# N SWEPs, N capturables | sin peso: N | sin precio: N`.
+
+**Verificación offline:** harness **355 checks verdes** (4 nuevos: una plantilla sale `n/a` y no
+`MISSING`; una clase de `Capture.Ignore` también; el resumen cuenta **capturables** y huecos
+reales, no plantillas; y una clase sin `value` sale marcada como no comerciable). **En juego:**
+el propio comando es la verificación — un `cargo_dev_dump_weapons` nuevo debe encabezar con
+`sin peso: 0 | sin precio: 0`.

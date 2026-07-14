@@ -252,38 +252,95 @@ if SERVER then
     -- database (stalker-gamma-db.com) can be cross-referenced without
     -- unpacking the mods into dev/. Console + tab-separated
     -- data/corpus/cargo/weapon_dump.txt. Arg "all" dumps every SWEP.
+    -- A SWEP the capture can never hand the player is NOT a hole in the tables
+    -- (author report, 2026-07-14: the dump still showed 9 "MISSING" after entry
+    -- 25 closed every real gap — all 9 were SWEP BASE TEMPLATES and the MW2019
+    -- fists). Flagging them as MISSING makes the dump cry wolf, and the dump is
+    -- the instrument you diagnose WITH: a false alarm in it costs a real search.
+    -- Two exclusions, both honest:
+    --   * not Spawnable  -> a base/template (arc9_base, arc9_eft_base, the
+    --     *_base_nade and *_melee_base of every pack). Nothing spawns it.
+    --   * Capture.Ignore -> deliberately never an item (fists, hands).
+    -- They still appear in the dump — hiding them would be its own lie — but as
+    -- "n/a", and they do not count towards the gap tally.
+    local function DumpStatus(class, t)
+        if CARGO.Capture and CARGO.Capture.Ignore
+            and CARGO.Capture.Ignore[class] then
+            return "ignored" -- unarmed state, not gear
+        end
+        if t.Spawnable ~= true then
+            return "base" -- SWEP template: the player can never receive it
+        end
+        return "weapon"
+    end
+
     concommand.Add("cargo_dev_dump_weapons", function(_, _, args)
         local wantAll = istable(args) and args[1] == "all"
         local weights = istable(CARGO.Capture)
             and CARGO.Capture.WeaponWeights or {}
-        local rows = {}
+        -- the twin gap: no value => not tradeable (Cargo_Trade §4). A weapon
+        -- missing its price is as broken as one missing its weight, and it used
+        -- to be invisible here.
+        local values = istable(CARGO.Capture)
+            and CARGO.Capture.WeaponValues or {}
+
+        local rows, gapsW, gapsV, real = {}, 0, 0, 0
         for _, t in ipairs(weapons.GetList() or {}) do
             local class = isstring(t.ClassName) and t.ClassName or ""
             local base = isstring(t.Base) and t.Base or ""
             local isArc9 = t.ARC9 == true or base:find("arc9", 1, true) ~= nil
                 or class:find("^arc9_") ~= nil
             if class ~= "" and (wantAll or isArc9) then
-                local kg = weights[class]
+                local status = DumpStatus(class, t)
+                local kg, val = weights[class], values[class]
+
+                local wCell, vCell
+                if status ~= "weapon" then
+                    wCell = "n/a (" .. status .. ")"
+                    vCell = "n/a (" .. status .. ")"
+                else
+                    real = real + 1
+                    if kg ~= nil then
+                        wCell = string.format("%.2f kg", kg)
+                    else
+                        wCell = "MISSING (2.5 nominal)"
+                        gapsW = gapsW + 1
+                    end
+                    if val ~= nil then
+                        vCell = tostring(val)
+                    else
+                        vCell = "MISSING (not tradeable)"
+                        gapsV = gapsV + 1
+                    end
+                end
+
                 rows[#rows + 1] = table.concat({
                     class,
                     isstring(t.PrintName) and t.PrintName or class,
                     isstring(t.SubCategory) and t.SubCategory or "-",
                     isstring(t.Ammo) and t.Ammo or "-",
                     tostring(tonumber(t.ClipSize) or "-"),
-                    kg ~= nil and string.format("%.2f kg", kg)
-                        or "MISSING (2.5 nominal)",
+                    wCell,
+                    vCell,
                 }, "\t")
             end
         end
         table.sort(rows)
-        local body = "class\tname\ttype\tammo\tclip\tweight\n"
+
+        local summary = string.format(
+            "# %d SWEPs, %d capturables | sin peso: %d | sin precio: %d",
+            #rows, real, gapsW, gapsV)
+        local body = summary .. "\n"
+            .. "class\tname\ttype\tammo\tclip\tweight\tprice\n"
             .. table.concat(rows, "\n")
         file.CreateDir("corpus/cargo")
         file.Write("corpus/cargo/weapon_dump.txt", body)
         MsgN(body)
         Corpus.Log("cargo", "cargo_dev_dump_weapons: " .. #rows
-            .. " armas volcadas a data/corpus/cargo/weapon_dump.txt")
-    end, nil, "Dump installed ARC9 weapons (class/name/type/ammo/clip/weight) to console + data file; arg 'all' dumps every SWEP")
+            .. " SWEPs (" .. real .. " capturables) volcados a "
+            .. "data/corpus/cargo/weapon_dump.txt — sin peso: " .. gapsW
+            .. ", sin precio: " .. gapsV)
+    end, nil, "Dump installed ARC9 weapons (class/name/type/ammo/clip/weight/price) to console + data file; bases and ignored classes are marked n/a, not MISSING. Arg 'all' dumps every SWEP")
 
 end
 
