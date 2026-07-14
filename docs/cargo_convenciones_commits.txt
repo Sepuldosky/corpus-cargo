@@ -101,6 +101,18 @@ Para corpus-cargo/ (el módulo), los alcances definidos son:
   arc9:
     Puente de attachments/stats con ARC9 (corpus_cargo_arc9.lua).
 
+  capture:
+    Captura de armas del engine como ítems: gate de mundo (WALK+USE), dedup del
+    give anónimo, defs autogen, drops como SWEP real y las tablas de datos que
+    las alimentan (corpus_cargo_capture.lua, corpus_cargo_weapon_weights.lua,
+    corpus_cargo_weapon_prices.lua, corpus_cargo_weapon_trivia.lua,
+    corpus_cargo_holster.lua).
+
+  trade:
+    Comercio: matemática de precio, traders (contenedor + capa de precio),
+    sesión, basket y el estado Trade del frame (corpus_cargo_trade.lua en los
+    tres realms, corpus_cargo_trader.lua). Ver Cargo_Trade_Arquitectura.md.
+
   ammo:
     Sistema de munición: ítems de munición HL2, mapa de calibres y el espejo
     cinturón <-> pool real del engine (corpus_cargo_ammo.lua en shared,

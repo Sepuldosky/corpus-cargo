@@ -61,12 +61,29 @@ Al resolver la imagen de un def, en orden estricto (gana el primero que exista):
 
 1. **`def.icon` explícito** — material hecho a mano (VTF/VMT o PNG en `materials/`).
    Para ítems con arte propio; gana siempre.
-2. **Render generado desde el modelo** — este subsistema. Si el def declara
-   `model` (o se puede resolver, ver §3), se genera.
+2. **Imagen generada** — este subsistema. Si el def declara `model` (o se puede
+   resolver, ver §3), se genera. **Dos rutas** (enmienda de abajo).
 3. **Letra (inicial del nombre)** — **último recurso**, solo cuando no hay modelo
    resoluble. Deja de ser el fallback normal y pasa a ser **señal de error**: si
    ves una letra en el grid, es que ese def no tiene ni icono ni modelo — hay algo
    que arreglar, no un estado esperado.
+
+> **Enmienda 2026-07-11 (CHANGELOG #16 del bloque de íconos) — el nivel 2 se parte en dos.**
+> Los tres niveles siguen siendo los que devuelve `Icons.ResolveIconSource` (`icon` /
+> `render` / `letter`), pero para las armas **ARC9 modulares** (`MirrorVMWM` — casi todo el
+> arsenal) **hoy no hay render de modelo**. `RenderIconToFile` prueba las dos rutas en este
+> orden:
+>
+> - **2a) Re-crop de la fuente ARC9** (`MirrorVMWM`): el **select-icon** que ARC9 captura
+>   en `data/arc9_presets/<base>_icon.arc9.png`, re-encuadrado en 2D por bbox de silueta.
+>   Es la foto que toma el **código dueño del estado** — siempre ensamblada, siempre
+>   encuadrada. Re-fotografiar la ensambladura nosotros mismos **corre carrera** con el
+>   posicionamiento de partes de ARC9, que se asienta a lo largo de **frames**, no de draw
+>   calls (recetas r3-r5, abandonadas). La fuente puede no existir todavía: la refresca el
+>   watcher del menú de customize.
+> - **2b) Render desde el modelo** (el resto del catálogo, y **fall-through** cuando 2a no
+>   tiene fuente en disco o falla): `ClientsideModel` → RT → PNG. Un viewmodel pelado es
+>   mejor que una letra.
 
 ---
 
@@ -79,9 +96,16 @@ Client-side, en cinco pasos:
    (CHANGELOG #3): `def.model` → `WorldModel` del SWEP scripted → mapa de modelos de
    armas de engine (pistol/357/smg/ar2/shotgun/physgun/toolgun/cámara/…). Sin
    modelo resoluble → cae a letra (§2.3).
+   **Enmienda 2026-07-11:** la cadena del **ícono** (`Icons.ModelFor`) **diverge a
+   propósito** de la de los drops (`CARGO.Items.ResolveModel`). Con `MirrorVMWM` el
+   `WorldModel` es un **placeholder de colisión** CSS/HL2 —la foto equivocada—, así que el
+   ícono usa `WorldModelMirror`/`ViewModel` (escape hatch: `def.icon_model`, gana siempre).
+   Los drops **conservan** el `WorldModel`: necesitan malla de colisión.
 2. **Render a RT.** `ClientsideModel` del modelo, montado en un `RenderTarget`
    propio, con la cámara del **encuadre** del def (§4). Un solo RT reutilizable de
-   512×512, no uno por ítem.
+   **2048×2048** (`RT_SIZE`), no uno por ítem. **Aplica solo a la ruta 2b** (§2): el
+   re-crop de la fuente ARC9 es 2D puro —ni `ClientsideModel` ni cámara—, y reusa el
+   mismo RT.
 3. **Capturar a PNG.** `render.Capture` del RT → bytes PNG, crop al aspect del
    footprint (§5).
 4. **Escribir a caché.** `file.Write` en `data/corpus/cargo/icons/<archivo>.png`
@@ -121,6 +145,12 @@ offset). Tres niveles, gana el más específico:
 Orden de lectura: override de data → `def.icon_cam` → auto. El editor puede
 "canonizar" un override de data al def imprimiendo el Lua (§8).
 
+> **Enmienda 2026-07-11 — el encuadre NO aplica en la ruta ARC9 (§2.2a).** Ahí **la foto ES
+> el encuadre**: el select-icon viene ya ensamblado y encuadrado por ARC9, y el re-crop solo
+> recorta su silueta. Ni la jerarquía de arriba ni el orbit/zoom/pan del editor (§8) mueven
+> la cámara de un arma `MirrorVMWM` — deuda aceptada, anotada en `cargo_estado.md`. El
+> override de **footprint** sí sigue mandando en ambas rutas.
+
 ---
 
 ## 5. Footprint (tamaño en celdas)
@@ -151,10 +181,19 @@ referencia RE.
 
 ## 6. Resolución y formato
 
-- Render al **aspect del footprint**, **64 px por celda**: rifle 6×2 = 384×128;
-  venda 1×1 = 64×64; placa 2×3 = 128×192.
-- RT de trabajo 512×512, crop al capturar. Sobra para el grid y aguanta el
-  zoom del tooltip de inspección (§9 de `Cargo_Architecture.md`).
+- Render al **aspect del footprint**, **256 px por celda** (`CELL_PX`; nació en 64,
+  subió a 128 y luego a 256 — el zoom del tooltip seguía mostrando upscale blando):
+  rifle 6×2 = **1536×512**; venda 1×1 = 256×256; placa 2×3 = 512×768. Ambas
+  dimensiones se capean al RT.
+- **RT de trabajo 2048×2048** (`RT_SIZE`), crop al capturar: tiene que entrar el
+  footprint más ancho — 6 celdas × 256 = 1536. El tamaño va en el **nombre** del RT
+  porque `GetRenderTarget` cachea por nombre para toda la sesión del engine (un RT
+  viejo de 1024 no puede quedar sirviendo la receta nueva tras un lua refresh).
+- **Salvedad — la ruta ARC9 (§2.2a) escribe a las mismas dimensiones, pero su detalle
+  real lo capa la fuente:** el select-icon es un PNG de **256²** (ARC9 lo duplica por
+  encima de 1100 px de alto), así que el re-crop se estira dentro del rect del
+  footprint. Subir `CELL_PX` **no compra calidad** ahí — agranda la misma foto. Límite
+  de la fuente, COMPAT-RUNTIME: deuda aceptada (`cargo_estado.md`).
 - PNG (por la transparencia — ver §9). `Material` con flag `smooth`.
 
 ---
@@ -162,7 +201,14 @@ referencia RE.
 ## 7. Caché e invalidación
 
 Nombre de archivo = `<defid>_<hash>.png`, donde
-`hash = hash(model + encuadre_efectivo + footprint_efectivo)`.
+`hash = hash(RECIPE_VERSION + model + encuadre_efectivo + footprint_efectivo [+ mtime de la
+fuente ARC9])`.
+
+**Enmienda 2026-07-11:** la clave pliega además la **versión de receta** (`RECIPE_VERSION` —
+subirla orfana toda la caché y la re-renderiza sola, sin `regen_all` a mano) y, en la ruta
+ARC9 (§2.2a), el **mtime de la fuente**: cada recaptura desde el menú de customize **re-keya
+el PNG por su cuenta**. Es obligatorio — `Material()` cachea por path, así que reusar un
+nombre serviría los píxeles viejos.
 
 - Cambia cualquier entrada del hash (nuevo modelo, encuadre editado, footprint
   distinto) → **nombre nuevo → re-render automático** la próxima vez que se pida.
@@ -216,10 +262,15 @@ el subsistema.
   transparencia real (un ícono sobre un slot resaltado se vería con su cuadro),
   costo menor.
 
-**Gate de verificación en juego:** probar el Plan A al **inicio** de la
-implementación, antes de construir el resto. Si el alpha no sale limpio, se baja a
-Plan B sin drama. No se asume cuál funciona — se verifica. (Disciplina del
-proyecto: verificar antes de finalizar.)
+**Gate de verificación en juego — corrido, y lo ganó el Plan A.** Se probó al inicio de la
+implementación, antes de construir el resto: el alpha real salió limpio (**verificado en
+juego el 2026-07-11**), con la receta de dos pasadas del selector de playermodel
+(`render.SetWriteDepthToDestAlpha` + captura con `alpha = true`) sobre un RT transparente.
+
+**Los dos planes shippearon**: el Plan B sobrevive como fallback de una línea detrás de la
+convar `cargo_icon_bake_bg` (**0 = Plan A, default**; 1 = Plan B, hornea el color de la
+celda). Flipearla regenera la caché entera —el fondo entra en la receta—, así que no hay
+que borrar nada a mano. No se asumió cuál funcionaba: se verificó.
 
 ---
 
@@ -245,7 +296,7 @@ El cliente los aplica al resolver el hash (§7). Los PNG **no** se sincronizan n
 |---|---|
 | Gate de admin de los comandos dev | Compartido con el resto de Cargo — espera primitiva de permisos de Corpus (roadmap #12) |
 | Afinado del mapeo aspect→footprint y techos por categoría | Empírico; se calibra en juego con inventario real |
-| Plan A vs B de transparencia | Se decide en el gate de verificación (§9), no antes |
+| Plan A vs B de transparencia | **Resuelto (2026-07-11): gana el Plan A** (alpha real). El Plan B sobrevive como fallback de una línea: convar `cargo_icon_bake_bg` (0 = A, default; 1 = B); flipearla regenera la caché entera |
 | Modelos sin `WorldModel` ni mapeo | Caen a letra (§2.3) — señal de error, no estado esperado; se resuelve agregando modelo o icono al def |
 
 ---
@@ -259,5 +310,5 @@ volcado (Sonnet). **Prerequisito declarado** del bloque de UI fullscreen (§15 d
 | Sección | Estado |
 |---|---|
 | Jerarquía de fuente, pipeline, encuadre, footprint, resolución, caché, editor, sync | **Cerrado — este documento** |
-| Transparencia (Plan A/B) | **Cerrado en diseño** — Plan concreto pendiente del gate de verificación en juego |
+| Transparencia (Plan A/B) | **Cerrado — Plan A verificado en juego (2026-07-11)**; el Plan B queda cableado como fallback por convar |
 | Mapeo aspect→footprint y techos por categoría | Cerrado el mecanismo; valores a calibrar empíricamente |

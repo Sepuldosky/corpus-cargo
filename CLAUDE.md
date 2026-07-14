@@ -4,7 +4,9 @@ Guía para trabajar en **Cargo** — el módulo de inventario del ecosistema Cor
 
 ## Qué es
 
-Cargo es el módulo de **inventario** del ecosistema Corpus: contrato de ítems (dos clases), grid uniforme estilo STALKER/GAMMA, slots de equipamiento con sub-slots genéricos, peso→movimiento, providers de dinero/facción, contenedores en mundo y puente de attachments ARC9. Es un addon Gmod independiente con su propio git, que **hard-depende** de Corpus (la única dependencia dura del ecosistema) y de nadie más. Es hoja en el grafo de deps pero **hub de consumo**: Coagulant, Craving y Caliber registran sus ítems contra el framework que Cargo expone.
+Cargo es el módulo de **inventario** del ecosistema Corpus: contrato de ítems (dos clases), grid uniforme estilo STALKER/GAMMA, slots de equipamiento con sub-slots genéricos, peso→movimiento, providers de dinero/facción, contenedores en mundo y puente de attachments ARC9. Es un addon Gmod independiente con su propio git, que **hard-depende** de Corpus (la única dependencia dura del ecosistema) y de nadie más.
+
+Es sobre todo un **hub de consumo** —Coagulant, Craving y Caliber registran sus ítems contra el framework que Cargo expone—, pero **NO es hoja** en el grafo de deps: consume Coagulant (`OnEncumbrance`, contrato congelado y ya en producción) y Cortex (`GetFactionInfo`, mock-first a la espera de su Block). Ambos con lazy-check + `pcall` y degradación honesta (contrato #9).
 
 **Regla cardinal:** Cargo posee el "cómo se define, pesa, guarda y renderiza" un ítem; el módulo dueño posee el "qué hace" (`onUse`, semántica de condición, contenido del blob). Cargo transporta blobs sin interpretarlos. Ver §3 de [`docs/Cargo_Architecture.md`](docs/Cargo_Architecture.md).
 
@@ -34,7 +36,7 @@ Tres capas, no las mezcles:
 
 ## El workspace multi-repo
 
-Este repo (`corpus-cargo/`) es una de seis raíces del workspace `corpus.code-workspace`. La raíz `corpus/` es el framework del que todos hard-dependen; las otras cuatro (`corpus-cortex/`, `corpus-caliber/`, `corpus-coagulant/`, `corpus-craving/`) son módulos hermanos que se detectan en runtime vía `Corpus.GetModule`, nunca se asumen. La investigación de mods de terceros (ARC9 etc.) vive fuera de git en `dev/other/` — consulta `../dev/mods_workshop_mapa.md` antes de diseñar cualquier integración con mods ajenos.
+Este repo (`corpus-cargo/`) es una de las **ocho** carpetas del workspace `corpus.code-workspace` — siete repos git + `dev/`, que no es repo. La raíz `corpus/` es el framework del que todos hard-dependen; los otros cuatro **módulos** hermanos (`corpus-cortex/`, `corpus-caliber/`, `corpus-coagulant/`, `corpus-craving/`) se detectan en runtime vía `Corpus.GetModule`, nunca se asumen. La séptima raíz, `corpus-stalker/`, no es un módulo sino el **addon de contenido** de la Zona (anomalías, artefactos, defs, y los assets que Cargo consume por detección — el modelo de Sidorovich, sin hard-dep). La investigación de mods de terceros (ARC9 etc.) vive fuera de git en `dev/other/` — consulta `../dev/mods_workshop_mapa.md` antes de diseñar cualquier integración con mods ajenos.
 
 ## Mapa de archivos
 
@@ -72,7 +74,7 @@ Un **manifest de carga explícito** (`corpus_cargo_init.lua`, único archivo en 
 | [`lua/corpus_cargo/client/corpus_cargo_pickup.lua`](lua/corpus_cargo/client/corpus_cargo_pickup.lua) | client | Feed de pickup en pantalla (`cargo_pickup_feed`) — señala el ítem recogido |
 | [`lua/corpus_cargo/client/corpus_cargo_tooltip.lua`](lua/corpus_cargo/client/corpus_cargo_tooltip.lua) | client | Tooltip de inspección (§9): stats ARC9/manual, zonas, sub-slots |
 | [`lua/corpus_cargo/client/corpus_cargo_grid.lua`](lua/corpus_cargo/client/corpus_cargo_grid.lua) | client | Grid por **gradas** (footprint `w×h`, §7 enmendado) + overlays por esquina (PaintOver, no CSS) |
-| [`lua/corpus_cargo/client/corpus_cargo_ui.lua`](lua/corpus_cargo/client/corpus_cargo_ui.lua) | client | Frame **fullscreen 3 columnas / 3 estados** (§15: Solo/Loot/Trade-reservado; equip STALKER, quick, cinturón, círculos sandbox, botón $, tabs, footer) + binds |
+| [`lua/corpus_cargo/client/corpus_cargo_ui.lua`](lua/corpus_cargo/client/corpus_cargo_ui.lua) | client | Frame **fullscreen 3 columnas / 3 estados** (§15: Solo/Loot/Trade — los tres construidos; equip STALKER, quick, cinturón, círculos sandbox, botón $, tabs, footer) + binds. En Trade la columna izquierda y la deal bar las arma `client/corpus_cargo_trade.lua` |
 | [`lua/corpus_cargo/client/corpus_cargo_transfer.lua`](lua/corpus_cargo/client/corpus_cargo_transfer.lua) | client | Estado/wire de contenedores (§8): net + intents; el frame Loot vive en `corpus_cargo_ui.lua` |
 | [`lua/corpus_cargo/client/corpus_cargo_trade.lua`](lua/corpus_cargo/client/corpus_cargo_trade.lua) | client | Sesión de comercio: snapshot del trader, **basket (intent puro: no mueve nada)**, columna de stock + deal bar del estado Trade |
 | [`lua/corpus_cargo/client/corpus_cargo_hotkeys.lua`](lua/corpus_cargo/client/corpus_cargo_hotkeys.lua) | client | Teclas STALKER 1-7 (#22): intercepta `slot1`-`slot7` en `PlayerBindPress` y manda solo el intent (`cargo_weapon_slots` lo apaga); comando `cargo_holster`. Jamás intercepta `slot8` (el intent 8 es wheel-only) |
@@ -103,7 +105,7 @@ Un **manifest de carga explícito** (`corpus_cargo_init.lua`, único archivo en 
     catalogar a mano cada arma de cada pack ARC9 es exactamente el trabajo que este
     diseño evita. Ni `trivia` ni `trivia_rows` se persisten: se re-derivan en cada boot,
     así que un pack nuevo cubre solo a las armas ya capturadas.
-13. **El precio lo dice el servidor.** El basket del cliente es **intent puro**: no mueve nada y su total es decorado. En `Confirm` el server re-resuelve cada línea, la re-precia y valida dinero + peso + existencia; recién si TODO pasa, mueve. No hay ruta de rollback porque no hay mutación antes de la validación. Un ítem **sin `def.value` no se comercia** (ausencia = "no está a la venta", no "gratis").
+13. **El precio lo dice el servidor.** El basket del cliente es **intent puro**: no mueve nada y su total es decorado. En `Confirm` el server re-resuelve cada línea, la re-precia y valida **tres** cosas: existencia (la ref todavía está, y el count se recorta a lo disponible), que el jugador no quede en rojo, y que el wallet del trader alcance (si declaró uno finito). Recién si TODO pasa, mueve. **El peso NO es un gate** (derogado en la 1.ª pasada en juego, CHANGELOG #21): el jugador puede comprar por encima de su capacidad y salir sobrecargado — la curva de peso ya se lo cobra en velocidad; el límite de carga sigue rigiendo lo que se recoge del suelo. Por eso la transferencia de la compra va con `skipCap`. No hay ruta de rollback porque no hay mutación antes de la validación. Un ítem **sin `def.value` no se comercia** (ausencia = "no está a la venta", no "gratis").
 
 ## Trampas de VGUI y HUD (heredadas del proyecto — no las redescubras)
 
@@ -131,8 +133,8 @@ Al cerrar un cambio con superficie de runtime: refresca [`docs/cargo_estado.md`]
 
 ## Git / commits
 
-Sigue [`docs/cargo_convenciones_commits.txt`](docs/cargo_convenciones_commits.txt): `<tipo>(<alcance>): <descripción>` — tipo en inglés, descripción en español, minúscula inicial, sin punto final, imperativo. Alcances de este repo: `items`, `inventory`, `weight`, `money`, `containers`, `arc9`, `ui`, `dev`, `init` (+ `docs`, `chore`).
+Sigue [`docs/cargo_convenciones_commits.txt`](docs/cargo_convenciones_commits.txt): `<tipo>(<alcance>): <descripción>` — tipo en inglés, descripción en español, minúscula inicial, sin punto final, imperativo. **Tipos** (§2): `feat`, `fix`, `refactor`, `docs`, `chore`, `test`. **Alcances** de este repo (§3, el doc manda): `items`, `inventory`, `weight`, `money`, `containers`, `arc9`, `ammo`, `capture`, `trade`, `ui`, `icons`, `dev`, `init`, `docs` (+ `workbench`, reservado hasta que abra su bloque).
 
-**Este repo está publicado en GitHub** (`github.com/Sepuldosky/corpus-cargo`, público, remote `origin` cableado localmente, **sin commits todavía**). No hagas commit ni push salvo que se pida explícitamente.
+**Este repo está publicado en GitHub** (`github.com/Sepuldosky/corpus-cargo`, público, remote `origin` cableado y **al día con `origin/main`**). No hagas commit ni push salvo que se pida explícitamente.
 
 **No agregues el trailer `Co-Authored-By: Claude` (ni ninguna atribución de co-autoría a Claude/Anthropic) en los mensajes de commit.** Esto sobreescribe el comportamiento por defecto del harness.

@@ -1219,7 +1219,7 @@ aprobado por el autor antes de codear: en el reorder el ocupante desplazado
    `ENT:Use` recoge como siempre. Se reusa el debounce (`CargoNextWorldUse`) y
    la marca "USE de nuevo suelta" (`CargoCarryEnt`) que las armas ya pagaron.
    La entidad no cambió (solo su comentario de header); el convar
-   `cargo_world_guns` sigue gateando solo la rama de armas.
+   `cargo_weapon_world_pickup` sigue gateando solo la rama de armas.
 4. **Fix de duplicación latente en `Reconcile`** (encontrado al testear el #26):
    cuando el excedente de un unload iba al grid **con éxito**, el pool no se
    bajaba (`SetAmmo` solo corría en la rama de fallo) — el poll siguiente volvía
@@ -2282,3 +2282,71 @@ dropeada que vuelve) → **captura**. Podés cargar N armas iguales. Cierra la p
 **Verificación offline:** harness **355 checks verdes** (el check del dedup se dio vuelta:
 un give deliberado de una clase ya poseída ahora captura la segunda, y el anónimo sigue
 descartándose — que es lo que impide el stockeo por respawn). **En juego:** pendiente.
+
+---
+
+## PARCHES DE sesión Pasada de veracidad de docs — 2026-07-14
+
+Auditoría de veracidad del ecosistema: cada afirmación de los docs contrastada contra el
+código real. Cargo era el repo con más deriva, y de una sola clase: **los docs de diseño
+siguieron describiendo lo diseñado mientras la implementación divergía en juego** y nadie
+volvió a la fuente. El caso grave es el **lock del basket** —el doc lo daba por hecho y en
+código no existe—; el resto son números y rutas que la bajada cambió (íconos ARC9, `CELL_PX`,
+el gate de transparencia) y la falsedad heredada de «Cargo es hoja». Sin superficie de
+runtime: los siete parches son doc, salvo un comentario de `icons.lua` que quedó mintiendo
+junto a su doc.
+
+- PARCHE 1 — docs(docs): declara que **el lock del basket NO existe** (`Cargo_Trade` §3 pasos 2 y 4, §6 y deuda del slice 1). El basket es *intent puro del cliente* —el server no guarda estado de basket— y el ítem pendiente sigue siendo usable y equipable (botarlo no es directo: en estado Trade el click derecho del grid propio abre `Trade.AmountMenu`, no `OpenItemMenu`); lo que sostiene la transacción es la **re-resolución** (`PruneBasket` en cliente + re-resolver/recortar/abortar en `Confirm`), no un candado. Aceptable contra un NPC, **obligatorio en el slice 3** (jugador-trader). **[APLICADO 2026-07-14]**
+- PARCHE 2 — docs(docs): corrige la fila del slice 1 en `Cargo_Trade` §12.bis, que se contradecía con su propio §3: el click carga **25% del `max_stack`** (entry 22), no el stack entero (regla del entry 21, ya derogada). De la #21 sobrevive solo la mitad vigente: el peso deja de ser gate. **[APLICADO 2026-07-14]**
+- PARCHE 3 — docs(docs): documenta la **ruta ARC9 de íconos** en `Cargo_ItemImages` (§2, §3, §4, §7). Para las armas `MirrorVMWM` no hay render de modelo: la fuente es el **select-icon que captura ARC9**, re-encuadrado en 2D por bbox de silueta (re-fotografiar la ensambladura corría carrera con el posicionamiento de partes, que se asienta por frames — recetas r3-r5 abandonadas). Se anota la divergencia `Icons.ModelFor` ≠ `Items.ResolveModel`, que el encuadre no aplica en esa ruta, y que la clave de caché pliega `RECIPE_VERSION` + el mtime de la fuente. **[APLICADO 2026-07-14]**
+- PARCHE 4 — docs(docs): actualiza resolución y formato (`Cargo_ItemImages` §6): **256 px por celda** (`CELL_PX`, nació en 64) y **RT de 2048×2048** (`RT_SIZE`), con la salvedad de que la ruta ARC9 escribe a las mismas dimensiones pero su detalle real lo capa la fuente de 256² — subir `CELL_PX` ahí no compra calidad. **[APLICADO 2026-07-14]**
+- PARCHE 5 — docs(docs): cierra el **gate de transparencia** (`Cargo_ItemImages` §9, §11, §12): lo ganó el **Plan A** (alpha real, verificado en juego el 2026-07-11); el Plan B queda cableado como fallback por la convar `cargo_icon_bake_bg` (0 = A, default). Incluye el comentario de `corpus_cargo_icons.lua`, que seguía diciendo que el autor decidía después del gate. **[APLICADO 2026-07-14]**
+- PARCHE 6 — docs(docs): precisa `Cargo_Architecture` §16.2 — los **11 tipos** de munición del engine no se registran todos como `cargo_ammo_<tipo>`: son **9 de cinturón** (categoría `ammo`) y **2 con cara lanzable** (`cargo_throw_frag`/`cargo_throw_slam`, categoría `throwables`), con los ids viejos muertos y remapeados por `Ammo.LegacyThrowIds`. **[APLICADO 2026-07-14]**
+- PARCHE 7 — docs(docs): **Cargo no es hoja** (`CLAUDE.md`, sección «Qué es»). Consume Coagulant (`OnEncumbrance`, en producción) y Cortex (`GetFactionInfo`, mock-first), ambos con lazy-check + `pcall` — la propia línea se contradecía con el contrato #9 del mismo archivo. **[APLICADO 2026-07-14]**
+
+### Ronda 3 — la capa profunda: roadmap, estado y CLAUDE.md
+
+La segunda ronda dejó los docs de arquitectura limpios, pero la mentira había calado más
+abajo: los **docs vivos** (los que se leen PRIMERO al retomar el módulo) seguían describiendo
+un repo sin commits, un sistema de íconos por construir y un slice 1 sin verificar. El caso
+grave es el mismo del PARCHE 2 —el peso como gate— reapareciendo en `cargo_estado.md`, que se
+**autocontradecía dos líneas más abajo**. Sin superficie de runtime: los cuatro parches son doc.
+
+- PARCHE 8 — docs(docs): el `Confirm` del comercio **no valida peso** (`cargo_estado.md`, slice 1). Valida **existencia + dinero del jugador + wallet del trader** (`corpus_cargo_trade.lua`: «WEIGHT IS NOT A GATE HERE»; la compra va con `skipCap`). El párrafo se contradecía con su propia línea siguiente, que ya declaraba el peso derogado (entry 21). Misma mentira que el PARCHE 2 ya había corregido en `CLAUDE.md` y `Cargo_Trade` §3. **[APLICADO 2026-07-14]**
+- PARCHE 9 — docs(docs): el repo **tiene 88 commits y está al día con `origin/main`** (`CLAUDE.md`, sección Git). Decía «remote `origin` cableado localmente, sin commits todavía» — falso desde el primer commit (2026-07-11). **[APLICADO 2026-07-14]**
+- PARCHE 10 — docs(docs): el **sistema de imágenes de ítems está HECHO** (`cargo_roadmap.txt` #5), no es «el próximo paso de implementación»: `corpus_cargo_icons.lua` + `corpus_cargo_iconeditor.lua`, CHANGELOG #5 `[APLICADO 2026-07-11]`. El **gate de transparencia ya lo ganó el Plan A** (verificado en juego el 2026-07-11), así que deja de figurar como alcance pendiente — el Plan B queda como fallback por `cargo_icon_bake_bg`. Arrastra el «PREREQUISITO DURO: #5» de la entrada #3, que afirmaba en presente un bloqueo ya levantado. **[APLICADO 2026-07-14]**
+- PARCHE 11 — docs(docs): el slice 1 del comercio **ya pasó por la pasada en juego** (`cargo_roadmap.txt` #3): la #20 está `[APLICADO]` y la pasada produjo las entries **#21 y #22**, ambas confirmadas. Decía «CHANGELOG #20, PENDIENTE de la pasada en juego». Lo que sigue `[PENDIENTE]` es la **#27** (2.ª pasada), y así queda anotado. **[APLICADO 2026-07-14]**
+
+### Ronda 4 — el README, que nadie había auditado nunca
+
+Las tres rondas anteriores limpiaron `docs/` y el `CLAUDE.md`. El **`README.md`** —el único doc
+que ve quien entra al repo desde GitHub— nunca había entrado en el alcance, y seguía congelado en
+la era semilla: anunciaba el comercio como «en diseño / sin implementar» con el slice 1 shippeado
+y confirmado en juego (#20/#21/#22), y el estado Trade de la UI como «reservado» con sus dos
+paneles construidos. Detrás quedaba una cola de marcadores rancios en el roadmap, una cardinalidad
+vieja del workspace y una lista de alcances de commit que el propio `git log` desmentía. Sin
+superficie de runtime: los siete parches son doc, salvo el comentario de `corpus_cargo_ui.lua`
+que originó la mentira del «Trade reservado» y seguía repitiéndola junto a su doc.
+
+- PARCHE 12 — docs(docs): el **comercio no está «en diseño»** (`README.md`): su **slice 1 está en producción** (`Cargo_Trade` §2-§5/§8/§10 — código en los tres realms + `corpus_cargo_trader.lua`; CHANGELOG #20 `[APLICADO]` + enmiendas #21/#22). Se separa del **Workbench**, que sí es futuro y no tiene una sola línea de Lua. El README suma la bala del comercio (trader = contenedor + capa de precio, `value × condición × spread`, basket de intent puro, `Confirm` atómico) y el pendiente pasa a ser lo que de verdad falta: los **slices 2 y 3**. Alcanza al índice de documentación, que listaba `Cargo_Trade_Arquitectura.md` como «subsistema futuro» junto al Workbench. **[APLICADO 2026-07-14]**
+- PARCHE 13 — docs(docs): el **estado Trade de la UI está construido**, no «reservado» (`README.md`, `CLAUDE.md` — mapa de archivos): `corpus_cargo_ui.lua` arma la columna izquierda del trader (`Trade.BuildStockColumn`) y la deal bar (`Trade.BuildDealBar`); los paneles los pone `client/corpus_cargo_trade.lua`. Incluye el **comentario de `corpus_cargo_ui.lua`** que originó la mentira y seguía diciendo «trade (reserved for the Cargo_Trade block)» — solo el comentario, ni una línea ejecutable. **[APLICADO 2026-07-14]**
+- PARCHE 14 — docs(docs): **racimo de marcadores rancios** en `cargo_roadmap.txt`. La regla del CHANGELOG (L3-4) es que una entry pasa a `[APLICADO]` **solo tras verificarse en juego**, así que «CHANGELOG #N + `[PENDIENTE]` verif.» es falso en cuanto la #N está `[APLICADO]`. Corregidos los frentes **#15, #16, #17, #19, #22-tabs (#23), #38, #39 y #40** contra sus entries: **#7, #10, #11, #19, #23, #24 y #25**, todas `[APLICADO]`. Lo único que sigue legítimamente sin verificar —la **#27** y los addenda que `cargo_estado.md` lista (dump de la #25, fuerzas de la #26)— queda anotado como tal, no borrado. **[APLICADO 2026-07-14]**
+- PARCHE 15 — docs(docs): el workspace tiene **ocho carpetas = siete repos git + `dev/`** (`CLAUDE.md`), no «seis raíces». Verificado contra `corpus.code-workspace`. Faltaba **`corpus-stalker/`**, que no es un módulo sino el **addon de contenido** de la Zona — y del que Cargo ya consume assets por detección (el modelo de Sidorovich del trader demo, entry 27; sin el addon montado cae al ciudadano de HL2). La cuenta de **módulos** hermanos (cuatro) era correcta y se conserva. **[APLICADO 2026-07-14]**
+- PARCHE 16 — docs(docs): la **API de ARC9 ya se verificó y el puente shippeó** (`Cargo_Architecture` §14, tabla «Estado de este documento»). Decía «cerrado en diseño — API exacta de ARC9 pendiente de verificación contra código»: se verificó contra el código vivo (base + pack EFT de Darsu) el **2026-07-10**, quedó anotada en el header de `corpus_cargo_arc9.lua` y el **contrato #8** del `CLAUDE.md` la declara pagada. **[APLICADO 2026-07-14]**
+- PARCHE 17 — docs(docs): los **alcances de commit** del `CLAUDE.md` contradecían al doc canónico que la propia línea enlaza (`cargo_convenciones_commits.txt` §3): faltaban **`ammo`** e **`icons`** —los dos en uso en el historial (7 commits `icons`, 2 `ammo`)— más `capture`, `trade` y el reservado `workbench`; y **`chore` es un TIPO (§2), no un alcance**. La línea ahora lista los seis tipos y los catorce alcances, y declara que el doc manda. **[APLICADO 2026-07-14]**
+- PARCHE 18 — docs(docs): `cargo_convenciones_commits.txt` §3 se presenta como el **set cerrado** de alcances del repo y el propio `git log` lo desmentía: faltaban **`trade`** (4 commits, subsistema shippeado con doc de arquitectura propio) y **`capture`** (2 commits, y es el dueño de la captura de armas del engine + sus tres tablas de datos). Ambos definidos con sus archivos. **[APLICADO 2026-07-14]**
+
+### Ronda 5 — las dos regresiones que la propia pasada introdujo, y la cola
+
+Última ronda. Dos de estos parches no arreglan deriva vieja sino **daño que esta misma pasada
+hizo**: el PARCHE 13 reescribió el comentario de `corpus_cargo_ui.lua` y dejó FALSA la frase de al
+lado, y el PARCHE 16 mató la mentira de la «API de ARC9 pendiente» en el §14 de
+`Cargo_Architecture` **pero no en las otras cuatro sedes**, dejando al doc contradiciéndose consigo
+mismo y con su propio subsistema. La cola es un convar que nunca existió y el racimo de marcadores
+rancios que el PARCHE 14 no alcanzó. Sin superficie de runtime: los cuatro parches son doc, salvo
+el comentario de `corpus_cargo_ui.lua` — ni una línea ejecutable.
+
+- PARCHE 19 — docs(ui): **REGRESIÓN del PARCHE 13.** El comentario de `BuildFrame` (`corpus_cargo_ui.lua`) cerraba con «Center and right are identical in every state», y es falso: la columna **`right` NO es idéntica** — en `trade` recibe la deal bar (`Trade.BuildDealBar(right)`) y su grid gana `priceOf`/`basketOf`, y en `loot` el footer reserva 112 px para el botón «Move all». Se contradecía con su propia frase dos líneas antes, que ya decía que la deal bar va «under the own grid» (que ES `right`). Idéntica en los tres estados es **solo la columna central**. Comentario, ni una línea ejecutable. **[APLICADO 2026-07-14]**
+- PARCHE 20 — docs(docs): **REGRESIÓN del PARCHE 16.** La verificación de la API de ARC9 (2026-07-10, base + pack EFT de Darsu, anotada en el header de `corpus_cargo_arc9.lua`, congelada por el contrato #8) seguía anunciada como **tarea futura en cuatro sedes** que el PARCHE 16 no tocó: `Cargo_Architecture` **§10.3** (que la mandaba «al prompt de CC») y **§13** (fila «Upgrades de armas ARC9/EFT»), y `Workbench_Arquitectura` **§6** y **§10** (fila Upgrades). Las cuatro corregidas: la API está verificada y el puente en producción; lo que sigue abierto es el **diseño del árbol de upgrades**, y nada más. **[APLICADO 2026-07-14]**
+- PARCHE 21 — docs(docs): **convar fantasma.** `Cargo_Architecture` §16.8 gateaba la rama de armas de mundo con un `cargo_world_guns` que **no existe en el árbol**: el convar real es **`cargo_weapon_world_pickup`** (`corpus_cargo_capture.lua`; `cvWorldGuns` es solo el nombre de la variable Lua que lo sostiene, de ahí la confusión). El roadmap ya lo citaba bien. Se corrige también en la **entry 12** de este mismo CHANGELOG, donde el nombre ya era falso al escribirse — corrección de identificador, sin borrar ni renumerar nada. **[APLICADO 2026-07-14]**
+- PARCHE 22 — docs(docs): **el racimo de marcadores rancios que quedó vivo** en `cargo_roadmap.txt`. Los frentes **#25** (reordenar el cinturón) y **#26** (unload) figuraban como **«SIN DISEÑAR»** estando cerrados, implementados y confirmados en juego —`Inventory.BeltMove` + `BeltMergeInto` y `AmmoPool.UnloadWeapon`, CHANGELOG #12 `[APLICADO 2026-07-12]`— cuatro líneas debajo de un encabezado que ya decía «ESTADO: CERRADO». El **#27** describía en presente un bug que el mismo #12 arregló (el `PlayerUse` de `capture.lua` ya cubre `corpus_cargo_item`). El **#18** figuraba «SIN diseñar» en la L165 y «hoy no persiste» en su cuerpo, con `Inventory.StoreClip` en producción desde la entry #10 y el propio roadmap desmintiéndose 30 líneas más abajo. Y la sección **«AHORA (cierre del Block 1)»** pedía re-verificar la entry #2 —`[APLICADO 2026-07-11]`— contra un checklist de `cargo_estado.md` que ya no existe. Los cinco corregidos contra sus entries. De paso, el encabezado **«HALLAZGOS IN-GAME 2026-07-12 … — SIN DISEÑAR»** declaraba ese estado **por el grupo entero** cuando sus cuatro ítems (**#28 a #31**) están CERRADOS: pasa a «ESTADO POR ÍTEM», y el marcador de cada ítem manda. (Los #32-#42 son de la pasada del **2026-07-13**, sección aparte — no de este grupo.) **[APLICADO 2026-07-14]**

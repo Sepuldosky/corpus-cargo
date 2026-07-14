@@ -9,9 +9,9 @@ Cargo_Architecture.md / Workbench_Arquitectura.md / Cargo_ItemImages_Arquitectur
 
 AHORA (cierre del Block 1)
 ---------------------------
-1. Block 1 verificado en juego (2026-07-10). Re-verificar el batch de fixes
-   de esa pasada + captura de armas (CHANGELOG #2 [PENDIENTE] -> [APLICADO];
-   checklist en cargo_estado.md).
+1. Block 1 verificado en juego (2026-07-10). El batch de fixes de esa pasada
+   + la captura de armas quedaron re-verificados en juego: CHANGELOG #2
+   [APLICADO 2026-07-11].  [HECHO 2026-07-11]
 2. Primer commit del repo cuando el autor lo pida.  [HECHO 2026-07-11]
 
 
@@ -31,14 +31,18 @@ SIGUIENTES BLOQUES
        entidad de dinero + traspaso P2P, NPC trader de ejemplo).
        [EN CURSO — corte de 3 slices validado con el autor 2026-07-13:
         (1) comercio con NPC: precio + spread + trader + estado Trade + basket
-            atómico  -> CHANGELOG #20, PENDIENTE de la pasada en juego.
+            atómico  -> CHANGELOG #20 [APLICADO 2026-07-14]. La pasada en juego
+            YA CORRIÓ: derogó el peso como gate de la compra y rehizo el basket
+            (entries #21 y #22, ambas APLICADAS y confirmadas). De la 2.ª pasada
+            queda la #27 [PENDIENTE] (Sidorovich, strips parejos, N armas iguales).
         (2) dinero como entidad (botar / línea de solo-dinero en el basket).
         (3) jugador-trader con doble confirm (incluye el traspaso P2P).
         Estado por slice en Cargo_Trade_Arquitectura.md §12.bis. El primitivo
         inventario-en-entidad de §2 NO se construyó de nuevo: es
         Containers.Attach; el trader es ese contenedor + capa de precio.]
-   PREREQUISITO DURO: #5 (imágenes) — las gradas no valen con fallback de letra.
-   La implementación VGUI es un bloque aparte, DESPUÉS de #5.
+   PREREQUISITO DURO (ya satisfecho): #5 (imágenes) — las gradas no valían con
+   fallback de letra. Bajó primero (CHANGELOG #5) y la implementación VGUI del
+   inventario fullscreen corrió después, en su propio bloque (CHANGELOG #8).
 
 4. MANOS DEFAULT (estado desarmado).  [APLICADO 2026-07-12, CHANGELOG #9 —
    confirmado in-game; solo queda remitir el fix de lighting a Twilight]
@@ -62,14 +66,21 @@ SIGUIENTES BLOQUES
    CONFIRMADO in-game (2026-07-12, aplicó en vivo sin reiniciar). PENDIENTE:
    remitir el fix a Twilight (acción del autor).
 
-5. SISTEMA DE IMÁGENES DE ÍTEMS  [DISEÑO CERRADO 2026-07-11]
+5. SISTEMA DE IMÁGENES DE ÍTEMS
+   [CERRADO — CHANGELOG #5, APLICADO 2026-07-11 (confirmado in-game el mismo
+    día): implementado en corpus_cargo_icons.lua (server: overrides de cámara
+    y footprint; client: pipeline modelo -> RT -> PNG con caché local) +
+    corpus_cargo_iconeditor.lua (cargo_icon_edit + regen-all). El GATE DE
+    TRANSPARENCIA lo ganó el PLAN A (alpha real: PNG transparentes limpios);
+    el Plan B (fondo horneado) queda cableado como fallback en la convar
+    cargo_icon_bake_bg (0 = A, default). Deuda viva: la fuente ARC9 es 256²
+    a 1080p (aceptada en la 2.ª pasada, 2026-07-12).]
    -> Cargo_ItemImages_Arquitectura.md (doc propio). Render del modelo a RT
    (estilo spawnicon/Edit Icon), caché en data/corpus/cargo/icons/, encuadre
    con override en data para defs autogenerados, footprint con auto por OBB
-   cuantizado + techo por categoría, editor cargo_icon_edit + regen-all,
-   gate de verificación de transparencia (Plan A alpha / Plan B fondo horneado).
-   *** ES EL PRÓXIMO PASO DE IMPLEMENTACIÓN *** — prerequisito de la UI
-   fullscreen (#3). Commit del repo después de aplicarlo (decisión del autor).
+   cuantizado + techo por categoría, editor cargo_icon_edit + regen-all.
+   Era el PREREQUISITO DURO de la UI fullscreen (#3), que ya corre con
+   gradas reales en vez del fallback de letra.
 
 6. WORKBENCH (doc particular ya cerrado: Workbench_Arquitectura.md).
    Craft + Reparación por zona + Desarme con herencia de condición +
@@ -114,7 +125,7 @@ INTEGRACIONES / DEUDA PROPIA
      el dedup quedó acotado al give ANÓNIMO del engine (el loadout, que si no
      stockearía una copia por respawn). Una toma deliberada captura la N-ésima.]
     Enlaza con loot de cadáveres (Trade §9, cruce Cortex).
-    PARCIAL (CHANGELOG #10, [PENDIENTE] verif.): variante WIPE lista
+    PARCIAL (CHANGELOG #10, [APLICADO 2026-07-12], confirmado en juego): variante WIPE lista
     (cargo_lose_on_death borra todo + dinero al morir; cargo_persistence 0 =
     sesión en memoria). La variante LOOT (todo cae recuperable) y el GC de
     huérfanos siguen pendientes — decisión del autor fue wipe, no loot.
@@ -136,13 +147,13 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     círculos — radio cuantizado); consumida por sandbox + botón $ + hub del
     wheel.
   - #19 (cinturón de munición) -> FORMA en §15; SEMÁNTICA CERRADA en §16 e
-    IMPLEMENTADA (CHANGELOG #11, [PENDIENTE] verif. in-game): el cinturón ES la
-    reserva real. Queda abierto: cargadores rellenables con toggle + binding de
-    ammo-atts de EFT (§16.6).
-  - #16 -> IMPLEMENTADO v1 (CHANGELOG #7, [PENDIENTE] verif. in-game): sin pickup
-    por contacto; WALK+USE toma, USE agarra como prop; drops de armas = SWEP real.
-    Convar cargo_weapon_world_pickup.
-  - #17 -> IMPLEMENTADO (CHANGELOG #10, [PENDIENTE] verif. in-game): reconciliador
+    IMPLEMENTADA (CHANGELOG #11, [APLICADO 2026-07-12], confirmado en juego): el
+    cinturón ES la reserva real. Queda abierto: cargadores rellenables con toggle +
+    binding de ammo-atts de EFT (§16.6).
+  - #16 -> IMPLEMENTADO v1 (CHANGELOG #7, [APLICADO 2026-07-11], confirmado en
+    juego): sin pickup por contacto; WALK+USE toma, USE agarra como prop; drops de
+    armas = SWEP real. Convar cargo_weapon_world_pickup.
+  - #17 -> IMPLEMENTADO (CHANGELOG #10, [APLICADO 2026-07-12], confirmado en juego): reconciliador
     universal en PlayerDroppedWeapon (compat mod "Drop Weapon" — gana sobre la
     nativa; el arma botada ya no queda fantasma en el equipo) + comando nativo
     cargo_drop (bota al frente, conserva la instancia). Antes: PARCIAL (CHANGELOG
@@ -151,7 +162,9 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     2026-07-13): orden 1-7 + holster + manos default; veto del historial
     stock de pickups (cargo_hide_pickup_history); 7.º slot vs HUD D/GL4
     sin conflicto por construcción. Derivó el #36.
-  - #18, #20 -> SIN diseñar.
+  - #18 -> CERRADO (CHANGELOG #10 [APLICADO 2026-07-12]): el cargador persiste
+    en el blob vía Inventory.StoreClip.
+  - #20 -> SIN diseñar.
 
 16. PICKUP POR MIRAR + USE, no por contacto [Cargo]. Hoy, sin el mod L4D, un arma
     generada por toolgun se recoge SOLA al pasarle por encima (AllowPlayerPickup
@@ -161,7 +174,7 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     prop) — algo que gmod/hl2 no permiten nativo → plus. Toca corpus_cargo_capture.
 
 17. BOTAR ARMA CON TECLA, conservando funciones de Corpus [Cargo + Caliber].
-    [IMPLEMENTADO CHANGELOG #10, PENDIENTE verif. in-game] Reconciliador universal
+    [IMPLEMENTADO — CHANGELOG #10, [APLICADO 2026-07-12], confirmado en juego] Reconciliador universal
     en PlayerDroppedWeapon: cualquier ruta de drop (comando nativo cargo_drop, el
     mod "Drop Weapon" YuRaNnNzZZ 946373028, u otro) vacía el slot de equipo y
     taguea la entidad con el uid de la instancia — el arma botada sigue siendo la
@@ -170,14 +183,16 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     cargador viaja en el Clip1 de la entidad (persistencia de #18 a nivel entidad;
     la persistencia del cargador en el BLOB del ítem para el grid es del Bloque B).
 
-18. PERSISTENCIA DE MUNICIÓN DEL CARGADOR [Caliber semántica + Cargo blob]. Si el
-    cargador es 30 y se disparan 15, el arma debe quedar con 15 (hoy no persiste al
-    capturar/botar/reequipar). El estado de munición viaja en el blob del ítem (Cargo
-    transporta, el dueño interpreta — contrato §3). Prerequisito de 17.
+18. PERSISTENCIA DE MUNICIÓN DEL CARGADOR [Caliber semántica + Cargo blob].
+    [IMPLEMENTADO — CHANGELOG #10, [APLICADO 2026-07-12], confirmado en juego]
+    Si el cargador es 30 y se disparan 15, el arma queda con 15: el estado de munición
+    viaja en el blob del ítem (Cargo transporta, el dueño interpreta — contrato §3) vía
+    Inventory.StoreClip, y se restaura al equipar. Antes no persistía al capturar/botar/
+    reequipar. Prerequisito de 17.
 
 19. SISTEMA DE MUNICIÓN / CARGADORES [Cargo].
-    [FUNDACIÓN IMPLEMENTADA — Bloque B, CHANGELOG #11, [PENDIENTE] verif. in-game.
-     Diseño cerrado en §16 de Cargo_Architecture.md]
+    [FUNDACIÓN IMPLEMENTADA — Bloque B, CHANGELOG #11, [APLICADO 2026-07-12],
+     confirmado en juego. Diseño cerrado en §16 de Cargo_Architecture.md]
     MODELO (decidido con el autor 2026-07-12, ya construido): EL CINTURÓN ES LA
     RESERVA REAL. Un stack colgado en el cinturón ES el pool nativo del engine para
     su tipo HL2 (SetAmmo/GetAmmoCount); el grid es solo almacén. Las armas del mismo
@@ -240,7 +255,7 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     ese HUD.
 
 23. CATEGORÍAS FIJAS PARA LA FILA DE TABS DEL GRID [Cargo UI].
-    [CERRADO — CHANGELOG #19, PENDIENTE de confirmación en juego: set fijo de 8
+    [CERRADO — CHANGELOG #19, [APLICADO 2026-07-14]: set fijo de 8
     tabs decidido con el autor (All · Weapons · Ammo · Gear · Mods · Meds · Food ·
     Misc), capa de AGRUPACIÓN de display sobre las categorías internas (que quedan
     intactas y siguen sirviendo al grammar "category:a,b"). La fila se dibuja
@@ -290,36 +305,40 @@ ESTADO: CERRADO — entry 12 [APLICADO 2026-07-12], confirmado en juego por el
 autor (incluido un intento de exploit de reserva "gratis" rotando munición:
 no pasó). La semilla de dev/ se borró al cerrar.
 
-25. REORDENAR EL CINTURÓN [Cargo UI + inventory] — SIN DISEÑAR.
+25. REORDENAR EL CINTURÓN [Cargo UI + inventory].
+    [CERRADO — CHANGELOG #12, [APLICADO 2026-07-12], confirmado en juego]
     Reporte del autor: "tengo 30 balas de smg en el slot 3 y no puedo ponerlo en el
-    ultimo slot del belt". HOY: Inventory.BeltSet solo acepta refs del GRID
-    (FindEntry busca en rec.items), así que mover un stack belt->belt no existe como
-    operación. La celda del cinturón YA es Droppable("cargo_item") — lo que falta es
-    el intent y el handler. Ojo: el swap sin pérdida y el merge con tope (max_stack)
-    ya están resueltos en BeltSet; hay que REUSAR esa lógica, no duplicarla.
+    ultimo slot del belt". Inventory.BeltSet solo aceptaba refs del GRID (FindEntry
+    busca en rec.items), así que mover un stack belt->belt no existía como operación.
+    Resuelto con el intent belt_move + Inventory.BeltMove: el swap sin pérdida y el
+    merge con tope (max_stack) se REUSARON de BeltSet extrayéndolos al helper común
+    BeltMergeInto — no se duplicó la lógica.
 
-26. DESCARGAR EL ARMA (unload) [Cargo + base de arma] — SIN DISEÑAR.
+26. DESCARGAR EL ARMA (unload) [Cargo + base de arma].
+    [CERRADO — CHANGELOG #12, [APLICADO 2026-07-12], confirmado en juego]
     Pedido del autor: poder quitarle la munición al cargador, ejecutando la animación
     de reload. La munición va al CINTURÓN; si el cinturón está lleno, al inventario.
-    NOTA: el espejo del pool (§16.3) YA absorbe correctamente lo que vuelve de un
-    cargador (pool sube -> cinturón lo absorbe -> excedente al grid) — está verificado
-    en el harness. Lo que falta es el DISPARADOR: ARC9 ya trae SWEP:Unload
-    (sh_reload.lua:201, hace GiveAmmo(Clip1)); para armas no-ARC9 hay que hacerlo a
-    mano (SetClip1(0) + GiveAmmo). Sumar el StoreClip del blob (#18) para que el
-    cargador vacío persista.
+    El espejo del pool (§16.3) ya absorbía lo que vuelve de un cargador (pool sube ->
+    cinturón lo absorbe -> excedente al grid); lo que faltaba era el DISPARADOR, hoy
+    AmmoPool.UnloadWeapon — intent unload, opción "Unload magazine" en el menú del slot
+    equipado y comando cargo_unload. Usa el SWEP:Unload de ARC9 cuando el arma es ARC9
+    y el fallback manual (GiveAmmo + SetClip1(0)) cuando no, y llama al StoreClip del
+    blob (#18) para que el cargador vacío persista.
 
-27. LOS ÍTEMS BOTADOS SE RECOGEN CON USE PELADO, NO CON WALK+USE [Cargo] — CAUSA YA
-    DIAGNOSTICADA. Reporte del autor: "smg rounds del inventario se toman
-    inmediatamente con use". El gate de WALK+USE del #16 vive en el hook PlayerUse de
-    corpus_cargo_capture.lua:282 y filtra por ent:IsWeapon() — SOLO cubre armas. El
-    ENT:Use de lua/entities/corpus_cargo_item.lua:49 recoge INCONDICIONALMENTE, así
-    que la entidad de ítem esquiva el gate entero. Arreglo: aplicarle la misma regla
-    (ply:KeyDown(IN_WALK) -> tomar; USE pelado -> cargar como prop de HL2, igual que
-    hacen las armas). Reusar el patrón de capture.lua, incluido el debounce
+27. LOS ÍTEMS BOTADOS SE RECOGEN CON USE PELADO, NO CON WALK+USE [Cargo].
+    [CERRADO — CHANGELOG #12, [APLICADO 2026-07-12], confirmado en juego]
+    Reporte del autor: "smg rounds del inventario se toman inmediatamente con use". El
+    gate de WALK+USE del #16 filtraba por ent:IsWeapon() — SOLO cubría armas — y el
+    ENT:Use de lua/entities/corpus_cargo_item.lua recogía INCONDICIONALMENTE, así que
+    la entidad de ítem esquivaba el gate entero. El hook PlayerUse de
+    corpus_cargo_capture.lua ahora cubre también corpus_cargo_item (USE pelado -> carry
+    de prop HL2; WALK+USE -> el hook se aparta y ENT:Use recoge), reusando el debounce
     (CargoNextWorldUse) y el "USE de nuevo suelta" (CargoCarryEnt).
 
-HALLAZGOS IN-GAME 2026-07-12 (pasada del Bloque C) — SIN DISEÑAR
+HALLAZGOS IN-GAME 2026-07-12 (pasada del Bloque C) — ESTADO POR ÍTEM
 -----------------------------------------------------------------
+(Sus cuatro ítems —#28 a #31— están CERRADOS. El marcador de cada ítem manda:
+ el encabezado no declara estado por el grupo.)
 28. DROP DE ARMAS EQUIPADAS [Cargo UI + inventory].
     [CERRADO — CHANGELOG #14, APLICADO 2026-07-13: opción "Drop" en el menú
     del slot equipado (incl. círculos de herramienta y throwable) → intent
@@ -445,8 +464,8 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     dropeada" del reconciliador (capture.lua/holster.lua) y por qué no cubre
     la ruta VJ. Diagnóstico primero, archivo:línea, después arreglo.
 
-38. TRIVIA REAL PARA ARMAS CAPTURADAS [Cargo UI] — HECHO (entry 23 del
-    CHANGELOG, 2026-07-14; pendiente de confirmación en juego).
+38. TRIVIA REAL PARA ARMAS CAPTURADAS [Cargo UI] — HECHO (CHANGELOG #23,
+    [APLICADO 2026-07-14]).
     Idea del autor (2026-07-13, pasada del entry 15c): el "autocaptured" del
     footer del tooltip podría moverse a la trivia estilo ARC9, y/o generarse
     trivias con datos reales (EFT/GAMMA) para el arsenal del volcado de
@@ -461,8 +480,8 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     pack no escribió, herencias mentirosas (el M16A1 hereda de arc9_eft_m4a1 y
     se presentaría como un M4A1) y las armas HL2, que no son SWEPs.
 
-39. SLOT POR TIPO DE ARMA [Cargo capture/slots] — HECHO (entry 24 del
-    CHANGELOG, 2026-07-14; pendiente de confirmación en juego).
+39. SLOT POR TIPO DE ARMA [Cargo capture/slots] — HECHO (CHANGELOG #24,
+    [APLICADO 2026-07-14]).
     Reporte del autor (pasada de la entry 23): un RPG podía equiparse en
     Sidearm. Los tres slots de arma filtran por category:weapons, así que
     cualquier arma entraba en cualquiera; def.equip_slots (el gancho para
@@ -482,7 +501,10 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     línea en KIND_SLOTS, no un rediseño.
 
 40. PESOS QUE CAEN AL NOMINAL DE 2,5 KG [Cargo capture, datos] — HECHO
-    (entry 25 del CHANGELOG, 2026-07-14; pendiente de confirmación en juego).
+    (CHANGELOG #25, [APLICADO 2026-07-14]). Sigue pendiente de verificar SOLO su
+    addendum (el dump dejó de gritar lobo: un cargo_dev_dump_weapons nuevo debe
+    encabezar con "sin peso: 0 | sin precio: 0", y las plantillas de SWEP salir
+    n/a, no MISSING).
     El volcado del autor tenía 369 SWEPs y 184 sin peso: packs EFT que no
     están en dev/other/ (SMG, escopetas, LMG, melee, gear, makeshift), el pack
     entero de CS:GO (arc9_go) y el Scorpion de arc9_wtt. El volcado alcanzó

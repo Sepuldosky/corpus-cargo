@@ -552,11 +552,11 @@ end
 -- Render pipeline (§3): ClientsideModel -> reusable 2048 RT -> PNG in
 -- data/corpus/cargo/icons/ -> Material("data/...", "smooth").
 --
--- TRANSPARENCY GATE (§9): Plan A captures real alpha (transparent RT +
--- depth-to-dest-alpha two-pass, playermodel-selector recipe). Plan B bakes
--- the slot color as an opaque background. One-line switch: convar
--- cargo_icon_bake_bg (0 = A, 1 = B). The author decides after the in-game
--- gate; flipping the convar regenerates the whole cache.
+-- TRANSPARENCY GATE (§9): SETTLED — Plan A won (real alpha, verified in game
+-- 2026-07-11): transparent RT + depth-to-dest-alpha two-pass, the
+-- playermodel-selector recipe. Plan B (bake the slot color as an opaque
+-- background) ships too, as a one-line fallback: convar cargo_icon_bake_bg
+-- (0 = A, the default; 1 = B). Flipping it regenerates the whole cache.
 -- ------------------------------------------------------------------
 
 local matCache = {}   -- defid -> { key = filename, mat = IMaterial | false | nil,

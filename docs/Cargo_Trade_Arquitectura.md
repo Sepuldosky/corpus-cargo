@@ -85,12 +85,24 @@ cadáver son el mismo mecanismo.
    **SHIFT+click = todo**, **click derecho = cantidad exacta**. Una línea de stack
    es un **agregado** sobre todas las entries del mismo `id + condición` (`max_stack`
    parte un pilón en varias) — el ítem lógico, no la celda.
-2. El ítem en basket queda **bloqueado**: no se puede usar, equipar ni mover a otro
-   lado mientras pende. Visualmente marcado (borde ámbar en el mock).
+2. El ítem en basket queda **marcado visualmente** (borde ámbar + contador de unidades
+   pendientes en la celda). **El lock NO está implementado (slice 1):** el basket es
+   *intent puro del cliente* —el servidor no guarda estado de basket— y el ítem sigue
+   siendo usable y equipable mientras pende (el frame deja el teclado al juego: F1-F4 y
+   1-7 siguen vivas; la columna de equipo acepta drops en estado Trade). Botarlo **no es
+   directo**: en estado Trade el click derecho del grid propio abre `Trade.AmountMenu`, no
+   `OpenItemMenu`, así que no hay opción Drop en la celda — hay que equiparlo primero y usar
+   el Drop del slot.
+   La defensa **no es un lock sino la re-resolución**: `PruneBasket` (cliente) descarta o
+   recorta cada línea rancia en cada sync, y en `Confirm` el servidor re-resuelve cada ref
+   contra el inventario real, recorta el count a lo disponible y **aborta la transacción
+   entera** si la ref ya no existe. El lock pasa a ser **requisito** recién con el
+   jugador-trader (§6), donde deja de ser conveniencia: ahí sí hay un segundo jugador al
+   que estafar.
 3. Los strips **Buy** y **Sell** acumulan el total de cada lado; el footer muestra
    el **neto** de la transacción (`+/− dinero`).
-4. **Confirm** valida y ejecuta **atómico**. **Cancel** vacía el basket y libera los
-   locks — nada cambió.
+4. **Confirm** valida y ejecuta **atómico**. **Cancel** vacía el basket — nada se había
+   movido.
 
 ### Validación atómica (en Confirm, servidor)
 
@@ -108,9 +120,10 @@ Todo o nada, en un solo paso:
 - **Stock/propiedad:** el trader todavía tiene lo que se le compra; el jugador
   todavía tiene lo que vende (relevante en multiplayer / jugador-trader).
 
-Si cualquier validación falla → **rollback limpio**, basket intacto, mensaje de qué
-faltó (voz de interfaz: "No cabe: te pasas 4.2 kg", no un error genérico). Si pasa →
-mover ítems, ajustar wallets de ambos lados, vaciar basket, liberar locks.
+Si cualquier validación falla → **no se movió nada** (no hay rollback porque no hay nada
+que revertir: `Confirm` valida todo y **recién después** muta), basket intacto, mensaje de
+qué faltó (voz de interfaz: "Not enough money: you're $340 short", no un error genérico).
+Si pasa → mover ítems, ajustar wallets de ambos lados, vaciar basket.
 
 ### Protocolo de net
 
@@ -164,11 +177,13 @@ del trader NPC y hay que diseñarlo con cuidado:
   columna izquierda del que abre la sesión muestra el inventario del otro jugador.
 - **Doble confirm obligatorio:** los dos lados arman su basket y **ambos deben
   aceptar** antes de ejecutar. Sin esto es festival de estafas (uno confirma, el otro
-  quita cosas). El lock del basket (§3) deja de ser conveniencia y pasa a ser
-  **requisito**: mientras un lado revisa, lo ofertado por el otro no puede cambiar.
+  quita cosas). El lock del basket (§3, **no implementado en slice 1**) deja de ser
+  conveniencia y pasa a ser **requisito**: mientras un lado revisa, lo ofertado por el
+  otro no puede cambiar.
 - **Ejecución atómica de ambos lados:** la validación de §3 corre para los dos
-  jugadores (dinero y peso de cada uno) antes de mover nada. Falla de un lado →
-  rollback total.
+  jugadores (dinero y existencia de cada uno — el peso no valida, ver §3) antes de
+  mover nada. Falla de un lado → **no se mueve nada**, en ninguno de los dos (no hay
+  rollback: se valida todo y recién después se muta).
 - Estado de la sesión: `A propone → B propone → A acepta → B acepta → ejecuta`. Si
   cualquiera modifica su basket después de aceptar, se **resetean las aceptaciones**
   (nadie acepta a ciegas un basket que cambió).
@@ -277,7 +292,7 @@ El bloque se implementa en **3 vertical slices** (corte validado con el autor
 
 | Slice | Alcance | Estado |
 |---|---|---|
-| **1 — comercio con NPC** | `def.value` + curva de condición + spread (§4/§5), trader = contenedor + capa de precio (§2), entidad `corpus_cargo_trader` con stock demo (§10), estado **Trade** del frame (§8), **basket con confirm atómico** (§3) | **CHANGELOG #20 — APLICADO 2026-07-14** (+ enmiendas de la pasada: **#21**, click = stack entero y el peso deja de ser gate) |
+| **1 — comercio con NPC** | `def.value` + curva de condición + spread (§4/§5), trader = contenedor + capa de precio (§2), entidad `corpus_cargo_trader` con stock demo (§10), estado **Trade** del frame (§8), **basket con confirm atómico** (§3) | **CHANGELOG #20 — APLICADO 2026-07-14** (+ enmiendas de las pasadas: **#21**, el peso deja de ser gate de la transacción; **#22**, la línea del basket es un agregado sobre todos los stacks del ítem y el **click carga 25% del `max_stack`**, SHIFT+click todo, click derecho cantidad exacta) |
 | **2 — dinero como entidad** | entidad cash, botón $ en Solo (botar) y en Trade (línea de solo-dinero) (§7) | pendiente |
 | **3 — jugador-trader** | sesión P2P, doble confirm, máquina de estados, spread por-jugador, traspaso P2P (§6/§7) | pendiente |
 
@@ -294,7 +309,12 @@ primitivo, no dos.
 números de arranque, a calibrar en juego (§11 ya lo declaraba); el trader demo es
 de sesión (no persiste entre mapas, a propósito); el cliente formatea el dinero
 con el shape del provider nativo USD (un provider externo con otro formato solo
-afecta la decoración de las etiquetas, no los números).
+afecta la decoración de las etiquetas, no los números); y **el lock del basket (§3)
+no existe** — el ítem pendiente sigue siendo usable y equipable (botarlo no es directo:
+el click derecho del grid propio abre el menú de cantidad, no el de ítem), y lo que
+sostiene la transacción es la re-resolución en `Confirm`, no un candado. Aceptable
+contra un NPC (el único que puede sabotearse el trato es el propio jugador);
+**obligatorio en el slice 3** (§6), donde hay un segundo jugador al que estafar.
 
 ---
 

@@ -32,7 +32,12 @@
 
 ## 1. Visión general
 
-**Cargo** es el framework de inventario de jugador de Corpus: contrato de ítems, grid de UI, peso, slots de equipamiento y contenedores. Es hoja en el grafo de dependencias — no depende de ningún otro módulo — pero es **hub de consumo**: Coagulant, Craving y Caliber registran sus propios ítems contra el framework que Cargo expone. Cargo posee el "cómo se ve y se guarda un ítem"; cada módulo dueño posee el "qué hace".
+**Cargo** es el framework de inventario de jugador de Corpus: contrato de ítems, grid de UI, peso, slots de equipamiento y contenedores. Es sobre todo un **hub de consumo**: Coagulant, Craving y Caliber registran sus propios ítems contra el framework que Cargo expone. Cargo posee el "cómo se ve y se guarda un ítem"; cada módulo dueño posee el "qué hace".
+
+Pero **no es hoja** en el grafo de dependencias: Cargo también consume hacia afuera. Dos aristas salen de acá, ambas con lazy-check + `pcall` y **degradación honesta** (nunca crash, nunca asunción — §6 de [`CORPUS_Architecture.md`](../../corpus/docs/CORPUS_Architecture.md)):
+
+- **Coagulant** → `OnEncumbrance(ply, fraction)`, en `corpus_cargo_movement.lua`. Arista **viva en ambos extremos**: el contrato está congelado y Coagulant ya lo implementa. Sin Coagulant, la penalización de sobrepeso se queda solo en velocidad.
+- **Cortex** → `GetFactionInfo(ply)`, en `corpus_cargo_inventory.lua`. Arista **anticipatoria**: el call-site existe, Cortex todavía no tiene código. Sin él, el header del inventario simplemente omite facción/rango.
 
 Modelo de referencia: **grid uniforme estilo STALKER/GAMMA**, no Tetris estilo EFT. Cada ítem ocupa una celda, auto-ordenada por categoría; el costo de cargar más no es espacial, es de **peso**. Decisión explícita: define el modelo de datos completo del módulo (ítems sin dimensiones), abarata la net-sync y fija la UX de transferencia con contenedores.
 
@@ -308,7 +313,7 @@ Distinción crítica que resuelve parcialmente la bandera de Upgrades: el princi
 - Cargo escucha los eventos de attach/detach de ARC9 para reconciliar: si el jugador instala desde el menú C un attachment que estaba en Cargo, Cargo lo descuenta; si desinstala, Cargo lo recibe.
 - Decisión de fuente única: el inventario de attachments propio de ARC9 se puentea — Cargo pasa a ser el almacén; ARC9 conserva el estado montado y la matemática de stats. Evita el doble-inventario con drift.
 
-> **Verificar contra código antes de implementar:** nombres exactos de la API de attach/detach y de los hooks de eventos en la versión de ARC9 que usa el pack de Darsu. Este proyecto ya aprendió (extractor EFT: `Penetration` vs nombres crudos, `armorDamage` ×0.01) que los nombres de ARC9 no se asumen de memoria — se leen del código vivo. Ítem explícito para el prompt de CC.
+> **Verificado contra el código vivo (2026-07-10):** los nombres exactos de la API de attach/detach y de los hooks de eventos se leyeron de la base de ARC9 + el pack EFT de Darsu (`dev/other/`) y quedaron anotados en el header de `lua/corpus_cargo/shared/corpus_cargo_arc9.lua`; el puente shippeó (§14). El contrato #8 del `CLAUDE.md` congela la regla que lo motivó: este proyecto ya había aprendido (extractor EFT: `Penetration` vs nombres crudos, `armorDamage` ×0.01) que los nombres de ARC9 no se asumen de memoria — se leen del código vivo, siempre contra `dev/other/`.
 
 ### 10.4 Compatibilidad y armas no-ARC9
 
@@ -358,7 +363,7 @@ Boundary-debt explícito, mismo espíritu que el flag de Scavenger en Caliber �
 | Escudos de energía de jugador vía sub-slot Body | Caliber Block 3 | Punto de acoplamiento (sub-slot) ya definido en este documento |
 | Compatibilidad con mods externos de NVG/ópticas | Cargo (integración) | Sub-slot Head ya generalizado; falta mapear mods concretos |
 | Categoría de materiales de crafteo | Cargo (contrato) + Caliber/Coagulant (contenido) | Reservada, sin schema de recetas — ver `Workbench_Arquitectura.md` |
-| Upgrades de armas ARC9/EFT | Workbench | Bandera parcialmente resuelta: la API de attach/detach de ARC9 es un canal de escritura legítimo (ver §10.3) — los upgrades de arma pueden modelarse como attachments nativos ARC9 en vez de escritura de stats. Verificar API contra código antes de cerrar |
+| Upgrades de armas ARC9/EFT | Workbench | Bandera parcialmente resuelta: la API de attach/detach de ARC9 es un canal de escritura legítimo (ver §10.3) — los upgrades de arma pueden modelarse como attachments nativos ARC9 en vez de escritura de stats. La API ya está verificada y el puente en producción (§10, §14); lo que sigue abierto es el **diseño del árbol** de upgrades |
 | Attachments no-ARC9 (TFA u otras bases) | Cargo (integración) | Solo con tabla de compatibilidad manual declarada por arma — sin alcance automático en v1 (§10.4) |
 
 ---
@@ -370,7 +375,7 @@ Bloque de diseño de Cargo (inventario) cerrado y validado en sesión de diseño
 | Sección | Estado |
 |---|---|
 | Contrato de ítems, slots/sub-slots, peso, providers, grid, contenedores, tooltip, stat-bars | **Cerrado — este documento** |
-| Attachments de armas (UX + puente ARC9) | **Cerrado en diseño** — API exacta de ARC9 pendiente de verificación contra código |
+| Attachments de armas (UX + puente ARC9) | **Cerrado y en producción — §10.** La API de ARC9 se verificó contra el código vivo (base + pack EFT de Darsu, 2026-07-10) y quedó anotada en el header de `corpus_cargo_arc9.lua`; el contrato #8 del `CLAUDE.md` la congela (nunca de memoria: siempre contra `dev/other/`) |
 | UI fullscreen (forma) | **Cerrado — §15**; VGUI es bloque de implementación aparte; depende de Cargo_ItemImages. Paletas runtime + teñido DGL4 **cerrados — §15.5** (entry 14) |
 | Sistema de munición (el cinturón ES el pool) | **Cerrado — §16** (Bloque B, roadmap #19). UX (reorder, unload, gate WALK+USE de ítems) **cerrada — §16.8** (Bloque C, roadmap #25 · #26 · #27). Throwables y cajas de mundo **cerrados — §16.9** (entries 13/16). Abierto: cargadores rellenables con toggle, y el binding de ammo-atts de EFT (§16.6) |
 | Wheel menu + slot throwable + compat de movimiento | **Cerrado — §17, §4/§5 (enmiendas)** (entries 13/14/16, verificados en juego 2026-07-13) |
@@ -556,11 +561,15 @@ literalmente `ply:GetAmmoCount(self:GetProcessedValue("Ammo"))`
 (`Arc9 Base/lua/weapons/arc9_base/sh_reload.lua:578-586`). Por eso el modelo funciona **nativo**,
 sin pelearse con ARC9 ni forkearlo.
 
-Los 11 tipos base de HL2 quedan registrados como ítems (`cargo_ammo_<tipo>`) en
+Los **11 tipos** de munición del engine que Cargo maneja quedan registrados como ítems en
 [`shared/corpus_cargo_ammo.lua`](../lua/corpus_cargo/shared/corpus_cargo_ammo.lua), cada uno con
-modelo, peso por unidad, descripción y **`max_stack`** — el tope es lo que convierte a los seis
-slots del cinturón en una **decisión** (cuánta munición y de qué calibre te colgás) en vez de
-decoración. Los `.mdl` se verificaron parseando los VPK reales, no de memoria.
+modelo, peso por unidad, descripción y **`max_stack`**: **9 como munición de cinturón**
+(`cargo_ammo_<tipo>`, categoría `ammo`) y **2 con cara lanzable** (`cargo_throw_frag` /
+`cargo_throw_slam`, categoría `throwables` — ver la enmienda de §4 y §16.9; los ids
+`cargo_ammo_grenade`/`cargo_ammo_slam` quedaron **muertos** y remapean vía
+`CARGO.Ammo.LegacyThrowIds`). El tope es lo que convierte a los seis slots del cinturón en una
+**decisión** (cuánta munición y de qué calibre te colgás) en vez de decoración. Los `.mdl` se
+verificaron parseando los VPK reales, no de memoria.
 
 ### 16.3 El espejo (`server/corpus_cargo_ammopool.lua`)
 
@@ -735,7 +744,7 @@ botado esquivaba el gate entero (USE pelado ya aspiraba la munición). El hook a
 Reusa el debounce por jugador (`ply.CargoNextWorldUse`) y la marca "USE de nuevo suelta"
 (`ply.CargoCarryEnt`) que el gate de armas de mundo (roadmap #16, entry 7) ya había pagado — sin
 duplicar lógica. La entidad `corpus_cargo_item.lua` no cambió (solo su comentario de header); el
-convar `cargo_world_guns` sigue gateando **solo** la rama de armas, no la de ítems.
+convar `cargo_weapon_world_pickup` sigue gateando **solo** la rama de armas, no la de ítems.
 
 **Sin convars nuevas** en este bloque. Net nuevo: `belt_move`, `unload` (ambos vía
 `Corpus.Net.Register("cargo", …)`, como todo mensaje del módulo).

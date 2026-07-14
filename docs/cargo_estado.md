@@ -41,8 +41,9 @@ queda solo para el give anónimo del engine).)
   curva de condición + spread; **el trader ES un contenedor** (`Containers.Attach`)
   con capa de precio — el primitivo inventario-en-entidad de §2 no se construyó
   de nuevo; entidad demo `corpus_cargo_trader`; **estado Trade** del frame con
-  basket, strips Buy/Sell y neto; **`Confirm` atómico** en server (valida dinero,
-  peso y existencia, y recién ahí mueve). El basket del cliente es intent puro.
+  basket, strips Buy/Sell y neto; **`Confirm` atómico** en server (valida
+  existencia, dinero del jugador y wallet del trader, y recién ahí mueve). El
+  basket del cliente es intent puro.
   **El peso NO bloquea una transacción** (entry 21): se puede comprar sobrecargado
   — la curva de peso lo cobra en velocidad; el límite sigue vigente para lo que se
   recoge del suelo (techo duro: **2× la capacidad**). Una línea del basket es un

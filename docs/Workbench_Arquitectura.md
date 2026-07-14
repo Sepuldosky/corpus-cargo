@@ -131,7 +131,7 @@ Toda herramienta de corte puede desarmar cualquier ítem con tabla — no hay bl
 
 Sin diseño cerrado, pero con la bandera de riesgo **parcialmente resuelta** y el spec de referencia levantado de la guía GAMMA:
 
-**Canal ARC9 identificado**: el principio lectura-only aplica a los stats (`GetProcessedValue`); la API de attach/detach de ARC9 es el canal de escritura legítimo — es lo que usa el propio menú de customización de ARC9. Los upgrades de arma pueden modelarse como **attachments nativos ARC9** (los stats cambian porque ARC9 procesa sus propios attachments, no porque Corpus escriba valores). Ver `Cargo_Architecture.md` §10.3, incluida la regla de reconciliación y la verificación de API pendiente contra el código vivo del pack de Darsu.
+**Canal ARC9 identificado**: el principio lectura-only aplica a los stats (`GetProcessedValue`); la API de attach/detach de ARC9 es el canal de escritura legítimo — es lo que usa el propio menú de customización de ARC9. Los upgrades de arma pueden modelarse como **attachments nativos ARC9** (los stats cambian porque ARC9 procesa sus propios attachments, no porque Corpus escriba valores). Ver `Cargo_Architecture.md` §10.3, incluida la regla de reconciliación. La API ya se verificó contra el código vivo (base ARC9 + pack EFT de Darsu, 2026-07-10, anotada en el header de `corpus_cargo_arc9.lua`) y el puente está en producción: lo que falta acá es el **diseño del árbol**, no la verificación.
 
 **Mecánicas de GAMMA a copiar cuando este bloque abra** (levantadas de la guía de referencia):
 
@@ -182,4 +182,4 @@ Craft, Reparación y Desarme cerrados y validados en sesión de diseño (Opus) �
 | Craft (categorías, recetas, componentes, toolkit) | **Cerrado** |
 | Reparación (por zona, tope por calidad de parte, sin consumo de carga) | **Cerrado** |
 | Desarme (tabla explícita, herencia de condición, tasa por herramienta, eyección) | **Cerrado** |
-| Upgrades | Pendiente — canal ARC9 identificado (attachments nativos, ver §6); falta diseño del árbol y verificación de API contra código |
+| Upgrades | Pendiente — canal ARC9 identificado (attachments nativos, ver §6) y su API ya verificada contra el código vivo (2026-07-10, puente en producción); falta **solo el diseño del árbol** |

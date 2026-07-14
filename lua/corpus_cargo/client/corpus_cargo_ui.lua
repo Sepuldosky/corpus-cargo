@@ -905,8 +905,11 @@ local function BuildEquipColumn(parent, s)
 end
 
 -- state: "solo" (left column absent — world behind the scrim), "loot"
--- (container in the left column, patch pending) or "trade" (reserved for
--- the Cargo_Trade block). Center and right are identical in every state.
+-- (container in the left column) or "trade" (trader stock + Buy strip on the
+-- left, deal bar under the own grid — both built by corpus_cargo_trade.lua,
+-- Cargo_Trade slice 1). The center column is identical in every state; the
+-- right one is NOT: in "trade" it takes the deal bar and its grid gains
+-- priceOf/basketOf, and in "loot" the footer reserves 112 px for "Move all".
 -- (local, forward-declared at the top of the file)
 function BuildFrame(state)
     if IsValid(frame) then frame:Remove() end
