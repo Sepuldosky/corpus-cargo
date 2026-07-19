@@ -155,7 +155,10 @@ end
 -- Extended optional fields transported by Cargo (owner module semantics):
 --   model          world model for drops (default cardboard box)
 --   max_stack      stack ceiling (default: unlimited)
---   onUse          function(ply, ctx) -> true to consume one unit (SERVER)
+--   onUse          function(ply, ctx) -> true to consume one unit. The closure
+--                  only RUNS on SERVER, but def + onUse must be registered in
+--                  BOTH realms (shared): the UI gates on isfunction(def.onUse)
+--                  client-side (cites COR-12)
 --   weapon_class   engine weapon given/stripped on equip/unequip
 --   equip_slots    { "primary", ... } narrows which matching slots accept it
 --   capacity_bonus kg added to carry capacity while equipped in Back
