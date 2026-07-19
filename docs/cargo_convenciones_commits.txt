@@ -74,8 +74,10 @@ válidos son:
 3. ALCANCES ESPECÍFICOS DE CARGO (<alcance>)
 -----------------------------------------------
 
-El alcance identifica el subsistema o área afectada. Debe ir siempre entre paréntesis.
-Para corpus-cargo/ (el módulo), los alcances definidos son:
+CRG-55 — El alcance identifica el subsistema o área afectada. Debe ir siempre entre
+paréntesis. Esta tabla es la de ESTE repo y MANDA: el CLAUDE.md la resume por comodidad,
+pero cuando difieran gana este doc. La §3 es por-repo, nunca se hereda del framework
+(cita GIT-6). Para corpus-cargo/ (el módulo), los alcances definidos son:
 
   items:
     Contrato de ítems, categorías, filtro de categorías y el primitivo de

@@ -4,6 +4,14 @@ Qué sigue y en qué orden. Dónde estamos dentro de esto → cargo_estado.md.
 Documento vivo. El detalle de diseño de cada punto vive en
 Cargo_Architecture.md / Workbench_Arquitectura.md / Cargo_ItemImages_Arquitectura.md
 / Cargo_Trade_Arquitectura.md; acá solo el orden.
+
+NOTA DE LECTURA (cita FLU-22 y el voto del autor del 2026-07-19): este doc es
+INTENCIÓN PURA, no autoridad — nivel 6 de la jerarquía de §7.1 del flujo. Los IDs
+que aparecen acá son CITAS a normas cuya sede está en un doc de diseño; este roadmap
+no acuña ninguna y no puede ser sede de nada. Un "limpio" del gate de coherencia
+sobre este archivo se reporta NO-AUDITABLE POR DISEÑO.
+Lo destapó el COMPLETO del 2026-07-19: CRG-45 tenía su sede declarada acá y el
+archivo ni siquiera contenía la etiqueta. Se mudó a Cargo_Architecture.md §13.1.
 =====================================================
 
 
@@ -123,6 +131,10 @@ INTEGRACIONES / DEUDA PROPIA
     primitiva de Corpus (sesión de diseño aparte, TODO ya dejado en código).
     Alcanza también a los comandos dev nuevos: cargo_icon_edit / regen_all (#5)
     y el spawn del NPC trader de ejemplo (Trade §10).
+    La norma es CRG-45 y su SEDE es Cargo_Architecture.md §13.1 — acá solo se
+    ordena el trabajo. Ojo con el matiz que la sede enuncia: el único net.Receive
+    que hoy espera gate es NET_ICON_OVERRIDE (contenido por CRG-46); los otros 14
+    no lo necesitan porque los protege CRG-6.
 13. Corpus.Data.Delete como primitiva del framework (hoy file.Delete
     directo en Instances.Delete, deuda declarada).
 14. addon.json + empaquetado Workshop (deuda compartida del ecosistema).

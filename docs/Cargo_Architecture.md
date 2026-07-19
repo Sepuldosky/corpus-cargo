@@ -135,6 +135,14 @@ Cada ítem único persiste un blob propio vía `Corpus.Data`, namespaced por ins
 >   (`CARGO.Slots.WheelSlots`, §17.1). Darle una tecla después es mover la entrada a
 >   `Slots.Hotkeys` — extensión, no rediseño.
 
+#### Cómo se deriva el slot de un arma capturada
+
+**CRG-42 — `SWEP.Slot` NO es la señal.** El campo existe en la base de SWEP y parece la respuesta obvia, pero es **inconsistente entre packs**: cada autor lo usa con su propio criterio (o lo hereda sin tocarlo), así que dos rifles de dos packs distintos pueden declarar slots distintos y dos armas de clase distinta pueden declarar el mismo. Derivar de ahí produce un inventario que se ordena de una forma con un pack y de otra con otro.
+
+La señal real es **`SWEP.Class` + `SWEP.SubCategory`**, resueltas **por herencia** (`weapons.Get(class)` ya resuelve la cadena de `SWEP.Base`, así que un pack que define su taxonomía en la base y no en cada arma sigue funcionando). Es el mismo principio que **CRG-41** aplica a la trivia: se le pregunta al SWEP por su propia identidad en vez de catalogar a mano cada arma de cada pack.
+
+> **Sede movida el 2026-07-19** (deuda D-3/D-13). Vivía en `cargo_estado.md` §Qué existe hoy (entry 24) — un doc **volátil de nivel 2** que se reescribe en cada refresh: la norma estaba a un `estado.md` de distancia de desaparecer sin que nadie lo notara. Confirmada en juego en su momento (entry 24).
+
 ### Primitivo genérico: sub-slots
 
 **CRG-8 —** Un ítem puede declarar **sub-slots propios**, cada uno con un filtro de categoría. Es el mismo primitivo en los tres casos siguientes — se implementa una vez:
@@ -370,6 +378,16 @@ Todo vía `Corpus.Data` (namespace `cargo`), sin necesidad de SQLite: no hay con
 | Categoría de materiales de crafteo | Cargo (contrato) + Caliber/Coagulant (contenido) | Reservada, sin schema de recetas — ver `Workbench_Arquitectura.md` |
 | Upgrades de armas ARC9/EFT | Workbench | Bandera parcialmente resuelta: la API de attach/detach de ARC9 es un canal de escritura legítimo (ver §10.3) — los upgrades de arma pueden modelarse como attachments nativos ARC9 en vez de escritura de stats. La API ya está verificada y el puente en producción (§10, §14); lo que sigue abierto es el **diseño del árbol** de upgrades |
 | Attachments no-ARC9 (TFA u otras bases) | Cargo (integración) | Solo con tabla de compatibilidad manual declarada por arma — sin alcance automático en v1 (§10.4) |
+
+### 13.1 Comandos dev sin gate de admin
+
+**CRG-45 —** Los comandos dev de Cargo quedan **SIN gate de admin**, con el `TODO` anotado en el código, esperando la primitiva de permisos de Corpus. Alcanza a `cargo_dev_give`, al editor de íconos (`cargo_icon_edit` / `regen_all`) y al spawn del trader de ejemplo (`Cargo_Trade_Arquitectura.md` §10).
+
+Es **deuda declarada, no una norma cumplida**: lo normativo es que el `TODO` esté anotado y espere la primitiva, no que los comandos estén protegidos. Se dice acá para que nadie lea la ausencia de gate como un descuido.
+
+De los 15 `net.Receive` del módulo, el único que necesita gate y no lo tiene es `NET_ICON_OVERRIDE`, hoy **abierto a cualquier jugador** y contenido solo por el saneo de entrada de **CRG-46** (def desconocida se ignora, footprint fuera del set permitido se descarta). Los otros 14 no lo necesitan por diseño: los protege **CRG-6** — el server posee el inventario y el cliente solo manda intents, así que un intent hostil se valida contra el estado real y no puede fabricar nada.
+
+> **Sede movida el 2026-07-19** (deuda D-3/D-13). Vivía en `cargo_roadmap.txt` (ítem 12 de su lista de deuda propia), y un roadmap es **intención pura, nivel 6** — no puede ser sede de una norma vigente. Peor: el archivo ni siquiera contenía la etiqueta `CRG-45`, así que era una sede rota que el gate LLM no vio y el checker tampoco, porque la ruta existía. El roadmap ahora **cita** esta sección.
 
 ---
 

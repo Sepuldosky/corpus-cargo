@@ -27,7 +27,7 @@
 
 El banco de trabajo es la UI y el framework de mantenimiento de ítems: craftear, reparar, desarmar y (a futuro) mejorar. Vive dentro de Cargo — reutiliza su contrato de ítems (§3 de `Cargo_Architecture.md`), su clase "único con instancia" para condición por zona, y su sistema de placas — pero es su propio archivo de arquitectura porque acumuló reglas de economía y balance que no pertenecen al documento de inventario general.
 
-**Propiedad**: el banco (UI, recetas, desarme, toolkits) es framework de **Cargo**. Cada módulo de dominio registra sus propias recetas y componentes contra ese framework — Caliber registra placas y materiales de armadura, Coagulant registra ítems médicos craftables. Mismo patrón de registro que rige todo el ecosistema.
+**Propiedad** (cita **CRG-1**, sede `../../corpus/docs/CORPUS_Architecture.md` §5): el banco (UI, recetas, desarme, toolkits) es framework de **Cargo**. Cada módulo de dominio registra sus propias recetas y componentes contra ese framework — Caliber registra placas y materiales de armadura, Coagulant registra ítems médicos craftables. Es el mismo "Cargo posee el cómo, el dueño posee el qué" del contrato de ítems, aplicado al banco: no es un patrón nuevo.
 
 ---
 
@@ -76,8 +76,8 @@ Adaptado del spec de GAMMA (que repara el ítem completo) al modelo de condició
 - Selección de ítem reparable desde el inventario.
 - Condición mostrada **por zona** (torso, estómago, brazos, piernas en una armadura).
 - Cada zona dañada acepta una **parte de reemplazo** (material Caliber) asignada individualmente.
-- **Regla de tope**: la condición de la parte asignada define el tope restaurado en esa zona — una parte al 94% no deja la zona al 100%. Mantiene demanda de partes de calidad y le da sentido al desarme selectivo (§5).
-- **Reemplazar partes no consume cargas del toolkit** — solo requiere que el toolkit correspondiente esté presente. Asimetría deliberada frente a Craft.
+- **CRG-54 — Regla de tope**: la condición de la parte asignada define el tope restaurado en esa zona — una parte al 94% no deja la zona al 100%. Mantiene demanda de partes de calidad y le da sentido al desarme selectivo (§5).
+- **Reemplazar partes no consume cargas del toolkit** — solo requiere que el toolkit correspondiente esté presente. Asimetría deliberada frente a Craft: es la mitad de **CRG-53** (§7).
 - **Zonas rotas se reparan aquí**, a diferencia de las placas (mecánica de campo, ver `Cargo_Architecture.md` §4), que solo restauran zonas placables (torso/estómago) y no reparan una zona ya rota. Dos dominios de reparación sin solapamiento: banco = mantenimiento profundo, placa = parche rápido de campo.
 
 ---
@@ -88,7 +88,7 @@ Diseño nuevo (no está en el spec de GAMMA con este nivel de detalle). Tres reg
 
 ### 5.1 Tabla explícita, no inversión automática
 
-Cada ítem declara opcionalmente su tabla de rendimiento de desarme en su definición; el módulo dueño la define. Invertir la receta de crafteo automáticamente rompe el balance (craftear consume un multitool entero; desarmar el resultado no debería devolverlo intacto). Ítems sin tabla declarada no son desarmables.
+**CRG-50 —** Cada ítem declara opcionalmente su tabla de rendimiento de desarme en su definición; el módulo dueño la define. Invertir la receta de crafteo automáticamente rompe el balance (craftear consume un multitool entero; desarmar el resultado no debería devolverlo intacto). Ítems sin tabla declarada no son desarmables.
 
 ```lua
 -- Firma ilustrativa
@@ -102,7 +102,7 @@ Workbench.Disassembly.RegisterYield(itemId, {
 
 ### 5.2 Herencia de condición
 
-Fórmula única que gobierna todo el sistema:
+**CRG-51 —** Fórmula única que gobierna todo el sistema:
 
 ```
 condición_de_parte = condición_de_zona × tasa_de_herramienta
@@ -112,7 +112,7 @@ Desarmar un ítem entrega componentes **por zona**, cada uno con la condición d
 
 ### 5.3 Herramienta: tasa, no acceso
 
-Toda herramienta de corte puede desarmar cualquier ítem con tabla — no hay bloqueo de categoría por herramienta. La diferencia es la **tasa de recuperación**:
+**CRG-52 —** Toda herramienta de corte puede desarmar cualquier ítem con tabla — no hay bloqueo de categoría por herramienta. La diferencia es la **tasa de recuperación**:
 
 | Herramienta | Tasa | Efecto sobre la herramienta |
 |---|---|---|
@@ -122,7 +122,7 @@ Toda herramienta de corte puede desarmar cualquier ítem con tabla — no hay bl
 
 ### 5.4 Protecciones obligatorias para ítems únicos
 
-- **Eyección antes de destruir**: sub-slots ocupados (placas, accesorios) se devuelven al inventario, nunca se consumen en el desarme.
+- **Eyección antes de destruir** (cita **CRG-9**, sede [`Cargo_Architecture.md`](Cargo_Architecture.md) §4): sub-slots ocupados (placas, accesorios) se devuelven al inventario, nunca se consumen en el desarme. El desarme es un flujo destructivo más — la norma ya existe y acá solo se aplica.
 - **Confirmación explícita**: desarmar un ítem único destruye la instancia sin undo — la UI exige confirmación separada del botón de acción.
 
 ---
@@ -131,7 +131,7 @@ Toda herramienta de corte puede desarmar cualquier ítem con tabla — no hay bl
 
 Sin diseño cerrado, pero con la bandera de riesgo **parcialmente resuelta** y el spec de referencia levantado de la guía GAMMA:
 
-**Canal ARC9 identificado**: el principio lectura-only aplica a los stats (`GetProcessedValue`); la API de attach/detach de ARC9 es el canal de escritura legítimo — es lo que usa el propio menú de customización de ARC9. Los upgrades de arma pueden modelarse como **attachments nativos ARC9** (los stats cambian porque ARC9 procesa sus propios attachments, no porque Corpus escriba valores). Ver `Cargo_Architecture.md` §10.3, incluida la regla de reconciliación. La API ya se verificó contra el código vivo (base ARC9 + pack EFT de Darsu, 2026-07-10, anotada en el header de `corpus_cargo_arc9.lua`) y el puente está en producción: lo que falta acá es el **diseño del árbol**, no la verificación.
+**Canal ARC9 identificado** (cita **CRG-23**, sede [`Cargo_Architecture.md`](Cargo_Architecture.md) §10.3): el principio lectura-only aplica a los stats (`GetProcessedValue`); la API de attach/detach de ARC9 es el canal de escritura legítimo — es lo que usa el propio menú de customización de ARC9. Los upgrades de arma pueden modelarse como **attachments nativos ARC9** (los stats cambian porque ARC9 procesa sus propios attachments, no porque Corpus escriba valores). Ver `Cargo_Architecture.md` §10.3, incluida la regla de reconciliación. La API ya se verificó contra el código vivo (base ARC9 + pack EFT de Darsu, 2026-07-10, anotada en el header de `corpus_cargo_arc9.lua`) y el puente está en producción: lo que falta acá es el **diseño del árbol**, no la verificación.
 
 **Mecánicas de GAMMA a copiar cuando este bloque abra** (levantadas de la guía de referencia):
 
@@ -144,7 +144,7 @@ Sin diseño cerrado, pero con la bandera de riesgo **parcialmente resuelta** y e
 
 ## 7. Economía de toolkits
 
-Tres operaciones, tres comportamientos distintos frente al toolkit — la asimetría es intencional y es lo que le da identidad a cada pestaña:
+**CRG-53 —** Tres operaciones, tres comportamientos distintos frente al toolkit — la asimetría es intencional y es lo que le da identidad a cada pestaña:
 
 | Operación | Consumo de toolkit |
 |---|---|
@@ -157,7 +157,7 @@ Tres operaciones, tres comportamientos distintos frente al toolkit — la asimet
 
 ## 8. Registro: patrón de módulo dueño
 
-Igual que el contrato de ítems de Cargo: el banco es framework, el contenido es de cada módulo.
+Igual que el contrato de ítems de Cargo (cita **CRG-1**): el banco es framework, el contenido es de cada módulo.
 
 - **Cargo owns**: UI de las cuatro pestañas, motor de recetas/componentes, motor de desarme con herencia de condición, economía de toolkits.
 - **Caliber owns**: recetas y materiales de armadura/armas, tabla de placas.
@@ -168,7 +168,7 @@ Igual que el contrato de ítems de Cargo: el banco es framework, el contenido es
 
 ## 9. Persistencia
 
-Vía `Corpus.Data`, namespace `cargo`. Conocimiento de recetas: un archivo por jugador (indexado por SteamID64) con el set de IDs de receta desbloqueados — se escribe solo al leer un manual/documento nuevo, se carga una vez al spawn. Sin necesidad de SQLite ni motor relacional: no hay consultas cruzadas ni volumen que lo justifique (ver discusión de persistencia en sesión de diseño).
+Vía `Corpus.Data`, namespace `cargo` (aplica **CRG-43**, que a su vez aplica **COR-3**; ojo con el remedio a **COR-8**: el round-trip JSON no preserva tipos de clave). Conocimiento de recetas: un archivo por jugador (indexado por SteamID64) con el set de IDs de receta desbloqueados — se escribe solo al leer un manual/documento nuevo, se carga una vez al spawn. Sin necesidad de SQLite ni motor relacional: no hay consultas cruzadas ni volumen que lo justifique (ver discusión de persistencia en sesión de diseño).
 
 ---
 

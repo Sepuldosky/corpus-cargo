@@ -2467,3 +2467,53 @@ de HOY — o falta la pasada en juego, o falta el flip.
 
 Verificación: checker en verde + suite 12/12. Sin superficie de runtime: todos los
 parches son doc.
+
+---
+
+## PARCHES DE sesión D-13: pre-2.º COMPLETO — 2026-07-19
+
+Parte de la tanda multi-repo guiada por `dev/PROMPT_d12_d13_segundo_completo.txt`, que cerró
+las deudas **D-12** y **D-13**. Este repo es el que más recibe: tenía **tres** de los 10 docs
+ciegos y **dos** sedes fuera de un doc de diseño. Solo prosa: ninguna norma cambió de contenido.
+
+- PARCHE 1 — **`Workbench_Arquitectura.md` deja de ser invisible: nacen `CRG-50`..`CRG-54`.**
+  Eran 128 líneas de diseño de un subsistema entero (craft/reparación/desarme) con **cero**
+  IDs — no estaba sano, estaba **ciego**, y produjo cero hallazgos en el COMPLETO por eso. Se
+  acuñó lo que la prosa YA enunciaba: tabla explícita de desarme (`CRG-50`), herencia de
+  condición (`CRG-51`), herramienta = tasa y no acceso (`CRG-52`), asimetría de toolkit
+  (`CRG-53`) y tope de reparación por calidad de parte (`CRG-54`). Toda la familia es
+  `INTENCION` por construcción: el bloque no está implementado y no hay un solo call site.
+  Eso es honesto, no deuda. **[APLICADO 2026-07-19]**
+- PARCHE 2 — **Tres reglas de ese mismo doc NO se acuñaron: se CITAN**, porque ya son normas
+  de otra sede y acuñarlas habría fabricado IDs bicéfalos al nacer. La eyección antes de
+  destruir es **CRG-9**, el patrón de módulo dueño es **CRG-1**, el canal ARC9 de
+  lectura-only es **CRG-23**. La persistencia del banco cita **CRG-43**/**COR-3**.
+  **[APLICADO 2026-07-19]**
+- PARCHE 3 — **`CRG-55` acuñado: la tabla de alcances de `cargo_convenciones_commits.txt` §3.**
+  Tercer doc ciego de este repo. La §3 es por-repo (cita GIT-6); el `CLAUDE.md` la resume y el
+  doc manda. Los 15 alcances se derivaron del propio doc — `workbench` está RESERVADO hasta
+  que abra su bloque, y existe en la tabla para que ese día nadie invente un alcance nuevo.
+  **[APLICADO 2026-07-19]**
+- PARCHE 4 — **La sede ROTA de `CRG-45` se muda a `Cargo_Architecture.md` §13.1** (nuevo).
+  Estaba rota **por partida doble**: `cargo_roadmap.txt` no contenía la cadena `CRG-45` en
+  ninguna parte, y un roadmap es intención pura (nivel 6) que no puede alojar una norma
+  vigente. El checker no la cazó porque **la ruta existía** — su validación de sede es
+  presencial sobre el archivo, no sobre la etiqueta. La sección nueva enuncia la norma con su
+  matiz completo: es DEUDA DECLARADA (el `TODO` anotado esperando la primitiva de permisos),
+  el único `net.Receive` que hoy espera gate es `NET_ICON_OVERRIDE` —contenido por
+  **CRG-46**— y los otros 14 no lo necesitan porque los protege **CRG-6**. El roadmap ahora
+  cita §13.1. **[APLICADO 2026-07-19]**
+- PARCHE 5 — **La sede de `CRG-42` se muda de `cargo_estado.md` a `Cargo_Architecture.md` §4**
+  (subsección nueva: cómo se deriva el slot de un arma capturada). Vivía en un doc **volátil
+  de nivel 2 que se reescribe entero en cada refresh**: la norma estaba a un refresh de
+  desaparecer sin que nadie lo notara. La prosa nueva explica el POR QUÉ, que el estado no
+  tenía espacio para decir: `SWEP.Slot` es inconsistente entre packs, así que la señal es
+  `SWEP.Class` + `SubCategory` resueltas por herencia — el mismo principio que **CRG-41**
+  aplica a la trivia. **[APLICADO 2026-07-19]**
+- PARCHE 6 — **`cargo_roadmap.txt` (531 líneas, el doc ciego más grande del ecosistema) pasa a
+  citante**, sin acuñar: por voto del autor un roadmap es intención pura. NOTA DE LECTURA que
+  lo declara nivel 6 y NO-AUDITABLE POR DISEÑO, con el caso de `CRG-45` anotado como la
+  demostración de por qué. **[APLICADO 2026-07-19]**
+
+Verificación: checker en verde sobre 207 IDs + suite 12/12. Sin superficie de runtime: **ni
+una línea de Lua cambió**, y ningún check de planilla nace de esta tanda (FLU-37).
