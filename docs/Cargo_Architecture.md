@@ -4,7 +4,8 @@
 >
 > **Estado:** Block 1 de Cargo (ver §13). Cubre el inventario de jugador: contrato de ítems, slots y sub-slots, peso, providers de dinero/facción, grid de UI, contenedores en mundo, inspección y stat-bars. El banco de trabajo (crafteo, reparación, desarme, upgrades) es un subsistema propio, documentado aparte en [`Workbench_Arquitectura.md`](Workbench_Arquitectura.md) — mismo patrón de desprendimiento que ya usó Caliber con Scavenger. El comercio (trueque, basket, dinero, trader) es otro subsistema desprendido — [`Cargo_Trade_Arquitectura.md`](Cargo_Trade_Arquitectura.md) — porque trae el primitivo de inventario-en-entidad, reusado para lootear cadáveres.
 >
-> **Dependencia dura:** Corpus. **Dependencias soft declaradas en este documento:** Cortex (facción/rango), Coagulant (drenaje de stamina por sobrepeso, vitales del panel de estado), Craving (hambre/sed del panel de estado), Caliber (protección de armadura, escudos de jugador — ambos en Block 3 de Caliber, aún no existe).
+> **Dependencia dura:** Corpus. **Soft-deps SALIENTES (Cargo consulta con lazy-check + `pcall`; ver §1):** Cortex (`GetFactionInfo` — facción/rango, arista anticipatoria) y Coagulant (`OnEncumbrance` — drenaje de stamina por sobrepeso, arista viva en ambos extremos). Son las únicas dos: no existe ninguna otra consulta de Cargo hacia un peer.
+> **Consumidores ENTRANTES (registran CONTRA Cargo; Cargo no los detecta ni los nombra en su código — CRG-44):** Coagulant (la barra de sangre del panel — **una sola**; la vida la pinta su silueta propia, ver §11), Craving (hambre/sed — cita **CRV-13**, `corpus-craving/docs/Craving_Architecture.md` §1), Caliber (protección de armadura y escudos vía sub-slot Body, Block 3, aún no existe). La barra la registra siempre el **módulo dueño**; si el dueño no está montado, la barra simplemente no se registra (§11, CRG-44).
 
 ---
 
@@ -39,7 +40,9 @@ Pero **no es hoja** en el grafo de dependencias: Cargo también consume hacia af
 - **Coagulant** → `OnEncumbrance(ply, fraction)`, en `corpus_cargo_movement.lua`. Arista **viva en ambos extremos**: el contrato está congelado y Coagulant ya lo implementa. Sin Coagulant, la penalización de sobrepeso se queda solo en velocidad.
 - **Cortex** → `GetFactionInfo(ply)`, en `corpus_cargo_inventory.lua`. Arista **anticipatoria**: el call-site existe, Cortex todavía no tiene código. Sin él, el header del inventario simplemente omite facción/rango.
 
-Modelo de referencia: **grid uniforme estilo STALKER/GAMMA**, no Tetris estilo EFT. Cada ítem ocupa una celda, auto-ordenada por categoría; el costo de cargar más no es espacial, es de **peso**. Decisión explícita: define el modelo de datos completo del módulo (ítems sin dimensiones), abarata la net-sync y fija la UX de transferencia con contenedores.
+Modelo de referencia: **grid estilo STALKER/GAMMA**, no Tetris estilo EFT. Los ítems se auto-ordenan por categoría, **sin gestión espacial ni rotación**; el costo de cargar más no es espacial, es de **peso**. Decisión explícita: define el modelo de datos completo del módulo (ítems sin ocupación espacial), abarata la net-sync y fija la UX de transferencia con contenedores.
+
+> **Enmienda 2026-07-11 (bloque UI fullscreen) — ver §7 y §15.** El grid deja de ser **uniforme**: «cada ítem ocupa una celda» pasa a «cada ítem pinta `w × h` celdas según su **footprint**» (`Cargo_ItemImages_Arquitectura.md` §5; set permitido y techos/pisos por categoría en `corpus_cargo_items.lua`). El footprint es solo **render**: el modelo de datos NO cambia.
 
 ---
 
@@ -58,11 +61,11 @@ Estos mocks son la fuente de verdad de layout hasta que exista una implementaci�
 
 ## 3. Contrato de ítems: dos clases
 
-Todo ítem registrado contra Cargo cae en una de dos clases. La clase se declara en la definición del ítem y determina si existe un blob de instancia.
+Todo ítem registrado contra Cargo cae en una de dos clases. La clase se declara en la definición del ítem y determina si el ítem tiene **uid y blob de instancia propios**. No determina si lleva condición: un stackeable con `has_condition` la lleva en la propia entry del stack.
 
 | Clase | Ejemplos | Persistencia | Stackea |
 |---|---|---|---|
-| **Stackeable** | munición, comida, componentes de crafteo, placas de armadura | solo un `count` | Sí |
+| **Stackeable** | munición, comida, componentes de crafteo, placas de armadura | entry `{id, count, condition?}` — sin blob ni uid; `condition` existe cuando el def declara `has_condition`, y **el stack se parte por condición** (mezclar desgastes sería una reparación gratis) | Sí, solo con condición idéntica |
 | **Único (con instancia)** | armas, armaduras, mochilas, NVG | blob de datos propio, persistido por instancia | No, nunca |
 
 ### Contrato base (Cargo owns)
@@ -81,6 +84,8 @@ Cargo.Items.Register({
     trivia = "Escopeta superpuesta de caza...",
 })
 ```
+
+> **Registro en ambos realms (cita COR-12; sede: `../../corpus/docs/CORPUS_Architecture.md` §5).** La def **y** su `onUse` se registran en **shared** — el `onUse` solo *corre* en server, pero la UI client-side exige `isfunction(def.onUse)` para pintar el botón de uso. Registrar la def solo en server deja al cliente sin el ítem; registrar el `onUse` solo en server deja el botón muerto. El retorno de `onUse` gobierna el consumo: COR-13.
 
 - **Cargo owns**: schema base (id, peso, icono, clase, categoría, stack), la API de registro, cómo se persiste el blob de instancia, cómo se renderiza en grid y tooltip.
 - **El módulo dueño owns**: la semántica — cómo se degrada la condición, qué hace un ítem al usarse, qué contiene su blob de instancia. Caliber decide cómo se rompe la protección de una zona; Cargo solo guarda el número y lo muestra.
@@ -132,11 +137,11 @@ Cada ítem único persiste un blob propio vía `Corpus.Data`, namespaced por ins
 
 ### Primitivo genérico: sub-slots
 
-Un ítem puede declarar **sub-slots propios**, cada uno con un filtro de categoría. Es el mismo primitivo en los tres casos siguientes — se implementa una vez:
+**CRG-8 —** Un ítem puede declarar **sub-slots propios**, cada uno con un filtro de categoría. Es el mismo primitivo en los tres casos siguientes — se implementa una vez:
 
 - **Head → sub-slot óptica**: acopla NVG o gafas (compatibilidad con mods externos de visión nocturna, ver §12).
 - **Body → sub-slot exo/escudo**: acopla armadura externa o generador de escudo de energía de jugador — punto de acoplamiento físico para Caliber Block 3, sin inventar un sistema nuevo.
-- **Body → slots de placa**: 0–N slots según la armadura, cada uno acepta un ítem stackeable de clase "placa" con campo `material` (tabla de materiales Caliber).
+- **Body → slots de placa**: 0–N slots según la armadura, cada uno acepta un ítem de `class = "stackable"` y **categoría `plates`** (el filtro del sub-slot es `"category:plates"`, como todo sub-slot — CRG-8) con campo `material` (tabla de materiales Caliber), y con **desgaste propio por unidad** si su def declara `has_condition`: la condición viaja con la unidad al montarla y arranca en 100 si venía de fábrica (`SubSlotAttach`). El eje es la CATEGORÍA, no la clase (§3).
 
 Los quick slots F1–F4 usan el mismo principio en reversa: su **disponibilidad** (no su contenido) depende de un ítem equipado en otro slot — igual que el cinturón de artefactos desbloqueable por upgrade de traje en la referencia STALKER. Un slot F puede estar bloqueado (candado) hasta que el traje equipado lo habilite.
 
@@ -151,19 +156,19 @@ Cargo.Items.DeclareSubSlot(itemDef, {
 
 ### Eyección obligatoria
 
-Regla dura, aplica en todo flujo que destruye o reemplaza un ítem con sub-slots ocupados (desarme, reemplazo de armadura, muerte con drop): **los sub-slots se eyectan al inventario o al mundo antes de que el contenedor se destruya.** Un generador de escudo o una placa nunca se pierden como efecto colateral de perder el chaleco que los contenía.
+**CRG-9 —** Regla dura, aplica en todo flujo que destruye o reemplaza un ítem con sub-slots ocupados (desarme, reemplazo de armadura, muerte con drop): **los sub-slots se eyectan al inventario o al mundo antes de que el contenedor se destruya.** Un generador de escudo o una placa nunca se pierden como efecto colateral de perder el chaleco que los contenía.
 
 ---
 
 ## 5. Peso y movimiento
 
-**Cargo nativo**: curva continua peso → velocidad de movimiento (walkspeed/runspeed). Funciona standalone, sin ningún módulo soft-dep presente — un servidor con solo Cargo montado ya tiene consecuencia real por sobrecarga.
+**CRG-11 — Cargo nativo**: curva continua peso → velocidad de movimiento (walkspeed/runspeed). Funciona standalone, sin ningún módulo soft-dep presente — un servidor con solo Cargo montado ya tiene consecuencia real por sobrecarga.
 
 **Coagulant soft-dep**: dueño del recurso de stamina. Si está presente, se suma *encima* de la penalización base: drenaje de stamina por sobrepeso, efectos de fatiga, interacción con vitales. Cargo nunca depende de la stamina de Coagulant para su propia consecuencia — evita degradación deshonesta si Coagulant no está montado.
 
 Capacidad total = base del jugador + bonus de mochila equipada (Back). El footer de peso muestra el desglose (`base + mochila = total`) y colorea según proximidad al límite.
 
-> **Enmienda 2026-07-13 — compat con mods de movimiento (entry 16, roadmap #34).** Un mod
+> **CRG-12 — Enmienda 2026-07-13 — compat con mods de movimiento (entry 16, roadmap #34).** Un mod
 > que re-estampa walk/run **cada tick** desde sus propias convars ("better movement v2":
 > su `SetupMove` reescribe `SetWalkSpeed`/`SetRunSpeed`, `sh_bm_main.lua:455-457`) mata las
 > bases que la ruta vanilla captura al spawn — la curva deja de morder. La pata de compat
@@ -235,7 +240,7 @@ permiso. La fila de tabs se poblaba **desde ese set**, así que crecía sola: co
 las categorías y pasa a ser una **capa de AGRUPACIÓN de display**, con un set
 **fijo y cerrado** de 8 tabs. No es un renombre ni un recorte: las categorías internas
 quedan intactas y siguen sirviendo al grammar `"category:a,b"` de slots y sub-slots
-(contrato #3) — **el id de un tab jamás es una categoría válida en ese filtro.**
+(contrato #3) — **CRG-10: el id de un tab jamás es una categoría válida en ese filtro.**
 
 | Tab | Categorías internas que agrupa |
 |---|---|
@@ -253,7 +258,7 @@ Reglas de la fila:
 - **Se dibuja SIEMPRE entera**, tenga o no ítems: las tabs no se mueven bajo el cursor
   al cambiar el inventario. Una tab sin nada se pinta **atenuada** (sigue filtrando, a
   un grid vacío).
-- **Nunca vuelve a crecer.** Una categoría ajena (`artifacts`, digamos) se auto-registra
+- **CRG-49 — Nunca vuelve a crecer.** Una categoría ajena (`artifacts`, digamos) se auto-registra
   como siempre y su ítem es visible bajo **Misc** y bajo **All**, pero **no acuña tab**.
 - Una entrada **sin def** (id desconocido) cae también en Misc — nunca se vuelve
   invisible en todas las tabs menos All.
@@ -304,7 +309,7 @@ Desacople: desde la inspección del arma (el tooltip §9 gana una fila de attach
 
 ### 10.3 Integración ARC9 — el canal legítimo de escritura
 
-Distinción crítica que resuelve parcialmente la bandera de Upgrades: el principio **lectura-only aplica a los stats** (`GetProcessedValue` — nadie escribe valores procesados). Instalar/remover attachments vía la **API propia de ARC9** es el canal de escritura *soportado* — es exactamente lo que hacen el menú de customización de ARC9 y sus entidades de attachment. Los stats cambian como *consecuencia* de que ARC9 procese sus propios attachments, no porque Corpus escriba valores. El contrato se preserva.
+**CRG-23 —** Distinción crítica que resuelve parcialmente la bandera de Upgrades: el principio **lectura-only aplica a los stats** (`GetProcessedValue` — nadie escribe valores procesados). Instalar/remover attachments vía la **API propia de ARC9** es el canal de escritura *soportado* — es exactamente lo que hacen el menú de customización de ARC9 y sus entidades de attachment. Los stats cambian como *consecuencia* de que ARC9 procese sus propios attachments, no porque Corpus escriba valores. El contrato se preserva.
 
 **Regla de reconciliación** (el jugador puede seguir usando el menú C de ARC9 directamente):
 
@@ -336,10 +341,10 @@ Cargo.StatusPanel.RegisterBar(module, {
 ```
 
 - **Craving**: hambre, hidratación.
-- **Coagulant**: estado vital (overall de vida) y cantidad de sangre — no vida/sangrado por separado como en la referencia STALKER; decisión explícita del autor para el bloque de Coagulant.
+- **Coagulant**: cantidad de sangre (`id = "blood"`) — **una sola barra**. La vida por zona no viaja al panel: la pinta la silueta de 6 zonas del HUD propio de Coagulant (`Coagulant_Architecture.md` §10, geometría única de silueta), que es información por zona y no cabe en una barra lineal.
 - **Caliber (Block 3, pendiente)**: protección de armadura equipada.
 
-Si el módulo dueño de una barra no está montado, la barra simplemente no se registra — degradación honesta, mismo principio que gobierna todo soft-dep del ecosistema.
+**CRG-44 —** Si el módulo dueño de una barra no está montado, la barra simplemente no se registra — degradación honesta, mismo principio que gobierna todo soft-dep del ecosistema.
 
 ---
 
@@ -355,7 +360,7 @@ Todo vía `Corpus.Data` (namespace `cargo`), sin necesidad de SQLite: no hay con
 
 ## 13. Fronteras y pendientes declarados
 
-Boundary-debt explícito, mismo espíritu que el flag de Scavenger en Caliber — se declara ahora para no perderlo, se resuelve cuando el bloque dueño cierre:
+**CRG-47 —** Boundary-debt explícito, mismo espíritu que el flag de Scavenger en Caliber — se declara ahora para no perderlo, se resuelve cuando el bloque dueño cierre:
 
 | Pendiente | Dueño futuro | Nota |
 |---|---|---|
@@ -462,9 +467,11 @@ Reordena los slots de §4 a la disposición GAMMA. De arriba a abajo:
 > - **El panel de estado se estira hasta el fondo** de la columna (era alto fijo): va a
 >   crecer con las barras de otros módulos. Las barras siguen siendo **registrables**
 >   (§11) — nada se hardcodea; cada módulo registra las suyas por soft-dep cuando exista:
->   Coagulant (Health · Blood), Craving (Hunger · Hydration), Caliber Block 3 (armadura
->   propia). **HL2 Armor queda declarado legacy**: hoy se conserva como demo bar y sale
->   cuando Caliber Block 3 traiga la armadura propia.
+>   Coagulant (**Blood** — la vida la pinta su silueta propia, no el panel), Craving
+>   (Hunger · Hydration), Caliber Block 3 (armadura propia). **Las dos barras demo de
+>   `corpus_cargo_dev.lua` quedan legacy**: HL2 Armor sale cuando Caliber B3 traiga la
+>   armadura propia, y **Health no tiene relevo previsto** (Coagulant la descartó — su
+>   vida vive en la silueta).
 
 #### Cinturón de munición (solo la FORMA)
 
@@ -509,7 +516,7 @@ comercio.
 *(Contrato de tokens del mock `mockups/cargo_theme_dynamic_mock_v1_1.html`. Todo vive en
 `corpus_cargo_theme.lua` — la única fuente de estilo.)*
 
-- **Mutación en sitio.** Los objetos `Color` de `T.Colors` se crean UNA vez; una paleta
+- **CRG-29 — Mutación en sitio.** Los objetos `Color` de `T.Colors` se crean UNA vez; una paleta
   solo muta sus rgba (`ApplyPalette`), conservando nombre **e identidad de tabla** — todos
   los closures de `Paint` (y tablas de file-scope) que capturaron una referencia se
   re-skinnean al frame siguiente sin tocar un consumidor.
@@ -536,7 +543,7 @@ comercio.
 
 ### 16.1 La decisión
 
-**El cinturón no guarda munición: ES la reserva real del jugador.** Un stack colgado en un
+**CRG-14 — El cinturón no guarda munición: ES la reserva real del jugador.** Un stack colgado en un
 slot del cinturón *es* el pool nativo del engine para su tipo de munición; el grid es solo
 almacén en data. Las armas del **mismo tipo HL2 comparten la reserva** — como en HL2 mismo y
 como en STALKER. Lo que queda distinto **por arma** es el **cargador** (`Clip1`), que ya
@@ -573,7 +580,7 @@ verificaron parseando los VPK reales, no de memoria.
 
 ### 16.3 El espejo (`server/corpus_cargo_ammopool.lua`)
 
-Invariante, para cada tipo que Cargo maneja:
+**CRG-15 —** Invariante, para cada tipo que Cargo maneja:
 
 ```
 ply:GetAmmoCount(tipo)  ==  suma de los stacks del cinturón de ese tipo
@@ -619,7 +626,7 @@ Se ataca en tres capas:
 1. **La fuente.** Cargo fuerza `arc9_mult_defaultammo 0` (su default es **2**) al ready —
    mismo patrón de takeover que el puente de attachments ya usa con `arc9_free_atts`. Convar
    propia: `cargo_ammo_arc9_takeover`.
-2. **El spawn.** En cada `PlayerLoadout`, `StripAmmo()` y después `Push()`: la reserva se
+2. **CRG-17 — El spawn.** En cada `PlayerLoadout`, `StripAmmo()` y después `Push()`: la reserva se
    reconstruye **del cinturón y de nada más**, diferido más allá de la ventana de 0.4 s de ARC9.
 3. **El gate.** El reconciliador queda **suprimido** para un jugador hasta que su `Push` de
    spawn corrió, así que nada de lo que una base de arma regale durante la ventana de spawn
@@ -635,7 +642,7 @@ Se ataca en tres capas:
 
 ### 16.5 Munición del mundo, muerte y persistencia
 
-- **Munición del mundo → el GRID.** Los `item_ammo_*` del mapa se vetan al engine y entran como
+- **CRG-16 — Munición del mundo → el GRID.** Los `item_ammo_*` del mapa se vetan al engine y entran como
   ítem de Cargo al inventario (decisión del autor: *el grid es el almacén, el cinturón es el
   pool* — la encontrás, la guardás, y vos decidís cuánta te colgás). Nunca se vuelve reserva a
   espaldas del jugador. Convar: `cargo_ammo_world_pickup`.
@@ -784,7 +791,7 @@ real; en divergencia, el código manda.)*
 
 ### 17.1 Principio rector — cero lógica de server nueva
 
-El wheel es un **front-end alternativo de las teclas 1-7**: el commit de un sector manda
+**CRG-30 —** El wheel es un **front-end alternativo de las teclas 1-7**: el commit de un sector manda
 el **mismo intent `slotkey`** que `corpus_cargo_hotkeys.lua`, y lo resuelve
 `corpus_cargo_holster.lua` como hoy. Lo único que el bloque sumó al server es que el
 resolver acepta los **intents wheel-only** de `CARGO.Slots.WheelSlots` (**8 =
@@ -825,7 +832,7 @@ quick use existente (`CARGO.UI.QuickUse`); los chips de herramientas a `CARGO.UI
 
 ### 17.4 Interacción
 
-- **Hold** abre, **soltar commitea**. Tecla por convar `cargo_key_wheel` (default `G`,
+- **CRG-31 — Hold** abre, **soltar commitea**. Tecla por convar `cargo_key_wheel` (default `G`,
   polleada en Think — el patrón de binds probado del proyecto) o `+cargo_wheel`/
   `-cargo_wheel` para binds de consola. Si la tecla ya tiene un bind del engine, **aviso
   único** por `Corpus.Log` (regla del autor: jamás pisar un bind en silencio — el engine
@@ -842,7 +849,7 @@ quick use existente (`CARGO.UI.QuickUse`); los chips de herramientas a `CARGO.UI
 ### 17.5 Hub central = superficie de información universal
 
 Todo lo que recibe hover alimenta el hub — sectores, chips quick, chips de tools y la
-deadzone (que muestra lo que hay en mano y ofrece la salida). **Ningún dato se inventa:**
+deadzone (que muestra lo que hay en mano y ofrece la salida). **CRG-32 — Ningún dato se inventa:**
 
 - **Cargador / reserva** → `CARGO.Wheel.AmmoInfo`, con las rutas **verificadas contra el
   ARC9 vivo** (2.ª pasada, 2026-07-13): el tipo de munición sigue la ruta del propio
@@ -862,7 +869,7 @@ deadzone (que muestra lo que hay en mano y ofrece la salida). **Ningún dato se 
   `sh_firemodes.lua:158`); si no está, el campo **se oculta** — jamás se adivina.
 - **Condición** → blob de instancia; barra segmentada, `< 25%` pinta en danger. **×N** del
   throwable: el count ES la línea de munición.
-- El círculo del hub (y el marcador de en-mano) pintan con **`Theme.DrawCircle` /
+- **CRG-26 —** El círculo del hub (y el marcador de en-mano) pintan con **`Theme.DrawCircle` /
   `DrawCircleOutlined`** — la **primitiva única de círculo** del theme (polígono
   triangulado, 32/48 segmentos según radio; `draw.RoundedBox` con radio mitad NO es un
   círculo — su radio está cuantizado a los materiales de esquina). La consumen también los
@@ -873,7 +880,8 @@ deadzone (que muestra lo que hay en mano y ofrece la salida). **Ningún dato se 
 - **Quick F1-F4**: fila de 4 chips **rectangulares** — verbo distinto = forma distinta
   (se **usan**, no se equipan; mezclar ambos verbos en sectores del mismo anillo es error
   de UX). No participan del pick angular. Candado del traje respetado (mismo hatching de
-  la UI fullscreen, recortado con **scissor** — HUDPaint no tiene clipping de panel);
+  la UI fullscreen, recortado con **scissor** — **CRG-28:** HUDPaint no tiene clipping de
+  panel);
   vacío = no-op honesto. El commit llama a la ruta de quick use existente.
 - **Tools sandbox**: mismo comportamiento que los círculos de la columna
   (`CARGO.UI.SelectTool`), mismo gate `cargo_ui_tools`.
@@ -888,7 +896,7 @@ deadzone (que muestra lo que hay en mano y ofrece la salida). **Ningún dato se 
 
 ### 17.7 Robustez (pagada in-game, 1.ª pasada 2026-07-13)
 
-- GMod **desengancha** un hook de HUDPaint que erra: un hover malo y el wheel muere en
+- **CRG-25 —** GMod **desengancha** un hook de HUDPaint que erra: un hover malo y el wheel muere en
   silencio la sesión entera (la forma exacta de la falla reportada). Pintado y commit
   corren en **pcall** con `Corpus.Log` ruidoso — el error se loguea una vez, con línea, y
   el wheel sigue vivo.

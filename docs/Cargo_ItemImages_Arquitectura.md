@@ -50,14 +50,14 @@ el mismo que usa el editor de iconos nativo del sandbox (Edit Icon sobre un
 spawnicon): render del modelo a un RenderTarget, captura a PNG, `Material()` desde
 `data/`.
 
-Principio: **cosmético y client-side puro, cero costo de net**. El servidor nunca
+**CRG-33 —** Principio: **cosmético y client-side puro, cero costo de net**. El servidor nunca
 genera ni transporta imágenes; cada cliente construye su propia caché local.
 
 ---
 
 ## 2. Jerarquía de fuente del icono
 
-Al resolver la imagen de un def, en orden estricto (gana el primero que exista):
+**CRG-34 —** Al resolver la imagen de un def, en orden estricto (gana el primero que exista):
 
 1. **`def.icon` explícito** — material hecho a mano (VTF/VMT o PNG en `materials/`).
    Para ítems con arte propio; gana siempre.
@@ -115,7 +115,7 @@ Client-side, en cinco pasos:
 
 ### Generación lazy con presupuesto
 
-Regla dura contra el hitch: **nada de generar todo el inventario en el frame en que
+**CRG-35 —** Regla dura contra el hitch: **nada de generar todo el inventario en el frame en que
 se abre.** Cola de renders procesada a **N por frame** (presupuesto configurable,
 arrancar en 1–2). Mientras un ícono está en cola, la celda muestra el placeholder
 de letra; se reemplaza en caliente cuando el render termina. Sesiones siguientes
@@ -155,9 +155,15 @@ Orden de lectura: override de data → `def.icon_cam` → auto. El editor puede
 
 ## 5. Footprint (tamaño en celdas)
 
-**El footprint vive en este subsistema**, no en el doc de UI: es una propiedad del
+**CRG-36 — El footprint vive en este subsistema**, no en el doc de UI: es una propiedad del
 ítem que solo tiene sentido una vez que existe la imagen que lo llena. `size = {w,
 h}` en unidades de celda (rifle 6×2, pistola 3×2, placa 2×3 vertical, venda 1×1).
+
+**CRG-38 — Ojo con la notación.** El AUTOR enuncia los tamaños en **alto×ancho** — el
+reverso del `{w, h}` del código: su «2x3» es `{w = 3, h = 2}`. Hay que **invertir**
+antes de escribir `def.size` (el toolgun salió invertido en juego por esto, CHANGELOG
+§8, 3.ª pasada 2026-07-12). Todos los pares de **este doc** (los ejemplos de arriba y
+el set permitido de abajo) están en notación de código **ancho×alto** = `{w, h}`.
 
 Dos niveles:
 
@@ -165,7 +171,7 @@ Dos niveles:
 2. **Auto por OBB cuantizado** *(decisión del autor 2026-07-11: sí, con auto)* —
    se toma el aspect del bounding box del modelo proyectado en la cámara del
    encuadre (§4) y se **cuantiza a un set cerrado de footprints permitidos**, con
-   **techo por categoría**. Nunca un tamaño arbitrario: eso rompería el flow de
+   **techo por categoría**. **CRG-37:** nunca un tamaño arbitrario — eso rompería el flow de
    gradas del grid.
 
 Set permitido (candidato, ajustable): `1×1, 2×1, 1×2, 2×2, 3×1, 3×2, 2×3, 5×2,
@@ -204,7 +210,7 @@ Nombre de archivo = `<defid>_<hash>.png`, donde
 `hash = hash(RECIPE_VERSION + model + encuadre_efectivo + footprint_efectivo [+ mtime de la
 fuente ARC9])`.
 
-**Enmienda 2026-07-11:** la clave pliega además la **versión de receta** (`RECIPE_VERSION` —
+**CRG-39 — Enmienda 2026-07-11:** la clave pliega además la **versión de receta** (`RECIPE_VERSION` —
 subirla orfana toda la caché y la re-renderiza sola, sin `regen_all` a mano) y, en la ruta
 ARC9 (§2.2a), el **mtime de la fuente**: cada recaptura desde el menú de customize **re-keya
 el PNG por su cuenta**. Es obligatorio — `Material()` cachea por path, así que reusar un

@@ -95,11 +95,18 @@ CRUCES CON OTROS MÓDULOS (cada uno espera el Block del dueño)
    pesa, se equipa y persiste condición por zona — falta el efecto),
    escudos de jugador vía sub-slot exo/escudo (punto de acoplamiento ya
    definido), barra de protección en el panel de estado.
-8. Coagulant: drenaje de stamina por sobrepeso (contrato congelado
-   esperado: coagulant.OnEncumbrance(ply, fraction), ya invocado con
-   lazy-check desde corpus_cargo_movement.lua), ítems médicos reales,
-   barras vital/sangre.
-9. Craving: consumibles reales (comida/agua) + barras hambre/hidratación.
+8. Coagulant: drenaje de stamina por sobrepeso — el ÚNICO pendiente real del
+   cruce (contrato congelado esperado: coagulant.OnEncumbrance(ply, fraction),
+   ya invocado con lazy-check desde corpus_cargo_movement.lua; Coagulant hoy
+   solo guarda la fracción, sin efecto).
+   - YA CERRADO: los ítems médicos reales (4 defs categoría medical,
+     verificadas en juego — rondas 1-4 de Coagulant).
+   - EN CÓDIGO SIN VERIFICAR: la barra de sangre del panel (slice 4 de
+     Coagulant, espera su ronda 7). Ojo: una barra "vital" separada NO
+     existe — Coagulant registra UNA sola (Blood); la vida la pinta su
+     silueta propia.
+9. Craving: CERRADO, sin pendientes — 6 consumibles reales + barras de
+   hambre/hidratación, verificado en juego (ver craving_estado.md).
 10. Cortex: provider de facción/rango real (contrato congelado esperado:
     cortex.GetFactionInfo(ply) -> {faction, rank}) + disguise leyendo el
     hook Corpus_Cargo_BodyChanged / GetEquipped(ply, "body").
@@ -180,8 +187,10 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     taguea la entidad con el uid de la instancia — el arma botada sigue siendo la
     instancia-ítem de Cargo con su blob (no un arma fresca), y el take-back la
     restaura. Decisión del autor: el mod "Drop Weapon" gana sobre la nativa. El
-    cargador viaja en el Clip1 de la entidad (persistencia de #18 a nivel entidad;
-    la persistencia del cargador en el BLOB del ítem para el grid es del Bloque B).
+    cargador viaja en el Clip1 de la entidad mientras el arma está en el mundo, y
+    se cosecha al blob de la instancia al recapturarla (la persistencia en el BLOB
+    la cerró el #18 en la MISMA entry — CHANGELOG #10, [APLICADO 2026-07-12], vía
+    Inventory.StoreClip/RestoreClip).
 
 18. PERSISTENCIA DE MUNICIÓN DEL CARGADOR [Caliber semántica + Cargo blob].
     [IMPLEMENTADO — CHANGELOG #10, [APLICADO 2026-07-12], confirmado en juego]
@@ -235,8 +244,9 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
 
 21. QUICKSLOTS DE SANDBOX EN EQUIP: PHYSGUN / TOOLGUN / CAMERA [Cargo UI]. 3 UI
     circulares (solo el símbolo — toolgun, cámara, physgun — sin texto) entre los
-    quickslots y los accesorios del equipamiento, por ser herramientas muy necesarias
-    del sandbox. Toggleable con "hide" en el inventario. -> DISEÑADO en §15.
+    quick slots F1-F4 y el cinturón de munición (orden de §15.2), por ser
+    herramientas muy necesarias del sandbox. Toggleable con "hide" en el
+    inventario. -> DISEÑADO en §15 y APLICADO (CHANGELOG #8, 2026-07-12).
 
 22. ORDEN DE ARMAS ESTILO STALKER + HOLSTER + matar notificaciones de GMod
     [CERRADO — CHANGELOG #9 y #17, APLICADOS (confirmado in-game
@@ -370,8 +380,13 @@ HALLAZGOS IN-GAME 2026-07-12 (pasada del Bloque C) — ESTADO POR ÍTEM
 30. SPAWNMENU: EL ÍCONO DE ARMA NO LLEGA AL INVENTARIO [Cargo capture].
     [CERRADO — CHANGELOG #14, APLICADO 2026-07-13: el hook PlayerGiveSWEP
     (sandbox commands.lua:940) marca el give del spawnmenu como deliberate
-    (ventana 1 s); el dedup avisa "You already have one." en vez de comerse
-    el click.]
+    (ventana 1 s), así que el arma clickeada llega al inventario.
+    ENMENDADO — CHANGELOG #27 (pedido del autor 2026-07-14): al ser DELIBERADO,
+    el click del spawnmenu sobre una clase ya poseída CAPTURA la N-ésima copia
+    (cada arma es su propia instancia; el comercio ya las vendía por separado).
+    El dedup quedó acotado al give ANÓNIMO — ver Capture.Decide en
+    server/corpus_cargo_capture.lua. El aviso "You already have one." YA NO
+    existe en el código: es historia, ver #15.]
     Reporte del autor: sin el toolgun no hay forma de obtener physgun/toolgun/
     camera; al clickear el ícono del arma en el spawnmenu, el arma no llega al
     inventario. Sospecha (NO confirmada): el filtro de loadout de sandbox del

@@ -2350,3 +2350,120 @@ el comentario de `corpus_cargo_ui.lua` — ni una línea ejecutable.
 - PARCHE 20 — docs(docs): **REGRESIÓN del PARCHE 16.** La verificación de la API de ARC9 (2026-07-10, base + pack EFT de Darsu, anotada en el header de `corpus_cargo_arc9.lua`, congelada por el contrato #8) seguía anunciada como **tarea futura en cuatro sedes** que el PARCHE 16 no tocó: `Cargo_Architecture` **§10.3** (que la mandaba «al prompt de CC») y **§13** (fila «Upgrades de armas ARC9/EFT»), y `Workbench_Arquitectura` **§6** y **§10** (fila Upgrades). Las cuatro corregidas: la API está verificada y el puente en producción; lo que sigue abierto es el **diseño del árbol de upgrades**, y nada más. **[APLICADO 2026-07-14]**
 - PARCHE 21 — docs(docs): **convar fantasma.** `Cargo_Architecture` §16.8 gateaba la rama de armas de mundo con un `cargo_world_guns` que **no existe en el árbol**: el convar real es **`cargo_weapon_world_pickup`** (`corpus_cargo_capture.lua`; `cvWorldGuns` es solo el nombre de la variable Lua que lo sostiene, de ahí la confusión). El roadmap ya lo citaba bien. Se corrige también en la **entry 12** de este mismo CHANGELOG, donde el nombre ya era falso al escribirse — corrección de identificador, sin borrar ni renumerar nada. **[APLICADO 2026-07-14]**
 - PARCHE 22 — docs(docs): **el racimo de marcadores rancios que quedó vivo** en `cargo_roadmap.txt`. Los frentes **#25** (reordenar el cinturón) y **#26** (unload) figuraban como **«SIN DISEÑAR»** estando cerrados, implementados y confirmados en juego —`Inventory.BeltMove` + `BeltMergeInto` y `AmmoPool.UnloadWeapon`, CHANGELOG #12 `[APLICADO 2026-07-12]`— cuatro líneas debajo de un encabezado que ya decía «ESTADO: CERRADO». El **#27** describía en presente un bug que el mismo #12 arregló (el `PlayerUse` de `capture.lua` ya cubre `corpus_cargo_item`). El **#18** figuraba «SIN diseñar» en la L165 y «hoy no persiste» en su cuerpo, con `Inventory.StoreClip` en producción desde la entry #10 y el propio roadmap desmintiéndose 30 líneas más abajo. Y la sección **«AHORA (cierre del Block 1)»** pedía re-verificar la entry #2 —`[APLICADO 2026-07-11]`— contra un checklist de `cargo_estado.md` que ya no existe. Los cinco corregidos contra sus entries. De paso, el encabezado **«HALLAZGOS IN-GAME 2026-07-12 … — SIN DISEÑAR»** declaraba ese estado **por el grupo entero** cuando sus cuatro ítems (**#28 a #31**) están CERRADOS: pasa a «ESTADO POR ÍTEM», y el marcador de cada ítem manda. (Los #32-#42 son de la pasada del **2026-07-13**, sección aparte — no de este grupo.) **[APLICADO 2026-07-14]**
+
+---
+
+## PARCHES DE sesión Etiquetado de IDs normativos (deuda D-7) — 2026-07-19
+
+Tanda multi-repo del ecosistema, guiada por `dev/PROMPT_d7_etiquetado_ids.txt` (§8 del flujo).
+Solo prosa: **ninguna norma cambió**. Cada sede que el registro
+(`../corpus/docs/ids.yaml`) declara ahora lleva su ID visible, para que un lector que
+aterriza en el doc vea de qué norma se trata sin abrir el registro, y para que el gate de
+coherencia (§7.8) pueda contrastar el título del yaml contra la prosa de su sede.
+
+- PARCHE 1 — **38 de 48 IDs de la familia `CRG` etiquetados en su sede.**
+  Los 10 restantes NO se etiquetaron a propósito: sus sedes viven en archivos `.lua`,
+  en el CHANGELOG, en el estado o en el roadmap. Etiquetar ahí volvería **definitorio** un
+  comentario, que es lo que **FLU-26** prohíbe, o tocaría un doc que no se reescribe
+  (**FLU-14**). Son deuda **D-3** del registro y se cierran moviendo la sede a un doc —
+  decisión de diseño, no mecánica. **[APLICADO 2026-07-19]**
+
+- PARCHE 2 — **La deuda D-1 pagada en el repo dueño.** `Cargo_Architecture.md` §3 gana un
+  bloque que **cita** `COR-12` (la def y su `onUse` van en shared) con su causa —la UI
+  client-side exige `isfunction(def.onUse)`— y `COR-13` (el retorno gobierna el consumo).
+  Cargo es el dueño de `Items.Register` y hasta hoy no lo decía en ningún doc: las seis
+  copias vivían en los repos consumidores. Es el único lugar de la tanda donde se agregó
+  prosa nueva en vez de solo anteponer un ID. **[APLICADO 2026-07-19]**
+
+- PARCHE 3 — **Contratos que eran copias, ahora CITAN:** `COR-11`, `COR-1`/`COR-10`,
+  `COR-2`, `COR-3`/`COR-8`, `COR-4`, `COR-5`, `COR-6`. **[APLICADO 2026-07-19]**
+
+Sigue abierto, y es la mitad fea de D-1: el comentario de `shared/corpus_cargo_items.lua`
+anota `onUse ... (SERVER)`, que **induce el bug** al leerse solo. Es `.lua`: va en la
+pasada de D-3.
+
+Verificación: `corpus/.claude/check-ids/corpus_check_ids.ps1` en verde (una etiqueta mal
+tipeada habría salido como `HUERFANO_DOC`). Sin superficie de runtime: nada que cargar en
+un mapa, y **ningún check de planilla nace de esta tanda** (FLU-37).
+
+---
+
+## PARCHES DE sesión Anti-drift: cierre de votos — 2026-07-19
+
+Tanda multi-repo guiada por `dev/PROMPT_cierre_antidrift.txt`: el autor votó las deudas
+abiertas del registro y acá se aplica lo que toca a este repo.
+
+- PARCHE 1 — **D-9 cerrada: la notación del footprint vive en su doc dueño.** **`CRG-38`**
+  (el «2x3» del autor es `{w=3, h=2}` — alto×ancho, el reverso del código) se enuncia en
+  `Cargo_ItemImages_Arquitectura.md` §5, la sede que `CRG-36` declara, aclarando que los
+  pares del propio doc (y el set permitido) van en notación de código **ancho×alto**. La
+  trampa del toolgun queda desactivada; la entry del §8 (3.ª pasada, 2026-07-12) de este
+  CHANGELOG queda como historia (FLU-14). **[APLICADO 2026-07-19]**
+- PARCHE 2 — **La mitad fea de D-1, saldada.** El comentario de
+  `shared/corpus_cargo_items.lua` ya no anota `onUse ... (SERVER)` a secas: dice que la def
+  y su `onUse` se registran en **AMBOS realms** y que la closure solo CORRE en server,
+  citando `COR-12`. Ya no induce el bug al leerse solo. **[APLICADO 2026-07-19]**
+- PARCHE 3 — **Curaduría D-10 (votada por el autor):** el contrato 7 del `CLAUDE.md`
+  enuncia la mitad real de **`CRG-6`** que solo el registro afirmaba (toda mutación termina
+  en Save + Sync + refresh de movimiento); el contrato 8 generaliza **`CRG-24`** a API de
+  terceros y del engine (no solo ARC9); la fila fija de tabs es ahora **`CRG-49`**
+  (`Cargo_Architecture.md` §7.1, partida de `CRG-10`); **`CRG-48`** se reescribe a las tres
+  capas de idioma que su sede enuncia; y **`CRG-19`** se reformula en positivo (voto del
+  autor: sigue **VIGENTE** — es la norma que sostiene el `skipCap` del `Confirm`; el
+  titular «DEROGADO» de `Cargo_Trade_Arquitectura.md` §3 pasa a enunciarla como regla
+  activa, conservando la historia de la enmienda del 2026-07-14). **[APLICADO 2026-07-19]**
+
+Verificación: `corpus/.claude/check-ids/corpus_check_ids.ps1` en verde sobre 197 IDs. Sin
+superficie de runtime (solo el comentario de items.lua, ni una línea ejecutable), y
+**ningún check de planilla nace de esta tanda** (FLU-37).
+
+---
+
+## PARCHES DE sesión Anti-drift: reparación del COMPLETO — 2026-07-19
+
+Aplica los hallazgos del acta `corpus/docs/auditorias/2026-07-19_coherencia_docs.md` que
+tocan este repo — el más auditado de la corrida (10 de 26).
+
+- PARCHE 1 — **2.1 / 2.7 / 2.11:** el encabezado de `Cargo_Architecture.md` separa por
+  fin **SALIENTES** (Cortex y Coagulant — las únicas dos consultas reales) de
+  **ENTRANTES** (Coagulant, Craving y Caliber registran CONTRA Cargo — CRG-44/CRV-13):
+  la flecha Cargo↔Craving estaba invertida y Caliber jamás fue arista saliente. La fila
+  de barras de §11 y la enmienda §15 dejan de prometer una barra «Health» que Coagulant
+  descartó: registra **una sola** (Blood); la vida la pinta su silueta. **[APLICADO 2026-07-19]**
+- PARCHE 2 — **2.2 (ALTA):** §3 deja de decir que un stackeable persiste «solo un
+  `count`»: la entry es `{id, count, condition?}` y el stack **se parte por condición** —
+  mezclar desgastes sería una reparación gratis (el anti-lavado de `AddStack`, que
+  además factura el comercio por `id + condición`). **[APLICADO 2026-07-19]**
+- PARCHE 3 — **2.3 (ALTA):** la fila de capture del CLAUDE.md deja de decir «nunca
+  vetando `PlayerCanPickupWeapon`»: la ruta de **give** no se veta; el **world gate** sí
+  veta armas en reposo en el mundo (roadmap #16, CHANGELOG #7). `CRG-40` alineado en el
+  registro. **[APLICADO 2026-07-19]**
+- PARCHE 4 — **2.5 (ALTA):** el harness deja de declararse descartable en el CLAUDE.md:
+  es **permanente** en `dev/harness_cargo.py` (355 checks acumulados), referente citable
+  de ~20 evidencias `tipo: harness` del registro — tirarlo borraría evidencia. **[APLICADO 2026-07-19]**
+- PARCHE 5 — **2.8 / 2.13 / 2.18:** §1 anota la enmienda de gradas (el «grid uniforme /
+  cada ítem una celda» murió el 2026-07-11; el footprint es **solo render**) — también en
+  el «Qué es» del CLAUDE.md; §4 corrige «clase "placa"» (el registro hace `error()` con
+  cualquier `class` fuera de stackable/unique — el eje es `category:plates`, CRG-8); y la
+  fila del SWEP Hands describe el fix **vivo** de brazos oscuros
+  (`render.SuppressEngineLighting` + caja de luz propia; `SetLightingOriginEntity` falló
+  y se revirtió — CHANGELOG #9). **[APLICADO 2026-07-19]**
+- PARCHE 6 — **2.14 / 2.21 / 2.22 / 2.23 (roadmap):** el #30 gana el cross-ref a la
+  enmienda #27 (el aviso «You already have one.» es historia), los cruces 8/9 se parten
+  en cerrado / en-código-sin-verificar / pendiente real (solo el drenaje de stamina), el
+  #21 ubica los círculos junto al cinturón (orden §15.2, APLICADO en CHANGELOG #8) y el
+  #17 deja de diferir al «Bloque B» la persistencia de blob que el #18 cerró en la misma
+  entry (#10). **[APLICADO 2026-07-19]**
+- PARCHE 7 — **2.25 — VOTO DEL AUTOR: el GC del cadáver looteado es de CARGO.** La
+  frontera del §9 de `Cargo_Trade` queda adjudicada: la loot table (el QUÉ dropea) es de
+  Cortex/Caliber; el **cadáver looteable es un contenedor de Cargo** (CRG-21) y su GC —
+  el CUÁNDO se limpia — es de **Cargo**, agnóstico al diseño de Cortex (que queda como
+  capa de IA sobre la base de NPC). Coincide con la fila del §11, que ya lo decía: la
+  contradicción interna del doc muere. **[APLICADO 2026-07-19]**
+
+Deuda de verificación que el acta detectó al pasar (decide el autor): la entry **#27
+sigue `[PENDIENTE]`** con su código en el árbol y `cargo_estado.md` dándolo por estado
+de HOY — o falta la pasada en juego, o falta el flip.
+
+Verificación: checker en verde + suite 12/12. Sin superficie de runtime: todos los
+parches son doc.

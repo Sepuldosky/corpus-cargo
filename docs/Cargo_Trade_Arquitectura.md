@@ -106,17 +106,18 @@ cadáver son el mismo mecanismo.
 
 ### Validación atómica (en Confirm, servidor)
 
-Todo o nada, en un solo paso:
+**CRG-18 —** Todo o nada, en un solo paso:
 
 - **Dinero suficiente:** el neto no deja el wallet en negativo (provider, §6 de
   `Cargo_Architecture.md`).
 - ~~**Peso resultante:** lo que el jugador se lleva no excede su capacidad.~~
-  **DEROGADO — enmienda 2026-07-14 (decisión del autor, 1.ª pasada en juego del slice 1,
-  CHANGELOG #21).** El peso **no** valida una transacción: comprar es un acto deliberado
+  **CRG-19 — La compra transfiere con `skipCap`: el peso no valida una transacción**
+  (enmienda 2026-07-14 — decisión del autor, 1.ª pasada en juego del slice 1,
+  CHANGELOG #21; reformulado en positivo el 2026-07-19). Comprar es un acto deliberado
   y negarle el trato al jugador porque saldría sobrecargado convierte al trader en una
   niñera. **Puede comprar por encima de su capacidad y salir sobrecargado**, y la curva
   de peso (§5 de `Cargo_Architecture.md`) ya se lo cobra en velocidad. El límite de carga
-  sigue vigente **para lo que se recoge del suelo**.
+  sigue vigente **para lo que se recoge del suelo** (CRG-13).
 - **Stock/propiedad:** el trader todavía tiene lo que se le compra; el jugador
   todavía tiene lo que vende (relevante en multiplayer / jugador-trader).
 
@@ -140,7 +141,7 @@ Precio de un ítem = **`def.value`** (precio base, campo nuevo en la definición
 ítem) **× multiplicador de condición × spread del trader**.
 
 - **`def.value`** — precio base de referencia del ítem, en la moneda del provider
-  activo (§6 de `Cargo_Architecture.md`). Campo nuevo; ítems sin `value` no son
+  activo (§6 de `Cargo_Architecture.md`). Campo nuevo; **CRG-20:** ítems sin `value` no son
   comerciables (no aparecen con precio).
 - **Multiplicador de condición** — un arma al 41% vale menos que una al 100%. Curva
   simple sobre la condición del blob (§3 de `Cargo_Architecture.md`). Ítems
@@ -245,9 +246,14 @@ resuelve cuando el bloque dueño cierre:
 - Un cadáver (NPC muerto, o jugador) es una **entidad con inventario** (§2) — su
   loadout + lo que llevaba. Abrirlo es el estado "loot" (§15.1 de
   `Cargo_Architecture.md`), no "trade": sin precios, con Take all.
-- **Frontera:** *qué* deja caer un NPC al morir y *cuándo* se limpia el cadáver es
-  semántica de Cortex/Caliber (loot table, muerte); *cómo se ve y se transfiere ese
-  inventario* es de Cargo. Se cierra al diseñar el bloque dueño — regla del flujo
+- **Frontera (voto del autor, 2026-07-19):** *qué* deja caer un NPC al morir es
+  semántica de Cortex/Caliber (loot table, muerte). El **cadáver looteable es un
+  contenedor de Cargo** (CRG-21: contenedor, trader y cadáver son el mismo
+  primitivo) y su **GC — *cuándo* se limpia un cadáver looteado — es de CARGO**:
+  mantiene el loot agnóstico al diseño de Cortex (que queda como capa de IA sobre
+  la base de NPC) y el dueño del primitivo de inventario-en-entidad es quien ya
+  reacciona vía `CallOnRemove`. *Cómo se ve y se transfiere ese inventario* también
+  es de Cargo. La loot table se cierra al diseñar el bloque dueño — regla del flujo
   (dueño se decide en diseño).
 - Enlaza con el pendiente de "loot on death / GC de instancias huérfanas" del roadmap
   Cargo #15.
@@ -300,7 +306,7 @@ El bloque se implementa en **3 vertical slices** (corte validado con el autor
 inventario-en-entidad. **Ya existía**: `Containers.Attach` (§8 de
 `Cargo_Architecture.md`) — items en la entidad, capacidad, persistencia por
 clave, derrame al removerse. El trader **es** ese contenedor con `buy_mult`,
-`sell_mult` y wallet encima; el net de transferencia del contenedor
+`sell_mult` y wallet encima; **CRG-22:** el net de transferencia del contenedor
 **deliberadamente no se cablea** a un trader: nada cruza salvo por `Confirm`.
 Cuando Cortex traiga traders reales o cadáveres looteables, hereda un único
 primitivo, no dos.
