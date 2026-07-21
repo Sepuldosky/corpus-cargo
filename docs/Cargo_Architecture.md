@@ -349,7 +349,7 @@ Cargo.StatusPanel.RegisterBar(module, {
 ```
 
 - **Craving**: hambre, hidratación.
-- **Coagulant**: cantidad de sangre (`id = "blood"`) — **una sola barra**. La vida por zona no viaja al panel: la pinta la silueta de 6 zonas del HUD propio de Coagulant (`Coagulant_Architecture.md` §10, geometría única de silueta), que es información por zona y no cabe en una barra lineal.
+- **Coagulant**: cantidad de sangre (`id = "blood"`) — **una sola barra**. La vida por zona no viaja al panel: la pinta la silueta de 7 zonas del HUD propio de Coagulant (`Coagulant_Architecture.md` §10, geometría única de silueta), que es información por zona y no cabe en una barra lineal.
 - **Caliber (Block 3, pendiente)**: protección de armadura equipada.
 
 **CRG-44 —** Si el módulo dueño de una barra no está montado, la barra simplemente no se registra — degradación honesta, mismo principio que gobierna todo soft-dep del ecosistema.
