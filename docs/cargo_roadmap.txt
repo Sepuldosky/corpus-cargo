@@ -133,7 +133,7 @@ INTEGRACIONES / DEUDA PROPIA
     y el spawn del NPC trader de ejemplo (Trade §10).
     La norma es CRG-45 y su SEDE es Cargo_Architecture.md §13.1 — acá solo se
     ordena el trabajo. Ojo con el matiz que la sede enuncia: el único net.Receive
-    que hoy espera gate es NET_ICON_OVERRIDE (contenido por CRG-46); los otros 14
+    que hoy espera gate es NET_ICON_OVERRIDE (contenido por CRG-46); los otros 21
     no lo necesitan porque los protege CRG-6.
 13. Corpus.Data.Delete como primitiva del framework (hoy file.Delete
     directo en Instances.Delete, deuda declarada).
@@ -157,7 +157,7 @@ Hallazgos del autor probando en juego, tras la baja del mod "L4D Item Pickup"
 mejoras de UI/manejo de armas. La FRONTERA de dueño (Cargo = pickup/drop/equip/
 UI/quickslots; Caliber = semántica del arma: munición, cargador, condición→traba)
 se resuelve AL diseñar el bloque. Varios tocan la UI fullscreen (#3).
-Espejado como cross-ref en caliber_roadmap.txt §2[5].
+Espejado como cross-ref en caliber_roadmap.txt §2[4].
 
 Estado de diseño de este bloque tras la sesión 2026-07-11:
   - #21 (círculos de herramienta sandbox) -> DISEÑADO dentro de §15; FIX de
@@ -503,7 +503,7 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     heredados por la cadena SWEP.Base. La captura los lee y los pone en
     def.trivia + def.trivia_rows; el tooltip pinta una sección "Specs" bajo los
     stats. Cualquier pack ARC9 que se monte después queda cubierto solo.
-    corpus_cargo_weapon_trivia.lua es la EXCEPCIÓN (36 entradas): huecos que el
+    corpus_cargo_weapon_trivia.lua es la EXCEPCIÓN (40 entradas): huecos que el
     pack no escribió, herencias mentirosas (el M16A1 hereda de arc9_eft_m4a1 y
     se presentaría como un M4A1) y las armas HL2, que no son SWEPs.
 

@@ -2517,3 +2517,27 @@ ciegos y **dos** sedes fuera de un doc de diseño. Solo prosa: ninguna norma cam
 
 Verificación: checker en verde sobre 207 IDs + suite 12/12. Sin superficie de runtime: **ni
 una línea de Lua cambió**, y ningún check de planilla nace de esta tanda (FLU-37).
+
+---
+
+## PARCHES DE sesión Reparación del gate de coherencia (acta 2026-07-22) — 2026-07-22
+
+Tanda de reparación documental propuesta por el gate de coherencia en su corrida COMPLETO del
+2026-07-22 (`../../corpus/docs/auditorias/2026-07-22_coherencia_docs.md`; el gate propone, el
+autor dispone). Acá lo que toca a este repo. Solo prosa; **ninguna norma cambió de contenido**.
+
+- PARCHE 1 — **Hallazgo 2.3 del acta (pase de valor):** `docs/cargo_roadmap.txt` decía
+  «espejado como cross-ref en `caliber_roadmap.txt §2[5]`»; no existe `[5]` en ese doc — el
+  cross-ref vive en `[4]`. Corregido a `§2[4]`. **[APLICADO 2026-07-22]**
+- PARCHE 2 — **Hallazgo 2.4 del acta:** la tabla `CARGO.Capture.WeaponTrivia` tiene **40**
+  entradas (9 arc9_eft + 19 arc9_cod2019 + 12 weapon_ HL2, contadas en el árbol), no 36. Se
+  corrige la cifra en `docs/cargo_roadmap.txt` (#38) **y** en `docs/cargo_estado.md` (misma
+  cifra stale). **[APLICADO 2026-07-22]**
+- PARCHE 3 — **Hallazgo 2.7 del acta:** el árbol tiene **22** `net.Receive` en
+  `lua/corpus_cargo/server/` (ammopool 1 + containers 3 + holster 1 + icons 1 + inventory 14 +
+  trade 2), no 15. Se corrige la cifra en su **sede**, `docs/Cargo_Architecture.md` §13.1 (22
+  net.Receive, otros 21), y el eco en `docs/cargo_roadmap.txt` (#12: «los otros 21»). CRG-45 /
+  CRG-46 / CRG-6 sin cambio de contenido. **[APLICADO 2026-07-22]**
+
+Verificación: sin superficie de runtime — **ni una línea de Lua cambió**. Cifras recontadas
+contra el árbol (árbitro de nivel 1, §7.1). No commiteado ni pusheado (GIT-7).

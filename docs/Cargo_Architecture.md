@@ -385,7 +385,7 @@ Todo vía `Corpus.Data` (namespace `cargo`), sin necesidad de SQLite: no hay con
 
 Es **deuda declarada, no una norma cumplida**: lo normativo es que el `TODO` esté anotado y espere la primitiva, no que los comandos estén protegidos. Se dice acá para que nadie lea la ausencia de gate como un descuido.
 
-De los 15 `net.Receive` del módulo, el único que necesita gate y no lo tiene es `NET_ICON_OVERRIDE`, hoy **abierto a cualquier jugador** y contenido solo por el saneo de entrada de **CRG-46** (def desconocida se ignora, footprint fuera del set permitido se descarta). Los otros 14 no lo necesitan por diseño: los protege **CRG-6** — el server posee el inventario y el cliente solo manda intents, así que un intent hostil se valida contra el estado real y no puede fabricar nada.
+De los 22 `net.Receive` del módulo, el único que necesita gate y no lo tiene es `NET_ICON_OVERRIDE`, hoy **abierto a cualquier jugador** y contenido solo por el saneo de entrada de **CRG-46** (def desconocida se ignora, footprint fuera del set permitido se descarta). Los otros 21 no lo necesitan por diseño: los protege **CRG-6** — el server posee el inventario y el cliente solo manda intents, así que un intent hostil se valida contra el estado real y no puede fabricar nada.
 
 > **Sede movida el 2026-07-19** (deuda D-3/D-13). Vivía en `cargo_roadmap.txt` (ítem 12 de su lista de deuda propia), y un roadmap es **intención pura, nivel 6** — no puede ser sede de una norma vigente. Peor: el archivo ni siquiera contenía la etiqueta `CRG-45`, así que era una sede rota que el gate LLM no vio y el checker tampoco, porque la ruta existía. El roadmap ahora **cita** esta sección.
 

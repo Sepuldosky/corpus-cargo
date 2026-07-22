@@ -54,7 +54,7 @@ queda solo para el give anónimo del engine).)
   `weapons.Get(class)` (ya heredados por la cadena `SWEP.Base`) → `def.trivia`
   + `def.trivia_rows`; el tooltip pinta **"Specs"** bajo los stats, sin exigir
   el arma en la mano. **Cualquier pack ARC9 que se monte después queda cubierto
-  solo.** `corpus_cargo_weapon_trivia.lua` es la *excepción* (36 entradas):
+  solo.** `corpus_cargo_weapon_trivia.lua` es la *excepción* (40 entradas):
   huecos del pack, herencias mentirosas (el M16A1 hereda de `arc9_eft_m4a1`) y
   las armas HL2, que no son SWEPs. **ARC9MW: las 87 clases** con peso y precio
   — los pesos los **declara el propio pack** en su `SWEP.Trivia` (54/87
