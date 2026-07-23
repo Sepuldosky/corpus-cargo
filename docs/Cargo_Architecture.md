@@ -90,6 +90,8 @@ Cargo.Items.Register({
 - **Cargo owns**: schema base (id, peso, icono, clase, categoría, stack), la API de registro, cómo se persiste el blob de instancia, cómo se renderiza en grid y tooltip.
 - **El módulo dueño owns**: la semántica — cómo se degrada la condición, qué hace un ítem al usarse, qué contiene su blob de instancia. Caliber decide cómo se rompe la protección de una zona; Cargo solo guarda el número y lo muestra.
 
+> **Sustitución de modelos (entry 34, decisión del autor 2026-07-23).** Un def **sin `model`** es el default honesto de un ítem setting-agnostic: dropea como la cajita de cartón (`models/props_junk/cardboard_box004a.mdl`, último eslabón de la cadena de resolución) y su ícono cae a la letra. `Cargo.Items.SetModel(id, model)` es el punto de extensión con el que un addon de **contenido** re-viste cualquier def sin poseerlo: el override se guarda y se aplica en el acto o cuando el def (re-)registre — orden-independiente entre addons (COR-5) y a prueba de re-registro (autogen/lua refresh) —, y gana sobre el `model` declarado. Un path no montado es inofensivo (`ModelUsable` gatea drop e íconos). Los defs siguen siendo del módulo dueño: solo cambia la piel.
+
 ### Blob de instancia (ítems únicos)
 
 Cada ítem único persiste un blob propio vía `Corpus.Data`, namespaced por instancia (no por definición — dos TOZ-34 en el mismo inventario tienen historiales independientes). Contenido mínimo genérico: condición (global o por zona, según declare el módulo dueño), sub-slots ocupados (§4), munición bindeada (grupo A/B). Todo lo demás es específico del módulo — Caliber define qué campos lleva la condición por zona de una armadura; Cargo no interpreta ese contenido, solo lo transporta.

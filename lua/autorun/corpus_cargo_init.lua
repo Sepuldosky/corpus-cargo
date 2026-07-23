@@ -17,6 +17,10 @@
 --   CARGO.Items.DeclareSubSlot(def, spec)     -- generic sub-slot primitive
 --                                                (optic / exo-shield / plates)
 --   CARGO.Items.Get(id) -> def | nil
+--   CARGO.Items.SetModel(id, model)           -- model substitution point for
+--                                                content addons: stored and
+--                                                applied now or whenever the
+--                                                def (re-)registers
 --   CARGO.Inventory.GiveItem(ply, id, count | blob) -> ok, err|uid
 --   CARGO.Inventory.TakeItem(ply, id, count) -> ok
 --   CARGO.Inventory.CountItem(ply, id) -> n  -- stack units ONLY (uniques are
@@ -55,6 +59,7 @@ local SHARED = {
     "shared/corpus_cargo_weight.lua",   -- pure weight -> speed curve
     "shared/corpus_cargo_movecompat.lua", -- curve vs speed-stomping movement mods (#34)
     "shared/corpus_cargo_ammo.lua",     -- HL2 ammo items + caliber map (§16)
+    "shared/corpus_cargo_supplies.lua", -- HL2 health/suit items + generic backpacks (#34)
     "shared/corpus_cargo_arc9.lua",     -- ARC9 bridge (realm-guarded inside)
     "shared/corpus_cargo_dev.lua",      -- selftest + dev item kit (verification)
 }

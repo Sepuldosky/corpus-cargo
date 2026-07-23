@@ -2716,3 +2716,70 @@ manos ya estaba (Hands, entry 9); esto porta la TRANSICIÓN. Verificado contra e
 Verificación offline: harness 355 verdes. En juego: enfundar un arma HL2 (anim reversa), una ARC9
 (su propia anim, sin doble), Q vuelve al arma, no se puede disparar/recargar mientras enfunda,
 re-apretar el número enfunda con anim. No commiteado ni pusheado (GIT-7).
+
+---
+
+## 34. La cajita como default honesto: suministros HL2, mochilas genéricas y el punto de sustitución de modelos `[APLICADO 2026-07-23]`
+
+Pedido del autor (2026-07-23): (a) los ítems sin modelo —el set médico de Coagulant, y todo def
+setting-agnostic— deben caer **a propósito** a la cajita de cartón del drop
+(`models/props_junk/cardboard_box004a.mdl`, el fallback que la cadena de resolución ya tenía),
+dejando una vía para que **cualquiera** sustituya esos modelos por los que quiera; (b) el
+framework base suma como ítems default las entidades estándar de salud y escudo de HL2; (c) y
+**ambas mochilas** genéricas. Es cross-repo (FLU-04, Cargo primero): `corpus-stalker` consume el
+punto de sustitución para re-vestir venda/botiquín/mochilas con modelos de la Zona, y Coagulant
+solo anota la decisión (sus defs ya no declaraban modelo — ahora es contrato de diseño, no
+accidente).
+
+- PARCHE 1 — feat(items): **`Items.SetModel(id, model)`** — el punto de sustitución de modelos
+  (`shared/corpus_cargo_items.lua`). El override se guarda en `_modelOverrides` y se aplica en el
+  acto si el def ya existe, o al registrar(se) — **orden-independiente entre addons** (COR-5:
+  nadie asume que el otro ya cargó) y **sobrevive al re-registro** (autogen defs y lua refresh
+  re-registran su tabla; sin la re-aplicación en `Register` resucitaban el modelo original). Gana
+  sobre el `model` declarado, así que sirve para re-vestir cualquier ítem. Un path no montado es
+  inofensivo: `ModelUsable` ya gatea drop e íconos y ambos caen al default exacto de siempre. El
+  precache del modelo declarado se extrajo a un helper (`PrecacheDeclared`) que ahora también
+  cubre al override. Va al bloque CONTRATO del init.
+- PARCHE 2 — feat(items): nace **`shared/corpus_cargo_supplies.lua`** (manifest: después de
+  `ammo`) — el set default del framework base, como el de munición (§16): **Health Kit** (+25 HP,
+  `models/items/healthkit.mdl`), **Health Vial** (+10, `healthvial.mdl`), **Suit Battery** (+15
+  de armadura HL2 cap 100, `battery.mdl`, categoría `misc`, `effect_icon` battery) — `onUse` con
+  los valores y sonidos de pickup del ENGINE (`HealthKit.Touch` & co.; al tope no consume, como
+  la entidad de HL2 que rechaza el touch). NO es medicina: heridas/sangre son de Coagulant y
+  estos ítems no las tocan (CRG-1 intacta — Cargo es dueño de estas defs, su semántica
+  engine-genérica vive acá). Más **dos mochilas genéricas** para el slot Back: `Backpack`
+  (1.8 kg, +12 kg, $1500) y `Large Backpack` (3.2 kg, +24 kg, $3200), `unique` con condición,
+  **sin modelo a propósito** (HL2 no tiene prop de mochila): caen a la cajita hasta que un addon
+  de contenido las re-viste vía SetModel. Números de arranque, a calibrar en juego.
+- PARCHE 3 — chore(dev): el kit `cargo_dev_give` entrega el set nuevo (healthkit/vial/battery ×2,
+  ambas mochilas) y el selftest suma **7 checks**: suministros registrados con `onUse` en ambos
+  realms (COR-12), mochilas equipables en Back con su bonus, mochilas sin modelo propio (caen a
+  la caja), y SetModel antes / después / sobre re-registro. `cargo_selftest` pasa a **76 server /
+  83 client**.
+- PARCHE 4 — chore(dev): **adquisición dev por ítem** (pedido del autor 2026-07-23, al preguntar
+  cómo probar ítems sueltos: los defs no son entidades y no se spawnean del spawnmenu — el kit
+  entero era la única vía). `cargo_dev_items [filtro]` lista los defs registrados en la sesión,
+  agrupados por categoría (armas capturadas `wpn_*` y attachments ARC9 son BULK: cientos de
+  autogen que ahogarían el listado — solo aparecen con filtro explícito; para el arsenal ya está
+  `cargo_dev_dump_weapons`). `cargo_dev_give_item <id|texto> [cantidad]` da N unidades de UN def:
+  id exacto primero, si no substring sobre id+nombre (1 match da, varios los imprime, 0 avisa);
+  stackables van en un solo GiveItem, uniques una instancia por unidad con **tope 10 por llamada**
+  (cada unique es un blob en disco — un typo en la cantidad no debe acuñar cientos). Sirve
+  también para los ítems de Coagulant/Craving montados (cualquier def registrado).
+
+Lado contenido (mismo pedido, repos hermanos): `corpus-stalker` estrena
+`lua/autorun/corpus_stalker_itemmodels.lua` (re-viste `corpus_coagulant_bandage` → wick_bandage,
+`corpus_coagulant_medkit` → medkit_low, y las dos mochilas → backpack-1/2 de hgn, mapeo
+provisorio) + los assets de spec45as/wick copiados con rutas verbatim; Coagulant anota en su §7 y
+en el comentario de sus defs que la ausencia de modelo es decisión, no deuda. Tourniquet y Blood
+Bag quedan en la cajita (sin modelo coherente identificado por el autor).
+
+Verificación offline: harness **355 verdes en ambos realms** (el manifest carga el archivo nuevo
+solo). En juego (pasada del autor): (a) `cargo_dev_give` → healthkit/vial/battery curan/cargan
+con su sonido y NO se consumen al tope; (b) las mochilas equipan en Back y suman capacidad;
+(c) SIN corpus_stalker las mochilas y los ítems de Coagulant dropean como la cajita con su
+etiqueta; (d) CON corpus_stalker montado, venda/botiquín/mochilas dropean y renderizan ícono con
+el modelo de la Zona (log `[Corpus:stalker] modelos de ítem sustituidos: 4/4`), y el autor
+verifica cuál mochila es cuál. **Confirmado en juego por el autor el 2026-07-23** (checklist
+a-d ✓; el mapeo chica→backpack-1 / grande→backpack-2 quedó confirmado, deja de ser provisorio).
+Commiteado y pusheado con autorización del autor.

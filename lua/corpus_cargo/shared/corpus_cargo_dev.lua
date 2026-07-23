@@ -195,6 +195,11 @@ if SERVER then
         { "cargo_dev_pistol" }, { "cargo_dev_melee" },
         { "cargo_dev_pda" }, { "cargo_dev_detector" },
         { "cargo_throw_frag", 3 },
+        -- real HL2 supplies + generic backpacks (#34): the default set is what
+        -- the in-game pass verifies (box drop, SetModel substitution, onUse)
+        { "cargo_hl2_healthkit", 2 }, { "cargo_hl2_healthvial", 2 },
+        { "cargo_hl2_battery", 2 },
+        { "cargo_backpack_small" }, { "cargo_backpack_large" },
         -- real HL2 ammo (§16): enough to hang stacks on the belt and watch the
         -- reserve follow. cargo_ammo_pistol shares its pool with the dev 9mm.
         { "cargo_ammo_pistol", 120 }, { "cargo_ammo_smg1", 120 },
@@ -209,6 +214,128 @@ if SERVER then
         end
         Corpus.Log("cargo", "kit dev entregado a " .. ply:Nick())
     end, nil, "Gives the Cargo test item kit")
+
+    -- ------------------------------------------------------------------
+    -- Per-item dev acquisition (entry 34 PARCHE 4, author request
+    -- 2026-07-23): the kit hands a fixed set, but verifying ONE def (a new
+    -- supply, a Coagulant med, a backpack) should not require the lot —
+    -- and the author has no way to know which ids exist in a session.
+    -- Captured weapons (wpn_*) and bridged ARC9 attachments are BULK:
+    -- hundreds of autogen defs that would drown the listing, so they only
+    -- show under an explicit filter (cargo_dev_dump_weapons is the
+    -- instrument for the weapon set anyway).
+    -- ------------------------------------------------------------------
+
+    local function IsBulk(id, def)
+        return def.arc9_att ~= nil or id:sub(1, 4) == "wpn_"
+    end
+
+    -- nil filter: every non-bulk def. With filter: case-insensitive plain
+    -- substring over id AND display name, bulk included.
+    local function FindDefs(filter)
+        local out = {}
+        for id, def in pairs(CARGO.Items._defs) do
+            if filter == nil then
+                if not IsBulk(id, def) then out[#out + 1] = { id = id, def = def } end
+            elseif id:lower():find(filter, 1, true)
+                or def.name:lower():find(filter, 1, true) then
+                out[#out + 1] = { id = id, def = def }
+            end
+        end
+        table.sort(out, function(a, b)
+            local ca = a.def.category or "misc"
+            local cb = b.def.category or "misc"
+            if ca == cb then return a.id < b.id end
+            return ca < cb
+        end)
+        return out
+    end
+
+    concommand.Add("cargo_dev_items", function(_, _, args)
+        local filter = isstring(args and args[1]) and args[1]:lower() or nil
+        local rows = FindDefs(filter)
+
+        MsgN(string.format("— %d ítems registrados%s —", #rows,
+            filter and (" (filtro '" .. filter .. "')") or ""))
+        local lastCat
+        for _, r in ipairs(rows) do
+            local cat = r.def.category or "misc"
+            if cat ~= lastCat then
+                MsgN("[" .. cat .. "]")
+                lastCat = cat
+            end
+            MsgN(string.format("  %-28s %s (%s)", r.id, r.def.name, r.def.class))
+        end
+
+        if filter == nil then
+            local bulk = 0
+            for id, def in pairs(CARGO.Items._defs) do
+                if IsBulk(id, def) then bulk = bulk + 1 end
+            end
+            if bulk > 0 then
+                MsgN("(+" .. bulk .. " armas capturadas/attachments ocultos — usá un filtro para verlos; armas: cargo_dev_dump_weapons)")
+            end
+        end
+        MsgN("dar uno: cargo_dev_give_item <id|texto> [cantidad]")
+    end, nil, "Lists registered item defs grouped by category (arg: id/name filter; captured weapons and attachments only show filtered)")
+
+    concommand.Add("cargo_dev_give_item", function(ply, _, args)
+        if not IsValid(ply) then ply = player.GetAll()[1] end
+        if not IsValid(ply) then return end
+        if not isstring(args and args[1]) or args[1] == "" then
+            Corpus.Log("cargo", "uso: cargo_dev_give_item <id|texto> [cantidad] — lista: cargo_dev_items")
+            return
+        end
+
+        -- exact id first (raw, ids may not be lowercase); then the same
+        -- substring search as the listing — one hit gives, several print
+        local chosen
+        if CARGO.Items.Get(args[1]) ~= nil then
+            chosen = args[1]
+        else
+            local matches = FindDefs(args[1]:lower())
+            if #matches == 0 then
+                Corpus.Log("cargo", "give_item: nada matchea '" .. args[1]
+                    .. "' — lista: cargo_dev_items")
+                return
+            end
+            if #matches > 1 then
+                Corpus.Log("cargo", "give_item: '" .. args[1] .. "' es ambiguo ("
+                    .. #matches .. " matches):")
+                for i = 1, math.min(#matches, 12) do
+                    MsgN("  " .. matches[i].id .. "  " .. matches[i].def.name)
+                end
+                if #matches > 12 then MsgN("  ...") end
+                return
+            end
+            chosen = matches[1].id
+        end
+
+        local def = CARGO.Items.Get(chosen)
+        local want = math.max(math.floor(tonumber(args and args[2]) or 1), 1)
+        local given = 0
+        if def.class == "stackable" then
+            local ok, err = CARGO.Inventory.GiveItem(ply, chosen, want)
+            if ok then given = want
+            else Corpus.Log("cargo", "give_item: " .. tostring(err)) end
+        else
+            -- one instance (blob on disk) per unit — clamped so a typo in
+            -- the count argument cannot mint hundreds of them
+            want = math.min(want, 10)
+            for _ = 1, want do
+                local ok, err = CARGO.Inventory.GiveItem(ply, chosen)
+                if not ok then
+                    Corpus.Log("cargo", "give_item: " .. tostring(err))
+                    break
+                end
+                given = given + 1
+            end
+        end
+        if given > 0 then
+            Corpus.Log("cargo", "give_item: " .. given .. "x " .. chosen
+                .. " a " .. ply:Nick())
+        end
+    end, nil, "Gives N units of ONE item def, by exact id or by id/name text (default 1; unique items cap at 10 per call). List: cargo_dev_items")
 
     concommand.Add("cargo_dev_money", function(ply)
         if not IsValid(ply) then ply = player.GetAll()[1] end
@@ -515,6 +642,48 @@ function CARGO._SelfTest()
     local back = CARGO.Items.Get("cargo_dev_backpack")
     local total, base, bonus = CARGO.Weight.Capacity(back)
     check("capacidad = base + mochila", total == base + 18 and bonus == 18)
+
+    -- HL2 supplies + generic backpacks (#34): the base framework's default set
+    local hk = CARGO.Items.Get("cargo_hl2_healthkit")
+    check("suministros HL2 registrados", istable(hk)
+        and CARGO.Items.Get("cargo_hl2_healthvial") ~= nil
+        and CARGO.Items.Get("cargo_hl2_battery") ~= nil)
+    check("suministros HL2: onUse presente en este realm (COR-12)",
+        isfunction((hk or {}).onUse)
+            and isfunction((CARGO.Items.Get("cargo_hl2_battery") or {}).onUse))
+    local bpS = CARGO.Items.Get("cargo_backpack_small")
+    local bpL = CARGO.Items.Get("cargo_backpack_large")
+    check("mochilas default: equipables en Back con bonus de capacidad",
+        istable(bpS) and istable(bpL)
+            and CARGO.Slots.CanEquip(bpS, "back") and CARGO.Slots.CanEquip(bpL, "back")
+            and bpS.capacity_bonus == 12 and bpL.capacity_bonus == 24)
+    -- deliberately NO model (author call 2026-07-23): they drop as the box
+    -- until a content addon substitutes one via Items.SetModel
+    check("mochilas default sin modelo propio (caen a la caja)",
+        (CARGO.Items._modelOverrides.cargo_backpack_small ~= nil
+            or CARGO.Items.ResolveModel(bpS) == nil)
+        and (CARGO.Items._modelOverrides.cargo_backpack_large ~= nil
+            or CARGO.Items.ResolveModel(bpL) == nil))
+
+    -- model substitution point (#34): order-independent, survives re-register
+    CARGO.Items.SetModel("st_model_a", "models/st_pre.mdl")
+    local mA = CARGO.Items.Register({
+        id = "st_model_a", name = "x", weight = 1, class = "stackable" })
+    check("SetModel antes del registro aplica al registrar",
+        mA.model == "models/st_pre.mdl")
+    local mB = CARGO.Items.Register({
+        id = "st_model_b", name = "x", weight = 1, class = "stackable",
+        model = "models/st_own.mdl" })
+    CARGO.Items.SetModel("st_model_b", "models/st_sub.mdl")
+    check("SetModel después del registro sustituye el declarado",
+        mB.model == "models/st_sub.mdl")
+    check("re-registro no resucita el modelo original", CARGO.Items.Register({
+        id = "st_model_b", name = "x", weight = 1, class = "stackable",
+        model = "models/st_own.mdl" }).model == "models/st_sub.mdl")
+    CARGO.Items._defs.st_model_a = nil
+    CARGO.Items._defs.st_model_b = nil
+    CARGO.Items._modelOverrides.st_model_a = nil
+    CARGO.Items._modelOverrides.st_model_b = nil
 
     -- numeric-key normalization after a JSON round-trip (Corpus.Data
     -- contract: key types are NOT preserved)

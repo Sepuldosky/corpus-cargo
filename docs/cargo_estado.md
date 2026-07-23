@@ -5,13 +5,14 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-23 (tarde: **entries 32/33 confirmadas en juego** →
-`[APLICADO]`, commiteadas y pusheadas a pedido del autor — compat Quick Loadouts (takeover de su
-`PlayerLoadout`: el loadout es una entrega de ítems, cero pérdida) + transición de holster
-reciclada de Simple Holster (cascada + undraw, candados, `m_hLastWeapon`). Antes en el día,
-**pasada unificada COA-2 + Cargo**: addendum 2 de la 26 → `[APLICADO]`; la **27** cerró en ronda 2
-(Sidorovich ✓, **#28** ✓, strips parejos vía **#30**); el addendum de la 25 era arsenal nuevo:
-11 `makeshift` catalogadas (**#31**), dump `sin peso: 0 | sin precio: 0` ✓.)
+**Última actualización:** 2026-07-23 (noche: **entry 34 confirmada en juego** → `[APLICADO]`,
+commiteada y pusheada a pedido del autor — suministros HL2 default (Health Kit/Vial/Battery con
+semántica de pickup del engine), dos mochilas genéricas **sin modelo a propósito** (caen a la
+cajita de cartón), el punto de sustitución **`Items.SetModel`** para addons de contenido
+(`corpus-stalker` re-viste venda/botiquín de Coagulant y ambas mochilas — mapeo chica→backpack-1
+/ grande→backpack-2 confirmado) y la adquisición dev por ítem (`cargo_dev_items` /
+`cargo_dev_give_item`). Antes en el día: **entries 32/33 confirmadas** — compat Quick Loadouts +
+transición de holster; y la **pasada unificada COA-2 + Cargo** cerró 26-add2, 27, 28, 30 y 31.)
 
 ---
 
@@ -97,16 +98,26 @@ reciclada de Simple Holster (cascada + undraw, candados, `m_hLastWeapon`). Antes
   actividad de ataque (`sh_anim.lua`: `ACT_MP_ATTACK_STAND_PRIMARYFIRE` →
   `index + 5`), no existe gesto de puño izquierdo en el set de anims de jugador —
   el `weapon_fists` de Valve tiene exactamente la misma limitación. Aceptado.
+- **Suministros HL2 + mochilas genéricas + `Items.SetModel`** (entry 34, confirmada
+  en juego): el framework base trae Health Kit/Vial/Battery como ítems (valores y
+  sonidos de pickup del ENGINE — no es medicina, Coagulant intacto) y dos mochilas
+  para Back (+12/+24 kg) **sin modelo a propósito**: la cajita de cartón es el
+  default honesto de todo def setting-agnostic, y un addon de contenido lo
+  re-viste desde afuera con `Items.SetModel(id, model)` (orden-independiente,
+  sobrevive re-registro, gana al `model` declarado). `corpus-stalker` lo consume
+  para venda/botiquín (wick/spec45as) y las mochilas (hgn backpack-1/2, mapeo
+  confirmado en juego). Adquisición dev por ítem: `cargo_dev_items [filtro]` +
+  `cargo_dev_give_item <id|texto> [n]`.
 - **Harness offline: 355 checks verdes en ambos realms** (con gate final: un
-  FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 76 client / 69 server.
+  FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 83 client / 76 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
   MIT y el rename `corpus_stalker` en el kit dev).
 
 ## Pendiente de verificar
 
-- **Nada** — las entries **32** (compat Quick Loadouts) y **33** (transición de holster) se
-  confirmaron en juego el 2026-07-23 y quedaron `[APLICADO]`.
+- **Nada** — la entry **34** (suministros HL2 + mochilas + SetModel + adquisición dev
+  por ítem) se confirmó en juego el 2026-07-23 y quedó `[APLICADO]`.
 
 ## Frentes abiertos (anotados, NO arreglados)
 

@@ -11,6 +11,7 @@ local CARGO = Corpus.GetModule("cargo")
 CARGO.Items = CARGO.Items or {}
 CARGO.Items._defs = CARGO.Items._defs or {}
 CARGO.Items._categories = CARGO.Items._categories or {}
+CARGO.Items._modelOverrides = CARGO.Items._modelOverrides or {}
 
 -- ------------------------------------------------------------------
 -- Categories. Open set: owner modules can register their own; unknown
@@ -153,7 +154,8 @@ end
 --            block; the order is the one the pack declares, not pairs() order.
 --
 -- Extended optional fields transported by Cargo (owner module semantics):
---   model          world model for drops (default cardboard box)
+--   model          world model for drops (default cardboard box; content
+--                  addons may substitute it via Items.SetModel — see below)
 --   max_stack      stack ceiling (default: unlimited)
 --   onUse          function(ply, ctx) -> true to consume one unit. The closure
 --                  only RUNS on SERVER, but def + onUse must be registered in
@@ -190,6 +192,16 @@ end
 
 local ITEM_CLASSES = { stackable = true, unique = true }
 
+-- Precache the declared model: a prop the map never used is NOT in the
+-- precache table, and the drop entity / icon gate then read it as invalid
+-- (see Items.ModelUsable). Precaching also networks it to clients.
+local function PrecacheDeclared(model)
+    if SERVER and isstring(model) and model ~= ""
+        and file.Exists(model, "GAME") then
+        util.PrecacheModel(model)
+    end
+end
+
 -- Stored and returned BY REFERENCE (same spirit as the Corpus registry
 -- invariant): the owner module may keep populating its own def table.
 function CARGO.Items.Register(def)
@@ -219,13 +231,13 @@ function CARGO.Items.Register(def)
         Corpus.Log("cargo", "Items.Register: '" .. def.id .. "' re-registered; replacing previous def")
     end
 
-    -- Precache the declared model: a prop the map never used is NOT in the
-    -- precache table, and the drop entity / icon gate then read it as invalid
-    -- (see Items.ModelUsable). Precaching also networks it to clients.
-    if SERVER and isstring(def.model) and def.model ~= ""
-        and file.Exists(def.model, "GAME") then
-        util.PrecacheModel(def.model)
+    -- a stored substitution (Items.SetModel) beats the declared model, and it
+    -- must re-apply here: autogen defs and lua refreshes re-register their
+    -- table, which would otherwise resurrect the original model
+    if CARGO.Items._modelOverrides[def.id] ~= nil then
+        def.model = CARGO.Items._modelOverrides[def.id]
     end
+    PrecacheDeclared(def.model)
 
     -- persisted icon overrides re-attach on (re-)register: autogen defs are
     -- rebuilt every session, but their editor adjustments must survive
@@ -242,6 +254,36 @@ end
 
 function CARGO.Items.Get(id)
     return CARGO.Items._defs[id]
+end
+
+-- ------------------------------------------------------------------
+-- Model substitution point (CHANGELOG #34, author call 2026-07-23).
+--
+-- A def registered WITHOUT a model is the honest default for
+-- setting-agnostic items (Coagulant's medical set, the generic backpacks):
+-- it drops as the cardboard box and its icon falls back to the letter
+-- placeholder. A CONTENT addon (corpus_stalker) re-skins those defs from
+-- outside without owning them: the override is stored and applied either
+-- right now or whenever the def (re-)registers, so the call order between
+-- addons never matters (COR-5: no addon may assume another already loaded).
+-- It also beats a def-declared model, so any item can be re-skinned. A
+-- path that is not mounted is harmless: ModelUsable gates the drop and the
+-- icon render, both fall back exactly as if no model were set.
+-- ------------------------------------------------------------------
+
+function CARGO.Items.SetModel(id, model)
+    if not isstring(id) or id == "" then
+        error("Cargo.Items.SetModel: 'id' must be a non-empty string", 2)
+    end
+    if not isstring(model) or model == "" then
+        error("Cargo.Items.SetModel: 'model' must be a non-empty model path (item '" .. id .. "')", 2)
+    end
+    CARGO.Items._modelOverrides[id] = model
+    local def = CARGO.Items._defs[id]
+    if def ~= nil then
+        def.model = model
+        PrecacheDeclared(model)
+    end
 end
 
 -- ------------------------------------------------------------------
