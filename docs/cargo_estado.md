@@ -5,13 +5,13 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-23 (**pasada unificada COA-2 + Cargo**: se confirmó el
-**addendum 2 de la 26** (`FORCE_SCALE = 0.2`, el cadáver trastabilla) → `[APLICADO]`. La **27** se
-cerró en ronda 2 (confirmada en juego 2026-07-23): Sidorovich ✓, toma del piso de clase equipada ✓
-(**#28**), y strips parejos vía **#30** (BUY crece por el footer de peso). El **addendum de la 25**
-era arsenal nuevo, no regresión: 11 clases `makeshift` catalogadas (**#31**), dump `sin peso: 0 |
-sin precio: 0` ✓. Antes, 2026-07-14: entries 21/22 —basket agregado,
-click 25% / SHIFT = todo, peso no bloquea.)
+**Última actualización:** 2026-07-23 (tarde: **entries 32/33 confirmadas en juego** →
+`[APLICADO]`, commiteadas y pusheadas a pedido del autor — compat Quick Loadouts (takeover de su
+`PlayerLoadout`: el loadout es una entrega de ítems, cero pérdida) + transición de holster
+reciclada de Simple Holster (cascada + undraw, candados, `m_hLastWeapon`). Antes en el día,
+**pasada unificada COA-2 + Cargo**: addendum 2 de la 26 → `[APLICADO]`; la **27** cerró en ronda 2
+(Sidorovich ✓, **#28** ✓, strips parejos vía **#30**); el addendum de la 25 era arsenal nuevo:
+11 `makeshift` catalogadas (**#31**), dump `sin peso: 0 | sin precio: 0` ✓.)
 
 ---
 
@@ -77,6 +77,18 @@ click 25% / SHIFT = todo, peso no bloquea.)
   ya **no grita lobo**: las plantillas de SWEP y las clases de `Capture.Ignore`
   salen `n/a`, no `MISSING`, y trae **columna de precio** + resumen de huecos
   reales.
+- **Compat Quick Loadouts** (entry 32, confirmada en juego): takeover de su hook `PlayerLoadout`
+  (`corpus_cargo_quickloadout.lua`, ÚLTIMO en el manifest) — los heals de Cargo corren siempre
+  antes del strip, los cargadores se banquean a los blobs, el cinturón no se drena, y el loadout
+  llega como **entrega de ítems** vía la captura (dedup anónimo, sin éter). Mid-round el arma en
+  mano vuelve a la mano. Sin el mod montado el archivo es inerte; kill-switch
+  `cargo_quickloadout_compat`. Referencia: `dev/Cargo_QuickLoadouts_Referencia.md`.
+- **El holster anima el enfundado** (entry 33, confirmada en juego): reciclaje de Simple Holster —
+  cascada `ACT_VM_HOLSTER→…` con **undraw** reverso para armas sin anim dedicada, exclusión de
+  bases que ya animan (ARC9 &co.), candados `StartCommand` + `m_flNextAttack` (absoluto, fix del
+  original), memoria `m_hLastWeapon` (Q alterna arma↔manos) y rate-limit 0,5 s. Spawn va
+  `instant` (#4). Kill-switch `cargo_holster_anim`. Referencia:
+  `dev/Cargo_SimpleHolster_Referencia.md`.
 - **Hands pega como puños** (entry 26, confirmado en juego): puñetazo **3-4** dmg
   (era 37-47) y se acabó el tirón al volver a `idle` — el port medía la duración
   de la secuencia **equivocada** (`SequenceDuration()` sin argumento, leída
@@ -93,9 +105,8 @@ click 25% / SHIFT = todo, peso no bloquea.)
 
 ## Pendiente de verificar
 
-- **Nada de esta tanda** — la ronda 2 cerró en juego el 2026-07-23: **W1** strips parejos (#30) y
-  **X1** dump `sin peso: 0 | sin precio: 0` con las 11 makeshift (#31), más **W3** (#28) y el **cap
-  del torniquete** (#29). Todo `[APLICADO 2026-07-23]`.
+- **Nada** — las entries **32** (compat Quick Loadouts) y **33** (transición de holster) se
+  confirmaron en juego el 2026-07-23 y quedaron `[APLICADO]`.
 
 ## Frentes abiertos (anotados, NO arreglados)
 

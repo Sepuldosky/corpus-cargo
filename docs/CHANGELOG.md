@@ -2641,3 +2641,78 @@ nombre / tipo / munición) con cifras reales de arranque, sin tener el pack.
 
 Verificación offline: sintaxis de las dos tablas (el harness las carga; 355 verdes). El conteo 0/0
 se confirma con el dump en juego. No commiteado ni pusheado (GIT-7).
+
+---
+
+## 32. Compat con Quick Loadouts: el loadout es una entrega de ítems, nunca destruye nada `[APLICADO 2026-07-23]`
+
+Pedido del autor (2026-07-23; mapa del mod + diagnóstico + wants en
+`dev/Cargo_QuickLoadouts_Referencia.md` — alcance acordado: solo funcionalidad, SIN UI). El bug
+reportado: con `quickloadout_enable_client 0` las armas equipadas persistidas desaparecen. Causa
+verificada contra el código vivo (`dev/other/quick loadouts/.../sv_loadout.lua`, CRG-24): el hook
+`PlayerLoadout` del mod (la global `QuickLoadout()`, sv:59) hace `StripWeapons()` +
+`RemoveAllAmmo()` INCONDICIONALES (sv:63-64) — también con tabla vacía, que es lo que deja el
+"cliente desactivado" (sv:29) —, y con loadout activo devuelve `true` (sv:100-102), cortando la
+cadena: que los hooks de restauración de Cargo corrieran era lotería de orden de inserción. Además
+el net receive re-corre la cadena ENTERA en cualquier momento de la partida (sv:42). El wipe del
+pool además le leía como consumo al espejo §16, que drenaba el cinturón (pérdida real de ítems).
+
+- PARCHE 1 — feat(capture): nace `server/corpus_cargo_quickloadout.lua` — **takeover del hook**:
+  se remueve `"QuickLoadoutLoadout"` y se re-registra la MISMA función envuelta, ÚLTIMA en el
+  orden del manifest. Con eso la cadena es determinista: todos los hooks `PlayerLoadout` de Cargo
+  (re-give del inventario + reconcile a 0.1 s, gate `ready` del ammopool + rebuild a 0.5 s, manos
+  a 0.25 s) ya corrieron Y agendaron sus heals antes del strip — el espejo queda suprimido en la
+  ventana, el reconcile re-da toda clase equipada stripeada, y el wrapper **banquea los cargadores
+  vivos** en los blobs (`StoreClip`) antes de llamar al original. Mid-round, además, recuerda el
+  arma en mano y la re-selecciona a 0.35 s (el loadout es una ENTREGA, no un swap; en spawn mandan
+  las manos del roadmap #4). El original corre intacto vía `pcall` y su `return true` hacia
+  `GM:PlayerLoadout` se preserva. Detección honesta (COR-5): sin el mod montado el archivo es
+  inerte; kill-switch `cargo_quickloadout_compat` (con captura apagada también es pass-through).
+  Los gives del mod NO se tocan: caen en la captura `WeaponEquip` existente como cualquier give
+  anónimo (clase nueva → ítem al grid; clase ya poseída → dedup; equipada → keep), y la munición
+  regalada muere en el rebuild del spawn (§16: sin éter). Edge aceptado y anotado: una clase del
+  loadout que además está equipada cae en "keep" y el `SetClip1(max)` del mod le llena ese cargador.
+- PARCHE 2 — fix(inventory): el re-give de `"corpus_cargo_inv_loadout"` ahora **salta las clases
+  que ya están en mano** (guard `HasWeapon`): en las pasadas mid-round re-daba sobre el arma viva y
+  `RestoreClip` le pisaba el cargador actual con el clip viejo del blob (recarga gratis). En spawn
+  real el jugador no tiene nada y todo se da igual que antes. **[APLICADO 2026-07-23]** (pasada en
+  juego del autor: checklist a-b-c de abajo verificado)
+
+Verificación offline: harness 355 verdes en ambos realms (el stub de player ganó `SetSaveValue` /
+`GetViewModel`, extensión explícita como pide su header). En juego, checklist: (a) con
+`quickloadout_enable_client 0`, spawn y pasada mid-round → cero pérdida (equipadas, cargadores,
+cinturón); (b) con loadout activo → las armas del loadout aparecen como ítems en el grid una sola
+vez, las equipadas siguen, sin munición del éter; (c) apply mid-round → el arma en mano vuelve a
+la mano. No commiteado ni pusheado (GIT-7).
+
+---
+
+## 33. El holster anima el enfundado: reciclaje de Simple Holster en las manos `[APLICADO 2026-07-23]`
+
+Pedido del autor (2026-07-23; mapa + wants en `dev/Cargo_SimpleHolster_Referencia.md`): reciclar
+la capa funcional de Simple Holster (Chen, 2546335680) en el holster propio (#22/#4). El SWEP de
+manos ya estaba (Hands, entry 9); esto porta la TRANSICIÓN. Verificado contra el código vivo
+(`dev/other/simple holster/.../sh_holsterweapon.lua`, CRG-24).
+
+- PARCHE 1 — feat(inventory): `server/corpus_cargo_holster.lua` recicla, del mod: (1) la **cascada
+  de animación** `ACT_VM_HOLSTER → seq "holster" → ACT_VM_DRAW → seq "draw" →
+  ACT_SLAM_DETONATOR_THROW_DRAW` con el truco **"undraw"** (solo hay draw → se reproduce AL REVÉS
+  a 2x, media duración) — cubre cualquier arma sin anim de holster dedicada; (2) la **lista de
+  exclusión de bases** que ya animan su propio enfundado (ArcCW/ARC9/TacRP/TFA/CW2/FAS2/UT99 +
+  SS/HLAZ condicionales por sus cvars) — para esas se cambia al acto y la base hace su transición
+  (ARC9 es la que importa acá); (3) los **candados de transición**: flag `CargoHolstering` +
+  scrub de `IN_ATTACK|IN_ATTACK2|IN_RELOAD` en `StartCommand` (la máscara 10241 del mod, sh:370)
+  + `m_flNextAttack`; (4) la **memoria `m_hLastWeapon`**: Q (lastinv) alterna arma ↔ manos, en
+  ambos modos de holster (Hands o nada); (5) el **rate-limit 0.5 s** por jugador (sh:235). El
+  switch real ocurre server-side al terminar la anim (nuestro holster es intent-driven, contrato
+  #7), con guard de identidad (si el jugador cambió de arma a mitad de la anim, no se le arranca
+  la nueva). Kill-switch `cargo_holster_anim`; el deploy de spawn va `instant` (roadmap #4: manos
+  YA). Desvíos deliberados del original, anotados en el header: `m_flNextAttack` va en tiempo
+  ABSOLUTO (el mod pasa la duración pelada, sh:309 — ese candado nunca mordía); el auto-holster
+  en escaleras NO se porta (opcional en los wants, fuera del alcance acordado). `SlotKey` ignora
+  intents durante la transición. **[APLICADO 2026-07-23]** (pasada en juego del autor: checklist
+  de abajo verificado — undraw en HL2, ARC9 con su propia anim, Q alterna, candados)
+
+Verificación offline: harness 355 verdes. En juego: enfundar un arma HL2 (anim reversa), una ARC9
+(su propia anim, sin doble), Q vuelve al arma, no se puede disparar/recargar mientras enfunda,
+re-apretar el número enfunda con anim. No commiteado ni pusheado (GIT-7).
