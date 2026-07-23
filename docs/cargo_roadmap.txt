@@ -571,3 +571,13 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     ver si el GL declara su ammo como att Free (que el puente ya excluye) o
     como att normal, y si el default loadout del SWEP lo instala por fuera de
     los hooks de inventario.
+
+43. ÍTEMS/ARMAS FAVORITOS [Cargo UI] — ABIERTO (pedido del autor 2026-07-23,
+    nota de la verificación de la entry #27).
+    Marcar un ítem/arma como favorito desde el CLIC DERECHO del grid, con una
+    ESTRELLITA en una esquina de la celda, del color del UI (T.Colors del theme
+    activo). SIN DISEÑAR — decidir: persistencia (¿flag en el record del
+    inventario o en el blob de la instancia?), alcance (¿solo display, u ordena /
+    protege del drop rápido?) y el render (overlay por esquina estilo PaintOver
+    del grid, no CSS). Toca corpus_cargo_grid.lua (overlay) + corpus_cargo_ui.lua
+    (menú contextual) + persistencia (inventory).

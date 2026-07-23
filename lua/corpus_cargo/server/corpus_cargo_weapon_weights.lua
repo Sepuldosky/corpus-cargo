@@ -279,6 +279,18 @@ CARGO.Capture.WeaponWeights = {
     arc9_eft_makeshift_mcx223        = 2.90,            -- MCX 5.56
     arc9_eft_makeshift_mdr_300       = 3.77,            -- DT MDR .300
     arc9_eft_makeshift_valak         = 3.50,            -- VALAK
+    -- makeshift: altas del volcado 2026-07-23 (pasada de la #27, 11 clases; peso real approx)
+    arc9_eft_makeshift_1911_919_1    = 1.10,            -- M919 (1911 en 9x19)
+    arc9_eft_makeshift_ash_20        = 3.20,            -- ASh-20 (lanzagranadas)
+    arc9_eft_makeshift_fal_newd      = 5.00,            -- NEWD M53 (FAL 7.62)
+    arc9_eft_makeshift_mxlr357       = 3.00,            -- MXLR .357
+    arc9_eft_makeshift_nl12g         = 3.00,            -- CG NL 12/70 (escopeta)
+    arc9_eft_makeshift_pk_76225_2    = 2.50,            -- TPPK (SMG)
+    arc9_eft_makeshift_rpdak         = 4.50,            -- AD-44 (RPD/AK)
+    arc9_eft_makeshift_sako_50       = 6.50,            -- Sako TRG 50 (sniper)
+    arc9_eft_makeshift_sks939        = 3.90,            -- SKS-9x39
+    arc9_eft_makeshift_tsvd_1        = 4.30,            -- TSVD (Dragunov)
+    arc9_eft_makeshift_valakmod4     = 3.55,            -- VALAK Mod.4
     -- EFT: subfusiles
     arc9_eft_fn_p90                  = 2.60,            -- P90
     arc9_eft_kedr                    = 1.55,            -- PP-91 Kedr

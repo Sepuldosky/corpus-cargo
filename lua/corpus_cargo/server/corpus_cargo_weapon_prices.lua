@@ -276,6 +276,18 @@ CARGO.Capture.WeaponValues = {
     arc9_eft_makeshift_mcx223        = 2800,            -- MCX 5.56
     arc9_eft_makeshift_mdr_300       = 2900,            -- DT MDR .300
     arc9_eft_makeshift_valak         = 2400,            -- VALAK
+    -- makeshift: altas del volcado 2026-07-23 (pasada de la #27, 11 clases; precio de arranque)
+    arc9_eft_makeshift_1911_919_1    = 800,             -- M919 (1911 en 9x19)
+    arc9_eft_makeshift_ash_20        = 2000,            -- ASh-20 (lanzagranadas)
+    arc9_eft_makeshift_fal_newd      = 2800,            -- NEWD M53 (FAL 7.62)
+    arc9_eft_makeshift_mxlr357       = 1800,            -- MXLR .357
+    arc9_eft_makeshift_nl12g         = 1200,            -- CG NL 12/70 (escopeta)
+    arc9_eft_makeshift_pk_76225_2    = 1200,            -- TPPK (SMG)
+    arc9_eft_makeshift_rpdak         = 2400,            -- AD-44 (RPD/AK)
+    arc9_eft_makeshift_sako_50       = 3500,            -- Sako TRG 50 (sniper)
+    arc9_eft_makeshift_sks939        = 1600,            -- SKS-9x39
+    arc9_eft_makeshift_tsvd_1        = 2200,            -- TSVD (Dragunov)
+    arc9_eft_makeshift_valakmod4     = 2450,            -- VALAK Mod.4
     -- EFT: subfusiles
     arc9_eft_fn_p90                  = 2600,            -- P90
     arc9_eft_kedr                    = 700,             -- PP-91 Kedr

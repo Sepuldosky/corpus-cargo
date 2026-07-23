@@ -22,6 +22,10 @@ local NET_TRADE_CONFIRM = Corpus.Net.Register("cargo", "trade_confirm")
 -- Height of the basket strip on BOTH sides: the trader's Buy panel and the
 -- player's Sell panel (which also carries the net + Cancel/Confirm row).
 CARGO.Trade.STRIP_TALL = 134
+-- Alto del footer de peso (la columna del jugador en corpus_cargo_ui.lua). El
+-- trader NO tiene peso propio, así que la barra BUY crece por esto + su gap de 8
+-- para que la fila de abajo quede pareja con Sell + peso (in-game 2026-07-23, W1).
+CARGO.Trade.WEIGHT_FOOTER_TALL = 34
 
 local tradeState          -- the trader snapshot (nil = no session)
 local basket = { buy = {}, sell = {} } -- keyed by RefKey -> { ref, count, entry }
@@ -271,7 +275,10 @@ function CARGO.Trade.BuildStockColumn(left)
     -- shared STRIP_TALL, not two hand-tuned numbers that drift apart.
     local strip = vgui.Create("DPanel", left)
     strip:Dock(BOTTOM)
-    strip:SetTall(CARGO.Trade.STRIP_TALL)
+    -- STRIP_TALL + el footer de peso del jugador (+ su gap de 8): el trader no
+    -- tiene strip de peso, así que BUY crece para igualar Sell + peso y la fila
+    -- de abajo lee como una sola (in-game 2026-07-23, W1)
+    strip:SetTall(CARGO.Trade.STRIP_TALL + 8 + CARGO.Trade.WEIGHT_FOOTER_TALL)
     strip:DockMargin(0, 8, 0, 0)
     strip:DockPadding(6, 22, 6, 6)
     strip.Paint = function(_, w, h)

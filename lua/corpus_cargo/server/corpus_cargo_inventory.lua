@@ -326,6 +326,25 @@ function CARGO.Inventory.HasItem(ply, id)
     return false
 end
 
+-- Remove ONE unique instance of `id` from the grid (and delete its blob). The
+-- stack-only TakeItem/CountItem are blind to uniques (they key on entry.uid ==
+-- nil), so a consumer that must actually CONSUME a unique — Coagulant OCCUPYING
+-- a tourniquet while it is strapped to a limb, so one tourniquet ties one limb
+-- (in-game 2026-07-23) — asks here. Returns true if one was removed.
+function CARGO.Inventory.TakeUnique(ply, id)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    for i = #rec.items, 1, -1 do
+        local entry = rec.items[i]
+        if entry.uid ~= nil and entry.id == id then
+            table.remove(rec.items, i)
+            CARGO.Instances.Delete(entry.uid)
+            CARGO.Inventory.Touch(ply)
+            return true
+        end
+    end
+    return false
+end
+
 -- Public contract: instance blob equipped in a slot (Cortex reads Body to
 -- resolve the apparent faction / disguise — Cargo_Architecture.md §6).
 -- Stack slots (throwable) have no instance: the stack entry itself comes

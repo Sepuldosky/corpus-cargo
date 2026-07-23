@@ -659,6 +659,27 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
             end
             return false
         end
+        -- A second weapon of a class the player ALREADY has equipped can't ride
+        -- the engine pickup: it holds one SWEP per class, so PickupWeapon refuses
+        -- (in-game 2026-07-23: "You can't take that right now."). A deliberate
+        -- floor-take of a duplicate is legit though — every gun is its own
+        -- instance (roadmap #15/#30) — so capture it STRAIGHT to the grid,
+        -- bypassing the engine equip. The equipped one is untouched; WeaponEquip
+        -- never runs for this take.
+        local class = ent:GetClass()
+        if cvCapture:GetBool() and EquippedClassCount(ply, class) > 0
+            and not CARGO.Capture.Ignore[class] and ThrowableFace(class) == nil then
+            local id = EnsureDef(class, ent)
+            local ok, newUid = CARGO.Inventory.GiveItem(ply, id)
+            if ok then
+                if isstring(newUid) then CARGO.Inventory.StoreClip(newUid, ent) end
+                CARGO.Inventory.NotifyPickup(ply, id, 1)
+                ent:Remove()
+            else
+                CARGO.Inventory.Notice(ply, "You can't carry that.")
+            end
+            return false
+        end
         ent.CargoUseTaken = true -- grant for the gate + "deliberate" marker
         if not ply:PickupWeapon(ent) then
             ent.CargoUseTaken = nil

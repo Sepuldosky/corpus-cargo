@@ -5,13 +5,13 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-14 (**entries 21 y 22 confirmadas**: el basket
-es un agregado sobre todos los stacks, el click carga 25% del `max_stack` con
-**SHIFT+click = todo**, y el peso no bloquea una compra. Antes cerraron 23/24/25
-(armas que se describen solas, saben a qué slot van y pesan de verdad) y la **26**
-(Hands deja de pegar como Apex). Queda `[PENDIENTE]` solo la **27**: strips
-Buy/Sell parejos, **Sidorovich** como trader demo y **N armas iguales** (el dedup
-queda solo para el give anónimo del engine).)
+**Última actualización:** 2026-07-23 (**pasada unificada COA-2 + Cargo**: se confirmó el
+**addendum 2 de la 26** (`FORCE_SCALE = 0.2`, el cadáver trastabilla) → `[APLICADO]`. La **27** se
+cerró en ronda 2 (confirmada en juego 2026-07-23): Sidorovich ✓, toma del piso de clase equipada ✓
+(**#28**), y strips parejos vía **#30** (BUY crece por el footer de peso). El **addendum de la 25**
+era arsenal nuevo, no regresión: 11 clases `makeshift` catalogadas (**#31**), dump `sin peso: 0 |
+sin precio: 0` ✓. Antes, 2026-07-14: entries 21/22 —basket agregado,
+click 25% / SHIFT = todo, peso no bloquea.)
 
 ---
 
@@ -93,19 +93,9 @@ queda solo para el give anónimo del engine).)
 
 ## Pendiente de verificar
 
-- **Entry 27 (2.ª pasada del comercio):** los strips Buy/Sell miden lo mismo;
-  el trader demo es **Sidorovich** (`models/rashkinsk/sidor.mdl`, desde
-  `corpus-stalker`; sin el addon cae al ciudadano de HL2); y **se pueden tomar
-  N armas iguales** — el dedup quedó acotado al give anónimo del engine.
-- **Addendum de la entry 25 (el dump deja de gritar lobo):** un
-  `cargo_dev_dump_weapons` nuevo debe encabezar con `sin peso: 0 | sin precio: 0`,
-  y las plantillas de SWEP deben salir `n/a`, no `MISSING`.
-- **Addendum 2 de la entry 26 (el NPC salió volando):** las fuerzas revividas
-  eran para golpes de 37-115 dmg, no de 3 — un jab lanzaba un ragdoll a ~150 u/s
-  y el uppercut agachado lo mandaba **hacia arriba** a ~300. Ahora pasan por una
-  sola perilla, `FORCE_SCALE = 0.2`, que conserva la forma relativa de la tuning
-  original. Un cadáver debe **trastabillar**, no despegar. (Los finishers de
-  combo, que existen por primera vez, se ven en la misma pasada.)
+- **Nada de esta tanda** — la ronda 2 cerró en juego el 2026-07-23: **W1** strips parejos (#30) y
+  **X1** dump `sin peso: 0 | sin precio: 0` con las 11 makeshift (#31), más **W3** (#28) y el **cap
+  del torniquete** (#29). Todo `[APLICADO 2026-07-23]`.
 
 ## Frentes abiertos (anotados, NO arreglados)
 

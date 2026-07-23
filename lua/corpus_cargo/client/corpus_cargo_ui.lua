@@ -1125,7 +1125,7 @@ function BuildFrame(state)
 
     local footer = vgui.Create("DPanel", right)
     footer:Dock(BOTTOM)
-    footer:SetTall(34)
+    footer:SetTall(CARGO.Trade.WEIGHT_FOOTER_TALL)
     footer:DockMargin(0, 8, 0, 0)
     footer.Paint = function(_, w, h)
         T.PaintPanel(w, h)

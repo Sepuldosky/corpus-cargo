@@ -2224,7 +2224,7 @@ Tenerlo de verdad exigiría animaciones de jugador nuevas (gesto de puño izquie
 o sea pisar el set de anims compartido por todos los playermodels — invasivo y territorio de
 choque con otros addons. **Se acepta el comportamiento de GMod.**
 
-### Addendum 2 — el NPC salió volando `[PENDIENTE]`
+### Addendum 2 — el NPC salió volando `[APLICADO 2026-07-23]`
 
 **Reporte:** *"si un NPC salió volando. Literalmente…"*. Lo advertía el check 5, y era la
 consecuencia directa de resucitar las ramas por animación: las fuerzas se dejaron **verbatim**
@@ -2246,6 +2246,9 @@ siempre estuvo activo y nadie se quejó de un bidón que se mueve al recibir un 
 **Verificación en juego:** golpear a un NPC hasta matarlo — el cadáver debe **trastabillar**, no
 salir despedido. Encadenar 3 golpes (combo) y probar el uppercut agachado: sigue siendo el más
 espectacular de los tres, pero dentro del planeta.
+
+**Resultado (pasada 2026-07-23):** X2 ✓ — el cadáver trastabilla, no despega, y los finishers de
+combo (uppercut/codazo) quedan a la vista. `FORCE_SCALE = 0.2` confirmado en juego.
 
 ---
 
@@ -2541,3 +2544,100 @@ autor dispone). Acá lo que toca a este repo. Solo prosa; **ninguna norma cambi�
 
 Verificación: sin superficie de runtime — **ni una línea de Lua cambió**. Cifras recontadas
 contra el árbol (árbitro de nivel 1, §7.1). No commiteado ni pusheado (GIT-7).
+
+---
+
+## 28. Toma del piso de una 2.ª arma de una clase ya EQUIPADA (fix W3 de la entry #27) `[APLICADO 2026-07-23]`
+
+Reporte del autor (pasada 2026-07-23 de la entry #27, check W3): comprar dos armas iguales
+✓, pero tomar del PISO una 2.ª de una clase **ya equipada** se rechazaba con «You can't take
+that right now». Causa raíz: la captura viaja en `WeaponEquip`, que solo dispara si
+`ply:PickupWeapon` tuvo éxito — y el engine sostiene **una entidad SWEP por clase**, así que
+rechaza la segunda de una clase equipada; encima `Capture.Decide` devuelve `"keep"` para toda
+clase equipada (`server/corpus_cargo_capture.lua` §525-548). El «N armas iguales» del #27
+funcionaba con la 1.ª en el GRID (`equippedCount == 0`), no con una equipada.
+
+El invariante «una clase equipada nunca se toca» se **mantiene para el give ANÓNIMO** del
+engine (el loadout del respawn, que es lo que el dedup protege). Lo que se abre es solo la
+TOMA DELIBERADA del piso: cada arma es su propia instancia (roadmap #15/#30).
+
+- PARCHE 1 — fix(capture): en la rama WALK+USE del hook `PlayerUse`, si la clase ya está
+  equipada (`EquippedClassCount(ply, class) > 0`), se captura el arma de mundo **directo al
+  grid** en vez de pasar por `ply:PickupWeapon`: `EnsureDef` + `Inventory.GiveItem` +
+  `StoreClip` (conserva el cargador del arma del piso, #18) + `NotifyPickup` + `ent:Remove`.
+  Guardas: `cargo_capture_weapons` activo, no `Capture.Ignore`, no cara throwable
+  (`ThrowableFace == nil`, para no resucitar la 2.ª cara de un frag/SLAM — #32). Queda una
+  equipada + N en el grid, cada una su instancia; el give anónimo sigue en `"keep"`.
+  **[APLICADO 2026-07-23]** (pasada 2026-07-23, W3 ✓: 3 armas probadas, las 3 entran al grid
+  con su propio cargador)
+
+Verificación offline: el archivo carga sin romper sintaxis y los 355 checks del harness
+siguen verdes (regresión). El camino nuevo es interacción con el engine (`PickupWeapon` /
+entidades de arma), que el harness no simula: se confirma EN JUEGO (§1 PASO 4). No commiteado
+ni pusheado (GIT-7).
+
+---
+
+## 29. `Inventory.TakeUnique`: consumir un ítem `unique` (soporte del cap de torniquete de Coagulant) `[APLICADO 2026-07-23]`
+
+Gemela de `HasItem` (#18) por el otro lado: `TakeItem`/`CountItem` drenan y cuentan **solo
+stacks** (`entry.uid == nil`), así que un consumidor que necesita CONSUMIR de verdad un
+`unique` no tenía cómo. Nace del cap del torniquete de Coagulant (pasada 2026-07-23, nota del
+check V3): un torniquete `unique` se ponía en varias extremidades porque `HasItem` seguía
+dando true (nunca salía del inventario). El torniquete pasa a **ocuparse** (sale al ponerlo,
+vuelve al quitarlo), y para eso Cargo debe poder sacar una instancia unique concreta.
+
+- PARCHE 1 — feat(inventory): `Inventory.TakeUnique(ply, id)` — saca UNA instancia unique de
+  `id` del grid (`entry.uid ~= nil`), borra su blob (`Instances.Delete`) y hace `Touch`.
+  Devuelve true si sacó una. No toca stacks (para eso está `TakeItem`). Lectura/mutación pura
+  sobre `rec.items`, misma forma que `HasItem`. **[APLICADO 2026-07-23]** (ejercitado por el cap
+  del torniquete: TQ ✓ en la pasada 2026-07-23 — ver el CHANGELOG de Coagulant)
+
+Verificación offline: harness_cargo carga el archivo y sus 355 checks siguen verdes; el uso
+real (occupy/return del torniquete) se prueba con Coagulant montado, en juego. No commiteado
+ni pusheado (GIT-7).
+
+---
+
+## 30. Strips del comercio parejos de verdad: BUY crece por el footer de peso (fix W1 de la #27) `[APLICADO 2026-07-23]`
+
+Reporte del autor (pasada 2026-07-23, ronda 2, check W1): la fila de abajo del estado Trade se ve
+despareja — la barra **BUY** (trader) queda más corta que el bloque **SELL** (jugador). La 1.ª
+pasada lo reportó al revés (SELL más bajo); la ronda 2 lo corrigió con el ojo del autor: BUY es más
+corto **porque el lado del jugador lleva abajo el footer de PESO** (`corpus_cargo_ui.lua`, la barra
+de capacidad `%.1f kg`) que el trader no tiene. Ambos strips ya leían el mismo `STRIP_TALL = 134`
+(entry #27a) — el número compartido estaba bien; faltaba que la columna del trader emparejara la
+altura del footer que solo existe del lado del jugador.
+
+- PARCHE 1 — fix(trade): la barra BUY de `BuildStockColumn` pasa a
+  `SetTall(STRIP_TALL + 8 + WEIGHT_FOOTER_TALL)` — crece por el footer de peso (34) + su gap (8),
+  así el bloque inferior del trader iguala `Sell (134) + peso (34)` del jugador y la fila lee como
+  una sola. Nace la constante compartida `CARGO.Trade.WEIGHT_FOOTER_TALL = 34`, que `ui.lua` lee
+  para el footer y `BuildStockColumn` para el crecimiento — un solo número, no dos que derivan.
+  **[APLICADO 2026-07-23]** (pasada en juego del autor: la fila BUY/SELL queda pareja de lado a lado)
+
+Verificación offline: el harness carga los archivos client sin romper (355 verdes). Es layout VGUI
+puro (alturas de dock), que el harness no pinta: se confirma EN JUEGO. No commiteado ni pusheado
+(GIT-7).
+
+---
+
+## 31. 11 armas makeshift más del arsenal del autor, pesadas y precificadas (cierra el addendum de la #25) `[APLICADO 2026-07-23]`
+
+Reporte del autor (pasada 2026-07-23, ronda 2, check X1): un `cargo_dev_dump_weapons` nuevo
+encabezó **`# 380 SWEPs, 371 capturables | sin peso: 11 | sin precio: 11`** — NO es regresión del
+fix de la #25 (el dump ya no grita lobo: las plantillas salen `n/a`, hay columna de precio), sino
+**arsenal nuevo**: 11 clases del pack `arc9_eft_makeshift` que no están en `dev/other/` y que la
+#25 no alcanzó a catalogar. Mismo remedio que la #25: se catalogan desde el propio volcado (clase /
+nombre / tipo / munición) con cifras reales de arranque, sin tener el pack.
+
+- PARCHE 1 — feat(capture): las 11 clases entran a `weapon_weights.lua` **y** `weapon_prices.lua`
+  (bloque «makeshift: altas 2026-07-23»): M919 (pistola 9x19), ASh-20 (lanzagranadas), NEWD M53
+  (FAL), MXLR .357, CG NL 12/70 (escopeta), TPPK (SMG), AD-44 (RPD/AK), Sako TRG 50 (sniper),
+  SKS-9x39, TSVD, VALAK Mod.4. Peso `real approx` y precio de arranque por tipo (a calibrar en
+  juego, como el resto del arsenal). Sin `value` no se comercia y sin peso cae al nominal 2.5 — los
+  dos huecos eran el mismo. **[APLICADO 2026-07-23]** (pasada en juego del autor: un dump nuevo
+  encabeza `sin peso: 0 | sin precio: 0`)
+
+Verificación offline: sintaxis de las dos tablas (el harness las carga; 355 verdes). El conteo 0/0
+se confirma con el dump en juego. No commiteado ni pusheado (GIT-7).
