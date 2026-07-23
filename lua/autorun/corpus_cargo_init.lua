@@ -72,6 +72,9 @@ local SERVER_FILES = {
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)
     "server/corpus_cargo_holster.lua",    -- STALKER weapon order + holster + default hands (#22/#4)
     "server/corpus_cargo_icons.lua",      -- icon cam/footprint override registry (ItemImages §4.3/§10)
+    -- LAST on purpose: its PlayerLoadout wrapper must run after every Cargo
+    -- loadout hook so the heals are scheduled before Quick Loadouts strips
+    "server/corpus_cargo_quickloadout.lua", -- Quick Loadouts compat: the loadout is an item delivery (no UI)
 }
 local CLIENT_FILES = {
     "client/corpus_cargo_theme.lua",       -- palette, fonts, shared paint helpers

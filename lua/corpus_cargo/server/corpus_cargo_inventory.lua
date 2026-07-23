@@ -1266,15 +1266,17 @@ end)
 hook.Add("PlayerLoadout", "corpus_cargo_inv_loadout", function(ply)
     local rec = CARGO.Inventory.GetRecord(ply)
     for _, val in pairs(rec.equip) do
-        if istable(val) then
-            -- stack slot: no blob, no default clip (its ammo is the stack —
-            -- the ammopool spawn Push reloads the pool from it)
-            local def = CARGO.Items.Get(val.id)
-            if def then GiveEquipWeapon(ply, def, nil, true) end
-        else
-            local blob = CARGO.Instances.Get(val)
-            local def = blob and CARGO.Items.Get(blob.id) or nil
-            if def then GiveEquipWeapon(ply, def, blob) end
+        -- stack slot (table): no blob, no default clip — its ammo is the
+        -- stack, the ammopool spawn Push reloads the pool from it
+        local blob = istable(val) and val or CARGO.Instances.Get(val)
+        local def = blob and CARGO.Items.Get(blob.id) or nil
+        -- a class already in hand is left alone: PlayerLoadout re-runs
+        -- MID-ROUND (Quick Loadouts fires the whole chain from its net
+        -- receive), and re-giving would stomp the live magazine with the
+        -- stale blob clip. On a real spawn the player owns nothing.
+        if def ~= nil and not (isstring(def.weapon_class)
+            and def.weapon_class ~= "" and ply:HasWeapon(def.weapon_class)) then
+            GiveEquipWeapon(ply, def, istable(val) and nil or blob, istable(val))
         end
     end
 
