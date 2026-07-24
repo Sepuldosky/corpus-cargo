@@ -5,7 +5,11 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-23 (noche: **entry 34 confirmada en juego** → `[APLICADO]`,
+**Última actualización:** 2026-07-24 (**entry 35 confirmada en juego → `[APLICADO]`, commiteada y
+pusheada**: la UI consume el banco de sonidos de GAMMA que estrenó el framework —abrir/cerrar por
+estado, drop, selección por categoría en el grid— y el trader demo gana la **capa persona**
+genérica: idles de plaza rotados + voz por proximidad/eventos, que corpus-stalker llena con
+Sidorovich vía `Trade.SetDefaultPersona`. Antes, 2026-07-23 noche: **entry 34 confirmada en juego** → `[APLICADO]`,
 commiteada y pusheada a pedido del autor — suministros HL2 default (Health Kit/Vial/Battery con
 semántica de pickup del engine), dos mochilas genéricas **sin modelo a propósito** (caen a la
 cajita de cartón), el punto de sustitución **`Items.SetModel`** para addons de contenido
@@ -108,6 +112,14 @@ transición de holster; y la **pasada unificada COA-2 + Cargo** cerró 26-add2, 
   para venda/botiquín (wick/spec45as) y las mochilas (hgn backpack-1/2, mapeo
   confirmado en juego). Adquisición dev por ítem: `cargo_dev_items [filtro]` +
   `cargo_dev_give_item <id|texto> [n]`.
+- **Sonidos de UI + persona del trader** (entry 35, `[APLICADO]`): banco de GAMMA
+  del framework (`corpus/sound/corpus/cargo/`, COR-17) cableado con gate
+  `file.Exists` — mochila/estuche al abrir/cerrar por estado, drop, y selección
+  por categoría en el clic del grid (sidearm=wpn, largas=wpnbig, por
+  `equip_slots`). El trader demo: `Trade.SetDefaultPersona` (perfil cosmético de
+  un addon de contenido) + callbacks `OnTradeOpened/Dealt/Closed` + idles de
+  plaza rotados + voz por proximidad (saludo/espera 1 min/despedida). Sin
+  persona: citizen mudo; sin banco: UI muda, consola limpia.
 - **Harness offline: 355 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 83 client / 76 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
@@ -116,8 +128,9 @@ transición de holster; y la **pasada unificada COA-2 + Cargo** cerró 26-add2, 
 
 ## Pendiente de verificar
 
-- **Nada** — la entry **34** (suministros HL2 + mochilas + SetModel + adquisición dev
-  por ítem) se confirmó en juego el 2026-07-23 y quedó `[APLICADO]`.
+- **Nada** — la entry **35** (sonidos de UI + persona del trader) se confirmó en juego el
+  2026-07-24 (checklist a-e ✓) y quedó `[APLICADO]`, commiteada y pusheada. (La 34 quedó
+  `[APLICADO]` el 2026-07-23.)
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -166,7 +179,8 @@ transición de holster; y la **pasada unificada COA-2 + Cargo** cerró 26-add2, 
    slot Throwable pide un **stack**). Enlaza con el #32.
 4. Cuando se prioricen: **#42** (el lanzagranadas capturado no dispara — perdió
    su attachment de munición; sospecha: el puente ARC9 §10), **#36** (slot HL2
-   alineado), **#37** (drop VJ), **#35** (footsteps).
+   alineado), **#37** (drop VJ), **#35** (footsteps), **#44** (overlay de máscara
+   de gas para cascos cerrados — los sonidos ya están en el banco, SIN DISEÑAR).
 
 ---
 

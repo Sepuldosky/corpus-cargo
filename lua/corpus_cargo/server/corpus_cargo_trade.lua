@@ -163,6 +163,11 @@ function CARGO.Trade.OpenFor(ply, ent)
     CARGO.Util.WriteBlob(Snapshot(trader))
     net.Send(ply)
     CARGO.Inventory.Sync(ply) -- the right half of the trade screen
+
+    -- trade-event callback: any trader entity that defines it may react
+    -- (voice line, animation). The contract is just the method name — what
+    -- plays is the entity's business (persona layer, see the demo trader).
+    if isfunction(ent.OnTradeOpened) then ent:OnTradeOpened(ply) end
 end
 
 local function ViewedTrader(ply, traderId)
@@ -437,12 +442,23 @@ net.Receive(NET_TRADE_CONFIRM, function(_, ply)
         or net_ < 0 and ("Deal closed: you paid " .. CARGO.Money.Format(-net_) .. ".")
         or "Deal closed: an even trade."
     CARGO.Inventory.Notice(ply, msg)
+
+    -- trade-event callback: the deal went through (see OnTradeOpened note)
+    if IsValid(trader.ent) and isfunction(trader.ent.OnTradeDealt) then
+        trader.ent:OnTradeDealt(ply, net_)
+    end
 end)
 
 net.Receive(NET_TRADE_CLOSE, function(_, ply)
     local traderId = net.ReadUInt(16)
     local trader = CARGO.Trade._traders[traderId]
-    if trader then trader.viewers[ply] = nil end
+    if trader then
+        trader.viewers[ply] = nil
+        -- trade-event callback: the player closed the screen (bought or not)
+        if IsValid(trader.ent) and isfunction(trader.ent.OnTradeClosed) then
+            trader.ent:OnTradeClosed(ply)
+        end
+    end
 end)
 
 hook.Add("PlayerDisconnected", "corpus_cargo_trade_viewers", function(ply)

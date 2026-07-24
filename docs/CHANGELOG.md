@@ -2783,3 +2783,54 @@ el modelo de la Zona (log `[Corpus:stalker] modelos de ítem sustituidos: 4/4`),
 verifica cuál mochila es cuál. **Confirmado en juego por el autor el 2026-07-23** (checklist
 a-d ✓; el mapeo chica→backpack-1 / grande→backpack-2 quedó confirmado, deja de ser provisorio).
 Commiteado y pusheado con autorización del autor.
+
+---
+
+## 35. El banco de sonidos entra al juego: UI de inventario + persona del trader `[APLICADO 2026-07-24]`
+
+Pedido del autor (2026-07-24): los sonidos generales de STALKER GAMMA viven ahora en el
+framework (`corpus/sound/corpus/`, ordenados por módulo; COR-17 — assets fuera de git) y cada
+módulo consume los suyos. Cargo cablea su UI al banco y el trader demo gana una **capa de
+persona genérica** para que el addon de contenido le cuelgue a Sidorovich sin que Cargo lo
+nombre (mismo espíritu que `Items.SetModel`, entry 34).
+
+- PARCHE 1 — feat(ui): nace `client/corpus_cargo_sounds.lua` (en el manifest tras el theme):
+  cues nombrados — `backpack_open/close` para el inventario personal (estado solo),
+  `inv_open/close` para loot/trade, `inv_drop` en los dos Send*Drop — más **selección por
+  categoría en el clic del grid** (mapa del autor en `sound/corpus/cargo/items/about.txt`:
+  sidearm = `wpn`, primary/secondary = `wpnbig` — derivado de `equip_slots` —, y
+  ammo/pills/knife/cloth/parts/generic por categoría, variante al azar). TODA ruta pasa por un
+  gate `file.Exists` cacheado: sin el banco montado la UI queda MUDA, sin errores de consola
+  (detección, nunca asunción). Reemplaza los `backpack/inv_*.wav` que apuntaban a un addon
+  externo que el ecosistema no trae.
+- PARCHE 2 — feat(trade): **capa persona** — `Trade.SetDefaultPersona/GetDefaultPersona`
+  (shared: perfil cosmético `{name, model, idles, radius, wait_interval, sounds}` que registra
+  un addon de contenido; rutas PRE-filtradas por el registrador) + callbacks genéricos de evento
+  en el server: `OnTradeOpened` al abrir sesión, `OnTradeDealt` al cerrar trato, `OnTradeClosed`
+  al cerrar pantalla — el contrato es el nombre del método; cualquier entity trader puede
+  definirlos (Cortex incluido, mañana). El bloque CONTRACT del init y el CLAUDE.md reflejan.
+- PARCHE 3 — feat(trade): la entity demo implementa la persona: modelo por persona (la cadena
+  sidor.mdl → citizen queda como fallback), **idles de plaza del citizen HL2 rotados**
+  (plazaidle1-4 / lineidle01-03, filtrados por `LookupSequence` — un modelo sin el set cae a
+  `idle_subtle`, nada rompe) y **voz por proximidad** server-side (`CHAN_VOICE`: una línea pisa
+  a la anterior; gap ambiental 2,5 s): saludo al entrar al radio (primera vez por sesión =
+  línea propia), línea de espera cada `wait_interval` parado sin comerciar (nunca con la
+  pantalla abierta; el reloj rearma al cerrarla), despedida al salir (histéresis del 15% para
+  no farmear el borde) y las líneas de trade forzadas en sus eventos. Sin persona: citizen mudo
+  en idles, como siempre. El nombre del trader sale de la persona — `"Trader (demo)"` sin ella
+  (deja de decir "Sidorovich (demo)" hardcodeado: menos Zona en Cargo, no más).
+
+Verificación offline: los 9 archivos tocados compilan (lupa; el harness no cubre client-UI ni
+entities). EN JUEGO (checklist del autor):
+(a) tecla I abre/cierra con foley de mochila; crate y trader abren/cierran con inv_open/close;
+(b) el clic en ítems del grid suena por categoría (pistola ≠ rifle ≠ munición ≠ venda ≠ ropa);
+(c) Drop del menú contextual (grid y slots) suena inv_drop;
+(d) CON corpus-stalker: el trader saluda al acercarse (línea distinta la primera vez), rezonga
+    ~1 min parado sin comerciar, se despide al alejarse, habla al abrir el trading y al cerrar
+    un trato, y rota idles de plaza;
+(e) SIN corpus-stalker: trader citizen y mudo, idles ok; sin el banco de corpus la UI queda
+    muda y la consola limpia.
+**Confirmado en juego por el autor el 2026-07-24** (a-e ✓; nota del autor: con corpus-stalker
+montado el vodka suena con el banco de Corpus y NO con el sonido original de la Zona — que es
+exactamente lo buscado, todo el audio de consumo tira del banco general). Commiteado y pusheado
+con autorización del autor.

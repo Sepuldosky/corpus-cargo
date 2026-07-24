@@ -36,6 +36,9 @@
 --                                                stock/persistKey). Cortex calls
 --                                                this on its own trader entities.
 --   CARGO.Trade.OpenFor(ply, ent)             -- SERVER: opens the trade session
+--   CARGO.Trade.SetDefaultPersona(tbl)        -- cosmetic trader profile a
+--                                                content addon registers (model/
+--                                                idles/voice); nil clears it
 --   def.value                                 -- base price; NO value => the item
 --                                                is not tradeable (Cargo_Trade §4)
 --   CARGO.StatusPanel.RegisterBar(module, spec)  -- CLIENT: status panel bars
@@ -83,6 +86,7 @@ local SERVER_FILES = {
 }
 local CLIENT_FILES = {
     "client/corpus_cargo_theme.lua",       -- palette, fonts, shared paint helpers
+    "client/corpus_cargo_sounds.lua",      -- UI sound bank (corpus/sound/corpus/cargo, COR-17)
     "client/corpus_cargo_icons.lua",       -- item icon pipeline (Cargo_ItemImages §2-§7)
     "client/corpus_cargo_iconeditor.lua",  -- dev icon cam/footprint editor (ItemImages §8)
     "client/corpus_cargo_statuspanel.lua", -- StatusPanel.RegisterBar + render

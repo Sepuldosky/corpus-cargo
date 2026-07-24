@@ -70,6 +70,29 @@ function CARGO.Trade.RefKey(ref)
     return "s:" .. tostring(ref.id) .. "|" .. tostring(ref.condition)
 end
 
+-- ------------------------------------------------------------------
+-- Persona: cosmetic profile a CONTENT addon hangs on the default trader —
+-- model, idle sequences and voice lines. Same substitution spirit as
+-- Items.SetModel: Cargo stays generic (no persona = silent citizen on plaza
+-- idles); corpus-stalker registers Sidorovich from outside. Shape (all
+-- fields optional):
+--   { name, model, radius, wait_interval, idles = { "seq", ... },
+--     sounds = { greet_first / greet / wait / bye / trade_open_first /
+--                trade_open / trade_done = { "path/relative/to/sound.ogg", ... } } }
+-- Sound paths must be PRE-FILTERED by the registrar (file.Exists): the bank
+-- is unversioned (COR-17 side) and a path that never mounted must not play.
+-- Shared so a content addon can call it from either realm; only the server
+-- entity reads it.
+-- ------------------------------------------------------------------
+
+function CARGO.Trade.SetDefaultPersona(persona)
+    CARGO.Trade._defaultPersona = istable(persona) and persona or nil
+end
+
+function CARGO.Trade.GetDefaultPersona()
+    return CARGO.Trade._defaultPersona
+end
+
 -- Money label. The provider interface (§6 of Cargo_Architecture) lives on the
 -- SERVER, so the client cannot ask it to format a number — but every price tag
 -- and basket total in the trade screen is a number the client renders. Server

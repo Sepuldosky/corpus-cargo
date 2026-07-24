@@ -224,6 +224,9 @@ function CARGO.Grid.Create(parent, opts)
                     CARGO.Tooltip.Show(self, entry)
                 end
                 cell.DoClick = function(self)
+                    -- STALKER-style pick foley by category (author's sound
+                    -- bank map, sound/corpus/cargo/items/about.txt)
+                    CARGO.Sounds.PickFor(def)
                     if isfunction(opts.onLeftClick) then opts.onLeftClick(entry, self) end
                 end
                 cell.DoRightClick = function(self)

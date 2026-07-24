@@ -581,3 +581,16 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     protege del drop rápido?) y el render (overlay por esquina estilo PaintOver
     del grid, no CSS). Toca corpus_cargo_grid.lua (overlay) + corpus_cargo_ui.lua
     (menú contextual) + persistencia (inventory).
+
+44. OVERLAY DE MÁSCARA DE GAS (EXTRA DEL BANCO DE SONIDOS) [Cargo UI/equip] —
+    ABIERTO (pedido del autor 2026-07-24, al ordenar el banco de sonidos).
+    Cuando el jugador se equipe un casco CERRADO (el def lo declara — p.ej.
+    flag `def.gasmask`, a diseñar), un overlay de pantalla que funcione como
+    máscara de gas + la respiración muffled del banco
+    (corpus/sound/corpus/cargo/gasmask/): gas_breath_N_x viene en INTENSIDAD
+    1..8 — la 8 es "sin stamina o muy mal herido" en GAMMA; candidata natural
+    a leer stamina/estado de Coagulant por detección (COR-5), con fallback a
+    intensidad fija sin él. mask_clean.ogg queda para el mantenimiento futuro.
+    Los sonidos ya están ordenados y documentados (about.txt de la carpeta);
+    SIN DISEÑAR: overlay (material/viñeta), gatillo exacto (qué cascos), y el
+    mapeo intensidad→estado.

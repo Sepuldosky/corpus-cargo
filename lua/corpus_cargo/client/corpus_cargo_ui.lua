@@ -67,6 +67,7 @@ local function SendUse(ref)
 end
 local function SendDrop(ref, count)
     net.Start(NET_DROP) CARGO.Util.WriteBlob(ref) net.WriteUInt(count or 1, 16) net.SendToServer()
+    CARGO.Sounds.Play("drop")
 end
 local function SendQuickBind(n, itemId)
     net.Start(NET_QUICKBIND) net.WriteUInt(n, 4) net.WriteString(itemId or "") net.SendToServer()
@@ -99,6 +100,7 @@ local function SendUnload()
 end
 local function SendEquipDrop(slotId)
     net.Start(NET_EQUIP_DROP) net.WriteString(slotId) net.SendToServer()
+    CARGO.Sounds.Play("drop")
 end
 
 -- ------------------------------------------------------------------
@@ -948,7 +950,9 @@ function BuildFrame(state)
         -- closing the frame IS cancelling the deal: the basket is intent, it
         -- holds nothing (Cargo_Trade §3), so nothing is lost by dropping it
         if self.cargoState == "trade" then CARGO.Trade.NotifyClosed() end
-        surface.PlaySound("backpack/inv_close.wav")
+        -- backpack foley for the personal inventory, case foley for the
+        -- loot/trade screens (sound/corpus/cargo/ui/about.txt)
+        CARGO.Sounds.Play(self.cargoState == "solo" and "close_solo" or "close_ext")
     end
 
     -- ---------------- left column: contextual (§15.1) ----------------
@@ -1227,7 +1231,7 @@ function BuildFrame(state)
     BuildTabs(tabsBar)
     grid.Refresh()
     if state == "trade" then CARGO.Trade.RefreshStrips(tradeLeft) end
-    surface.PlaySound("backpack/inv_open.wav")
+    CARGO.Sounds.Play(state == "solo" and "open_solo" or "open_ext")
 end
 
 -- ------------------------------------------------------------------
