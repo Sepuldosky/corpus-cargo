@@ -594,3 +594,16 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Los sonidos ya están ordenados y documentados (about.txt de la carpeta);
     SIN DISEÑAR: overlay (material/viñeta), gatillo exacto (qué cascos), y el
     mapeo intensidad→estado.
+
+45. TRADE ADOSABLE A CUALQUIER ENTIDAD POR ADMIN [Cargo trade] — ABIERTO
+    (wanted idea del autor, 2026-07-24, al estrenar el trader NextBot de
+    corpus-stalker). Para CÓDIGO la superficie ya existe y es el contrato:
+    `Trade.AttachTrader(ent, opts)` + `Trade.OpenFor` sobre cualquier entidad
+    (el NextBot de stalker es la prueba viva). Lo que falta es la ruta ADMIN:
+    marcar EN JUEGO un NPC/entidad arbitraria como trader sin escribir Lua.
+    SIN DISEÑAR — decidir: vehículo (¿toolgun/comando?), persistencia del
+    attach entre sesiones (¿persistKey contra Corpus.Data?), y de dónde salen
+    stock/spread/billetera (¿preset dev, editor?). Anotado para que la idea
+    no se pierda; enlaza con el estándar de voz por carpetas de acción de
+    corpus-stalker (el NextBot subclaseable es la otra mitad de "traders
+    hechos por usuarios").
