@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/cargo_lockup_dark.svg">
+    <img src="assets/cargo_lockup_light.svg" width="200" alt="Cargo">
+  </picture>
+</p>
+
 # Cargo
 
 Módulo de **inventario** del ecosistema [Corpus](https://github.com/Sepuldosky/corpus) para
