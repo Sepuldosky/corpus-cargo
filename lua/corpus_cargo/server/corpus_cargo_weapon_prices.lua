@@ -481,3 +481,28 @@ CARGO.Capture.WeaponValues = {
     weapon_slam       = 250,
     weapon_bugbait    = 80,
 }
+
+-- ------------------------------------------------------------------
+-- FAMILY prices (author call 2026-07-24). Some weapon ecosystems are too
+-- wide to catalogue class-by-class and too uniform to deserve it: VJ Base
+-- NPC weapons (weapon_vj_*, the base pack plus every SNPC pack that follows
+-- the prefix convention) are NPC-grade guns the player loots but rarely
+-- keeps — one flat number covers the family, present and future classes
+-- alike. An exact WeaponValues entry above still wins over a prefix hit.
+-- ------------------------------------------------------------------
+
+CARGO.Capture.WeaponValuePrefixes = {
+    { prefix = "weapon_vj_", value = 200 },
+}
+
+-- def.value for an autogen class: exact catalogue entry, else family prefix,
+-- else nil — and nil still means NOT tradeable (Cargo_Trade §4)
+function CARGO.Capture.WeaponValueFor(class)
+    if not isstring(class) then return nil end
+    local exact = CARGO.Capture.WeaponValues[class]
+    if exact ~= nil then return exact end
+    for _, fam in ipairs(CARGO.Capture.WeaponValuePrefixes) do
+        if class:sub(1, #fam.prefix) == fam.prefix then return fam.value end
+    end
+    return nil
+end

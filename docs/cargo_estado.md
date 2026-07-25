@@ -5,18 +5,19 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-24 (**entry 35 confirmada en juego → `[APLICADO]`, commiteada y
-pusheada**: la UI consume el banco de sonidos de GAMMA que estrenó el framework —abrir/cerrar por
-estado, drop, selección por categoría en el grid— y el trader demo gana la **capa persona**
-genérica: idles de plaza rotados + voz por proximidad/eventos, que corpus-stalker llena con
-Sidorovich vía `Trade.SetDefaultPersona`. Antes, 2026-07-23 noche: **entry 34 confirmada en juego** → `[APLICADO]`,
-commiteada y pusheada a pedido del autor — suministros HL2 default (Health Kit/Vial/Battery con
-semántica de pickup del engine), dos mochilas genéricas **sin modelo a propósito** (caen a la
-cajita de cartón), el punto de sustitución **`Items.SetModel`** para addons de contenido
-(`corpus-stalker` re-viste venda/botiquín de Coagulant y ambas mochilas — mapeo chica→backpack-1
-/ grande→backpack-2 confirmado) y la adquisición dev por ítem (`cargo_dev_items` /
-`cargo_dev_give_item`). Antes en el día: **entries 32/33 confirmadas** — compat Quick Loadouts +
-transición de holster; y la **pasada unificada COA-2 + Cargo** cerró 26-add2, 27, 28, 30 y 31.)
+**Última actualización:** 2026-07-24 (**entries 36-40 `[APLICADO]`, confirmadas en juego,
+commiteadas y pusheadas** — pasada de compat/economía + saga VJ). La 36: MTs-255-12 a slot largo
+(su `SWEP.Class` EFT es "Revolver" y la regla sidearm ganaba), **precios por familia**
+(`Capture.WeaponValueFor`: `weapon_vj_*` a $200 plano), attachments ARC9 con `value = 100`, y
+**Quick Loadouts apagado** ya no corre el strip incondicional en el primer spawn. Las 37-40, la
+**saga de armas VJ**, en su forma final: el `PlayerCanPickupWeapon` de VJ corre **embebido en el
+world gate** (un solo hook — la lección: el orden de `hook.Call` entre hooks distintos NO es de
+inserción), las armas **NPC-only** (`MadeForNPCsOnly`) no son tomables por ninguna ruta / nunca
+se acuñan / se purgan al spawn, la toma respeta `vj_npc_wep_ply_pickup 0`, el drop cae al piso
+sin re-captura, y el **regalo de munición se neutraliza antes de existir** (copia propia de
+`Primary` con `PickUpAmmoAmount = 0` en la instancia — sin fantasma en el history de DGL4).
+Antes: **entry 35** (banco de sonidos de UI + persona del trader) y **34** (suministros HL2 +
+mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ---
 
@@ -128,14 +129,12 @@ transición de holster; y la **pasada unificada COA-2 + Cargo** cerró 26-add2, 
 
 ## Pendiente de verificar
 
-- **Nada** — la entry **35** (sonidos de UI + persona del trader) se confirmó en juego el
-  2026-07-24 (checklist a-e ✓) y quedó `[APLICADO]`, commiteada y pusheada. (La 34 quedó
-  `[APLICADO]` el 2026-07-23.)
+- **Nada** — la saga VJ (entries 37-40) y la pasada de compat/economía (36) quedaron
+  confirmadas en juego el 2026-07-24 ("funciona todo bien"), `[APLICADO]`, commiteadas y
+  pusheadas.
 
 ## Frentes abiertos (anotados, NO arreglados)
 
-- **Drop de armas VJ vuelve solo al inventario** → **roadmap #37** (reporte
-  4c: re-captura instantánea del drop; diagnóstico contra el mod vivo).
 - **Slot del menú HL2 desalineado del slot Cargo** → **roadmap #36** (pedido
   17c: la RPD de EFT es Slot 4 de engine aunque esté equipada como primary).
 - **Texturas negras en playermodels ZONA** (SEVA Woodland/Heavy/EXO-Heavy
@@ -179,8 +178,9 @@ transición de holster; y la **pasada unificada COA-2 + Cargo** cerró 26-add2, 
    slot Throwable pide un **stack**). Enlaza con el #32.
 4. Cuando se prioricen: **#42** (el lanzagranadas capturado no dispara — perdió
    su attachment de munición; sospecha: el puente ARC9 §10), **#36** (slot HL2
-   alineado), **#37** (drop VJ), **#35** (footsteps), **#44** (overlay de máscara
+   alineado), **#35** (footsteps), **#44** (overlay de máscara
    de gas para cascos cerrados — los sonidos ya están en el banco, SIN DISEÑAR).
+   (El **#37** —saga VJ completa— quedó resuelto y confirmado en las entries 37-40.)
 
 ---
 

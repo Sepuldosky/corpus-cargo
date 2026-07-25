@@ -146,6 +146,12 @@ local KIND_SLOTS = {
 -- returns nil for them, so they have no type to declare. An entry here beats
 -- everything the SWEP says.
 CARGO.Capture.WeaponSlotKinds = {
+    -- EFT MTs-255-12: a revolving SHOTGUN whose SWEP.Class is EFT's "Revolver"
+    -- phrase (eft_class_weapon_revol — the shotguns pack is not in dev/other/,
+    -- but the class phrases and the sidearm symptom pin it), so the sidearm
+    -- rule matched before the SubCategory ("6Shotguns") was ever consulted
+    -- (in-game report 2026-07-24: it equipped in Sidearm)
+    arc9_eft_mts255   = "long",
     weapon_pistol     = "sidearm",
     weapon_357        = "sidearm",
     weapon_smg1       = "long",
@@ -302,11 +308,15 @@ local function RegisterAutogen(class, name, caliber)
         -- real weight when the class is catalogued (GAMMA/EFT table, loaded
         -- by the manifest right before this file); 2.5 kg nominal otherwise
         weight = (CARGO.Capture.WeaponWeights or {})[class] or 2.5,
-        -- base price from the twin table. NO fallback on purpose: an uncatalogued
-        -- class ends up with no value, and no value means not tradeable
-        -- (Cargo_Trade §4) — better an honest hole in the economy than a made-up
-        -- price for a gun nobody priced. The sandbox tools live in that hole.
-        value = (CARGO.Capture.WeaponValues or {})[class],
+        -- base price from the twin table (exact class, else family prefix —
+        -- weapon_vj_* prices flat). NO generic fallback on purpose: an
+        -- uncatalogued class ends up with no value, and no value means not
+        -- tradeable (Cargo_Trade §4) — better an honest hole in the economy
+        -- than a made-up price for a gun nobody priced. The sandbox tools
+        -- live in that hole.
+        value = isfunction(CARGO.Capture.WeaponValueFor)
+            and CARGO.Capture.WeaponValueFor(class)
+            or (CARGO.Capture.WeaponValues or {})[class],
         class = "unique",
         category = (kind == "melee") and "melee" or "weapons",
         -- which of primary/secondary/sidearm accept it (Slots.CanEquip). nil =
@@ -362,6 +372,19 @@ local function ThrowableFace(class)
         and CARGO.Ammo.ThrowableClass[class] or nil
 end
 
+-- VJ NPC-only classes (3rd in-game report 2026-07-24): a SWEP with
+-- MadeForNPCsOnly self-deletes from a player's hands (VJ SWEP:Equip prints
+-- "<name> removed! It's made for NPCs only!", weapon_vj_base/shared.lua:417)
+-- — AFTER gifting its pickup ammo (:409-415). It can never be gear: an item
+-- minted for one is an unequippable farm vector (drop → take → ammo grant →
+-- entity deleted → item back, ad infinitum). weapons.Get resolves the flag
+-- up the SWEP.Base chain; non-VJ classes have no field and return false.
+local function NpcOnlyWeapon(class)
+    if not isstring(class) or class == "" then return false end
+    local swep = weapons.Get(class)
+    return istable(swep) and swep.MadeForNPCsOnly == true
+end
+
 local autogenDirty = false
 for id, meta in pairs(autogenDefs) do
     -- engine names are localization tokens ("#HL2_Pistol") stored raw — the
@@ -369,6 +392,11 @@ for id, meta in pairs(autogenDefs) do
     if istable(meta) and ThrowableFace(meta.weapon_class or "") ~= nil then
         -- dead face (roadmap #32): a pre-#32 capture minted wpn_weapon_frag;
         -- re-registering it would resurrect the item-vs-stack conflict
+        autogenDefs[id] = nil
+        autogenDirty = true
+    elseif istable(meta) and NpcOnlyWeapon(meta.weapon_class or "") then
+        -- NPC-only VJ class captured before the block existed: the def dies
+        -- here and the spawn purge below clears the items that pointed at it
         autogenDefs[id] = nil
         autogenDirty = true
     elseif istable(meta) and isstring(meta.weapon_class) and meta.weapon_class ~= ""
@@ -437,7 +465,8 @@ local function HealOrphanDefs(ply)
         local blob = CARGO.Instances.Get(uid)
         if blob == nil or CARGO.Items.Get(blob.id or "") ~= nil then return end
         local class = string.match(blob.id or "", "^wpn_(.+)$")
-        if class == nil or ThrowableFace(class) ~= nil then return end
+        if class == nil or ThrowableFace(class) ~= nil
+            or NpcOnlyWeapon(class) then return end
         RegisterAutogen(class, class)
         autogenDefs[blob.id] = { name = class, weapon_class = class }
         healed = true
@@ -473,8 +502,50 @@ local function ReconcileEquipSlots(ply)
     end
 end
 
+-- NPC-only VJ items captured before the block existed are removed outright
+-- (3rd in-game report 2026-07-24): equipping one deletes its entity with
+-- VJ's "NPCs only" chat spam and the 0.1 s reconcile re-gives it — a loop —
+-- and dropping one seeds the ammo farm. They carry no sub-slots (autogen
+-- weapon defs never do), so CRG-9 ejection does not apply.
+local function PurgeNpcOnlyItems(ply)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    local removed = 0
+    local function npcOnlyId(id)
+        local class = string.match(isstring(id) and id or "", "^wpn_(.+)$")
+        return class ~= nil and NpcOnlyWeapon(class)
+    end
+    for i = #rec.items, 1, -1 do
+        local entry = rec.items[i]
+        if istable(entry) and npcOnlyId(entry.id) then
+            table.remove(rec.items, i)
+            removed = removed + 1
+        end
+    end
+    for slotId, val in pairs(rec.equip) do
+        local id
+        if istable(val) then
+            id = val.id
+        elseif isstring(val) then
+            local blob = CARGO.Instances.Get(val)
+            id = blob and blob.id or nil
+        end
+        if npcOnlyId(id) then
+            rec.equip[slotId] = nil
+            removed = removed + 1
+        end
+    end
+    if removed > 0 then
+        CARGO.Inventory.Touch(ply)
+        CARGO.Inventory.Notice(ply,
+            removed .. " NPC-only weapon(s) removed from your inventory.")
+        Corpus.Log("cargo", "purga NPC-only (VJ): " .. removed
+            .. " ítems removidos de " .. ply:Nick())
+    end
+end
+
 hook.Add("PlayerInitialSpawn", "corpus_cargo_capture_heal", function(ply)
     HealOrphanDefs(ply)
+    PurgeNpcOnlyItems(ply)
     ReconcileEquipSlots(ply)
 end)
 
@@ -570,6 +641,19 @@ function CARGO.Capture.SpawnWorldWeapon(class, pos, uid)
     wep.CargoInstanceUid = isstring(uid) and uid or nil
     wep.CargoWorldSpawned = true -- our drops are NEVER taken by touch
     wep:Spawn()
+    -- VJ Base compat (roadmap #37, diagnosed against the live code 2026-07-24):
+    -- its PlayerCanPickupWeapon hook (vj_base/hooks.lua:354) authorizes ANY
+    -- pickup of a VJ weapon younger than 0.15 s (the InitTime window, meant for
+    -- its own NPC gives) — and in hook.Call the first non-nil return wins, so
+    -- our world gate never got to veto: a VJ gun dropped from the grid spawned
+    -- at the player's feet and was hoovered back BY TOUCH the same instant,
+    -- farming free ammo each cycle (VJ's SWEP:Equip gifts ClipSize*2,
+    -- weapon_vj_base/shared.lua:411). Backdate the stamp so the drop is born a
+    -- RESTING weapon: past the window VJ's own hook denies touch pickup too,
+    -- and a WALK+USE take still rides its KeyPressed(IN_USE) branch.
+    if wep.IsVJBaseWeapon and isnumber(wep.InitTime) then
+        wep.InitTime = CurTime() - 1
+    end
     -- a gun dropped straight out of the grid carries its stored magazine (#18);
     -- a fresh SWEP would otherwise spawn with its DefaultClip
     CARGO.Inventory.ApplyClipToEntity(wep, uid)
@@ -589,15 +673,83 @@ hook.Add("PlayerSpawnedSWEP", "corpus_cargo_world_spawnmenu", function(_, ent)
     if IsValid(ent) then ent.CargoWorldSpawned = true end
 end)
 
+-- VJ Base takeover, 2nd form (4th in-game report 2026-07-24: plain USE still
+-- took VJ guns and NPC-only guns still reached VJ's Equip). Its
+-- PlayerCanPickupWeapon hook (vj_base/hooks.lua:354) always returns non-nil
+-- for a VJ weapon — plain USE while looking at it (its KeyPressed branch),
+-- the opt-in autopickup userinfo, or its 0.15 s InitTime window — and the
+-- first non-nil return in hook.Call ends the chain. Re-seating the function
+-- as a SECOND hook behind ours (the previous fix) lost the ordering lottery:
+-- hook.Call order between DISTINCT hooks is not insertion-ordered, and VJ's
+-- logic kept answering first. The only deterministic order is INSIDE one
+-- hook: capture VJ's function, remove its registration, and run it embedded
+-- in the world gate below wherever the gate abstains. A takeover of ORDER,
+-- not of behavior. Absent mod = nil, and the gate runs bare (COR-5).
+local vjPickup = isfunction(hook.GetTable)
+    and ((hook.GetTable()["PlayerCanPickupWeapon"] or {})["VJ_PlayerCanPickupWeapon"])
+    or nil
+if vjPickup ~= nil then
+    hook.Remove("PlayerCanPickupWeapon", "VJ_PlayerCanPickupWeapon")
+    Corpus.Log("cargo", "VJ Base detectado — su PlayerCanPickupWeapon embebido en el world gate")
+end
+
 -- The world gate. Deny order matters: the WALK+USE grant wins, our own
 -- world spawns always deny, give flows (entity born an instant ago) pass,
--- and anything that has been RESTING in the world is denied.
+-- and anything that has been RESTING in the world is denied. VJ's own logic
+-- (captured above) rules exactly where the gate abstains: the give window
+-- and the gate-off convar.
 hook.Add("PlayerCanPickupWeapon", "corpus_cargo_world_gate", function(ply, wep)
-    if not cvWorldGuns:GetBool() then return end
+    -- keep VJ's registration out of the chain even if a lua refresh re-added
+    -- it (idempotent, trivially cheap); its logic lives embedded below
+    if vjPickup ~= nil then
+        hook.Remove("PlayerCanPickupWeapon", "VJ_PlayerCanPickupWeapon")
+    end
+    -- VJ pickup-ammo gift, neutralized at the choke point (5th in-game report
+    -- 2026-07-24: DGL4's pickup history logged "+60 SMG1" on every legit
+    -- take). Its SWEP:Equip calls GiveAmmo(ClipSize*2) WITH the engine pickup
+    -- popup, so ammo HUDs log the gift even though the WeaponEquip clawback
+    -- nets it to zero a tick later — the event itself must never fire. Every
+    -- player acquisition (touch, USE, and ply:Give too) passes through this
+    -- hook BEFORE Equip runs: zero the gift on THIS instance only, via an own
+    -- Primary copy — writing through wep.Primary would mutate the SHARED
+    -- class table (a fork by mutation). The clawback reads the same field and
+    -- becomes a no-op: nothing gifted, nothing to claw, nothing logged.
+    -- Capture off = stock VJ gift (Cargo is not managing the economy).
+    if wep.IsVJBaseWeapon == true and wep.CargoVJGiftCut == nil
+        and cvCapture:GetBool() and istable(wep.Primary) then
+        wep.CargoVJGiftCut = true
+        local prim = table.Copy(wep.Primary)
+        prim.PickUpAmmoAmount = 0
+        wep.Primary = prim
+    end
+    if not cvWorldGuns:GetBool() then
+        -- gate off: stock VJ behavior, from inside the single hook
+        if vjPickup ~= nil then return vjPickup(ply, wep) end
+        return
+    end
     if ply.CargoEquipGive then return end        -- our equip give: engine decides
+    -- NPC-only VJ gun: never player-pickable by ANY path at ANY age — VJ
+    -- would delete it from the player's hands right after gifting its pickup
+    -- ammo (Equip runs the gift BEFORE the removal), and that aborted equip
+    -- never reaches WeaponEquip, so the clawback there cannot see the gift.
+    -- Denying the pickup is the only lever: no gift, no "NPCs only" chat
+    -- spam, no phantom ammo flash on ammo HUDs (4th in-game report).
+    if wep.IsVJBaseWeapon == true and wep.MadeForNPCsOnly == true then return false end
     if wep.CargoUseTaken then return true end    -- WALK+USE grant (PlayerUse below)
     if wep.CargoWorldSpawned then return false end
-    if CurTime() - wep:GetCreationTime() < 0.5 then return end -- a give, not a pickup
+    -- VJ NPC corpse drop: the death drops the very entity the NPC held
+    -- (DeathWeaponDrop, npc_vj_human_base/init.lua:4491), and OwnerIsNPC only
+    -- updates with a VALID owner (SWEP:OwnerChanged, shared.lua:1011), so it
+    -- stays stamped on the loose gun — a WORLD weapon from frame one, never a
+    -- give. WALK+USE still takes it (the grant above wins first), and the
+    -- PlayerUse take itself honors vj_npc_wep_ply_pickup 0.
+    if wep.IsVJBaseWeapon == true and wep.OwnerIsNPC == true then return false end
+    if CurTime() - wep:GetCreationTime() < 0.5 then
+        -- a give, not a pickup — and for VJ weapons the give window is VJ's
+        -- own call (its 0.15 s InitTime rule; non-VJ classes answer nil)
+        if vjPickup ~= nil then return vjPickup(ply, wep) end
+        return
+    end
     return false
 end)
 
@@ -659,6 +811,27 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
             end
             return false
         end
+        -- VJ Base takes (3rd in-game report 2026-07-24), refused BEFORE any
+        -- pickup can run — the refusal is the fix: VJ's SWEP:Equip gifts the
+        -- pickup ammo BEFORE it self-deletes an NPC-only gun, and an aborted
+        -- equip never reaches WeaponEquip, so the clawback there can't see it.
+        if ent.IsVJBaseWeapon == true then
+            -- NPC-only: it would be deleted from the player's hands anyway
+            -- ("<name> removed! It's made for NPCs only!") — no pickup, no
+            -- ammo gift, no chat spam, no item
+            if ent.MadeForNPCsOnly then
+                CARGO.Inventory.Notice(ply, "That weapon is made for NPCs only.")
+                return false
+            end
+            -- honor the server's own switch (vj_npc_wep_ply_pickup 0 =
+            -- players don't loot NPC weapons — the author runs it OFF):
+            -- Cargo's deliberate take must not outrank the mod's config
+            local cvVJ = GetConVar("vj_npc_wep_ply_pickup")
+            if ent.OwnerIsNPC == true and cvVJ ~= nil and cvVJ:GetInt() == 0 then
+                CARGO.Inventory.Notice(ply, "Picking up NPC weapons is disabled.")
+                return false
+            end
+        end
         -- A second weapon of a class the player ALREADY has equipped can't ride
         -- the engine pickup: it holds one SWEP per class, so PickupWeapon refuses
         -- (in-game 2026-07-23: "You can't take that right now."). A deliberate
@@ -714,6 +887,43 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
     if not IsValid(wep) then return end
     -- older engine branches pass only the weapon; the owner lands a tick later
     if not IsValid(ply) then ply = wep:GetOwner() end
+
+    -- VJ Base gifts reserve ammo on EVERY player acquisition of a non-melee
+    -- VJ gun (SWEP:Equip, weapon_vj_base/shared.lua:409-415:
+    -- PickUpAmmoAmount "Default" = ClipSize*2, a number = that amount).
+    -- Under Cargo ammo comes from ITEMS — an equip from the grid, a WALK+USE
+    -- take or a loadout give must not mint rounds (no ether, same rule as
+    -- the ARC9/QL free-ammo takeovers). Claw the exact grant back one tick
+    -- later (order-proof against Equip vs WeaponEquip sequencing; if a 4 Hz
+    -- mirror tick sneaks in between, the pool drop reads as consumption and
+    -- the belt re-drains — eventually consistent either way). Scheduled
+    -- BEFORE the equip-give fast path below on purpose: OUR gives get the
+    -- gift too.
+    if wep.IsVJBaseWeapon == true and wep.IsMeleeWeapon ~= true
+        and IsValid(ply) and ply:IsPlayer() then
+        local prim = istable(wep.Primary) and wep.Primary or {}
+        local grant
+        if prim.PickUpAmmoAmount == "Default" then
+            grant = (tonumber(prim.ClipSize) or 0) * 2
+        elseif isnumber(prim.PickUpAmmoAmount) then
+            grant = prim.PickUpAmmoAmount
+        end
+        local ammoType = prim.Ammo
+        if isnumber(grant) and grant > 0 and ammoType ~= nil then
+            local owner = ply
+            timer.Simple(0, function()
+                if IsValid(owner) and owner:IsPlayer() then
+                    owner:RemoveAmmo(grant, ammoType)
+                end
+            end)
+        end
+    end
+
+    -- NPC-only VJ gun (3rd in-game report 2026-07-24): VJ deletes it from
+    -- player hands right after this equip — never mint an item for it (the
+    -- clawback above still runs: the ammo gift fired before the deletion)
+    if wep.MadeForNPCsOnly == true and wep.IsVJBaseWeapon == true then return end
+
     -- our own equip flow gives weapons through this same engine path; the
     -- flag is only set synchronously around ply:Give, so read it NOW
     if IsValid(ply) and ply.CargoEquipGive then return end

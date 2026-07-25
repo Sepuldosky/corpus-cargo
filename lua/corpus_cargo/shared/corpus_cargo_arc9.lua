@@ -68,6 +68,11 @@ local function RegisterAttachmentItems()
                 -- ARC9 atts declare no mass; flat nominal weight until some
                 -- pack exposes one
                 weight = 0.3,
+                -- flat base price (author call 2026-07-24): the packs declare
+                -- no economy and mods flood the grid — one starting number
+                -- makes the whole family sellable, tuned in play like the
+                -- weapon tables (Cargo_Trade §11)
+                value = 100,
                 class = "stackable",
                 category = "attachments",
                 icon = atttbl.Icon, -- Material object; the cell painter accepts it

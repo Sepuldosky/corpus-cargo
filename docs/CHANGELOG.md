@@ -2834,3 +2834,223 @@ entities). EN JUEGO (checklist del autor):
 montado el vodka suena con el banco de Corpus y NO con el sonido original de la Zona — que es
 exactamente lo buscado, todo el audio de consumo tira del banco general). Commiteado y pusheado
 con autorización del autor.
+
+## 36. Pasada de compat y economía: MTs-255 a slot largo, armas VJ vendibles y sin re-captura, attachments con precio, Quick Loadouts apagado ya no stripea `[APLICADO 2026-07-24]`
+
+Cuatro pedidos del autor (2026-07-24), tres de ellos diagnosticados contra el código vivo de
+los mods en `dev/other/` (CRG-24):
+
+- PARCHE 1 — fix(capture): **la MTs-255-12 va a Primary/Secondary, no a Sidearm**. Su
+  `SWEP.Class` es la frase EFT "Revolver" (`eft_class_weapon_revol` — es una escopeta de
+  acción revólver), y la regla sidearm del clasificador matchea "revolver" ANTES de que la
+  SubCategory ("6Shotguns") se consulte. Alta en `Capture.WeaponSlotKinds` (el escape hatch
+  existe exactamente para esto): `arc9_eft_mts255 = "long"`. El def autogen se re-registra al
+  boot y `ReconcileEquipSlots` saca del Sidearm una ya equipada.
+- PARCHE 2 — feat(trade): **precios por FAMILIA** (`Capture.WeaponValuePrefixes` +
+  `Capture.WeaponValueFor`, en `weapon_prices.lua`): la entrada exacta del catálogo sigue
+  ganando; sin ella, un prefijo precia la familia entera. Primera familia: `weapon_vj_*`
+  (VJ Base + todo pack SNPC que siga la convención) a **$200 plano** — armas de NPC que el
+  jugador lootea pero rara vez conserva. La captura y el dump dev resuelven por la misma
+  función (un arma preciada por familia ya no lista MISSING).
+- PARCHE 3 — fix(capture): **el drop de un arma VJ ya no vuelve solo al inventario**
+  (roadmap #37, ahora DIAGNOSTICADO): el hook `PlayerCanPickupWeapon` de VJ Base
+  (`vj_base/hooks.lua:354`) autoriza CUALQUIER pickup de un arma VJ con menos de 0,15 s de
+  vida (ventana `InitTime`, pensada para sus propios gives de NPC) — y en `hook.Call` el
+  primer retorno no-nil gana: el world gate nunca llegaba a vetar, la entidad recién dropeada
+  a los pies del jugador se aspiraba por contacto al instante, y cada ciclo regalaba munición
+  (el `SWEP:Equip` de VJ da `ClipSize*2`, `weapon_vj_base/shared.lua:411`).
+  `SpawnWorldWeapon` ahora RETRO-fecha `InitTime` en armas VJ: nacida "en reposo", el propio
+  hook de VJ niega el pickup por contacto y el WALK+USE deliberado sigue entrando por su rama
+  `KeyPressed(IN_USE)`.
+- PARCHE 4 — feat(arc9): **attachments ARC9 con `value = 100`** plano en el registro del
+  puente: los mods llenan el grid y necesitaban ruta de venta; número de arranque a calibrar
+  en juego, misma regla que las tablas de armas (Cargo_Trade §11).
+- PARCHE 5 — fix(capture): **Quick Loadouts con el toggle del cliente apagado ya no stripea
+  el equipo persistido en el primer spawn**. El net "disabled" deja `ply.quickloadout = {}`
+  (sv:29), que pasa el guard de `QuickLoadout()` (solo chequea nil, sv:62) y ejecuta el
+  `StripWeapons + RemoveAllAmmo` incondicional (sv:63-64) SIN dar nada a cambio — y el
+  cliente auto-manda ese loadout vacío ~1 s después de `InitPostEntity`
+  (`cl_loadoutmenu.lua:1830`), aterrizando el strip sobre las armas recién restauradas. El
+  wrapper ahora salta el mod entero con loadout vacío/ausente: nada que entregar = el strip
+  no corre (mismo retorno nil, cadena del engine intacta).
+
+Verificación offline: harness ALL GREEN en ambos realms (355 checks). EN JUEGO (checklist):
+(a) capturar/equipar la MTs-255-12 → entra en Primary y Secondary, no en Sidearm (una ya
+    equipada en Sidearm se va al grid al spawn con notice);
+(b) arma VJ (`weapon_vj_*`): se vende al trader por ~$200 × condición × spread; dropearla
+    desde el inventario la deja EN EL PISO (sin re-captura ni munición gratis); WALK+USE la
+    retoma;
+(c) attachments ARC9 listan precio en el trade y se venden a ~$100 base;
+(d) con Quick Loadouts montado y su toggle de cliente APAGADO: primer spawn conserva las
+    armas equipadas persistidas (y el cinturón no se drena); con el toggle ENCENDIDO el
+    loadout sigue entregándose como ítems (entry 32 intacta).
+**Confirmado en juego por el autor el 2026-07-24** ("funciona todo bien"), con UN hueco de
+seguimiento: las armas VJ del mundo aún se capturaban SIN walk+use y con munición regalada —
+diagnóstico y cierre en la entry 37.
+
+## 37. Armas VJ, cierre: el hook de VJ ya no salta el world gate y la munición de pickup se devuelve `[APLICADO 2026-07-24]`
+
+> **NOTA (reemplazo parcial):** el PARCHE 1/2 (re-asiento del hook detrás del gate) lo
+> reemplazó la **entry 39** (embebido en el gate — el re-asiento perdía la lotería de orden);
+> el PARCHE 3 (clawback del regalo) lo dejó de red la **entry 40** (el regalo se neutraliza
+> antes de existir). El retro-fechado de `InitTime` en `SpawnWorldWeapon` y el deny de cadáver
+> por `OwnerIsNPC` sobreviven. Se conserva por el registro histórico (no se borra ni renumera).
+
+Reporte del autor (2026-07-24, tras confirmar la entry 36): las armas VJ del mundo seguían
+capturándose SIN walk+use, regalando munición en cada captura. Dos causas, ambas contra el
+código vivo (CRG-24):
+
+1. **Orden de la cadena**: el `PlayerCanPickupWeapon` de VJ (vj_base/hooks.lua:354) se registra
+   en autorun — ANTES del world gate, que Cargo registra en Initialize — y para un arma VJ
+   SIEMPRE retorna no-nil: USE a secas mirándola (su rama `KeyPressed(IN_USE)`), el userinfo
+   opt-in `vj_wep_autopickup`, o su ventana `InitTime` de 0,15 s. Primer retorno no-nil gana:
+   el gate nunca llegaba a vetar (el retro-fechado del PARCHE 3 de la #36 solo cubría NUESTROS
+   drops — el resto de las entidades VJ del mundo quedaba en manos del hook de VJ).
+2. **El regalo de munición**: el `SWEP:Equip` de VJ (weapon_vj_base/shared.lua:409-415) da
+   `ClipSize*2` de reserva (`PickUpAmmoAmount = "Default"` de fábrica) en CADA adquisición del
+   jugador — pickups del mundo, gives de loadout Y nuestros propios equips desde el grid
+   (`ply:Give` también pasa por `Equip`): equipar↔desequipar un arma VJ farmeaba munición sin
+   siquiera dropearla.
+
+- PARCHE 1 — fix(capture): **takeover de ORDEN, no de comportamiento** (mismo movimiento que la
+  compat de Quick Loadouts): el hook de VJ se saca de la cadena y se re-registra LA MISMA
+  función detrás del gate (`corpus_cargo_vj_pickup_defer`). El gate manda en los casos de
+  mundo (arma en reposo → deny, nuestros drops → deny, WALK+USE → grant determinista — de paso
+  muere la flakiness del `KeyPressed` de VJ en la retoma); todo lo que el gate abstiene (gives
+  frescos, o el gate entero apagado por `cargo_weapon_world_pickup 0`) sigue cayendo en la
+  lógica intacta de VJ. Sin el mod: no-op (COR-5).
+- PARCHE 2 — fix(capture): **el drop de cadáver de NPC es arma de mundo desde el frame uno**:
+  `OwnerIsNPC` queda estampado en la entidad suelta (solo se actualiza con dueño válido,
+  `SWEP:OwnerChanged` shared.lua:1011) — el gate lo niega ANTES de la abstención por entidad
+  fresca, cerrando el hoover por contacto parado sobre el cadáver (la ventana de 0,15 s de
+  VJ). WALK+USE la toma igual (el grant gana primero; deliberadamente incluso con
+  `vj_npc_wep_ply_pickup 0` — bajo Cargo la toma deliberada rige las armas de mundo).
+- PARCHE 3 — fix(capture): **clawback del regalo**: en el `WeaponEquip`, para armas VJ no-melee
+  se re-calcula el monto exacto del regalo (`"Default"` → ClipSize*2; número → ese número) y se
+  lo remueve un tick después (a prueba del orden Equip↔WeaponEquip; si un tick del espejo 4 Hz
+  se cuela en el medio, la baja del pool se lee como consumo y el cinturón re-drena — consistente
+  igual). Programado ANTES del fast-path de `CargoEquipGive` a propósito: nuestros gives también
+  reciben el regalo. Sin éter, misma regla que los takeovers de ammo de ARC9 y QL.
+
+Verificación offline: harness ALL GREEN en ambos realms. EN JUEGO (checklist):
+(a) arma VJ en reposo en el mundo: tocarla o apretar E a secas NO la captura (E a secas la
+    carga como prop HL2); WALK+USE la captura;
+(b) matar un NPC VJ parado encima: su arma NO entra sola al inventario; WALK+USE la toma;
+(c) equipar↔desequipar un arma VJ del grid repetidas veces NO acumula munición en el cinturón;
+    capturarla del mundo tampoco;
+(d) con `vj_wep_autopickup 1` puesto por el cliente: el hoover sigue muerto mientras
+    `cargo_weapon_world_pickup 1` (Cargo manda en el mundo);
+(e) dar un arma VJ por spawnmenu/loadout sigue entrando al inventario como siempre.
+**Parcialmente confirmado en juego el 2026-07-24** ("ahora se pueden botar las armas VJ" ✓);
+el mismo reporte destapó el frente de las armas NPC-only → entry 38.
+
+## 38. Armas VJ NPC-only: nunca son ítems, la toma respeta el convar del mod y las ya acuñadas se purgan `[APLICADO 2026-07-24]`
+
+> **NOTA (afinado por la #39):** el deny de NPC-only en la toma WALK+USE de esta entry se
+> subió al world gate en la **entry 39** (rechazo por cualquier ruta, no solo WALK+USE). Los
+> PARCHES 2 (nunca acuñar) y 3 (purga al spawn) siguen vigentes tal cual.
+
+Reporte del autor (2026-07-24, tras probar la 37): las armas VJ marcadas **`MadeForNPCsOnly`**
+("CAG Terrorist Assault Rifle removed! It's made for NPCs only!") entraban al inventario y
+seguían regalando munición — botar y re-tomar farmeaba, con spam de chat incluido — y eso con
+**"Players Can Pickup Dropped Weapons: OFF"** (`vj_npc_wep_ply_pickup 0`), que la entry 37
+pisaba a propósito (decisión revertida: el convar del mod manda).
+
+Diagnóstico contra el código vivo: el `SWEP:Equip` de VJ regala la munición de pickup
+(shared.lua:409-415) **ANTES** de auto-borrar el arma NPC-only (:417-420) — y como el borrado
+aborta el equip, `WeaponEquip` no llega a disparar: el clawback de la entry 37 (que viaja ahí)
+nunca ve ese regalo. La única palanca real es que el pickup NO ocurra.
+
+- PARCHE 1 — fix(capture): la toma WALK+USE **rechaza antes de cualquier pickup**: (a) armas
+  `MadeForNPCsOnly` — "That weapon is made for NPCs only." — sin pickup no hay regalo, ni spam,
+  ni ítem; (b) armas con `OwnerIsNPC` cuando `vj_npc_wep_ply_pickup = 0` — "Picking up NPC
+  weapons is disabled." — la toma deliberada de Cargo ya no pisa la config del mod.
+- PARCHE 2 — fix(capture): `WeaponEquip` **nunca acuña** ítem para una clase NPC-only (el
+  clawback igual corre para las rutas donde el regalo sí llegó a WeaponEquip); el def autogen
+  de una clase NPC-only capturada antes del bloqueo **muere en el boot** (mismo patrón que las
+  caras throwable muertas) y `HealOrphanDefs` no lo resucita.
+- PARCHE 3 — fix(capture): **purga al spawn** (`PurgeNpcOnlyItems`, junto al heal): todo ítem
+  `wpn_*` cuya clase resuelva `MadeForNPCsOnly` se remueve del grid y del equip con notice
+  ("N NPC-only weapon(s) removed...") — equiparlos era un loop (la entity se borra, el
+  reconcile de 0,1 s re-da, VJ re-borra con spam) y botarlos era la semilla del farmeo. Sin
+  sub-slots (los defs autogen de arma no declaran), CRG-9 no aplica.
+
+Verificación offline: harness ALL GREEN en ambos realms. EN JUEGO (checklist):
+(a) arma NPC-only en el suelo: WALK+USE la rechaza con notice, sin mensaje de VJ, sin
+    munición, sin ítem;
+(b) con "Players Can Pickup Dropped Weapons: OFF": el arma normal de un NPC VJ muerto no se
+    puede tomar (notice); con ON se lootea como siempre;
+(c) al primer spawn, las armas NPC-only que ya estaban en el inventario desaparecen con
+    notice, y el cinturón no gana munición por ninguna vía VJ;
+(d) las armas VJ normales (weapon_vj_ak47 etc.) siguen: capturables por WALK+USE, vendibles
+    a ~$200, drop al piso sin re-captura.
+**Verificación en juego 2026-07-24 (4.º reporte): PARCIAL** — el respeto del convar OFF ✓,
+pero con el convar ON las NPC-only seguían llegando al Equip de VJ (doble mensaje + flash de
+ammo en el HUD de DGL4) y el USE a secas seguía tomando armas VJ normales: el re-asiento de la
+entry 37 perdió la lotería de orden de hooks → entry 39.
+
+## 39. VJ, forma final: la lógica de su hook corre EMBEBIDA en el world gate (un solo hook, orden determinista) `[APLICADO 2026-07-24]`
+
+4.º reporte del autor (2026-07-24): con `vj_npc_wep_ply_pickup` ON, (a) tomar un arma NPC-only
+mostraba AMBOS mensajes ("[Cargo] That weapon is made for NPCs only." + "MP5 removed! It's
+made for NPCs only!") y el HUD de DGL4 flasheaba munición obtenida (el regalo existía un tick
+y el clawback lo devolvía — neto cero real, pero el pickup ocurría); (b) las armas VJ normales
+se tomaban con USE a secas, cuando debería ser WALK+USE.
+
+Causa raíz: **el orden de `hook.Call` entre hooks DISTINTOS no es orden de inserción** — el
+supuesto sobre el que se apoyaba el re-asiento de la entry 37. El hook re-registrado
+(`corpus_cargo_vj_pickup_defer`) seguía respondiendo ANTES que `corpus_cargo_world_gate`, y su
+rama `KeyPressed(IN_USE)` autorizaba el pickup con el gate mudo. El único orden determinista
+es DENTRO de un hook.
+
+- PARCHE 1 — fix(capture): la función de VJ se captura y su registro se remueve (re-asegurado
+  idempotente en cada corrida del gate, por si un lua refresh lo re-agrega), y su lógica corre
+  **embebida en el world gate** exactamente donde el gate se abstiene: la ventana de give
+  (<0,5 s — la regla InitTime de VJ sigue mandando en SUS armas) y el gate apagado por convar
+  (`cargo_weapon_world_pickup 0` = comportamiento stock de VJ, desde adentro). El hook
+  `corpus_cargo_vj_pickup_defer` de la entry 37 desaparece.
+- PARCHE 2 — fix(capture): el deny de **NPC-only sube al gate** (antes vivía solo en la toma
+  WALK+USE): un arma `MadeForNPCsOnly` no es tomable por NINGUNA ruta a NINGUNA edad — sin
+  pickup no hay regalo de Equip, ni doble mensaje, ni flash fantasma en el HUD. La notice de
+  Cargo en WALK+USE se mantiene como único feedback.
+- El deny de cadáver (`OwnerIsNPC`) queda verificado contra el drop real: la muerte dropea LA
+  MISMA entidad que el NPC sostenía (`DeathWeaponDrop`, npc_vj_human_base/init.lua:4491), así
+  que el estampado sobrevive.
+
+Verificación offline: harness ALL GREEN en ambos realms. EN JUEGO (checklist):
+(a) arma VJ normal en reposo: USE a secas NO la toma (la carga como prop); WALK+USE sí;
+(b) arma NPC-only con el convar ON: ni contacto, ni USE, ni WALK+USE la toman — solo la
+    notice de Cargo, sin mensaje de VJ y sin flash de ammo en DGL4;
+(c) convar OFF: sigue rechazando armas de NPC con notice (ya confirmado en el 4.º reporte);
+(d) gives (spawnmenu, loadout, equipar del grid) siguen entrando normal;
+(e) `cargo_weapon_world_pickup 0`: comportamiento stock de VJ (USE toma, autopickup opcional).
+**Confirmado en juego por el autor el 2026-07-24** ("funciona bien en todo") con UN residuo
+cosmético: el history de DGL4 logueaba "+60 SMG1" en la toma legítima de un arma VJ equipable
+— el regalo existía un tick antes del clawback y el popup del engine ya había disparado →
+entry 40.
+
+## 40. VJ, el regalo de munición se neutraliza ANTES de existir (adiós al fantasma en el history de DGL4) `[APLICADO 2026-07-24]`
+
+5.º reporte del autor (2026-07-24): todo bien salvo que el HUD de DGL4 aún mostraba en su
+history "+60 SMG1" al tomar un arma VJ equipable. Es el costo estructural del enfoque
+"regalar → devolver" de la entry 37: el `GiveAmmo(ClipSize*2)` del `SWEP:Equip` de VJ dispara
+el **popup de pickup del engine** (sin el arg `hidePopup`), DGL4 loguea el evento, y el
+clawback solo netea el número un tick después — el evento ya quedó registrado.
+
+- PARCHE ÚNICO — fix(capture): el regalo se **neutraliza antes de existir**. Todo pickup de
+  jugador (touch, USE, y también `ply:Give` — la ruta de loadouts y de nuestros equips) pasa
+  por `PlayerCanPickupWeapon` ANTES de que corra el `Equip`, así que el world gate es el choke
+  point: para un arma VJ bajo captura activa se le asigna a ESA instancia una **copia propia
+  de `Primary`** con `PickUpAmmoAmount = 0` (escribir a través de `wep.Primary` mutaría la
+  tabla compartida de la clase — fork por mutación, jamás). El `Equip` de VJ entonces regala 0
+  (sin popup, el engine no anuncia dádivas vacías) y el clawback de la entry 37, que lee el
+  mismo campo, se vuelve no-op solo — queda como red para rutas exóticas. Con
+  `cargo_capture_weapons 0`: regalo stock intacto (Cargo no administra esa economía).
+
+Verificación offline: harness ALL GREEN en ambos realms. EN JUEGO (checklist):
+(a) tomar un arma VJ equipable con WALK+USE: NADA en el history de ammo de DGL4, cinturón sin
+    cambios (el arma llega con su cargador, como cualquier captura);
+(b) equipar↔desequipar un arma VJ del grid: tampoco loguea ni acumula;
+(c) con `cargo_capture_weapons 0`: la toma vuelve a regalar munición con popup (stock VJ).
+**Confirmado en juego por el autor el 2026-07-24** ("funciona todo bien"). Commiteado y
+pusheado con autorización del autor (junto con las entries 36-39 de la misma pasada VJ).

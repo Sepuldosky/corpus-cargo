@@ -419,7 +419,14 @@ if SERVER then
                 or class:find("^arc9_") ~= nil
             if class ~= "" and (wantAll or isArc9) then
                 local status = DumpStatus(class, t)
+                -- price through the same resolver the capture uses (exact
+                -- class, else family prefix — weapon_vj_* et al.): a
+                -- family-priced gun must not read MISSING here
                 local kg, val = weights[class], values[class]
+                if val == nil and istable(CARGO.Capture)
+                    and isfunction(CARGO.Capture.WeaponValueFor) then
+                    val = CARGO.Capture.WeaponValueFor(class)
+                end
 
                 local wCell, vCell
                 if status ~= "weapon" then

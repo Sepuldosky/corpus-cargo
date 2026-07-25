@@ -27,6 +27,9 @@
 -- reconcile re-gives every stripped equipped class, and the wrapper banks
 -- the live magazines into the instance blobs beforehand: nothing of Cargo's
 -- rides the strip into the void, on spawn or mid-round, loadout or not.
+-- An EMPTY loadout (client toggle off, ply.quickloadout = {}) skips
+-- QuickLoadout() entirely: nothing to deliver means the strip never runs
+-- (2nd in-game report, 2026-07-24 — see the guard in the wrapper).
 --
 -- WHAT THE LOADOUT BECOMES. The gives are untouched: the weapons QL hands
 -- out at tick 0 land on the existing WeaponEquip capture like any anonymous
@@ -86,6 +89,21 @@ hook.Add("PlayerLoadout", "corpus_cargo_ql_compat", function(ply)
             return
         end
         return retRaw
+    end
+
+    -- A DISABLED loadout is not a loadout (in-game report 2026-07-24: first
+    -- spawn with the client toggle off ate the persisted equipped weapons).
+    -- The "client disabled" net message leaves ply.quickloadout = {} (sv:29)
+    -- and QuickLoadout() with {} still runs its UNCONDITIONAL StripWeapons +
+    -- RemoveAllAmmo (sv:63-64) while giving nothing back — and the client
+    -- auto-sends that empty loadout ~1 s after InitPostEntity
+    -- (cl_loadoutmenu.lua:1830), landing the strip right on the freshly
+    -- restored spawn equipment. Nothing to deliver = nothing to run: skip the
+    -- mod entirely (nil loadout, the pre-sync state, took this exit inside
+    -- QuickLoadout anyway, sv:62). Return nil, exactly what QuickLoadout
+    -- returns in both cases — the engine handout chain is untouched.
+    if not istable(ply.quickloadout) or table.IsEmpty(ply.quickloadout) then
+        return
     end
 
     -- bank every live magazine into its instance blob BEFORE the strip

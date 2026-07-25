@@ -481,15 +481,47 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Slot en runtime y en qué realm hay que escribirlo.
 
 37. ARMAS VJ: EL DROP VUELVE SOLO AL INVENTARIO [Cargo capture, COMPAT] —
-    SIN DIAGNOSTICAR. Reporte del autor (2026-07-13, pasada del entry 4c):
-    las armas de VJ Base se toman UNA sola vez con USE, entran bien al
-    inventario, pero al dropearlas la re-captura es instantánea (el arma
-    vuelve al inventario y no queda en el piso). Sospecha a verificar contra
-    el mod vivo (dev/other/, referencia dev/Cortex_VJBase_Referencia.md):
-    el SWEP de VJ o su entidad de mundo re-da el arma al contacto y el
-    WeaponEquip post-drop dispara la captura — mirar la marca de "recién
-    dropeada" del reconciliador (capture.lua/holster.lua) y por qué no cubre
-    la ruta VJ. Diagnóstico primero, archivo:línea, después arreglo.
+    HECHO y CONFIRMADO EN JUEGO 2026-07-24 (CHANGELOG #36-#40; saga completa).
+    Reporte del autor (2026-07-13, pasada del entry 4c): las armas de VJ Base
+    se toman UNA sola vez con USE, entran bien al inventario, pero al
+    dropearlas la re-captura es instantánea (el arma vuelve al inventario y
+    no queda en el piso), regalando munición en cada ciclo.
+    DIAGNOSTICADO contra el mod vivo (2026-07-24): el hook
+    PlayerCanPickupWeapon de VJ (vj_base/hooks.lua:354) autoriza CUALQUIER
+    pickup de un arma VJ con menos de 0,15 s de vida (ventana InitTime para
+    sus gives de NPC) y en hook.Call el primer retorno no-nil gana — el
+    world gate de Cargo nunca vetaba; la munición gratis era el
+    GiveAmmo(ClipSize*2) del SWEP:Equip de VJ (shared.lua:411).
+    RESUELTO en SpawnWorldWeapon: retro-fechar wep.InitTime en armas VJ —
+    el drop nace "en reposo", el propio hook de VJ niega el contacto y el
+    WALK+USE deliberado entra por su rama KeyPressed(IN_USE). De paso la
+    familia entera se preció: weapon_vj_* a $200 plano vía
+    Capture.WeaponValuePrefixes (mismo parche, PARCHE 2).
+    CIERRE (CHANGELOG #37, tras confirmar la #36): el hook de VJ respondía
+    ANTES que el world gate (autorun vs Initialize) y siempre no-nil — USE a
+    secas / autopickup / ventana InitTime capturaban sin WALK+USE. Se
+    re-asienta LA MISMA función detrás del gate (takeover de orden, patrón
+    QL), el drop de cadáver de NPC (OwnerIsNPC estampado) se niega desde el
+    frame uno, y el regalo de ClipSize*2 del SWEP:Equip se devuelve en cada
+    adquisición (nuestros equips del grid incluidos).
+    CIERRE 2 (CHANGELOG #38): las armas MadeForNPCsOnly regalan la munición
+    ANTES de auto-borrarse y el equip abortado nunca llega al clawback — la
+    toma WALK+USE las rechaza antes del pickup, respeta
+    vj_npc_wep_ply_pickup 0 (revertido el pisado de la #37), nunca se acuñan
+    como ítems y las ya acuñadas se purgan al spawn.
+    CIERRE 3 / FORMA FINAL (CHANGELOG #39): el re-asiento de la #37 perdió
+    la lotería de orden — hook.Call entre hooks DISTINTOS no es orden de
+    inserción y el KeyPressed de VJ seguía autorizando USE a secas. La
+    función de VJ corre ahora EMBEBIDA en el world gate (un solo hook: VJ
+    manda solo donde el gate se abstiene — ventana de give, gate apagado) y
+    el deny de NPC-only sube al gate (ninguna ruta, ninguna edad).
+    LECCIÓN para futuros takeovers: si el orden entre dos hooks importa, el
+    segundo se embebe en el primero — jamás se re-registra aparte.
+    REMATE (CHANGELOG #40): el clawback neteaba el regalo pero el popup del
+    engine ya había disparado (history de DGL4 con "+60 SMG1") — el gate,
+    choke point de todo pickup, neutraliza el regalo ANTES de que exista:
+    copia propia de Primary con PickUpAmmoAmount = 0 en la instancia (nunca
+    a través de wep.Primary: mutaría la tabla de la clase). Prevenir > devolver.
 
 38. TRIVIA REAL PARA ARMAS CAPTURADAS [Cargo UI] — HECHO (CHANGELOG #23,
     [APLICADO 2026-07-14]).
