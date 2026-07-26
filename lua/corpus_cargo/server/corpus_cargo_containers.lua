@@ -59,6 +59,19 @@ function CARGO.Containers.Attach(ent, opts)
                 entry.id = legacy[entry.id]
             end
         end
+
+        -- Honest degradation (cites COR-5), same rule GetRecord applies: a
+        -- persisted container is NOT an owner file yet — it stores entries, not
+        -- blobs (that is B3, when CRG-58 gets its second owner). So a uid entry
+        -- that survives a restart has no blob behind it: drop it instead of
+        -- rendering a weightless ghost. Stacks are unaffected.
+        for i = #cont.items, 1, -1 do
+            local uid = istable(cont.items[i]) and cont.items[i].uid or nil
+            if uid ~= nil and CARGO.Instances.Get(uid) == nil then
+                Corpus.Log("cargo", "Containers.Attach: entrada sin blob (uid " .. tostring(uid) .. "), descartada")
+                table.remove(cont.items, i)
+            end
+        end
     end
 
     ent.CargoContainer = cont

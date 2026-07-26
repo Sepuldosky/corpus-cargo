@@ -15,6 +15,11 @@
 --            player's engine ammo reserve, mirrored per HL2 ammo type by
 --            corpus_cargo_ammopool.lua. Numeric keys re-normalized like quick.
 --   wallet : native money provider storage
+--   instances : { [uid] = blob } — the blobs this player owns, embedded
+--            (CRG-56). This file is self-contained: no entry of it points at
+--            another file. The field is a RENDER of Instances._live rebuilt on
+--            every save, and on load it hydrates back into _live BY REFERENCE
+--            (CRG-57) — same table, never a parallel copy.
 --
 -- The server owns the inventory; the client only renders snapshots and
 -- sends intents. Every mutation ends in Save + Sync + movement refresh.
@@ -50,8 +55,9 @@ local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
 --     #15). Default OFF: without it the inventory survives death, as before.
 --   cargo_persistence — persist records to disk across sessions. 0 keeps them
 --     session-only: the in-memory _records still survive respawn within a
---     session, but nothing is written to / loaded from Corpus.Data (instance
---     blobs still write — orphan-GC debt, roadmap #15).
+--     session, but nothing is written to / loaded from Corpus.Data. Since the
+--     blobs travel inside the record (CRG-56), 0 now really means NOTHING is
+--     written — instance blobs used to leak past this gate with a file each.
 local cvLoseOnDeath = CreateConVar("cargo_lose_on_death", "0", FCVAR_ARCHIVE,
     "On death, lose the entire inventory (items, equipment, quick, belt) and money")
 local cvPersist = CreateConVar("cargo_persistence", "1", FCVAR_ARCHIVE,
@@ -66,6 +72,53 @@ local function SteamKey(ply)
     return ply:SteamID64() or ("bot" .. ply:EntIndex())
 end
 
+-- Every uid a record can REACH: grid entries, equipped uniques (a STACK slot
+-- holds a table, not a uid — §4 amendment) and, recursively, whatever hangs in
+-- their sub-slots. The belt is stacks today and carries no uid; it is walked
+-- anyway, in case it ever stops being stacks-only. Cycle guard: the visited
+-- set, since nothing forbids a blob graph from closing on itself.
+--
+-- This is the single reachability primitive of CRG-56: the render (SaveRecord),
+-- the prune on disconnect and anything that has to ask "what does this owner
+-- carry?" all walk with it.
+function CARGO.Inventory.CollectInstances(rec)
+    local seen = {}
+    if not istable(rec) then return seen end
+
+    local function visit(uid)
+        if not isstring(uid) or seen[uid] then return end
+        seen[uid] = true
+
+        local blob = CARGO.Instances.Get(uid)
+        if not istable(blob) or not istable(blob.subslots) then return end
+        for _, entries in pairs(blob.subslots) do
+            if istable(entries) then
+                for _, e in ipairs(entries) do
+                    if istable(e) then visit(e.uid) end
+                end
+            end
+        end
+    end
+
+    if istable(rec.items) then
+        for _, entry in ipairs(rec.items) do
+            if istable(entry) then visit(entry.uid) end
+        end
+    end
+    if istable(rec.equip) then
+        for _, val in pairs(rec.equip) do
+            if isstring(val) then visit(val) end
+        end
+    end
+    if istable(rec.belt) then
+        for _, entry in pairs(rec.belt) do
+            if istable(entry) then visit(entry.uid) end
+        end
+    end
+
+    return seen
+end
+
 function CARGO.Inventory.GetRecord(ply)
     local sid = SteamKey(ply)
     local rec = CARGO.Inventory._records[sid]
@@ -73,7 +126,7 @@ function CARGO.Inventory.GetRecord(ply)
 
     rec = cvPersist:GetBool() and Corpus.Data.Load("cargo", "inv_" .. sid) or nil
     if rec == nil then
-        rec = { items = {}, equip = {}, quick = {}, belt = {}, wallet = {} }
+        rec = { items = {}, equip = {}, quick = {}, belt = {}, wallet = {}, instances = {} }
     else
         -- Corpus.Data does not guarantee key types on the JSON round-trip:
         -- re-normalize the numeric quick/belt-slot keys (contract in its
@@ -83,6 +136,38 @@ function CARGO.Inventory.GetRecord(ply)
         rec.quick = CARGO.Util.NumberKeys(rec.quick)
         rec.belt = CARGO.Util.NumberKeys(rec.belt)
         rec.wallet = istable(rec.wallet) and rec.wallet or {}
+
+        -- HYDRATION (CRG-56/57). The blobs came inside this file: push them
+        -- into _live WITHOUT COPYING, so rec.instances[uid] and _live[uid] stay
+        -- THE SAME TABLE. That identity is what makes the divergence CRG-57
+        -- forbids impossible — a module mutating one mutates the other. Same
+        -- spirit as the by-ref invariant COR-7: a "defensive" copy here breaks
+        -- persistence in silence. It runs BEFORE the legacy remaps below, which
+        -- read blobs through Instances.Get (i.e. through _live).
+        rec.instances = istable(rec.instances) and rec.instances or {}
+        for uid, blob in pairs(rec.instances) do
+            if isstring(uid) and istable(blob) then
+                CARGO.Instances._live[uid] = blob
+            end
+        end
+
+        -- Honest degradation (cites COR-5): an entry whose blob did NOT come in
+        -- the file is dropped with a log — an item with no blob is never
+        -- half-rendered.
+        for i = #rec.items, 1, -1 do
+            local uid = istable(rec.items[i]) and rec.items[i].uid or nil
+            if uid ~= nil and rec.instances[uid] == nil then
+                Corpus.Log("cargo", "GetRecord: entrada sin blob (uid " .. tostring(uid) .. "), descartada")
+                table.remove(rec.items, i)
+            end
+        end
+        for slotId, val in pairs(rec.equip) do
+            if isstring(val) and rec.instances[val] == nil then
+                Corpus.Log("cargo", "GetRecord: entrada sin blob (uid " .. val .. "), descartada")
+                rec.equip[slotId] = nil
+            end
+        end
+
         -- legacy slot ids from the first dev pass (pda/detector became the
         -- generic accessory slots) — remap so nothing equipped is orphaned
         if rec.equip.pda ~= nil and rec.equip.accessory1 == nil then
@@ -142,6 +227,20 @@ function CARGO.Inventory.SaveRecord(ply)
     if not cvPersist:GetBool() then return end -- session-only mode: nothing hits disk
     local rec = CARGO.Inventory._records[SteamKey(ply)]
     if rec == nil then return end
+
+    -- RENDER (CRG-56/57): rebuild `instances` FROM SCRATCH on every save,
+    -- taking each blob from _live by reference. Rebuilding — instead of
+    -- patching — is the point: a uid that stopped being referenced (dropped to
+    -- the world, sold, eaten by a sub-slot detach) leaves the file on its own,
+    -- with no explicit delete and no sweeper. That is why the orphan class
+    -- cannot exist any more.
+    local instances = {}
+    for uid in pairs(CARGO.Inventory.CollectInstances(rec)) do
+        local blob = CARGO.Instances._live[uid]
+        if istable(blob) then instances[uid] = blob end
+    end
+    rec.instances = instances
+
     Corpus.Data.Save("cargo", "inv_" .. SteamKey(ply), rec)
 end
 
@@ -503,8 +602,9 @@ function CARGO.Inventory.StoreClip(uid, wep)
     if not istable(blob) then return end
     local ok, clip = pcall(wep.Clip1, wep)
     if ok and isnumber(clip) and clip >= 0 then
+        -- mutating the live blob IS the update (CRG-57): the write happens in
+        -- the Touch of whoever called us, which is the one holding the player.
         blob.clip1 = clip
-        CARGO.Instances.Save(uid)
     end
 end
 
@@ -1035,8 +1135,7 @@ function CARGO.Inventory.SetAmmoGroup(ply, uid, group)
     local blob = CARGO.Instances.Get(uid)
     if blob == nil then return end
     blob.ammo_group = group
-    CARGO.Instances.Save(uid)
-    CARGO.Inventory.Sync(ply)
+    CARGO.Inventory.Touch(ply) -- the blob rides in the record now (CRG-56)
 end
 
 -- ------------------------------------------------------------------
@@ -1097,7 +1196,6 @@ function CARGO.Inventory.SubSlotAttach(ply, hostUid, subId, ref)
     end
 
     table.insert(hostBlob.subslots[subId], mounted)
-    CARGO.Instances.Save(hostUid)
     CARGO.Inventory.Touch(ply)
 end
 
@@ -1111,7 +1209,6 @@ function CARGO.Inventory.SubSlotDetach(ply, hostUid, subId, entryIndex)
 
     local entry = table.remove(entries, entryIndex)
     CARGO.Inventory.GiveEntry(ply, entry, true) -- ejection path: never blocked
-    CARGO.Instances.Save(hostUid)
     CARGO.Inventory.Touch(ply)
 end
 
@@ -1206,7 +1303,7 @@ end)
 function CARGO.Inventory.WipeOnDeath(ply)
     local rec = CARGO.Inventory.GetRecord(ply)
 
-    -- destroy every reachable instance so no blob file is orphaned (the host
+    -- destroy every reachable instance so no blob survives in `_live` (the host
     -- plus any uid'd sub-slot entry it carries)
     local function purgeInstance(uid)
         local blob = CARGO.Instances.Get(uid)
@@ -1303,6 +1400,17 @@ end)
 
 hook.Add("PlayerDisconnected", "corpus_cargo_inv_save", function(ply)
     CARGO.Inventory.SaveRecord(ply)
+
+    -- PRUNE (CRG-57): the blobs leave with their owner. The record was just
+    -- rendered to disk, so dropping them from _live loses nothing — and without
+    -- this the live table only ever grows over a session.
+    local rec = CARGO.Inventory._records[SteamKey(ply)]
+    if rec ~= nil then
+        for uid in pairs(CARGO.Inventory.CollectInstances(rec)) do
+            CARGO.Instances._live[uid] = nil
+        end
+    end
+
     CARGO.Inventory._records[SteamKey(ply)] = nil
 end)
 
