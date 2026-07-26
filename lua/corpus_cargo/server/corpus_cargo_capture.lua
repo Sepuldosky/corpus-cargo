@@ -647,6 +647,14 @@ function CARGO.Capture.SpawnWorldWeapon(class, pos, uid)
     wep:SetPos(pos)
     wep.CargoInstanceUid = isstring(uid) and uid or nil
     wep.CargoWorldSpawned = true -- our drops are NEVER taken by touch
+    -- THE BLOB TRAVELS WITH THE ENTITY (CRG-60). A gun on the ground is a world
+    -- drop like any other: a savegame gives the flat fields back but not the
+    -- instance, and a uid on its own is a ghost — the take would mint a
+    -- factory-fresh item and the condition, the attachments and the stored
+    -- magazine would be gone.
+    if wep.CargoInstanceUid ~= nil then
+        wep.CargoInstances = CARGO.Instances.RenderEntry({ uid = wep.CargoInstanceUid })
+    end
     wep:Spawn()
     -- VJ Base compat (roadmap #37, diagnosed against the live code 2026-07-24):
     -- its PlayerCanPickupWeapon hook (vj_base/hooks.lua:354) authorizes ANY
@@ -947,6 +955,7 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
     -- world-drop context, read NOW: by the time the timer runs the entity
     -- is the held weapon (or gone) and these fields are the only trace
     local dropUid = isstring(wep.CargoInstanceUid) and wep.CargoInstanceUid or nil
+    local dropBlobs = istable(wep.CargoInstances) and wep.CargoInstances or nil
     local deliberate = wep.CargoUseTaken == true
     local dropPos = wep:GetPos()
 
@@ -984,13 +993,45 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
         -- a dropped Cargo instance always comes back AS ITSELF: it is not a
         -- duplicate to dedup, it is a concrete item with its own blob
         local blob = dropUid and CARGO.Instances.Get(dropUid) or nil
+
+        -- SAVEGAME (CRG-60): the uid is live per BOOT, so a gun that survived a
+        -- gm_save/gm_load names an instance that died with the map. Mint it
+        -- again from the blob that travelled on the entity. VALUE test, never a
+        -- timing one — "is this uid possible in this session?" — which is what
+        -- makes it indifferent to when the duplicator wrote the fields.
+        local revivedFromSave = false
+        if blob == nil and dropUid ~= nil and istable(dropBlobs) then
+            local saved = dropBlobs[dropUid]
+            local revived = CARGO.Instances.Remint(
+                { { id = istable(saved) and saved.id or nil, uid = dropUid } }, dropBlobs)
+            if revived[1] ~= nil then
+                dropUid = revived[1].uid
+                blob = CARGO.Instances.Get(dropUid)
+                revivedFromSave = true
+                Corpus.Log("cargo", "Capture: arma de mundo restaurada de un savegame ("
+                    .. tostring(blob and blob.id) .. ", cargador " .. tostring(blob and blob.clip1) .. ")")
+            end
+        end
         local action
         if blob ~= nil then
             action = "capture"
             -- the world entity is about to be Removed below: harvest whatever
             -- is left in its magazine into the blob first (#18), so re-equipping
-            -- from the grid does not hand back a free full clip
-            CARGO.Inventory.StoreClip(dropUid, wep)
+            -- from the grid does not hand back a free full clip.
+            --
+            -- EXCEPT when the blob just came back from a savegame. Cargo did NOT
+            -- spawn that entity — the engine re-created it — so
+            -- SpawnWorldWeapon's ApplyClipToEntity never ran and its Clip1 is
+            -- the SWEP's DefaultClip, a value from nowhere. Harvesting it writes
+            -- a free full magazine over the one that travelled. Measured in game
+            -- (planilla R, ronda 2): a dev pistol dropped EMPTY came back with
+            -- 18, and the SMG with 15 came back with 45 — the two DefaultClips.
+            -- Same rule as everything else in this block: a value that only
+            -- makes sense in the session that produced it is not continuity, so
+            -- the blob is the authority and the restored entity is not.
+            if not revivedFromSave then
+                CARGO.Inventory.StoreClip(dropUid, wep)
+            end
         else
             action = CARGO.Capture.Decide(
                 EquippedClassCount(owner, class), HasWeaponItem(owner, class),
@@ -1091,6 +1132,7 @@ hook.Add("PlayerDroppedWeapon", "corpus_cargo_drop_reconcile", function(ply, wep
     CARGO.Inventory.StoreClip(uid, wep)
     rec.equip[slotId] = nil
     wep.CargoInstanceUid = uid
+    wep.CargoInstances = CARGO.Instances.RenderEntry({ uid = uid }) -- CRG-60, as above
     wep.CargoWorldSpawned = true
     CARGO.Inventory.Touch(ply)
 end)
