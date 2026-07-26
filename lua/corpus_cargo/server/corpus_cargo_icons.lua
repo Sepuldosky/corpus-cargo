@@ -13,10 +13,15 @@ local CARGO = Corpus.GetModule("cargo")
 
 local NET_ICON_OVERRIDE = Corpus.Net.Register("cargo", "icon_override")
 
+-- SERVER CONFIG, not game state (COR-19): a hand-framed icon is a catalog
+-- decision about a def, so it outlives deleting a save. Declared here; today
+-- both scopes still resolve to the same folder, so nothing moves.
+local CATALOG = { scope = "config" }
+
 -- load persisted overrides and re-attach them to every def already
 -- registered; defs that register later (capture autogen) merge inside
 -- Items.Register itself
-CARGO.Items._iconOverrides = Corpus.Data.Load("cargo", "icon_overrides") or {}
+CARGO.Items._iconOverrides = Corpus.Data.Load("cargo", "icon_overrides", CATALOG) or {}
 
 for id, ovr in pairs(CARGO.Items._iconOverrides) do
     local def = CARGO.Items.Get(id)
@@ -91,7 +96,7 @@ net.Receive(NET_ICON_OVERRIDE, function(_, ply)
     end
 
     CARGO.Items._iconOverrides[defid] = ovr
-    Corpus.Data.Save("cargo", "icon_overrides", CARGO.Items._iconOverrides)
+    Corpus.Data.Save("cargo", "icon_overrides", CARGO.Items._iconOverrides, CATALOG)
     def.icon_override = ovr
 
     -- push the updated def to every client over the existing snapshot
