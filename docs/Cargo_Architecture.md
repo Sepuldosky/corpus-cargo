@@ -362,9 +362,18 @@ Cargo.StatusPanel.RegisterBar(module, {
 
 Todo vía `Corpus.Data` (namespace `cargo`), sin necesidad de SQLite: no hay consultas relacionales ni volumen que lo justifique.
 
-- **Instancias de ítem único**: un archivo por instancia, blob definido por el módulo dueño.
-- **Inventario del jugador**: estructura de slots + stacks, indexado por SteamID64 (charset válido para el saneo de `Corpus.Data`, sin necesidad de tabla adicional).
-- **Conocimiento de recetas** (usado por el banco de trabajo, ver `Workbench_Arquitectura.md`): mismo mecanismo, un archivo por jugador con el set de IDs desbloqueados.
+**CRG-56 — No existen archivos de instancia; existen archivos de DUEÑO.** Un blob de instancia no tiene archivo propio: viaja embebido en el archivo de quien lo posee, bajo el campo `instances = { [uid] = blob }`. El inventario de un jugador es por lo tanto **un** archivo autocontenido — sus entradas de grid y equipo viajan junto a los blobs que referencian, incluidos los sub-slots anidados de forma recursiva. La forma anterior (un archivo `inst_<uid>` por instancia, §12 hasta el 2026-07-25) generaba un archivo en el instante de crear la instancia, sin saber si le pertenecía a un jugador o al mapa: la medición sobre la data real del autor dio **354 huérfanas sobre 370 archivos**, todas de estado de mundo que nunca debió tocar el disco.
+
+**CRG-57 — `Instances._live` es la única fuente de verdad en runtime.** El campo `instances` del archivo es un **render** de `_live` en el momento de guardar, y al cargar se hidrata *hacia* `_live` **por referencia**: `rec.instances[uid]` y `_live[uid]` son la misma tabla. Jamás una copia paralela — si un módulo dueño mutara la copia en vez de la viva, el cambio se perdería en silencio en el próximo guardado. Es del tipo de invariante que un refactor "defensivo" rompe sin ruido, como COR-7.
+
+**CRG-58 — Una instancia nunca se referencia desde fuera del archivo de su dueño.** La referencia cruzada entre archivos es exactamente lo que fabrica huérfanos. Cuando un ítem cambia de dueño el blob **se muda**: se escribe primero el destino y después el origen, de modo que un corte en el medio **duplica** en vez de borrar — duplicar es el modo de falla seguro.
+
+- **Inventario del jugador** (`inv_<steamid64>`): slots + stacks + el mapa `instances` de sus blobs. Indexado por SteamID64, **sin noción de mapa**: cruza de nivel en nivel con el jugador.
+- **Contenedor persistente** (`cont_<key>`): mismo trato cuando declara `persistKey`.
+- **Estado del mundo sin dueño persistente**: no llega a disco. El stock de un trader de sesión, una crate sin `persistKey` y un ítem en el suelo viven solo en memoria y mueren con el mapa — GMod reinicia el estado Lua entero al cambiar de nivel, así que la limpieza es gratis y no hay nada que barrer. La contrapartida, que es una decisión de diseño y no un defecto: **un ítem tirado en el suelo se destruye al cambiar de mapa**.
+- **Conocimiento de recetas** (banco de trabajo, ver `Workbench_Arquitectura.md`): mismo mecanismo, un archivo por jugador con el set de IDs desbloqueados.
+
+Una entrada con `uid` cuyo blob no viene en el archivo se **descarta con log** al cargar: un ítem sin blob no se renderiza a medias (degradación honesta, cita COR-5).
 
 ---
 

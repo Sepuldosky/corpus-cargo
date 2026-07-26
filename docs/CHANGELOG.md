@@ -3054,3 +3054,108 @@ Verificación offline: harness ALL GREEN en ambos realms. EN JUEGO (checklist):
 (c) con `cargo_capture_weapons 0`: la toma vuelve a regalar munición con popup (stock VJ).
 **Confirmado en juego por el autor el 2026-07-24** ("funciona todo bien"). Commiteado y
 pusheado con autorización del autor (junto con las entries 36-39 de la misma pasada VJ).
+
+---
+
+## 41. El blob de instancia vive dentro del archivo de su dueño (adiós a `inst_<uid>` y a las huérfanas) `[APLICADO 2026-07-25]`
+
+Medición sobre `data/corpus/cargo/` del autor (2026-07-25, antes de borrarla): **370** archivos
+`inst_*.json`, **16** referenciados por el inventario, **0** referencias rotas — **354 huérfanas,
+el 95,7%**. El histograma las delata (25 `cargo_dev_pistol`, 25 `cargo_dev_smg`, 20
+`cargo_dev_backpack` ≈ 25 sesiones de trader demo): son estado de MUNDO — stock de trader, drops
+al suelo, derrames de contenedor— que muere con el mapa y deja el archivo atrás.
+
+**La causa raíz no es la falta de un barredor.** Es que `Instances.Create` escribía el archivo en
+el instante de crear la instancia, sin saber ni preguntar si le pertenecía a un jugador o al mapa.
+Las 354 no son archivos que se quedaron sin dueño: son archivos que **nunca debieron escribirse**.
+Por eso el remedio no es un mark & sweep (necesitaría raíces en disco, se rompería con
+`cargo_persistence 0` barriendo el mundo, y dejaría el savegame futuro apuntando a archivos que el
+propio GC podría borrar): el remedio es **dejar de escribir**.
+
+- PARCHE 1 — feat(inventory): **el blob no tiene archivo propio; viaja embebido en el archivo de
+  su dueño** (CRG-56), bajo `instances = { [uid] = blob }`. `Instances.Create` ya no escribe nada,
+  `Get` pierde el fallback a disco (`_live` es la única verdad de runtime, CRG-57), `Save`
+  **se elimina** y `Delete` deja de tocar el filesystem — con eso **cierra roadmap #13**: el
+  `file.Delete` crudo era la violación declarada de COR-3, y desaparece sin necesitar la primitiva
+  `Corpus.Data.Delete` (que sigue siendo deseable y pasa a B2).
+- PARCHE 2 — feat(inventory): **walker, render, hidratación, descarte y poda.**
+  `Inventory.CollectInstances(rec)` es la primitiva única de alcanzabilidad (grid + equipo +
+  sub-slots **recursivos**, con guardia de ciclos; el cinturón se camina igual por si un día deja
+  de ser stacks). `SaveRecord` **reconstruye `instances` desde cero** en cada guardado tomando los
+  blobs de `_live` **por referencia**: un uid que dejó de estar referenciado (se dropeó, se vendió)
+  desaparece del archivo solo, sin borrado explícito y sin barredor — por eso la clase "huérfana"
+  ya no puede existir. `GetRecord` hidrata **hacia** `_live` sin copiar: `rec.instances[uid]` y
+  `_live[uid]` son **la misma tabla**, que es lo que hace imposible la divergencia que CRG-57
+  prohíbe (mismo espíritu que el invariante by-ref COR-7). El `PlayerDisconnected` **poda** los
+  uids del dueño: hasta hoy `_live` solo crecía.
+- PARCHE 3 — feat(inventory): **degradación honesta** (cita COR-5). Una entrada con `uid` cuyo
+  blob no vino en el archivo se **descarta con log** al cargar, en grid y en equipo: un ítem sin
+  blob no se renderiza a medias. Mismo trato en el loader de contenedores con `persistKey` —
+  un `cont_<key>` guarda entradas, no blobs (ser archivo de dueño es B3), así que sus uids no
+  sobreviven un reinicio y se descartan en vez de quedar como fantasmas de peso cero.
+
+**Los cuatro call sites de `Instances.Save`** (el PROMPT de la tanda contaba uno): `StoreClip` y
+los dos de sub-slot pierden la línea —los de sub-slot ya terminaban en `Touch`, que es quien
+escribe el record—; `SetAmmoGroup`, que era el único que sincronizaba **sin** guardar, pasa a
+`Touch` (decisión del autor, 2026-07-25). Con eso todo flujo cumple el "every mutation ends in
+Save + Sync + movement refresh" del header del archivo.
+
+**Comportamiento aceptado y declarado** (no es un pendiente): de los 8 call sites de `StoreClip`,
+todos terminan en `Touch` salvo el espejo del ammopool y el drop al mundo. En el primero el blob es
+del jugador y la escritura llega con el próximo `Touch` —a más tardar en el disconnect o el
+ShutDown—; en el segundo el blob es del mundo y no va a disco por diseño. La única pérdida posible
+es una mutación de cargador seguida de un crash duro sin ningún `Touch` en el medio; hoy ese mismo
+crash ya se lleva el record entero.
+
+**Deuda del CHANGELOG #10 cerrada de paso:** con `cargo_persistence 0` los blobs se escribían
+igual (el gate solo cubría el record). Ahora 0 significa que **no se escribe nada**.
+
+Verificación offline: harness **ALL GREEN en ambos realms, 373 checks** (eran 355). Los 18 nuevos
+en `TESTS_SERVER`: `Create` no deja rastro en disco · round-trip de un record con un unique en el
+grid, uno equipado y un tercero **anidado** en sub-slot, con su condición · identidad **por
+referencia** `rec.instances[uid] == Instances._live[uid]` (no igualdad de contenido: es lo que
+prueba CRG-57) · mutar el blob vivo se ve en el render · entrada con uid sin blob descartada y
+resto del record intacto · dropear el unique y su uid sale del archivo solo · poda de `_live` en
+el disconnect. EN JUEGO: planilla **P1-P5** (sección P, la primera de Cargo).
+**Confirmado en juego por el autor el 2026-07-25: los cinco checks en PASA.** `cargo_selftest`
+76 OK / 0 fallas en realm server; P5 reportado con la frase que cierra el caso — "no hay restos
+del ítem que boté".
+
+---
+
+## 42. §12 reescrita: normas del blob-en-su-dueño (CRG-56/57/58) y barrido de la forma vieja `[APLICADO 2026-07-25]`
+
+La entrada 41 cambió la forma en disco; esta le pone las normas y barre los ecos. Hasta hoy §12
+eran tres viñetas sin un solo ID: un subsistema entero de persistencia descrito en prosa, que es
+exactamente lo que FLU-30 y §7.2 del flujo persiguen — una norma sin ID es una norma que va a
+derivar.
+
+- PARCHE 1 — docs(docs): **§12 de `Cargo_Architecture.md` reescrita entera**, acuñando **CRG-56**
+  (no existen archivos de instancia, existen archivos de DUEÑO), **CRG-57** (`_live` es la única
+  verdad de runtime; el campo `instances` es un render **por referencia**) y **CRG-58** (una
+  instancia nunca se referencia desde fuera del archivo de su dueño; el cambio de dueño **muda** el
+  blob, destino primero y origen después, porque duplicar es el modo de falla seguro). Las tres
+  entran en `corpus/docs/ids.yaml` en el mismo parche (FLU-30), con la letra **P** registrada en
+  `familias_excluidas` **antes** de que la planilla la use.
+- PARCHE 2 — docs(docs): **CRG-43 enmendada** — `inst_<uid>` sale de la lista de claves del
+  namespace, en el CLAUDE.md de Cargo y en la `nota` de su entrada del registro, citando CRG-56
+  como el motivo. No se le tocó sede, fuerza ni evidencia.
+- PARCHE 3 — docs(docs): **barrido de ratificación** (§7.3, barriendo **por el valor**): el mapa de
+  archivos del CLAUDE.md, el header de `corpus_cargo_instances.lua`, el comentario del convar
+  `cargo_persistence`, el de `WipeOnDeath`, el estado, y en el roadmap **#13 cerrado** (el
+  `file.Delete` ya no existe; la primitiva `Corpus.Data.Delete` sigue siendo deseable y pasa a B2)
+  y **#15 recortado** a "loot on death" — el GC de huérfanas deja de ser un pendiente porque la
+  clase no existe. En `Cargo_Trade_Arquitectura.md`, el pendiente que queda es **cuándo** se limpia
+  un cadáver looteado (adjudicado a Cargo en `Cortex_ContratosEntrantes.md` §3.2), no el GC de
+  blobs.
+
+**Lo que esta tanda NO acuña, a propósito:** la norma de que el estado del mundo no va a disco
+salvo dueño persistente declarado. B1 ya lo hace de hecho, pero su cláusula de excepción solo tiene
+sentido cuando el contenedor persistente sea archivo de dueño — eso es B3, y su ID está
+presupuestado ahí en el plan madre. En §12 el punto va redactado como **prosa descriptiva**, sin
+SIEMPRE/NUNCA, para no fabricar una norma sin ID (§7.2).
+
+Verificación: checker de IDs (`corpus/.claude/check-ids/corpus_check_ids.ps1`) en verde — las tres
+normas nuevas están citadas Y registradas, y la letra P está en `familias_excluidas`. El framework
+**no** se toca en código, así que el inciso de FLU-16 (`corpus_estado`, §9 de la arquitectura,
+espejo) no se dispara por B1; sí lo hará B2.

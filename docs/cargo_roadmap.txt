@@ -135,10 +135,21 @@ INTEGRACIONES / DEUDA PROPIA
     ordena el trabajo. Ojo con el matiz que la sede enuncia: el único net.Receive
     que hoy espera gate es NET_ICON_OVERRIDE (contenido por CRG-46); los otros 21
     no lo necesitan porque los protege CRG-6.
-13. Corpus.Data.Delete como primitiva del framework (hoy file.Delete
-    directo en Instances.Delete, deuda declarada).
+13. Corpus.Data.Delete como primitiva del framework.
+    [CERRADO por CHANGELOG #41 (2026-07-25): el file.Delete crudo de
+     Instances.Delete YA NO EXISTE — el blob dejó de tener archivo propio
+     (CRG-56), así que borrar es sacarlo de _live y no hay nada que
+     desenlazar. Con eso desaparece la violación declarada de COR-3.
+     La primitiva en sí sigue siendo deseable y pasa al bloque B2 del plan
+     dev/PLAN_cargo_persistencia_gc.md, junto con List y el scope; su primer
+     consumidor real será el comando dev que purgue los inst_* legacy de
+     terceros.]
 14. addon.json + empaquetado Workshop (deuda compartida del ecosistema).
-15. Loot on death / GC de instancias huérfanas — diseño posterior.
+15. Loot on death — diseño posterior.
+    [El "GC de instancias huérfanas" que esta línea traía SALE del pendiente:
+     la clase dejó de existir con CHANGELOG #41 (CRG-56). Un blob sin dueño ya
+     no puede quedar en disco porque no tiene archivo propio, y el render del
+     archivo de dueño se reconstruye entero en cada guardado.]
     [La segunda arma de una clase ya poseída YA NO se absorbe — CHANGELOG #27,
      pedido del autor 2026-07-14: cada arma capturada es su propia instancia, y
      el dedup quedó acotado al give ANÓNIMO del engine (el loadout, que si no
@@ -146,8 +157,9 @@ INTEGRACIONES / DEUDA PROPIA
     Enlaza con loot de cadáveres (Trade §9, cruce Cortex).
     PARCIAL (CHANGELOG #10, [APLICADO 2026-07-12], confirmado en juego): variante WIPE lista
     (cargo_lose_on_death borra todo + dinero al morir; cargo_persistence 0 =
-    sesión en memoria). La variante LOOT (todo cae recuperable) y el GC de
-    huérfanos siguen pendientes — decisión del autor fue wipe, no loot.
+    sesión en memoria, y desde #41 eso significa que NO se escribe nada — antes
+    los blobs de instancia se colaban igual). Lo que sigue pendiente es la
+    variante LOOT (todo cae recuperable) — decisión del autor fue wipe, no loot.
 
 
 BLOQUE DE MANEJO / INTERACCIÓN DE ARMAS (hallazgos in-game 2026-07-11)

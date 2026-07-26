@@ -255,8 +255,10 @@ resuelve cuando el bloque dueño cierre:
   reacciona vía `CallOnRemove`. *Cómo se ve y se transfiere ese inventario* también
   es de Cargo. La loot table se cierra al diseñar el bloque dueño — regla del flujo
   (dueño se decide en diseño).
-- Enlaza con el pendiente de "loot on death / GC de instancias huérfanas" del roadmap
-  Cargo #15.
+- Enlaza con el pendiente de "loot on death" del roadmap Cargo #15. Lo que queda
+  pendiente ahí es **cuándo** se limpia un cadáver looteado, no un GC de blobs: desde
+  CHANGELOG #41 el blob no tiene archivo propio (CRG-56) y la clase "instancia huérfana"
+  dejó de existir.
 
 ---
 
@@ -283,7 +285,7 @@ reporta su facción/rango); degradación honesta a "Trader" genérico si no.
 | Pendiente | Dueño futuro | Nota |
 |---|---|---|
 | Loot table de NPC (qué dropea al morir) | Cortex / Caliber | Cargo provee el inventario-en-entidad y la UI de loot; el contenido y la muerte son del dueño (§9) |
-| GC de cadáveres / instancias huérfanas | Cargo | Enlaza roadmap #15; cuándo se limpia un cadáver looteado |
+| GC de cadáveres looteados | Cargo | **Cuándo** se limpia un cadáver ya looteado (enlaza roadmap #15; adjudicado en `Cortex_ContratosEntrantes.md` §3.2 — el dueño del primitivo inventario-en-entidad es quien ya reacciona vía `CallOnRemove`). El GC de blobs NO es parte: la clase "instancia huérfana" murió con CRG-56 |
 | Persistencia de traders NPC reales | Cortex | El primitivo persiste; qué traders existen y su stock inicial es de Cortex |
 | Gate de admin del spawn del trader de ejemplo | Cargo | Mismo TODO que el resto de comandos dev — espera primitiva de permisos (roadmap #12) |
 | Economía balanceada (values reales de los ítems) | Cargo (contenido) | `def.value` existe como campo; los números se calibran en juego |

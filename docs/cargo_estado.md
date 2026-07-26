@@ -5,8 +5,17 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-24 (**entries 36-40 `[APLICADO]`, confirmadas en juego,
-commiteadas y pusheadas** — pasada de compat/economía + saga VJ). La 36: MTs-255-12 a slot largo
+**Última actualización:** 2026-07-25 (**entries 41-42 `[APLICADO]`, confirmadas en juego —
+planilla P, los cinco checks en PASA** — bloque **B1** de la tanda de persistencia). El blob de instancia **dejó de tener
+archivo propio**: viaja embebido en el archivo de su dueño (`inv_<steamid64>`) bajo `instances`, y
+`Instances._live` es la única verdad de runtime (CRG-56/57/58, §12 reescrita). La medición que lo
+originó: **354 huérfanas sobre 370 archivos** en la data real, todas estado de mundo que nunca
+debió persistirse — la causa era `Instances.Create` escribiendo sin saber de quién era la
+instancia. Cierra de paso **roadmap #13** (murió el `file.Delete` crudo) y la deuda del
+**CHANGELOG #10** (`cargo_persistence 0` ahora sí no escribe nada). Plan madre:
+[`../../dev/PLAN_cargo_persistencia_gc.md`](../../dev/PLAN_cargo_persistencia_gc.md).
+Antes: **entries 36-40 `[APLICADO]`, confirmadas en juego,
+commiteadas y pusheadas** — pasada de compat/economía + saga VJ. La 36: MTs-255-12 a slot largo
 (su `SWEP.Class` EFT es "Revolver" y la regla sidearm ganaba), **precios por familia**
 (`Capture.WeaponValueFor`: `weapon_vj_*` a $200 plano), attachments ARC9 con `value = 100`, y
 **Quick Loadouts apagado** ya no corre el strip incondicional en el primer spawn. Las 37-40, la
@@ -121,7 +130,7 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   un addon de contenido) + callbacks `OnTradeOpened/Dealt/Closed` + idles de
   plaza rotados + voz por proximidad (saludo/espera 1 min/despedida). Sin
   persona: citizen mudo; sin banco: UI muda, consola limpia.
-- **Harness offline: 355 checks verdes en ambos realms** (con gate final: un
+- **Harness offline: 373 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 83 client / 76 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -129,9 +138,13 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **Nada** — la saga VJ (entries 37-40) y la pasada de compat/economía (36) quedaron
-  confirmadas en juego el 2026-07-24 ("funciona todo bien"), `[APLICADO]`, commiteadas y
-  pusheadas.
+- **Nada.** Las entries 41-42 (B1) quedaron confirmadas el 2026-07-25 con la **planilla P**
+  —la primera sección de planilla de Cargo— **en PASA los cinco**: P1 arranque limpio · P2
+  ningún archivo suelto en el ciclo de vida de un ítem · P3 el relog conserva equipo,
+  condición y sub-slots · P4 `cargo_persistence 0` no escribe nada · P5 el mundo es efímero
+  y no deja rastro. Harness offline: **373 checks verdes** en ambos realms. **Sin commitear
+  todavía** (GIT-7). Antes, la saga VJ (37-40) y la pasada de compat/economía (36) habían
+  quedado confirmadas el 2026-07-24, ya commiteadas y pusheadas.
 
 ## Frentes abiertos (anotados, NO arreglados)
 
@@ -161,22 +174,30 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   de mundo sin bajar al spec de `Cargo_ItemImages_Arquitectura.md`.
 - **Remitir el fix de brazos oscuros a Twilight** (ya confirmado, acción del
   autor).
-- `Corpus.Data` sin `Delete`; peso nominal de attachments; instancias
-  huérfanas sin GC; comandos dev sin gate admin; sin `addon.json`.
+- Peso nominal de attachments; comandos dev sin gate admin; sin `addon.json`.
 
 ## Próximo paso
 
-1. **Slice 2 del comercio**: el dinero como entidad (`Cargo_Trade` §7 — botar
-   efectivo desde el botón $, línea de solo-dinero en el basket). Después el
-   slice 3 (jugador-trader con doble confirm). Semilla del chat nuevo:
+1. **B2 — `Corpus.Data` gana `List`, `Delete` y scope** (plan:
+   [`../../dev/PLAN_cargo_persistencia_gc.md`](../../dev/PLAN_cargo_persistencia_gc.md)).
+   Que ningún módulo vuelva a tocar `file.*` para persistir y que el scope distinga config
+   de servidor de estado de partida (las dos normas del framework que ese bloque acuña,
+   con sus IDs presupuestados en el plan), dejando el gancho de perfil puesto **sin mover
+   un solo archivo hoy**. Primer consumidor real de las primitivas: un
+   comando dev que lista y purga los `inst_*` legacy. Toca el framework ⇒ dispara el
+   inciso de FLU-16. Se escribe su PROMPT **cuando vuelva el reporte de la planilla P**.
+2. **Slice 2 del comercio** (desplazado por decisión del autor el 2026-07-25, D4 del plan
+   madre): el dinero como entidad (`Cargo_Trade` §7 — botar efectivo desde el botón $,
+   línea de solo-dinero en el basket). Después el slice 3 (jugador-trader con doble
+   confirm). Semilla del chat nuevo:
    [`../../dev/HANDOFF_cargo_trade_slice2.md`](../../dev/HANDOFF_cargo_trade_slice2.md).
    La entry 27 se confirma de paso en esa pasada (checklist en el artifact).
-2. Remitir el fix de brazos oscuros a Twilight (acción del autor).
-3. **#41 — explosivos ARC9 como stack throwable** (bloque propio, pedido del
+3. Remitir el fix de brazos oscuros a Twilight (acción del autor).
+4. **#41 — explosivos ARC9 como stack throwable** (bloque propio, pedido del
    autor): hoy las granadas de EFT/CS:GO/MW2019 se equipan en Primary. El
    clasificador ya las etiqueta `thrown`; falta el destino (son `unique` y el
    slot Throwable pide un **stack**). Enlaza con el #32.
-4. Cuando se prioricen: **#42** (el lanzagranadas capturado no dispara — perdió
+5. Cuando se prioricen: **#42** (el lanzagranadas capturado no dispara — perdió
    su attachment de munición; sospecha: el puente ARC9 §10), **#36** (slot HL2
    alineado), **#35** (footsteps), **#44** (overlay de máscara
    de gas para cascos cerrados — los sonidos ya están en el banco, SIN DISEÑAR).
