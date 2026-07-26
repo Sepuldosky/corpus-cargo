@@ -523,6 +523,57 @@ if SERVER then
             .. " claves inst_* legacy borradas de data/corpus/cargo/")
     end, nil, "Lists (dry run) or deletes ('confirm') the legacy inst_* instance files left behind by pre-entry-41 Cargo. Never touches inv_/cont_/trader_ nor the catalog files")
 
+    -- ------------------------------------------------------------------
+    -- What does THIS entity carry of Cargo's? (planilla R, round 3)
+    --
+    -- A dropped weapon came back from a savegame with nothing of ours on it,
+    -- and an ABSENCE leaves no trace to log: there is no marker left to ask.
+    -- Two rounds could not tell "the blob never travelled" from "the blob
+    -- travelled and something overwrote it", because both end in a
+    -- factory-fresh item. This makes it observable — look at the entity and
+    -- read what is actually there.
+    --
+    -- It prints the container marker too, on purpose: pointing it at a crate
+    -- and then at a dropped gun IN THE SAME SAVE is the whole experiment. The
+    -- crate is a scripted entity and the gun is a SWEP, and whether the engine
+    -- treats their Lua tables the same is exactly the open question.
+    -- No admin gate, like the rest of the dev kit (CRG-45).
+    -- ------------------------------------------------------------------
+    concommand.Add("cargo_dev_worldwep", function(ply)
+        if not IsValid(ply) then ply = player.GetAll()[1] end
+        if not IsValid(ply) then return end
+
+        local ent = ply:GetEyeTrace().Entity
+        if not IsValid(ent) then
+            Corpus.Log("cargo", "worldwep: no estás mirando ninguna entidad")
+            return
+        end
+
+        Corpus.Log("cargo", "worldwep: " .. ent:GetClass() .. " #" .. ent:EntIndex())
+
+        local uid = isstring(ent.CargoInstanceUid) and ent.CargoInstanceUid or nil
+        local blobs = istable(ent.CargoInstances) and ent.CargoInstances or nil
+        Corpus.Log("cargo", "  CargoInstanceUid  = " .. tostring(uid))
+        Corpus.Log("cargo", "  CargoWorldSpawned = " .. tostring(ent.CargoWorldSpawned))
+        Corpus.Log("cargo", "  CargoInstances    = "
+            .. (blobs and (table.Count(blobs) .. " blob(s)") or "nil"))
+        if blobs ~= nil and uid ~= nil and istable(blobs[uid]) then
+            local b = blobs[uid]
+            Corpus.Log("cargo", "    blob del uid: id=" .. tostring(b.id)
+                .. " condition=" .. tostring(b.condition) .. " clip1=" .. tostring(b.clip1))
+        end
+        Corpus.Log("cargo", "  instancia viva    = "
+            .. tostring(uid ~= nil and CARGO.Instances.Get(uid) ~= nil))
+
+        local cont = istable(ent.CargoContainer) and ent.CargoContainer or nil
+        Corpus.Log("cargo", "  CargoContainer    = " .. (cont
+            and (#(cont.items or {}) .. " entrada(s), "
+                .. table.Count(cont.instances or {}) .. " blob(s)") or "nil"))
+        local entry = istable(ent.CargoEntry) and ent.CargoEntry or nil
+        Corpus.Log("cargo", "  CargoEntry        = " .. (entry
+            and (tostring(entry.id) .. (entry.uid and (" uid=" .. entry.uid) or "")) or "nil"))
+    end, nil, "DEV: prints the Cargo fields the entity you are looking at carries (world drop, crate, trader). Point it at a crate and at a dropped gun in the same save to compare")
+
 end
 
 -- ------------------------------------------------------------------
