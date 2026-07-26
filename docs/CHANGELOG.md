@@ -3221,3 +3221,307 @@ intacto tras el relog, y T7 —el dry-run— cerrado en la ronda 2. La 1.ª corr
 devuelto el atajo `no quedan claves inst_* legacy` porque los archivos todavía no estaban;
 quedó anotado acá porque el orden de esa preparación es lo que hace que el check pruebe algo.
 El único ✗ de la planilla, T4, es del framework y no de Cargo.
+
+---
+
+## 44. Un solo serializador de dueño: `cont_<key>` gana sus blobs (y el contenedor persistente deja de perder sus uniques) `[APLICADO 2026-07-26]`
+
+B1 dejó **una** rutina de serialización escrita, pero inline dentro del inventario, y **un** archivo
+de dueño. Esta entry extrae la rutina y le da el segundo dueño, que es lo que saca a **CRG-58** de
+`INTENCION`: hasta hoy la norma "una instancia nunca se referencia desde fuera del archivo de su
+dueño" tenía un solo archivo donde ser cierta, y una norma con un solo call site no está probada.
+
+De paso arregla un bug real que la unificación vuelve trivial: **una crate con `persistKey` perdía
+sus uniques en cada reinicio.** Guardaba entradas y no blobs, así que el loader se encontraba con
+uids sin nada detrás y los descartaba con log. El comentario del propio código lo declaraba —
+"a persisted container is NOT an owner file yet ... (that is B3)".
+
+- PARCHE 1 — refactor(inventory): **la rutina única, con el dueño como parámetro.** El render que
+  vivía inline en `SaveRecord` y la hidratación que vivía inline en `GetRecord` salen a
+  `Instances.RenderOwner(owner)` e `Instances.HydrateOwner(owner)`, en
+  `corpus_cargo_instances.lua` y no en el de inventario: son del dueño de los blobs, y el punto de
+  la tanda es que el inventario deje de ser su sede. `HydrateOwner` **devuelve el set de uids que
+  llegaron**, porque el descarte por degradación honesta se queda en cada llamador — cada dueño
+  tiene listas distintas que barrer (el record tiene `equip`, el contenedor no).
+  `Inventory.CollectInstances` **no se duplicó ni se parametrizó**: ya era genérico —recorre
+  `items`/`equip`/`belt` con un `istable` por cada uno—, así que un contenedor pasa por él sin
+  tocarle una línea. Solo cambió el nombre del parámetro, de `rec` a `owner`. Media rutina ya
+  estaba escrita.
+- PARCHE 2 — feat(containers): **`cont_<key>` es archivo de dueño de primera clase.** `Attach`
+  hidrata antes de barrer, `Containers.Save` renderiza antes de escribir, y el archivo pasa a
+  llevar `{ items, instances }`. **Se cae el bloque de descarte que existía solo porque el
+  contenedor no era dueño**: el descarte por degradación honesta se queda, pero ahora significa lo
+  que significa en el inventario — "el archivo vino incompleto", no "los blobs nunca vinieron".
+- PARCHE 3 — feat(containers) + refactor(trade): **UN SOLO ESCRITOR de `cont_<key>`.** Hasta hoy
+  `SaveContainer` (containers) y `SaveTrader` (trade) escribían **los dos** el mismo archivo, y en
+  cuanto uno aprendiera a serializar `instances` y el otro no, el blob se perdía según quién
+  guardó último. `SaveContainer` pasa a ser público (`Containers.Save`) y es el único que toca
+  `cont_`; `SaveTrader` lo llama y persiste **solo su wallet**.
+- PARCHE 4 — feat(dev): **`cargo_dev_persist_key`**, convar de servidor, vacía por default.
+  Ninguna entidad del módulo declaraba un `persistKey`, así que la ruta del dueño persistente
+  —lo que esta entry construye— **no tenía forma de ejercerse en juego**. Con la convar puesta, la
+  crate y el trader demo la adoptan, cada uno con su sufijo (`<key>_crate`, `<key>_trader`) para
+  no compartir archivo. Vacía, todo sigue siendo de sesión exactamente como antes. Sin gate de
+  admin, como el resto del kit dev (CRG-45). Limitación declarada: **dos crates comparten la clave**
+  — de a una por vez.
+
+**Decisión del autor tomada en la ejecución (§4.0 del PROMPT): el wallet del trader NO se muda
+adentro de `cont_<key>`.** Se queda en `trader_<key>`, por **CRG-21**: un trader es el contenedor
+**más una capa de precio**, y fundir el dinero en el primitivo de storage metería economía dentro
+de lo que mañana reusan el alijo y el cadáver de Cortex. Lo que sí era innegociable en cualquiera
+de las dos formas es el escritor único, y eso es el PARCHE 3.
+
+**CRG-59 acuñada** — "El estado del mundo no va a disco salvo dueño persistente declarado
+(`persistKey`)". Sede: `Cargo_Architecture.md` §12. La entry 42 se abstuvo de acuñarla a propósito
+para no fabricar una norma sin call site: recién ahora el dueño persistente declarado guarda algo
+**distinto** de lo que guarda el efímero, y la cláusula de excepción tiene sentido.
+
+**Lo que NO se unificó, y hay que decirlo:** los remaps de `LegacyThrowIds` y de slots viejos. Son
+migraciones de **forma** del record, no serialización, y el contenedor tiene su propia versión
+recortada. Meterlos en la rutina común haría que un `cont_` empiece a correr remaps de `equip`, que
+no tiene.
+
+Verificación offline: harness **ALL GREEN en ambos realms, 418 checks** (eran 393). **Los 393 de
+B2 siguieron verdes sin tocar uno solo durante el PARCHE 1** — era el criterio: un refactor puro que
+obligue a cambiar un check cambió comportamiento. Los 25 nuevos en `TESTS_SERVER`, sección B3: la
+rutina corre sobre un dueño que solo tiene `items` y embebe por referencia · `HydrateOwner` devuelve
+el set que llegó · `cont_<key>` lleva `instances` en disco · **el unique sobrevive un reinicio
+completo del runtime con su condición** (el bug, medido offline) · un contenedor sin `persistKey` no
+escribe un solo archivo (CRG-59) · la entrada cuyo blob no vino se descarta y el stack de al lado
+queda · el guardado **por el trader** también escribe `instances` · el wallet está en `trader_<key>`
+y **no** dentro del contenedor · la convar dev da claves distintas a crate y trader.
+EN JUEGO: planilla **Q** (ver entry 45, que comparte la pasada).
+
+---
+
+## 45. La entidad sin referencias vivas encima (saneo del duplicator) `[APLICADO 2026-07-26]`
+
+`duplicator.CopyEntTable` hace `table.Merge(data, ent:GetTable())` quitando **solo las funciones**.
+Y la entidad llevaba encima una Entity y un set con Players de clave, **dos veces**:
+
+    ent.CargoContainer = { id, ent = <Entity>, name, capacity, persistKey, items,
+                           viewers = { [Player] = true } }
+    ent.CargoTrader    = { cont = <la tabla de arriba>, ent = <Entity>, name, buyMult,
+                           sellMult, money, persistKey, viewers = { [Player] = true } }
+
+Todo eso entraba a cualquier duplicación y a cualquier savegame. Es **saneo, no feature**, y va
+acá y no en el bloque del savegame porque ese bloque depende de que esté hecho: no se puede
+escribir un blob controlado en `PreEntityCopy` mientras el merge crudo arrastra basura por detrás.
+
+- PARCHE 1 — refactor(containers): **la entidad guarda estado plano y nada más.** Las referencias
+  vivas se mudan a `Containers._live[id] = { ent, viewers }`, indexadas por el id de sesión que ya
+  existía. Los cinco call sites de `containers.lua` (`ViewedContainer`, `SyncViewers`, `OpenFor`,
+  el `CallOnRemove`, el hook de `PlayerDisconnected`) pasan por ahí. `_live` significa lo mismo que
+  en `Instances._live`: la mitad que solo existe en runtime y nunca llega a disco.
+- PARCHE 2 — refactor(trade): **lo mismo para el trader**, que además soltó la **tabla del
+  contenedor embebida** — arrastraba el stock entero y su propia mitad viva. Guarda el `contId` y
+  lo resuelve por `_byId`.
+- PARCHE 3 — feat(trade): **la API pública que reemplaza los campos que se fueron**:
+  `Trade.StockOf(trader)` (la lista del contenedor, por referencia), `Trade.HasViewer(trader, ply)`
+  y `Trade.ClearViewers(trader)`, más `Containers.EntityOf(cont)` para el camino de vuelta. Sin
+  ellas, un consumidor de afuera tendría que leer `Containers._byId`, que es tabla privada: la
+  dependencia no desaparecía, se disfrazaba.
+- PARCHE 4 — refactor(trade): **el trader demo también estaba sucio, y el PROMPT no lo enumeraba.**
+  `ENT.CargoVoice` era un set `{ [Player] = { waitNext } }` viviendo directo sobre la entidad —
+  exactamente la misma clase de basura que `viewers`. Pasa a indexarse por SteamID64, que es dato
+  plano (`CargoGreeted` ya lo hacía). La poda cambia de "borrar los Player inválidos" a "borrar a
+  los que se desconectaron", para que morir cerca del trader no vuelva a disparar el saludo.
+
+**Alternativa rechazada, y conviene dejar dicho por qué:** limpiar en un `PreEntityCopy` que borre
+los campos sucios. Es un parche en el punto de salida —cualquier otra ruta que lea `ent:GetTable()`
+sigue viendo la Entity y los Players— y además es exactamente el gancho que el bloque del savegame
+necesita libre para escribir SU blob. Se arregla la forma, no el síntoma.
+
+**Decisión del autor (§5.2 del PROMPT): mudanza completa ahora**, contenedor y trader juntos, no
+solo el trader. CRG-21 dice que son el MISMO primitivo, y sanear la mitad deja la puerta abierta por
+donde el duplicator ya entra. El costo es que toca superficie ya verificada en juego (el slice 1 del
+comercio), y por eso la planilla Q lleva un check de verificación negativa.
+
+**Rompió un repo hermano, y se arregló en la misma tanda (2.ª decisión del autor, §7.5 disparado).**
+`corpus-stalker` no estaba entre las raíces declaradas del PROMPT, pero su NextBot de Sidorovich
+—confirmado en juego y pusheado— leía `trader.cont.items` en `OnKilled` para borrar el stock y
+`trader.viewers` en dos lugares: con la forma nueva eso es un `index a nil value` que se lleva
+puestos el ragdoll y el respawn. Pasa a la API del PARCHE 3, y de paso su `SidorVoz` —el mismo
+set indexado por Player— se sanea igual. Ver el CHANGELOG de ese repo.
+
+Verificación offline: incluida en los 418 del harness. Los checks de forma: `ent.CargoContainer` sin
+`ent` ni `viewers` · `ent.CargoTrader` sin `ent`, sin `viewers` y sin `cont` · las referencias vivas
+están en `_live` indexadas por el id de sesión · el camino de vuelta `cont -> entidad` existe · la
+API pública devuelve la lista del contenedor **por referencia**.
+
+**EN JUEGO — planilla `Q`** (sección nueva de la planilla de CARGO; la de B1 es la P, y la T es de
+corpus, otra planilla). Comparte pasada con la entry 44:
+
+- **Q1** · crate con `persistKey` sobrevive un reinicio **con su unique y su condición intactos** —
+  es el bug que la tanda arregla, y hoy FALLA. **Preparación primero:** `cargo_dev_persist_key q1`
+  ANTES de spawnear la crate. Si al terminar **no existe `data/corpus/cargo/cont_q1_crate.json`**,
+  la preparación no se hizo y el check NO corrió — no se marca PASA.
+- **Q2** · trader sin `persistKey` re-siembra stock en un mapa nuevo (verifica D1). Preparación:
+  `cargo_dev_persist_key ""` (vacía, que es el default).
+- **Q3** · `gm_save` con una crate spawneada no corrompe el save — canario del bloque siguiente,
+  medido acá: si la entidad quedó sucia, se ve en este check.
+- **Q4** · el slice 1 del comercio sigue igual (comprar, vender, basket) — **verificación negativa**
+  del saneo, que toca su superficie. Con Sidorovich montado, corre sobre él: es el trader que el
+  autor usa de verdad.
+- **Q5** · Sidorovich muere, deja ragdoll y respawnea — es el arreglo del repo hermano, y va como
+  check propio y no dentro de Q4: bundlear "el comercio sigue igual" con "matarlo" haría que un
+  solo PASA cubra dos cosas que fallan por motivos distintos, que es exactamente lo que la lección
+  de la sección T persigue. Señal de que el fix no está cargado: `attempt to index a nil value`
+  dentro de `OnKilled`.
+
+La letra **Q** se registra en `familias_excluidas` en el mismo parche, ANTES de usarse (FLU-30), y
+no se recicla (FLU-07). Planilla (sección nueva de la de Cargo, la misma URL que la P):
+https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+
+### Ronda 1 de la planilla Q (2026-07-26): Q2/Q4/Q5 PASA, Q1 y Q3 destapan dos defectos
+
+Los dos salieron del **campo de notas**, no del estado: Q1 vino marcado PASA y su nota describía
+el fallo. Es la tercera vez que pasa (la sección T lo pagó dos veces) — un ✓ se adjudica abriendo
+la evidencia, y acá la evidencia era el JSON pegado y la frase «no mostraban los iconos».
+
+- PARCHE 5 — fix(items) + fix(containers) + fix(trade): **el snapshot del contenedor y el del
+  trader no llevaban los defs autogen.** Reporte de Q1: la crate persistente devolvió sus dos
+  armas —los blobs viajaron bien, el JSON lo prueba— pero se dibujaban como **celda 1×1 muda**,
+  mientras la munición dev al lado se veía perfecta. Causa: los defs de armas capturadas se
+  acuñan **server-side** (`capture.lua` es de server) y el cliente los aprende del snapshot que
+  se los trae. `BuildSnapshot` del inventario lo hacía inline —su propio comentario lo declara—;
+  el contenedor y el trader, no. Con la def en nil, `grid.lua` PaintCell corta antes de dibujar y
+  `Icons.GetFootprint` cae a `{w=1,h=1}`: los dos síntomas, una sola causa. Se extrae a rutina
+  única —`Items.PackDefs(snap, entries)` del lado server, `Items.AbsorbDefs(snap)` del lado
+  cliente— y la usan los **tres** snapshots. La munición dev se veía porque es def **shared**,
+  registrada en ambos realms; por eso el defecto era invisible mientras el stock de los traders
+  demo fuera del kit dev.
+  **Por qué aparece recién ahora:** hasta esta tanda una crate persistente no podía devolver un
+  unique —se descartaba— así que ese cuadro no tenía cómo dibujarse. El defecto es viejo; lo
+  alcanzable es nuevo.
+- PARCHE 6 — fix(containers) + fix(trade): **el marcador de attach sobrevive al savegame y
+  bloqueaba el re-attach.** Reporte de Q3, con `gm_load` corrido **desde el menú** (por consola
+  no carga, ver abajo): la crate y el trader volvieron **inservibles**, sin responder al USE.
+  `ent.CargoContainer` es dato plano, y dato plano colgado de una entidad es exactamente lo que
+  un savegame restaura. El marcador vuelve nombrando un id de sesión que murió con el mapa:
+  `Attach` retornaba temprano por él, devolviendo un contenedor que no está en ningún registro, y
+  `OpenFor` no encontraba su mitad viva. Ahora la pregunta «¿ya está attacheado?» **la contesta
+  `_live`, no el campo** — y exige además que la entidad coincida, porque un id muerto puede
+  COLISIONAR con uno que esta sesión ya acuñó (sin eso, la crate abriría el contenido de otra).
+  Marcador que no valida: se descarta y se attachea de cero. Las entradas que traía **no se
+  heredan**: sus instancias murieron con el mapa, y heredarlas fabricaría justo los fantasmas sin
+  blob que la degradación honesta descarta. Restaurar contenido de verdad es del bloque del
+  savegame.
+  Es **regresión de esta tanda**: antes del saneo el marcador volvía con una Entity muerta y el
+  panel abría igual (roto de otra forma, pero abría). Q3 existía como canario y funcionó —
+  destapó lo contrario de lo que buscaba: la entidad quedó limpia, y lo que estorba es el
+  marcador que el duplicator devuelve.
+
+**Los checks nuevos se verificaron en negativo**, revirtiendo cada arreglo y confirmando que el
+check se pone rojo: sin ellos, un check que nunca falló no prueba nada (lección de la sección T).
+Harness **425** (eran 418).
+
+### Ronda 2 (2026-07-26): Q1 cierra, Q3 destapa el gemelo del PARCHE 6 en la entidad de al lado
+
+Q1 volvió **PASA limpio** — «funcionó correctamente el render, no hay problemas en ningún arma o
+ítem». El PARCHE 5 quedó confirmado en juego. Q3 quedó a medias, y otra vez lo dijo la nota:
+la **crate** ya abre (el PARCHE 6 hizo su trabajo) y vuelve vacía, que es lo declarado —restaurar
+contenido es del bloque del savegame—, pero **el trader no respondía al USE**, además de «hablar
+infinitamente» y quedar con la cara deformada.
+
+No es de Cargo, pero **es exactamente el mismo defecto** y merece quedar anotado acá porque el
+PARCHE 6 solo cubrió la mitad del problema: `ent.CargoContainer` era dato plano que el savegame
+devolvía, y los **sellos de tiempo** de la entidad de Sidorovich también lo son. `CurTime()` arranca
+de cero al cargar el mapa, así que un plazo heredado queda en el futuro para siempre: su candado
+anti doble-USE nunca vencía. Arreglado del lado de `corpus-stalker` (su CHANGELOG, PARCHE 4 de la
+tanda del 2026-07-26), reiniciando el estado de sesión entero en `Initialize` — el único punto que
+corre tanto en un spawn nuevo como en una entidad que devuelve un savegame.
+
+**La regla que sale de las dos mitades, y que el bloque del savegame hereda:** dato plano encima de
+una entidad es lo que un savegame trae de vuelta. Un id de sesión, un plazo de `CurTime()` y una
+marca de estado de partida son todos sospechosos, no continuidad. Lo que el bloque siguiente
+escriba en `PreEntityCopy` tiene que nacer sabiendo esto.
+
+### Ronda 3 (2026-07-26): el arreglo del vecino estaba en el lugar equivocado, y eso enseñó DÓNDE va
+
+Q3 volvió por tercera vez con los tres síntomas del trader **intactos**, con foto. El arreglo del
+lado de `corpus-stalker` reiniciaba el estado en `Initialize`, y **ese fallo es la evidencia**: si
+el reinicio hubiese quedado en pie, poner el candado de USE en cero habría destrabado el USE. No lo
+destrabó, así que **el duplicator escribe los campos planos DESPUÉS del constructor** y pisa
+cualquier reinicio hecho al nacer.
+
+El contraste dentro de la misma ronda es la lección, y por eso queda escrita acá y no solo en el
+repo vecino: **la crate sí se arregló a la primera.** La diferencia no era el defecto —era el mismo—
+sino dónde vivía el remedio. El PARCHE 6 **valida al leer** (`_live` manda, el campo no) y por eso
+es indiferente al orden; el del vecino **reiniciaba al nacer** y dependía de un orden que nadie
+controla. Reescrito con un **sello de sesión** verificado en cada lectura, que es la misma forma.
+
+- PARCHE 7 — fix(trade): **el trader demo de Cargo tenía el defecto latente y se sanea igual.**
+  No dio la cara porque no tiene flexes ni candado de USE —sus síntomas serían quedarse mudo y con
+  el idle congelado—, pero su `Initialize` reiniciaba la contabilidad de voz exactamente igual de
+  tarde. Mismo sello, verificado en `CargoSpeak`, `CargoVoiceThink` y `Think`. Se arregla acá y no
+  cuando alguien lo reporte, porque la causa ya está probada en la entidad de al lado.
+
+**Lo que esto le deja al bloque del savegame, y vale más que los dos parches:** el estado que una
+entidad necesita entre partidas no se puede dejar colgado en campos planos esperando que alguien lo
+reinicie a tiempo. O se valida al leer, o se escribe y se lee por el gancho del duplicator. La
+cadena `PreEntityCopy` → `PostEntityPaste` nace con esta restricción medida en juego, no supuesta.
+
+### Ronda 4 (2026-07-26): el USE vuelve, y la cara resulta ser una división entre negativos
+
+El sello de sesión devolvió **el USE y el comercio** — «ahora se le puede hablar y tradear». Quedó la
+cara, y esta vez el reporte trajo una foto de dos Sidorovich lado a lado, el cargado deforme y el
+recién spawneado perfecto: la comparación aisló el defecto sin ambigüedad.
+
+Se arregló del lado de `corpus-stalker` (su CHANGELOG, PARCHE 6) y **no era el sello, era una
+fórmula**: el parpadeo interpola un triángulo que da por sentado que su `t` es positivo, y con un
+sello de tiempo heredado `t` sale negativo, entra igual en la rama y el peso del flex se va a
+**-5500**. Los vértices salen disparados por el lado negativo del morph. Dos remedios: clamp del
+peso —para que ningún `t` imposible pueda deformar— y cerar todos los flexes al reiniciar sesión,
+porque un morph que quedó movido no lo endereza nadie: el código solo reescribe los índices que
+conoce.
+
+**El patrón que dejan las cuatro rondas, y que conviene tener a mano en el bloque siguiente:**
+un valor heredado de otra sesión no rompe donde se guarda, rompe **donde se usa en una cuenta**. El
+id de sesión rompió una búsqueda en un registro; el plazo de `CurTime()` rompió una comparación; el
+mismo plazo rompió una interpolación y la volvió negativa. Los tres se veían distinto y eran lo
+mismo. Al escribir `PostEntityPaste`, la pregunta no es «¿qué campos restauro?» sino **«¿qué cuentas
+hacen estos campos, y aguantan un valor de otra partida?»**.
+
+### Ronda 5 (2026-07-26): el clamp tapaba, y la lección final sobre en qué apoyarse
+
+«Arreglaron los flexes deformes, **pero no parpadea**, la boca nace hablando pero al decir algo se
+arregla». Ese cuadro es un diagnóstico entero: el plazo heredado **seguía ahí**, y el clamp de la
+ronda anterior no lo había arreglado —lo había **silenciado**. Con el plazo de otra partida, la
+interpolación del parpadeo da siempre negativo: sin clamp eso era -5500 (cara estirada), con clamp
+es 0 **para siempre**, o sea sin parpadeo. Un síntoma visible convertido en uno callado, que es la
+peor clase de arreglo.
+
+Cerrado del lado de `corpus-stalker` (su CHANGELOG, PARCHE 7) con un **segundo candado por VALOR**:
+cada plazo se compara contra la cota exacta de la línea que lo escribe, y ninguno puede superarla
+dentro de una sesión porque el tiempo solo avanza. No le pregunta nada al duplicator.
+
+**La lección que este bloque le pasa al del savegame, y es la más cara de las cinco rondas:** hubo
+tres intentos apoyados en *cuándo* corre el código —reiniciar en el constructor, sellar la sesión,
+acotar el resultado— y los tres fallaron o taparon, porque el orden en que el duplicator escribe no
+está bajo nuestro control y no se puede observar desde afuera del juego. El que funcionó se apoya en
+*qué valores son posibles*, que no depende de nadie. **Cuando el orden no es observable, el
+invariante tiene que ser de valor, no de momento.** El contenedor ya lo hacía sin que nadie lo
+dijera —`Containers.Attach` pregunta si el id está vivo, no cuándo llegó— y por eso fue el único que
+salió bien a la primera.
+
+### Cierre
+
+**Confirmado en juego por el autor el 2026-07-26: planilla `Q` en 5/5, tras seis rondas.**
+Q1 (la crate persistente conserva su unique, con su ícono y su footprint), Q2 (el trader efímero
+re-siembra en un mapa nuevo — verifica D1), Q3 (`gm_save`/`gm_load` deja crate y trader usables, con
+la cara del NextBot neutra y parpadeando), Q4 (el slice 1 del comercio intacto) y Q5 (Sidorovich
+muere, deja ragdoll y respawnea). Harness offline **425 verdes** en ambos realms, checker de IDs
+limpio, espejo regenerado.
+
+**Las cinco rondas no fueron ruido: tres de los cinco defectos de esta tanda no los encontró ningún
+check, los encontró el CAMPO DE NOTAS de checks marcados PASA.** El estado decía verde y la nota
+decía qué estaba roto. Vale como método, no como anécdota — la planilla se lee entera, empezando por
+las notas.
+Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+
+**Hallazgo que cambia las premisas del bloque siguiente, anotado y NO resuelto acá:** `gm_load`
+**no funciona desde la consola** en la instalación del autor —el menú SAVES sí—, y el autor
+descartó que fueran sus addons apagándolos todos. El bloque del savegame es el que estrena esa
+cadena: su PROMPT no puede escribirse asumiendo que `gm_load <nombre>` es una ruta de
+verificación. Va por el menú, y eso hay que decirlo en su planilla.
