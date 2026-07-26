@@ -476,6 +476,53 @@ if SERVER then
             .. ", sin precio: " .. gapsV)
     end, nil, "Dump installed ARC9 weapons (class/name/type/ammo/clip/weight/price) to console + data file; bases and ignored classes are marked n/a, not MISSING. Arg 'all' dumps every SWEP")
 
+    -- ------------------------------------------------------------------
+    -- Legacy inst_* purge. Entry 41 stopped WRITING one file per instance
+    -- (CRG-56), but a third party who ran Cargo before it still has them on
+    -- disk — the author's own data/ held 354 orphans out of 370 files. This
+    -- is the first real call site of Corpus.Data.List/Delete.
+    --
+    -- DRY RUN by default: this deletes player data and has NO admin gate yet
+    -- (CRG-45 waits on the Corpus permission primitive — one is not invented
+    -- here). Only the literal `confirm` deletes anything.
+    --
+    -- The filter is `^inst_` and nothing else: autogen_defs, icon_overrides,
+    -- inv_*, cont_* and trader_* are current data and must survive.
+    -- ------------------------------------------------------------------
+
+    local PURGE_PREVIEW = 10
+
+    concommand.Add("cargo_dev_purge_legacy", function(_, _, args)
+        local confirm = istable(args) and args[1] == "confirm"
+
+        local legacy = {}
+        for _, key in ipairs(Corpus.Data.List("cargo")) do
+            if key:match("^inst_") ~= nil then legacy[#legacy + 1] = key end
+        end
+
+        if #legacy == 0 then
+            Corpus.Log("cargo", "purge: no quedan claves inst_* legacy en data/corpus/cargo/")
+            return
+        end
+
+        if not confirm then
+            MsgN(string.format("— %d claves inst_* legacy (DRY RUN: no se borró nada) —", #legacy))
+            for i = 1, math.min(#legacy, PURGE_PREVIEW) do MsgN("  " .. legacy[i]) end
+            if #legacy > PURGE_PREVIEW then
+                MsgN(string.format("  ... y %d más", #legacy - PURGE_PREVIEW))
+            end
+            Corpus.Log("cargo", "purge: dry run — para borrarlas: cargo_dev_purge_legacy confirm")
+            return
+        end
+
+        local borradas = 0
+        for _, key in ipairs(legacy) do
+            if Corpus.Data.Delete("cargo", key) then borradas = borradas + 1 end
+        end
+        Corpus.Log("cargo", "purge: " .. borradas .. " de " .. #legacy
+            .. " claves inst_* legacy borradas de data/corpus/cargo/")
+    end, nil, "Lists (dry run) or deletes ('confirm') the legacy inst_* instance files left behind by pre-entry-41 Cargo. Never touches inv_/cont_/trader_ nor the catalog files")
+
 end
 
 -- ------------------------------------------------------------------
