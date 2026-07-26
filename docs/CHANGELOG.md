@@ -3159,3 +3159,65 @@ Verificación: checker de IDs (`corpus/.claude/check-ids/corpus_check_ids.ps1`) 
 normas nuevas están citadas Y registradas, y la letra P está en `familias_excluidas`. El framework
 **no** se toca en código, así que el inciso de FLU-16 (`corpus_estado`, §9 de la arquitectura,
 espejo) no se dispara por B1; sí lo hará B2.
+
+---
+
+## 43. Primer consumidor de `Corpus.Data.List`/`Delete`: purga de los `inst_*` legacy, y el catálogo declara su scope `[APLICADO 2026-07-25]`
+
+La entry 41 dejó de **escribir** un archivo por instancia (CRG-56), pero no borró los que ya
+estaban: un tercero que venía usando Cargo tiene todavía sus `inst_*` en disco, y no
+desaparecen solos. Esta entry es la otra mitad — y le da a las primitivas nuevas del
+framework su call site inmediato, en vez de que nazcan `INTENCION`.
+
+- PARCHE 1 — feat(dev): **`cargo_dev_purge_legacy`**, en el kit dev de
+  `corpus_cargo_dev.lua` (dentro del bloque `if SERVER then` que ya aloja al resto — server-side
+  por construcción). Sin argumento hace **DRY RUN**: cuenta las claves `inst_*` y lista las
+  primeras 10 por nombre, sin borrar nada. Con `confirm` borra y reporta el conteo. El dry-run
+  es el default **porque el comando borra data del jugador y hoy no tiene gate de admin**
+  (CRG-45 sigue esperando la primitiva de permisos de Corpus; no se inventa uno acá). El filtro
+  es `^inst_` y **nada más**: `inv_`, `cont_`, `trader_`, `autogen_defs` e `icon_overrides`
+  quedan en pie. No hay purga automática al bootear — el barrido silencioso de data ajena es
+  exactamente lo que el diseño rechaza: la purga es un comando, con confirmación.
+- PARCHE 2 — refactor(capture) + refactor(icons): **los dos archivos de catálogo declaran
+  `scope = "config"`** (cita **COR-19**, sede `../../corpus/docs/CORPUS_Architecture.md` §3):
+  `autogen_defs` (5 sitios en `corpus_cargo_capture.lua`: 1 Load, 4 Save) e `icon_overrides`
+  (2 en el `corpus_cargo_icons.lua` de server). Son config de SERVIDOR —lo que los packs
+  montados resultaron ser, más las decisiones de encuadre del editor— y sobreviven a borrar una
+  partida. El resto de Cargo (`inv_`, `cont_`, `trader_`) **no se toca**: ya es estado de
+  partida y el default lo cubre. Hoy la declaración **no mueve un solo archivo** —los dos
+  scopes resuelven a la misma carpeta a propósito—; lo que compra es que el día que las rutas
+  se separen, el catálogo no se vaya con la partida borrada.
+- PARCHE 3 — docs(docs): **§12 de `Cargo_Architecture.md`** suma el catálogo de servidor como
+  categoría propia y el párrafo de la purga legacy; **CRG-43** en el `CLAUDE.md` cita COR-18 y
+  COR-19 y marca cuál de sus claves declara scope (sin tocarle sede, fuerza ni evidencia);
+  y el **roadmap #13** cierra su coleta — decía que la primitiva "sigue siendo deseable y pasa
+  a B2", y ahora existe.
+
+**Lo que esta entry NO hace:** migrar el resto del ecosistema al scope (no es de Cargo
+decidirlo), mover un archivo a un layout de perfiles, ni convertir el contenedor persistente
+en archivo de dueño de primera clase. Y **no** toca los dos sidecars JSON del caché de íconos
+del cliente: quedan como deuda declarada de COR-18 con su motivo (viven en la subcarpeta
+`icons/` junto a los PNG que indexan, y la primitiva no direcciona subcarpetas).
+
+Verificación offline: harness **ALL GREEN en ambos realms, 389 checks** (eran 373). Los 16
+nuevos en `TESTS_SERVER`: `List` devuelve keys sin `.json` y ordenadas · `List` de un namespace
+inexistente devuelve `{}` y nunca `nil` · `Delete` true la primera vez y false la segunda ·
+`Load` post-`Delete` nil · `Delete` y `List` rechazan separadores (path traversal) · los dos
+scopes resuelven igual · un scope desconocido tira `error()` · el **dry run no borra nada** ·
+`confirm` borra **solo** los `inst_*` y deja en pie `inv_`/`cont_`/`trader_` y el catálogo.
+EN JUEGO: la purga corrida primero en **dry-run sobre data real** — es lo mínimo irrenunciable
+antes de dar la tanda por cerrada. Va en la planilla **T**, que es de **corpus** y no de Cargo:
+la tanda es cruzada y su peso está en el framework, así que el autor abrió la primera planilla
+del framework en vez de gastar una letra de Cargo (Q/R/S siguen presupuestadas acá).
+Checks que tocan a este repo: **T5** (nada de lo viejo cambió), **T6** (el catálogo
+`scope=config` sobrevive el reinicio), **T7**/**T8** (la purga en dry run y con `confirm`) y
+**T9** (el inventario sobrevive a la purga).
+Planilla: https://claude.ai/code/artifact/fc204b66-e751-42a2-af8a-0c02429934bd
+
+**Confirmado en juego por el autor el 2026-07-25.** Los cinco checks que tocan a este repo
+pasaron: T5 y T6 limpios ("no he visto nada fuera de lo común"), T8 con "2 de 2 claves `inst_*`
+legacy borradas" sobre dos archivos traídos de la papelera a propósito, T9 con el inventario
+intacto tras el relog, y T7 —el dry-run— cerrado en la ronda 2. La 1.ª corrida de T7 había
+devuelto el atajo `no quedan claves inst_* legacy` porque los archivos todavía no estaban;
+quedó anotado acá porque el orden de esa preparación es lo que hace que el check pruebe algo.
+El único ✗ de la planilla, T4, es del framework y no de Cargo.

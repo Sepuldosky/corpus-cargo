@@ -139,11 +139,12 @@ INTEGRACIONES / DEUDA PROPIA
     [CERRADO por CHANGELOG #41 (2026-07-25): el file.Delete crudo de
      Instances.Delete YA NO EXISTE — el blob dejó de tener archivo propio
      (CRG-56), así que borrar es sacarlo de _live y no hay nada que
-     desenlazar. Con eso desaparece la violación declarada de COR-3.
-     La primitiva en sí sigue siendo deseable y pasa al bloque B2 del plan
-     dev/PLAN_cargo_persistencia_gc.md, junto con List y el scope; su primer
-     consumidor real será el comando dev que purgue los inst_* legacy de
-     terceros.]
+     desenlazar. Con eso desaparece la violación declarada de COR-3.]
+    [COLETA CERRADA por CHANGELOG #43 (2026-07-25): la primitiva ya EXISTE.
+     Corpus.Data expone List y Delete, más el scope de COR-19, y su primer
+     consumidor real es cargo_dev_purge_legacy — el comando que lista y purga
+     los inst_* legacy que un tercero pueda tener todavía en disco. Esta línea
+     no deja nada abierto.]
 14. addon.json + empaquetado Workshop (deuda compartida del ecosistema).
 15. Loot on death — diseño posterior.
     [El "GC de instancias huérfanas" que esta línea traía SALE del pendiente:

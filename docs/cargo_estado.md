@@ -5,8 +5,15 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-25 (**entries 41-42 `[APLICADO]`, confirmadas en juego —
-planilla P, los cinco checks en PASA** — bloque **B1** de la tanda de persistencia). El blob de instancia **dejó de tener
+**Última actualización:** 2026-07-25 (**entry 43 `[APLICADO]`, confirmada en juego**: el framework estrenó
+`Corpus.Data.List`/`Delete` y el **scope** de COR-19, y Cargo es su primer consumidor real —
+`cargo_dev_purge_legacy` lista y purga los `inst_*` legacy de terceros con **dry-run por
+default** (sin gate de admin todavía, CRG-45), y los dos archivos de catálogo `autogen_defs` e
+`icon_overrides` declaran `scope = "config"`. **No mueve un solo archivo.** Los cinco checks de
+la planilla **T** de corpus que tocan este repo están en PASA (T5, T6, T7 dry-run, T8 borrado
+2 de 2, T9 inventario intacto); el ✗ que queda abierto, T4, es del framework. Harness 393/393.
+Antes, **entries 41-42 `[APLICADO]`, confirmadas en juego —
+planilla P, los cinco checks en PASA**). El blob de instancia **dejó de tener
 archivo propio**: viaja embebido en el archivo de su dueño (`inv_<steamid64>`) bajo `instances`, y
 `Instances._live` es la única verdad de runtime (CRG-56/57/58, §12 reescrita). La medición que lo
 originó: **354 huérfanas sobre 370 archivos** en la data real, todas estado de mundo que nunca
@@ -178,14 +185,14 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Próximo paso
 
-1. **B2 — `Corpus.Data` gana `List`, `Delete` y scope** (plan:
-   [`../../dev/PLAN_cargo_persistencia_gc.md`](../../dev/PLAN_cargo_persistencia_gc.md)).
-   Que ningún módulo vuelva a tocar `file.*` para persistir y que el scope distinga config
-   de servidor de estado de partida (las dos normas del framework que ese bloque acuña,
-   con sus IDs presupuestados en el plan), dejando el gancho de perfil puesto **sin mover
-   un solo archivo hoy**. Primer consumidor real de las primitivas: un
-   comando dev que lista y purga los `inst_*` legacy. Toca el framework ⇒ dispara el
-   inciso de FLU-16. Se escribe su PROMPT **cuando vuelva el reporte de la planilla P**.
+1. **Verificar en juego la entry 43** (`[PENDIENTE]`): `cargo_dev_purge_legacy` corrido
+   **primero en dry-run sobre data real**, y recién después con `confirm`. La tanda es cruzada
+   —el framework estrenó `Corpus.Data.List`/`Delete` y el scope de COR-19 en la misma pasada—
+   así que va junto con la planilla **T** de corpus. Offline ya está: harness 389/389.
+   Lo que sigue de ese plan
+   ([`../../dev/PLAN_cargo_persistencia_gc.md`](../../dev/PLAN_cargo_persistencia_gc.md)) es
+   el serializador de dueño único, que le da al contenedor persistente su archivo de dueño y
+   saca a CRG-58 de `INTENCION`; su PROMPT se escribe **cuando vuelva el reporte de T**.
 2. **Slice 2 del comercio** (desplazado por decisión del autor el 2026-07-25, D4 del plan
    madre): el dinero como entidad (`Cargo_Trade` §7 — botar efectivo desde el botón $,
    línea de solo-dinero en el basket). Después el slice 3 (jugador-trader con doble

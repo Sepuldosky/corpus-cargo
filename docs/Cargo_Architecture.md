@@ -360,7 +360,7 @@ Cargo.StatusPanel.RegisterBar(module, {
 
 ## 12. Persistencia
 
-Todo vía `Corpus.Data` (namespace `cargo`), sin necesidad de SQLite: no hay consultas relacionales ni volumen que lo justifique.
+Todo vía `Corpus.Data` (namespace `cargo`), sin necesidad de SQLite: no hay consultas relacionales ni volumen que lo justifique. Nada de `file.*` para estado propio (cita **COR-18**), y los dos archivos de catálogo declaran su scope (cita **COR-19**, ver abajo).
 
 **CRG-56 — No existen archivos de instancia; existen archivos de DUEÑO.** Un blob de instancia no tiene archivo propio: viaja embebido en el archivo de quien lo posee, bajo el campo `instances = { [uid] = blob }`. El inventario de un jugador es por lo tanto **un** archivo autocontenido — sus entradas de grid y equipo viajan junto a los blobs que referencian, incluidos los sub-slots anidados de forma recursiva. La forma anterior (un archivo `inst_<uid>` por instancia, §12 hasta el 2026-07-25) generaba un archivo en el instante de crear la instancia, sin saber si le pertenecía a un jugador o al mapa: la medición sobre la data real del autor dio **354 huérfanas sobre 370 archivos**, todas de estado de mundo que nunca debió tocar el disco.
 
@@ -372,6 +372,9 @@ Todo vía `Corpus.Data` (namespace `cargo`), sin necesidad de SQLite: no hay con
 - **Contenedor persistente** (`cont_<key>`): mismo trato cuando declara `persistKey`.
 - **Estado del mundo sin dueño persistente**: no llega a disco. El stock de un trader de sesión, una crate sin `persistKey` y un ítem en el suelo viven solo en memoria y mueren con el mapa — GMod reinicia el estado Lua entero al cambiar de nivel, así que la limpieza es gratis y no hay nada que barrer. La contrapartida, que es una decisión de diseño y no un defecto: **un ítem tirado en el suelo se destruye al cambiar de mapa**.
 - **Conocimiento de recetas** (banco de trabajo, ver `Workbench_Arquitectura.md`): mismo mecanismo, un archivo por jugador con el set de IDs desbloqueados.
+- **Catálogo de servidor** (`autogen_defs`, `icon_overrides`): NO es estado de partida — es lo que los packs montados resultaron ser, más las decisiones de encuadre del editor de íconos. Los dos declaran `scope = "config"` (cita **COR-19**, sede `../../corpus/docs/CORPUS_Architecture.md` §3). Hoy la declaración no mueve nada —los dos scopes resuelven a la misma carpeta a propósito—; lo que compra es que el día que las rutas se separen, el catálogo no se vaya con la partida borrada.
+
+**Los `inst_<uid>` legacy y su purga.** Un tercero que corrió Cargo antes del CHANGELOG #41 tiene todavía esos archivos en disco: no los escribe nadie más, pero tampoco desaparecen solos. El comando dev `cargo_dev_purge_legacy` los lista (**dry run por default**, porque borra data del jugador y todavía no hay gate de admin — CRG-45) y con el argumento `confirm` los borra. Su filtro es `^inst_` y nada más: `inv_`, `cont_`, `trader_` y los dos archivos de catálogo quedan en pie. Es el primer consumidor real de `Corpus.Data.List`/`Delete`.
 
 Una entrada con `uid` cuyo blob no viene en el archivo se **descarta con log** al cargar: un ítem sin blob no se renderiza a medias (degradación honesta, cita COR-5).
 
