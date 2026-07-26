@@ -3525,3 +3525,328 @@ Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
 descartó que fueran sus addons apagándolos todos. El bloque del savegame es el que estrena esa
 cadena: su PROMPT no puede escribirse asumiendo que `gm_load <nombre>` es una ruta de
 verificación. Va por el menú, y eso hay que decirlo en su planilla.
+
+---
+
+## 46. El savegame de GMod: el estado plano de la entidad ES el blob, y vuelve con uid nuevo `[APLICADO 2026-07-26]`
+
+`gm_save` copia la entidad con `duplicator.CopyEnts`, que mergea `ent:GetTable()` entero; `gm_load`
+se la devuelve con esos campos puestos. La entry 45 dejó ese estado plano **limpio** y la 44 lo dejó
+**serializable por la rutina del dueño**. Esta entry junta las dos mitades: hasta hoy la crate volvía
+del save **usable y vacía** (el PARCHE 6 de la 45 arregló lo primero y declaró lo segundo como trabajo
+de este bloque); al terminar vuelve usable y **con su loot**.
+
+- PARCHE 1 — feat(inventory): **`Instances.Remint(entries, blobs)`**, el re-acuñado. Un blob que llega
+  de otra sesión se **crea de nuevo con uid NUEVO** y las entradas se reescriben. El uid es único por
+  boot y no globalmente (misma razón que el re-uid del import de B5): reusar el guardado es una
+  colisión esperando ocurrir. Es **recursivo** —un chaleco trae sus placas en `subslots` y esas
+  entradas también nombran uids— y aplica la degradación honesta de los dos archivos de dueño (cita
+  COR-5): la entrada cuyo blob no viajó, o cuya def este boot no conoce (un pack desmontado), se
+  descarta con log en vez de volver como fantasma sin peso. Al lado, `Instances.RenderEntry(entry)`
+  para el dueño de UNA sola entrada, que es lo que es un drop de mundo.
+- PARCHE 2 — feat(containers): **`Containers.Save` renderiza SIEMPRE**, persistente o no. Es la línea
+  que hace que el marcador plano de la entidad sea un dueño autocontenido *en todo momento*, que es
+  exactamente lo que el savegame se lleva. Escribir a disco sigue gobernado por **CRG-59** (el `return`
+  por `persistKey` quedó donde estaba, un renglón más abajo). Y **`Attach` adopta lo que el marcador
+  muerto traía**: lo re-acuña y **reemplaza** la lista de items.
+- PARCHE 3 — feat(trade): **la capa de precio también vuelve.** El stock ya vuelve por el contenedor
+  (CRG-21: un trader es ese contenedor más precio), así que lo único que le queda a esta capa es el
+  **wallet**, que viaja en el marcador plano y le gana al `opts` y al archivo. Y el stock recién
+  sembrado se **renderiza al sembrarse**: sin eso, guardar la partida antes de la primera compra se
+  llevaba entradas sin blob, que al cargar son justo los fantasmas que la degradación honesta descarta.
+- PARCHE 4 — feat(containers): **el drop de mundo, por las dos rutas que existen.** La entidad de ítem
+  (`corpus_cargo_item.lua`) lleva su blob al lado de la entrada y lo re-acuña al leer; y el **arma
+  tirada**, que no es esa entidad sino el SWEP real con `CargoInstanceUid`, hace lo mismo en
+  `capture.lua`. Sin la segunda, un arma soltada, guardada y recargada se recogía como ítem de fábrica
+  —sin condición, sin attachments y sin el cargador guardado—, que es el drop que el autor usa de
+  verdad. El PROMPT solo enumeraba la primera.
+
+**DECISIÓN DE DISEÑO, y es la que se aparta del PROMPT: no hay `PreEntityCopy`.** El PROMPT pedía
+escribir un blob propio en ese gancho. El árbol ofrece algo mejor y la entry 45 lo dejó servido: el
+estado plano YA viaja y YA está limpio, así que alcanza con que esté **completo**. El argumento es el
+mismo que la 45 usó para rechazar limpiar la basura ahí, leído al derecho — un blob que solo es
+correcto adentro del gancho de copia está mal en cualquier otra ruta que lea `ent:GetTable()` (la
+herramienta de duplicado, un sistema de saves de terceros). Y compra algo que la forma del PROMPT no
+podía: **la restauración vive en `Containers.Attach`, la única puerta del primitivo**, así que toda
+entidad que se vuelve contenedor la hereda —la crate demo, el trader demo, el **Sidorovich de
+`corpus-stalker`** y mañana el cadáver de Cortex— sin una línea propia y **sin cuarta raíz**. El único
+`PostEntityPaste` del bloque es el del drop de mundo, y ni siquiera él depende de correr: la toma
+ejecuta la misma rutina.
+
+**El invariante es de VALOR, no de momento** — la lección cara de las seis rondas de la planilla Q, y
+acá se respeta en cada línea. Nada pregunta cuándo el duplicator escribió los campos: se pregunta si
+el dato es **posible en esta sesión** (un id de contenedor que no está vivo, un uid que no está en
+`_live`). Por eso restaurar **reemplaza** y nunca acumula: correrlo tarde, dos veces, o después de que
+algo ya leyó la entidad da el mismo resultado, y hay un check offline que lo prueba.
+
+**Lo que la cadena del engine puede y no puede afirmarse (cita CRG-24).** `gm_save` → `gmsave.SaveMap`
+→ `duplicator.CopyEnts` → `engine.WriteSave`, y al cargar `duplicator.Paste` → `PostEntityPaste`, se
+verificó contra la wiki y `Facepunch/garrysmod`, **no contra una copia local** — no hay fuente de
+garrysmod en `dev/other/`. Lo que sí está **medido en juego** es la única premisa de la que este
+diseño depende: los campos planos de la entidad vuelven del savegame (es lo que rompió el USE en la
+ronda 1 de Q) y vuelven **después** del constructor (rondas 3 a 5). El orden de `PreEntityCopy`
+respecto del merge no hace falta afirmarlo, porque nada acá lo usa.
+
+Verificación offline: harness **443** (eran 425), 18 checks nuevos, **los 425 anteriores intactos
+salvo uno** — el de la 45 que afirmaba que el wallet del marcador muerto se ignora. Ese comportamiento
+lo **invierte esta entry a propósito** (CRG-60), así que el check se partió: la mitad que probaba lo
+que ese bloque probaba de verdad —que el contenedor vivo no se secuestra— se queda donde estaba, y la
+del wallet se reescribió en la sección B4. **Los 18 se verificaron EN NEGATIVO**, revirtiendo cada
+arreglo y confirmando el rojo. Hallazgo de paso: **al harness le faltaba `table.Merge`**, así que
+`Instances.Create(id, seed)` nunca se había ejercido con seed offline desde B1; el stub se agregó con
+la semántica de GMod.
+
+**Lo que el harness NO cubre, y hay que decirlo:** todo lo de `lua/entities/` — el drop de mundo lo
+carga el sistema de scripted_ents del engine, no el manifest. De ese archivo se apoya en tests la
+mitad de módulo que llama (`RenderEntry` / `Remint`); el resto va a la pasada del autor.
+
+EN JUEGO: planilla **R** (ver entry 47, que comparte la pasada).
+
+---
+
+## 47. CRG-60 acuñada: el savegame guarda el MUNDO, no al jugador `[APLICADO 2026-07-26]`
+
+La mitad contraintuitiva del bloque, y la que sin norma escrita se reporta como bug.
+
+**CRG-60 acuñada** — "El savegame guarda el **MUNDO**, no al jugador: el inventario del jugador no
+retrocede al cargar una partida". Sede: `Cargo_Architecture.md` §12. Es la **contrapartida declarada**
+de que el inventario sea por SteamID64 y sin noción de mapa (**CRG-43**): cruza de nivel en nivel *y*
+de partida en partida. No hay línea de código que lo implemente y ése es el punto — el record no es
+una entidad, así que no viaja por la cadena del duplicator salvo que alguien lo meta a propósito;
+lo que la norma hace es que nadie lo meta y que el tester sepa qué esperar.
+
+§12 se reescribe con las cuatro cosas que este bloque decidió: cómo viaja el blob (el estado plano de
+la entidad **es** el blob) y por qué no hay un gancho que lo escriba; el re-acuñado con uid nuevo; el
+invariante de valor; y la resolución de la discrepancia entre el savegame y el archivo de dueño.
+
+**Decisión del autor, tomada ANTES de escribir código (§5.2 del PROMPT): cuando un contenedor con
+`persistKey` tiene dos fuentes, MANDA EL SAVEGAME.** El argumento que decidió no fue el de coherencia
+narrativa sino que el árbol ya había clasificado esos archivos: `cont_<key>` y `trader_<key>` declaran
+scope `save` —estado de partida, muere al borrar una partida (**COR-19**)— y el layout objetivo de
+perfiles los pone bajo `saves/<perfil>/maps/<mapa>/`. La opción contraria los trataba como config de
+servidor, que es la OTRA categoría de COR-19, y habría que sacarlos de `saves/`. El archivo se
+**reconcilia** con lo que ganó, para que la próxima transferencia no escriba un estado mezclado.
+
+La letra **R** se registra en `familias_excluidas` en el mismo parche, ANTES de usarse (FLU-30), y no
+se recicla (FLU-07).
+
+**EN JUEGO — planilla `R`** (sección nueva de la planilla de CARGO; la de B1 es la P, la de B3 la Q, y
+la T es de corpus, otra planilla). **Todos los checks que carguen una partida lo hacen POR EL MENÚ**
+(hallazgo medido en la ronda 6 de Q: `gm_load` no carga desde la consola en la instalación del autor;
+`gm_save <nombre>` por consola sí funciona):
+
+- **R1** · una crate con loot sobrevive `save`/`load` **con sus condiciones intactas**. Preparación:
+  meterle un ÚNICO capturado (no del kit dev) y **anotar su condición ANTES de guardar**. Señal de que
+  el check no corrió: si al cargar la crate no existe, el save no la incluyó.
+- **R2** · un trader con stock mermado y wallet gastado sobrevive el ciclo: se le compra algo, se
+  guarda, se carga, y **ni el stock ni el dinero vuelven al estado inicial**.
+- **R3** · el inventario del jugador **NO** retrocede al cargar (confirma CRG-60). Es el check
+  contraintuitivo: lo esperado es que la mochila siga como estaba ANTES de cargar, no como en el save.
+- **R4** · un ítem tirado en el suelo sobrevive el ciclo con su blob. Vale **un arma soltada**, que es
+  la ruta que el PARCHE 4 agregó: al recogerla tiene que seguir siendo la suya, con su condición.
+- **R5** · verificación negativa: **Sidorovich sigue entero** — abre trade, muere, deja ragdoll y
+  respawnea, y su cara sigue neutra y parpadeando tras cargar. Es el consumidor externo, y este bloque
+  vuelve a tocar su superficie (aunque esta vez sin tocar su repo).
+
+Planilla (sección nueva de la de Cargo, la misma URL que la P y la Q):
+https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+
+### Ronda 1 de la planilla R (2026-07-26): R1/R2/R5 PASA, y R3/R4 destapan que el save del engine se rompe con un arma ARC9 en el suelo
+
+**Lo que quedó confirmado en juego.** R1: la crate volvió con su loot **y el casco con el NVG puesto
+en su sub-slot** — el re-acuñado recursivo, que era lo más frágil del bloque, funciona. R2: los dos
+traders conservaron stock mermado y wallet (Sidorovich 48.900, el demo 40.560, iguales antes y
+después del ciclo). R5: Sidorovich entero.
+
+**R2 vale doble, y conviene dejarlo escrito:** el wallet de **Sidorovich** volvió bien sin que esta
+tanda tocara una línea de `corpus-stalker`. Es la confirmación en juego de la decisión de diseño de
+la entry 46 — poner la restauración en `Containers.Attach`, la única puerta del primitivo, en vez de
+en un gancho por entidad.
+
+**R3 y R4 no se pudieron correr: el savegame del engine se rompió.** Tres errores distintos, del
+reporte del autor:
+
+    attempt to serialize structure with cyclic reference   (gmsave → util.TableToJSON, ABORTA el save)
+    Can't write unknown type IMaterial                     (saverestore, ~20 veces, DESCARTA la clave)
+    CSave BLOCK SIZE OVERFLOW! (79031 … 190757 > 65k)      "This save will not load correctly!"
+
+**No es de esta tanda, y la evidencia es del propio reporte.** R1 y R2 guardaron y cargaron **bien**,
+con una crate llena de blobs y dos traders con stock: si lo que Cargo cuelga de la entidad fuera la
+causa, R1 habría fallado primero y no habría PASA que mostrar. Los tres errores aparecen recién en
+**R4, que es el primer check de la historia del proyecto que pide soltar un arma al suelo antes de
+guardar**. Un arma ARC9 en el suelo es una entidad de un tercero cuya tabla el save del engine
+recorre entera.
+
+**Verificado contra `dev/other/` y no de memoria (CRG-24):** las defs de attachment de ARC9 declaran
+`ATT.Icon = Material(...)`, y el SWEP se cuelga esas tablas encima (`self.Attachments`). La traza del
+reporte tiene exactamente esa forma — tres `WriteTable` anidados antes de que `GetType` encuentre el
+`IMaterial`: tabla de la entidad → `Attachments` → la att → su icono.
+
+**Cuánto pesa lo NUESTRO, medido y no argumentado.** El marcador de una crate con 10 uniques —cada
+uno con un anidado en su sub-slot— más un stack pasa de **482 a 2.325 bytes**: **184 bytes por
+unique**, y un drop de mundo son **145**. Para llegar solo a los 190 KB del desborde harían falta del
+orden de **mil** uniques colgados de entidades. El elefante es la tabla del SWEP, no el blob.
+
+**Consecuencia operativa, y hay que decirla porque cambia lo que se puede esperar de un save:** con un
+arma ARC9 tirada en el suelo, `gm_save` **no escribe un save cargable** — y eso alcanza a TODO el
+mapa, no solo a Cargo. No hay arreglo del lado de Cargo: ARC9 es COMPAT-RUNTIME y no se forkea, y la
+tabla que desborda es suya. Queda como **deuda de frontera declarada** en `Cargo_Architecture.md`
+§13, con su fila propia. Lo que sí es de Cargo es el camino que la hace alcanzable: nuestro drop de
+armas deja el **SWEP real** en el suelo (roadmap #16/#17, para que un arma ARC9 se dibuje ella misma
+con sus attachments), y ése es el precio de esa decisión, ahora medido.
+
+- PARCHE 5 — test(dev): **guard de serializabilidad para lo nuestro.** El defecto era ajeno, pero la
+  clase de defecto nos aplica: `saverestore.WritableKeysInTable` descarta con error en consola
+  cualquier valor que no sepa escribir, y `util.TableToJSON` aborta ante un ciclo. Dos checks nuevos
+  recorren lo que Cargo cuelga de la entidad —el marcador del contenedor y las dos mitades del
+  trader— y exigen **dato plano y acíclico**: claves string/number, valores string/number/boolean o
+  tabla, nada más. Si algún día un módulo dueño mete un Material o una Entity dentro de un blob
+  (CRG-1 le deja escribir ahí), el rojo sale offline y no en el reporte del autor. Verificado en
+  negativo: con una función metida en el blob, el check falla **nombrando la clave culpable**.
+
+Harness **445** (eran 443). **Entries 46 y 47 siguen `[PENDIENTE]`**: dos checks sin correr no cierran
+una sección. Ronda 2 en la misma planilla — R3 y R4 se re-corren **sin un arma ARC9 en el suelo al
+guardar**, y R4 usa la **pistola del kit dev** (`weapon_pistol`, SWEP de HL2 con tabla chica) para la
+mitad de arma soltada: prueba la misma ruta de código de Cargo sin pasar por la tabla que desborda.
+
+### Ronda 2 (2026-07-26): R3 cierra CRG-60, y R4 destapa que el arma soltada volvía con el cargador LLENO
+
+**R3 PASA y con eso CRG-60 queda confirmada en juego**: «la mochila no retrocedió después de darme
+todas las armas de HL2 posterior a guardar». El check contraintuitivo se comportó como la norma dice.
+La regla operativa de la ronda funcionó: sin armas ARC9 en el suelo, el `gm_save` del engine escribió
+saves cargables y los dos checks pudieron correrse.
+
+**R4 FALLA, y el reporte trae el número exacto:** los dos drops volvieron y se pudieron tomar, pero
+«la munición gastada no se reflejó — la pistola tenía 0 balas y volvió a 18, el SMG tenía 15 y ahora
+tiene 45». 18 y 45 son los `DefaultClip` de `weapon_pistol` y `weapon_smg1`.
+
+**El diagnóstico, y por qué el síntoma era ambiguo.** Un arma que devuelve un savegame **no la
+spawneó Cargo**: la re-creó el engine, así que el `ApplyClipToEntity` de `SpawnWorldWeapon` nunca
+corrió sobre ella y su `Clip1` es el DefaultClip del SWEP — un valor de ninguna partida. Al tomarla,
+la **cosecha de cargador** del roadmap #18 (`StoreClip`, que existe para que re-equipar desde el grid
+no regale un cargador lleno) escribía ese DefaultClip **encima** del cargador que sí había viajado en
+el blob. Lo ambiguo es que un ítem acuñado de fábrica —o sea, el blob perdido— daba **exactamente los
+mismos 18 y 45**, así que el reporte por sí solo no distinguía «el blob no llegó» de «el blob llegó y
+se lo pisaron».
+
+**Lo desempató un check offline, y de paso probó lo que la ronda 1 no pudo:** el ciclo completo del
+arma soltada ahora corre en el harness —equipar, soltar, morir el runtime, pegar los campos planos en
+una entidad que reporta 30, tomarla— y con el arreglo revertido **reproduce el defecto con el blob
+PRESENTE**: el arma vuelve como su instancia, con uid nuevo, y el cargador en 30 en vez de 3. O sea
+**el blob sí viaja pegado a un SWEP de mundo**, que era la mitad de B4 que solo se podía afirmar por
+analogía con la crate.
+
+- PARCHE 6 — fix(capture): **no se cosecha el cargador de una entidad que acaba de revivir de un
+  savegame.** Es la misma regla que gobierna el bloque entero, aplicada al cargador: un valor que
+  solo tiene sentido en la sesión que lo produjo no es continuidad. Cuando el blob se re-acuña, el
+  blob es la autoridad y la entidad restaurada no; en el camino normal —el arma que Cargo spawneó en
+  esta sesión— la cosecha sigue igual, porque ahí la entidad lleva el cargador que el blob le puso.
+  Se suma un `Corpus.Log` en la restauración del arma de mundo, que nombra el ítem y el cargador
+  recuperado: si el próximo reporte vuelve a discrepar, la consola dice de qué mitad se trata.
+
+Harness **448** (eran 445). Los tres nuevos verificados en negativo. **Entries 46 y 47 siguen
+`[PENDIENTE]`**: R4 vuelve a la ronda 3.
+
+### Ronda 3 (2026-07-26): R4 vuelve a fallar, y la línea de log que NO apareció es el hallazgo
+
+R4 se corrió **dos veces** —soltando con la tecla de drop y dropeando desde el inventario— y las dos
+volvieron con el cargador lleno. **La línea `Capture: arma de mundo restaurada de un savegame` no
+apareció nunca.**
+
+**Esa ausencia es el dato, y corrige lo que la ronda 2 dio por probado.** El log vive adentro de la
+rama de revive, que solo necesita dos cosas en la entidad: `CargoInstanceUid` y `CargoInstances`. Si
+no imprime, esos campos **no volvieron del savegame** — así que el PARCHE 6 arregló un clobber real
+pero no el defecto que R4 mide. En la ronda 2 se afirmó que «el blob sí viaja pegado a un SWEP de
+mundo»; el check offline probaba la **ruta de código** con los campos presentes, no que el engine los
+devuelva. No los devuelve.
+
+**El contraste está medido dentro de esta misma sección, y es lo que le da forma al hallazgo:**
+
+| Entidad | Qué es | ¿Vuelve su tabla Lua? |
+|---|---|---|
+| `corpus_cargo_crate` | scripted entity (`base_gmodentity`) | **Sí** — R1 volvió con su loot y sus blobs; antes Q3 medía lo mismo con el marcador |
+| `corpus_cargo_trader` | scripted entity | **Sí** — R2, stock mermado y wallet |
+| un arma soltada | el SWEP real (`weapon_pistol`, `weapon_smg1`) | **No** — R4, dos veces, dos rutas de drop |
+
+O sea: **el savegame del engine no trata igual la tabla Lua de una entidad scripteada que la de un
+arma.** Todo B4 se apoya en que el estado plano vuelve, y vuelve — para las entidades que Cargo
+declara. Para un SWEP, no. No se afirma acá el mecanismo exacto del engine (no hay fuente local de
+garrysmod — cita CRG-24); se afirma lo medido, que es la tabla de arriba.
+
+**Lo que esto NO invalida:** las entidades de Cargo (crate, trader, y el drop `corpus_cargo_item`,
+que es de la misma base que la crate) son la superficie que el bloque construyó, y están confirmadas
+salvo la última. **Lo que sí:** un arma soltada **no conserva su instancia a través de un savegame** —
+vuelve como ítem de fábrica, sin condición, sin attachments y sin cargador. Degradación honesta, pero
+hasta hoy no declarada.
+
+**La ruta que sí sobrevive ya existe, y es un trade-off del autor, no un arreglo.** La convar
+`cargo_weapon_world_pickup` (default 1) gobierna **dos cosas a la vez**: que un arma soltada spawnee
+el **SWEP real** en el suelo, y el world gate de WALK+USE. En **0**, el drop de un arma spawnea
+`corpus_cargo_item` —entidad scripteada de Cargo, que sí conserva su blob— pero se pierde el gate:
+vuelve el pickup por contacto del engine, y el arma en el suelo se ve con el modelo del ítem en vez
+de dibujarse ella misma con sus attachments (que es justo por lo que el SWEP real está ahí, roadmap
+#16/#17). **Decisión del autor, no de la tanda.** Si algún día se quiere lo mejor de las dos, la
+forma es partir la convar en dos —ruta de drop y gate de pickup son decisiones distintas—, y eso es
+un bloque propio, no un parche de acá.
+
+- PARCHE 7 — feat(dev): **`cargo_dev_worldwep`**, el instrumento que faltaba. Una ausencia no deja
+  rastro que loguear: no hay marcador que preguntar, y por eso dos rondas no pudieron distinguir «el
+  blob no viajó» de «viajó y algo lo pisó». El comando mira la entidad que el jugador tiene en la
+  mira e imprime **qué campos de Cargo lleva de verdad** — uid, blobs, contenedor, entrada. Apuntarlo
+  a una crate y después a un arma soltada **en el mismo save** es el experimento entero. Sin gate de
+  admin, como el resto del kit (CRG-45).
+
+**El PARCHE 6 se queda.** No arregla R4, pero el clobber que corrige es real y sigue vigente en toda
+ruta donde el blob sí vuelva —un paste del duplicator en la misma sesión, o el día que la ruta del
+arma cambie— y no toca el camino normal, donde la entidad lleva el cargador que el blob le puso.
+
+Harness **448**, sin checks nuevos: lo que esta ronda descubrió es **del engine**, y un check offline
+que lo "probara" estaría probando nuestro stub, no el juego. Lo honesto es el instrumento en juego.
+**Entries 46 y 47 siguen `[PENDIENTE]`.** Ronda 4: R4 se corre sobre la ruta que el §6 del PROMPT
+nombraba y que ninguna ronda llegó a probar —el **drop no-arma**, `corpus_cargo_item`— más una
+pasada de `cargo_dev_worldwep` sobre una crate y sobre un arma en el mismo save, para dejar la
+frontera evidenciada y no inferida.
+
+### Cierre — planilla `R` en 5/5, cuatro rondas (2026-07-26)
+
+**Confirmado en juego por el autor.** R1 (la crate vuelve con su loot y el casco con el NVG en su
+sub-slot) · R2 (los dos traders con stock mermado y wallet: Sidorovich 48.900 y el demo 40.560, y el
+de Sidorovich **sin que la tanda tocara `corpus-stalker`**) · R3 (**CRG-60**: la mochila no
+retrocede) · R4 (el drop `corpus_cargo_item` vuelve con su blob: «el test con el casco sí funciona,
+no hay problemas») · R5 (Sidorovich entero).
+
+**La pasada de `cargo_dev_worldwep` cerró la frontera con evidencia, y afinó el mecanismo.** Cuatro
+entidades leídas en el MISMO save cargado:
+
+    weapon_smg1 #272        uid=nil   instances=nil          CargoWorldSpawned=true
+    weapon_smg1 #271        uid=nil   instances=nil          CargoWorldSpawned=true
+    corpus_cargo_item #251  entry=cargo_dev_helmet uid=i1785101775_2   instances=2 blob(s)
+    corpus_cargo_crate #250 CargoContainer = 7 entrada(s), 5 blob(s)   → "estado restaurado (7 entradas)"
+
+Las dos entidades scripteadas volvieron **completas**, blobs incluidos, y el arma volvió **pelada**.
+Y el detalle que corrige la lectura de la ronda 3: en el arma **sobrevive un campo**,
+`CargoWorldSpawned = true`. No es que un boolean se salve y un string no — **ese campo no se
+restauró, lo re-puso Cargo**: el hook `PlayerSpawnedSWEP` del world gate re-etiqueta el arma cuando
+el load la crea. O sea la tabla Lua del arma **no vuelve en absoluto**, y lo único de Cargo que hay
+encima es lo que Cargo escribió recién. Efecto colateral afortunado, y conviene saberlo: por ese
+mismo hook, **el world gate sigue funcionando tras cargar** — el arma restaurada tampoco se recoge
+por contacto.
+
+**DECISIÓN DEL AUTOR (ratificada acá, cierra la fila de §13):** el cargador de un arma soltada que se
+restablece al cargar **se acepta como está**. Textual: «con las armas la munición se restablece —eso
+ya me da lo mismo, dejémoslo así como OK, lo importante es que los ítems funcionan». No se parte la
+convar `cargo_weapon_world_pickup` y no se toca la ruta del SWEP real: el world gate y el arma
+dibujándose a sí misma valen más que el cargador. La deuda queda **declarada y aceptada**, no
+pendiente.
+
+**Lo que las cuatro rondas dejaron como método, y no es anécdota:** dos de los cuatro hallazgos
+salieron de **notas de checks que no eran rojos** (los wallets de R2, que confirmaron lo mejor de la
+tanda; los errores de guardado en la nota de R5, que resultaron ser una frontera del engine), y el
+hallazgo decisivo salió de **una ausencia**: la línea de log que nunca imprimió. Un log que no sale
+es un dato, pero solo si algo lo estaba esperando — de ahí el instrumento (`cargo_dev_worldwep`),
+porque una ausencia no deja rastro que loguear. Y la ronda 3 obligó a corregir una afirmación propia:
+un check offline verde prueba la **ruta de código**, nunca que el engine devuelva lo que la ruta
+necesita.
+
+Harness **448** verdes en ambos realms, checker de IDs limpio, espejo regenerado. **Sin commitear**
+(GIT-7). Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9

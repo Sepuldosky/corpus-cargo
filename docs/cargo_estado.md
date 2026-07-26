@@ -5,18 +5,27 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-26 (**entries 44-45 `[PENDIENTE]`, a verificar con la planilla Q**: un solo
-serializador de dueño. El render y la hidratación salen a `Instances.RenderOwner`/`HydrateOwner` —una rutina,
-el dueño como parámetro— y **`cont_<key>` pasa a ser archivo de dueño de primera clase**, con sus blobs
-adentro: eso saca a **CRG-58 de INTENCION** y arregla el bug de que una crate con `persistKey` **perdía sus
-uniques al reiniciar**. `cont_<key>` tiene ahora **un solo escritor** (`Containers.Save`); el wallet del
-trader se queda aparte en `trader_<key>` (decisión del autor, por CRG-21). **CRG-59 acuñada.** Y la entidad
-suelta sus referencias vivas —Entity y sets con Players de clave que `duplicator.CopyEntTable` copiaba— a
-`Containers._live`/`Trade._live`, con API pública nueva (`Trade.StockOf`/`HasViewer`/`ClearViewers`,
-`Containers.EntityOf`). El saneo **rompió el NextBot de Sidorovich** y se arregló en la misma tanda (4.ª raíz,
-decisión del autor). Convar dev `cargo_dev_persist_key`, vacía por default: sin ella ninguna entidad declaraba
-`persistKey` y la ruta del dueño persistente no tenía cómo ejercerse en juego. Harness **418** (eran 393, y
-los 393 quedaron intactos durante el refactor). Antes, **entry 43 `[APLICADO]`, confirmada en juego**: el framework estrenó
+**Última actualización:** 2026-07-26 (**entries 46-47 `[APLICADO]`, confirmadas en juego con la planilla R en 5/5** — B4, el
+savegame de GMod: `gm_save`/`gm_load` conservan el estado de partida de Cargo que vive en entidades. Una crate
+vuelve **con su loot y sus condiciones**, un trader con su **stock mermado y su wallet**, y un ítem tirado en el
+suelo sobrevive el ciclo — por las **dos** rutas de drop, la entidad de ítem y el arma soltada. **CRG-60
+acuñada**: *el savegame guarda el MUNDO, no al jugador* — la mochila NO retrocede, que es la contrapartida
+declarada de CRG-43. La forma, y es la decisión de diseño de la tanda: **no hay `PreEntityCopy`**. El estado
+plano de la entidad YA viaja y la entry 45 lo dejó limpio, así que `Containers.Save` **renderiza siempre** y ese
+marcador ES el blob; al volver, `Containers.Attach` lo re-acuña con **uid nuevo** (`Instances.Remint`,
+recursivo por los sub-slots). Como vive en la única puerta del primitivo, **Sidorovich lo hereda sin tocar su
+repo** — no hubo cuarta raíz. Decisión del autor previa al código (§5.2): con `persistKey`, **manda el
+savegame** sobre el archivo de dueño, y el archivo se reconcilia. Harness **448** (eran 425), los nuevos
+verificados **en negativo**. **Cuatro rondas** dejaron además una frontera **medida y aceptada por el autor**:
+la tabla Lua vuelve completa en las entidades scripteadas de Cargo y **no vuelve en absoluto** en el SWEP real
+que deja el drop de un arma, así que un arma soltada vuelve de fábrica (§13; instrumento
+`cargo_dev_worldwep`). Antes, **entries 44-45 `[APLICADO]`, confirmadas en juego con la planilla Q en
+5/5**: un solo serializador de dueño (`Instances.RenderOwner`/`HydrateOwner`), **`cont_<key>` como archivo de
+dueño de primera clase** con un solo escritor —eso sacó a **CRG-58 de INTENCION** y arregló que una crate
+persistente perdiera sus uniques al reiniciar—, **CRG-59 acuñada**, el wallet aparte en `trader_<key>` por
+CRG-21, y la entidad sin referencias vivas encima (`_live` + API pública `Trade.StockOf`/`HasViewer`/
+`ClearViewers`, `Containers.EntityOf`). El saneo rompió el NextBot de Sidorovich y se arregló en la misma tanda
+(4.ª raíz). Convar dev `cargo_dev_persist_key`, vacía por default. Antes, **entry 43 `[APLICADO]`, confirmada en juego**: el framework estrenó
 `Corpus.Data.List`/`Delete` y el **scope** de COR-19, y Cargo es su primer consumidor real —
 `cargo_dev_purge_legacy` lista y purga los `inst_*` legacy de terceros con **dry-run por
 default** (sin gate de admin todavía, CRG-45), y los dos archivos de catálogo `autogen_defs` e
@@ -148,7 +157,7 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   un addon de contenido) + callbacks `OnTradeOpened/Dealt/Closed` + idles de
   plaza rotados + voz por proximidad (saludo/espera 1 min/despedida). Sin
   persona: citizen mudo; sin banco: UI muda, consola limpia.
-- **Harness offline: 425 checks verdes en ambos realms** (con gate final: un
+- **Harness offline: 448 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 83 client / 76 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -156,7 +165,15 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **Nada.** Las entries 44-45 (B3) quedaron confirmadas el 2026-07-26 con la **planilla Q en 5/5**,
+- **Nada.** Las entries 46-47 (B4) quedaron confirmadas el 2026-07-26 con la **planilla R en 5/5**, tras
+  cuatro rondas: R1 (la crate vuelve con su loot y el casco con el NVG en su sub-slot) · R2 (los dos
+  traders con stock mermado y wallet — el de Sidorovich **sin tocar `corpus-stalker`**) · R3 (**CRG-60**:
+  la mochila no retrocede) · R4 (el drop `corpus_cargo_item` vuelve con su blob) · R5 (Sidorovich
+  entero). Harness **448**, checker limpio, espejo regenerado. **Sin commitear** (GIT-7).
+  **Dos hallazgos salieron de notas de checks que no eran rojos, y el decisivo de una AUSENCIA** —una
+  línea de log que nunca imprimió—, que es lo que motivó el instrumento `cargo_dev_worldwep`.
+  Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+- Antes, las entries 44-45 (B3) quedaron confirmadas el 2026-07-26 con la **planilla Q en 5/5**,
   tras **seis rondas**: Q1 (la crate persistente conserva su unique, con ícono y footprint) · Q2 (el
   trader efímero re-siembra en un mapa nuevo, verifica D1) · Q3 (`gm_save`/`gm_load` deja crate y
   trader usables, con la cara del NextBot neutra y parpadeando) · Q4 (el slice 1 del comercio
@@ -177,6 +194,16 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   quedado confirmadas el 2026-07-24, ya commiteadas y pusheadas.
 
 ## Frentes abiertos (anotados, NO arreglados)
+
+- **Un arma ARC9 en el suelo rompe `gm_save`** (medido 2026-07-26, ronda 1 de la planilla R).
+  El save del engine recorre la tabla Lua de cada entidad y las tablas de attachment de ARC9
+  llevan `Material(...)` adentro: `Can't write unknown type IMaterial`, referencia cíclica y
+  `CSave BLOCK SIZE OVERFLOW (>65k)` → el save no carga bien, y eso alcanza a **todo el mapa**,
+  no solo a Cargo. **No es de esta tanda** —R1 y R2 guardaron y cargaron bien con crates y
+  traders llenos de blobs— ni se arregla desde acá (ARC9 es COMPAT-RUNTIME, no se forkea). Lo que
+  Cargo cuelga de una entidad son **184 bytes por unique**, medidos. Deuda de frontera declarada
+  con su fila en `Cargo_Architecture.md` §13. Regla operativa mientras tanto: no dejar armas ARC9
+  tiradas al guardar.
 
 - **Slot del menú HL2 desalineado del slot Cargo** → **roadmap #36** (pedido
   17c: la RPD de EFT es Slot 4 de engine aunque esté equipada como primary).
@@ -208,12 +235,11 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Próximo paso
 
-1. **B4 — el savegame de GMod** ([`../../dev/PLAN_cargo_persistencia_gc.md`](../../dev/PLAN_cargo_persistencia_gc.md)):
-   estrena la cadena `PreEntityCopy` → `PostEntityPaste`, y arranca sobre una entidad ya limpia —
-   que es lo que la entry 45 dejó hecho y lo que Q3 midió. PROMPT escrito:
-   [`../../dev/PROMPT_cargo_b4_savegame.txt`](../../dev/PROMPT_cargo_b4_savegame.txt). Lleva dos
-   premisas medidas en juego que no se pueden ignorar: `gm_load` va **por el menú**, y el estado que
-   una entidad necesita entre partidas **se valida por VALOR, no por momento**.
+1. **B5 — export/import LAN** ([`../../dev/PLAN_cargo_persistencia_gc.md`](../../dev/PLAN_cargo_persistencia_gc.md) §4),
+   con PROMPT escrito: [`../../dev/PROMPT_cargo_b5_export_lan.txt`](../../dev/PROMPT_cargo_b5_export_lan.txt).
+   Comparte el serializador con B4 y solo le agrega **transporte y política**: convar en 0 por default,
+   whitelist de SteamIDs, gate de admin, saneo server-side, firma de compatibilidad y **re-uid al
+   importar** — el mismo `Instances.Remint` que la entry 46 estrenó y que la planilla R confirmó.
 2. **Slice 2 del comercio** (desplazado por decisión del autor el 2026-07-25, D4 del plan
    madre): el dinero como entidad (`Cargo_Trade` §7 — botar efectivo desde el botón $,
    línea de solo-dinero en el basket). Después el slice 3 (jugador-trader con doble
