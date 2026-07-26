@@ -139,6 +139,95 @@ function CARGO.Instances.HydrateOwner(owner)
     return arrived
 end
 
+-- The ONE-ENTRY owner. A world drop owns exactly one entry — the item entity,
+-- or the real SWEP a dropped gun is — and renders through the SAME routine the
+-- two files use, by reference (CRG-57), so a condition that changes while it
+-- lies there is the one that gets saved. Sub-slot content rides inside, because
+-- the reachability walk is the same one.
+function CARGO.Instances.RenderEntry(entry)
+    local owner = { items = { entry } }
+    CARGO.Instances.RenderOwner(owner)
+    return owner.instances
+end
+
+-- ------------------------------------------------------------------
+-- SAVEGAME RE-MINT (CRG-60, §12)
+--
+-- A savegame gives an entity its flat state back, blobs included: the marker
+-- an entity carries IS a rendered owner (Containers.Save renders on every
+-- write, precisely so that it is). What a save CANNOT bring back is the uid —
+-- it is unique per BOOT and not globally, so reusing one is a collision
+-- waiting to happen (same reason the import of B5 re-uids).
+--
+-- So a blob that arrives from another session is CREATED AGAIN with a new uid
+-- and the entries are rewritten to point at it. Recursive, because a vest
+-- carries its plates in `subslots` and those entries name uids too — the same
+-- reachability the owner file walks.
+--
+-- Honest degradation (cites COR-5), the same rule both owner files apply: an
+-- entry whose blob did not travel, or whose def this boot does not know (a
+-- pack that is no longer mounted), is dropped with a log instead of coming
+-- back as a weightless ghost.
+--
+-- The invariant this serves is of VALUE, not of moment: the caller asks "is
+-- this uid possible in this session?", never "when did the duplicator write
+-- this?" — an order that is not observable from outside the game (B3, six
+-- rounds).
+-- ------------------------------------------------------------------
+
+function CARGO.Instances.Remint(entries, blobs)
+    local out = {}
+    if not istable(entries) then return out end
+    blobs = istable(blobs) and blobs or {}
+
+    -- `seen` is the cycle guard, same reason CollectInstances keeps one:
+    -- nothing forbids a blob graph that closes on itself, and this walk
+    -- creates as it goes.
+    local function mint(uid, seen)
+        local blob = blobs[uid]
+        if not istable(blob) or seen[uid] then return nil end
+        seen[uid] = true
+
+        local def = CARGO.Items.Get(blob.id)
+        if def == nil or def.class ~= "unique" then return nil end
+
+        -- copy, never the arrived table: it is dead data from another session
+        -- and Create keeps whatever the seed carries
+        local seed = table.Copy(blob)
+        if istable(seed.subslots) then
+            for slotId, list in pairs(seed.subslots) do
+                local kept = {}
+                for _, e in ipairs(istable(list) and list or {}) do
+                    if istable(e) and e.uid == nil then
+                        kept[#kept + 1] = e
+                    elseif istable(e) then
+                        local sub = mint(e.uid, seen)
+                        if sub ~= nil then kept[#kept + 1] = { id = e.id, uid = sub } end
+                    end
+                end
+                seed.subslots[slotId] = kept
+            end
+        end
+
+        return (CARGO.Instances.Create(blob.id, seed))
+    end
+
+    for _, entry in ipairs(entries) do
+        if istable(entry) and entry.uid == nil then
+            out[#out + 1] = entry
+        elseif istable(entry) then
+            local uid = mint(entry.uid, {})
+            if uid == nil then
+                Corpus.Log("cargo", "Instances.Remint: entrada sin blob o con def desconocida (uid "
+                    .. tostring(entry.uid) .. "), descartada")
+            else
+                out[#out + 1] = { id = entry.id, uid = uid }
+            end
+        end
+    end
+    return out
+end
+
 -- Weight of an instance = its def + everything mounted in its sub-slots
 -- (plates and accessories weigh; nested unique entries recurse).
 function CARGO.Instances.WeightOf(uidOrBlob)
