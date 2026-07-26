@@ -363,7 +363,14 @@ end
 -- blob whose id no longer resolves — PlayerLoadout skips its re-give and
 -- the slot shows a weapon the player does not have. id -> { name,
 -- weapon_class }, re-registered at boot, saved on every new registration.
-local autogenDefs = Corpus.Data.Load("cargo", "autogen_defs") or {}
+--
+-- SERVER CONFIG, not game state (COR-19): the autogen catalog is what the
+-- installed weapon packs happen to be, so it outlives deleting a save the same
+-- way icon_overrides does. Declared here; today both scopes still resolve to
+-- the same folder, so nothing moves.
+local CATALOG = { scope = "config" }
+
+local autogenDefs = Corpus.Data.Load("cargo", "autogen_defs", CATALOG) or {}
 
 -- throwable-faced classes (roadmap #32): frag/SLAM never autogen — their
 -- Cargo face is the canonical throwable stack (corpus_cargo_ammo.lua)
@@ -407,7 +414,7 @@ for id, meta in pairs(autogenDefs) do
             isstring(meta.caliber) and meta.caliber or nil)
     end
 end
-if autogenDirty then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs) end
+if autogenDirty then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs, CATALOG) end
 
 local function EnsureDef(class, wep)
     local id = "wpn_" .. class
@@ -441,14 +448,14 @@ local function EnsureDef(class, wep)
         if dirty then
             autogenDefs[id] = { name = existing.name, weapon_class = class,
                 caliber = istable(existing.ammo) and existing.ammo.caliber or nil }
-            Corpus.Data.Save("cargo", "autogen_defs", autogenDefs)
+            Corpus.Data.Save("cargo", "autogen_defs", autogenDefs, CATALOG)
         end
         return id
     end
 
     RegisterAutogen(class, name, caliber)
     autogenDefs[id] = { name = name, weapon_class = class, caliber = caliber }
-    Corpus.Data.Save("cargo", "autogen_defs", autogenDefs)
+    Corpus.Data.Save("cargo", "autogen_defs", autogenDefs, CATALOG)
     return id
 end
 
@@ -475,7 +482,7 @@ local function HealOrphanDefs(ply)
         if entry.uid then heal(entry.uid) end
     end
     for _, uid in pairs(rec.equip) do heal(uid) end
-    if healed then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs) end
+    if healed then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs, CATALOG) end
 end
 
 -- The slot narrowing above is applied at REGISTRATION, so it only governs new
