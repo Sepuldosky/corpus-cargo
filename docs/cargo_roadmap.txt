@@ -652,3 +652,88 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     no se pierda; enlaza con el estándar de voz por carpetas de acción de
     corpus-stalker (el NextBot subclaseable es la otra mitad de "traders
     hechos por usuarios").
+
+46. LISTA DE FUENTES DE LUZ EN EL WHEEL [Cargo ui/arc9] — ABIERTO (pedido del
+    autor 2026-07-26, tras mapear el mod [TLS] Tactical Light Sources).
+    El dolor concreto: la G es a la vez el wheel de Cargo y la linterna del
+    autor. La solución es meter las luces DENTRO del wheel, que ya es hold.
+    TERCER GRUPO DE CHIPS (no un anillo nuevo: el anillo es "equipar", los
+    quick son "usar", las luces son "togglear" — mezclar verbos en un mismo
+    anillo ya está declarado error de UX en §17.6), en COLUMNA vertical,
+    convar cargo_wheel_lights_anchor, default left.
+    REGLA DE COLISIÓN pedida por el autor, y distinta a la de §17.6: las
+    luces SÍ pueden compartir lado con quick o tools, EMPUJADAS unas unidades
+    hacia afuera. ResolveAnchors no se toca (es pura y la cubre el harness);
+    se le suma una hermana pura, LightsPushOut, con aviso único por
+    Corpus.Log — jamás un error.
+    TRES FUENTES, ninguna inventada (CRG-32): linterna del jugador ·
+    NVG de Neosun (concommand cliente arc_vm_nvg, estado NWInt "nvg" /
+    NWBool "nvg_on", con el EquipDelay de ~1,3 s pintado como tránsito) ·
+    dispositivos ARC9, uno por slot toggleable (GetSubSlotList → ToggleStats
+    + ToggleOnF; commit = ToggleStat(addr) + PostModify(), client-side, que
+    replica solo — el MISMO contrato de CRG-23). Fuera: TFA (§10.4), y el
+    chemlight / los perfiles de linterna extendida (sus addons no están
+    instalados). Para que eso no sea techo, la lista SE REGISTRA
+    (RegisterLightSource, patrón de StatusPanel.RegisterBar §11).
+    LA DECISIÓN QUE FALTA (necesita al autor): ply:Flashlight es server-only.
+    Opción (a) RunConsoleCommand("impulse","100") no cuesta nada pero ARC9
+    SECUESTRA ese impulso cuando el arma en mano tiene un dispositivo
+    toggleable (sh_move.lua:360-369) — comportamiento distinto según lo que
+    lleves en la mano. Opción (b), la recomendada: UN net sin payload
+    (Corpus.Net.Register("cargo","torch")), seis líneas de server, sin
+    estado; cuesta una enmienda explícita a CRG-30 en §17.1.
+    NUNCA devolver true a "impulse 100" en PlayerBindPress: eso es
+    justamente lo que TLS hace y lo que le rompe el toggle de atts a ARC9.
+    Diseño completo, API verificada contra el código vivo y defectos del mod
+    inventariados en dev/Cargo_TLS_Referencia.md §9. Assets: dos íconos
+    propios (linterna, NVG); los de dispositivo los pone ARC9.
+
+47. NVG DE NEOSUN COMO ÍTEMS DEL INVENTARIO [Cargo items/capture] — ABIERTO
+    (pedido del autor 2026-07-26, tras mapear [VManip] Neosun's Cooler
+    Nightvision). Es la OTRA MITAD de #46: aquel ACCIONA la visión nocturna
+    desde el wheel, este la POSEE — recogerla del mundo, guardarla, equiparla.
+    Cierra el hueco que Cargo_Architecture.md §13 tiene anotado como
+    "compat con mods externos de NVG/ópticas: falta mapear mods concretos".
+    RUTA DE SLOT, DECIDIDA POR EL AUTOR: las DOS. Con casco, las gafas montan
+    en su sub-slot óptica (§4, ya existe y cargo_dev_helmet ya lo declara);
+    sin casco ocupan Head directo — cuesta UNA cadena, el filtro del slot head
+    pasa a "category:helmets,optics" y MatchesFilter ya parsea listas. Ni un
+    primitivo nuevo: CRG-8 intacto. La regla que percibe el jugador es "o el
+    casco con las gafas montadas, o las gafas solas".
+    CUATRO HUECOS, y son de Cargo, no del mod:
+    (a) NO HAY SEÑAL DE EQUIPAR. Equip/Unequip solo dan/quitan weapon_class y
+        la única difusión es Corpus_Cargo_BodyChanged, exclusiva del slot body;
+        SubSlotAttach/Detach no difunden nada. Hace falta un
+        Corpus_Cargo_EquipChanged genérico (+ Corpus_Cargo_SubSlotChanged),
+        SUMADO al BodyChanged, que se queda como está (Cortex cuelga de él).
+        Cargo difunde "cambió el slot X"; la semántica vive en el compat —
+        CRG-1 intacto. Descartado def.onEquip: 61 defs cargando la misma
+        closure es más superficie por el mismo resultado.
+    (b) LA ENTIDAD NO-ARMA ESQUIVA EL PORTERO. El PlayerUse de capture.lua
+        atiende tres formas y sale en "if not ent:IsWeapon() then return end":
+        hoy E sobre unas gafas llega al ENT:Use del mod y el inventario nunca
+        se entera. La técnica de bloqueo ya está probada (return false, #27);
+        exponerlo como Capture.RegisterWorldPickup(class, spec) — patrón de
+        StatusPanel.RegisterBar — en vez de una cuarta rama inline.
+    (c) El slot Head no acepta ópticas sueltas (ver ruta arriba).
+    (d) Nada más: model/icon/has_condition/size/value/equip_slots ya existen.
+    EL COMMIT ES ESCRIBIR LA NW, NUNCA ArcticNVGs_SetPlayerGoggles: esa función
+    DROPEA al mundo el par anterior, o sea que duplica un ítem del que Cargo ya
+    es dueño. ply:SetNWInt("nvg", id) directo, validando el nombre corto antes
+    (el mod no valida: nombre inexistente -> SetNWInt con nil -> error).
+    EL ID DEL MOD ES UN ORDINAL de su tabla, no un nombre: se persiste el
+    ShortName y el ordinal se resuelve al equipar. Mismo espíritu que CRG-42.
+    LOS DEFS SE DERIVAN, NO SE CATALOGAN (lección de CRG-41/42): 61 variantes
+    sobre 6 modelos; se itera la tabla global ArcticNVGs (shared, existe en
+    ambos realms), el PrintName sale de la entidad y el ícono del PNG que el
+    propio mod trae por variante (def.icon gana en el pipeline y descarta
+    materiales rotos solo). A mano, SOLO la tabla de 6 familias: peso, valor y
+    footprint. Convar cargo_nvg_register para no inflar el catálogo del trader.
+    sh_arctic_nvg_losegoggles VA A 0: Cargo es dueño de qué se pierde al morir
+    (cargo_lose_on_death) y su reconcile de PlayerLoadout re-escribe la NW. El
+    orden de hooks favorece al reconcile, pero depender del orden es el bug que
+    Quick Loadouts ya costó — se apaga el convar y se avisa UNA vez por
+    Corpus.Log si se lo encuentra en 1; jamás pisarlo en silencio.
+    Mapeo completo, API verificada contra el código vivo y defectos del mod
+    inventariados en dev/Cargo_NVG_Neosun_Referencia.md. El mod es OFF-LIMITS
+    para modificar (dato del autor): integración en runtime y nada más.
