@@ -24,6 +24,12 @@
 -- keeps the container's SESSION ID and resolves it — same reason, spelled out
 -- in the header of corpus_cargo_containers.lua: duplicator.CopyEntTable merges
 -- ent:GetTable() wholesale.
+--
+-- That same merge is what carries the trader through a savegame (CRG-60): the
+-- stock comes back through the container it sits on, and the only thing this
+-- layer has to bring back is the WALLET, which rides in the flat marker. The
+-- spread and the name do not — they are decisions of whoever calls
+-- AttachTrader, not saved state.
 
 local CARGO = Corpus.GetModule("cargo")
 
@@ -128,7 +134,20 @@ function CARGO.Trade.AttachTrader(ent, opts)
         if istable(saved) and isnumber(saved.money) then trader.money = saved.money end
     end
 
-    -- seed the demo/initial stock only when the container came up empty
+    -- THE SAVEGAME'S PRICE LAYER (CRG-60), and it goes LAST for the same reason
+    -- the container's does: what the save carried outranks the file. The stock
+    -- already came back through Containers.Attach — a trader is that container
+    -- plus this layer (CRG-21) — and the wallet has to follow the SAME source,
+    -- or the trader ends up with stock from the save and money from the file,
+    -- a state neither of the two ever had. Only `money` travels: the spread and
+    -- the name are decisions of whoever calls AttachTrader, not saved state,
+    -- exactly like `cont_<key>` spells out what it writes.
+    if istable(prior) and isnumber(prior.money) then trader.money = prior.money end
+
+    -- Seed the demo/initial stock only when the container came up empty — which
+    -- now also means "and the savegame did not bring one back", since Attach
+    -- restored it before returning. That order is the whole of D1 surviving
+    -- CRG-60: a trader re-seeds on a NEW map, and returns mermado from a save.
     if #cont.items == 0 and istable(opts.stock) then
         for _, line in ipairs(opts.stock) do
             local def = CARGO.Items.Get(line.id or "")
@@ -146,6 +165,13 @@ function CARGO.Trade.AttachTrader(ent, opts)
             end
         end
     end
+
+    -- The freshly seeded stock has to be RENDERED before anything can save the
+    -- map: a unique that nobody has traded yet would otherwise ride into the
+    -- savegame as an entry with no blob, and come back as the ghost honest
+    -- degradation drops. Containers.Save is the single writer (it renders
+    -- always and only touches disk when persistent — CRG-59).
+    CARGO.Containers.Save(cont)
 
     ent.CargoTrader = trader
     CARGO.Trade._traders[cont.id] = trader
