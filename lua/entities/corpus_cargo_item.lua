@@ -5,6 +5,13 @@
 -- like an HL2 prop. The gate lives in the PlayerUse hook of
 -- server/corpus_cargo_capture.lua (roadmap #27), which blocks the engine
 -- from reaching ENT:Use unless the take is deliberate.
+--
+-- IT IS A ONE-ENTRY OWNER (CRG-60). The entry is flat data and a savegame
+-- brings it back on its own; the instance it names does not. So the blob
+-- travels next to it (`CargoInstances`, rendered by the same routine the two
+-- files use) and is minted again with a fresh uid when the entry comes back
+-- from another session. The world drop is still ephemeral across a MAP CHANGE
+-- (CRG-59, §12): surviving a save is not the same as reaching disk.
 
 AddCSLuaFile()
 
@@ -17,7 +24,10 @@ ENT.Spawnable = false
 
 if SERVER then
 
-    function ENT:Initialize()
+    -- Look and blob, both derived FROM the entry. Split out of Initialize on
+    -- purpose: a savegame lands the flat fields AFTER the constructor (measured
+    -- in game, B3 round 3), so the restore below has to be able to re-run this.
+    function ENT:CargoApplyEntry()
         local model = "models/props_junk/cardboard_box004a.mdl"
         local CARGO = Corpus and Corpus.GetModule and Corpus.GetModule("cargo")
         if CARGO and istable(self.CargoEntry) then
@@ -38,9 +48,18 @@ if SERVER then
                 -- (icon model vs collision placeholder — see Draw below)
                 self:SetNWString("cargo_defid", def.id)
             end
+
+            -- THE BLOB TRAVELS WITH THE ENTRY (CRG-60). Without this the entry
+            -- rides into the savegame naming a uid and nothing else, which is
+            -- exactly the ghost the owner files discard on load.
+            self.CargoInstances = CARGO.Instances.RenderEntry(self.CargoEntry)
         end
 
         self:SetModel(model)
+    end
+
+    function ENT:CargoBuild()
+        self:CargoApplyEntry()
         self:PhysicsInit(SOLID_VPHYSICS)
         self:SetMoveType(MOVETYPE_VPHYSICS)
         self:SetSolid(SOLID_VPHYSICS)
@@ -49,8 +68,48 @@ if SERVER then
         if IsValid(phys) then phys:Wake() end
     end
 
+    function ENT:Initialize()
+        self:CargoBuild()
+    end
+
+    -- The savegame side (CRG-60). The entry comes back as flat data, but the
+    -- instance it names died with the map: it is minted again from the blob
+    -- that travelled alongside it.
+    --
+    -- VALUE test, never a timing one (B3's lesson, six rounds): it asks whether
+    -- the uid is possible in THIS session, not when the duplicator wrote the
+    -- field — an order nobody here controls. That makes it idempotent (once the
+    -- uid is live it returns on the first line) and safe to call from anywhere,
+    -- which is why the paste hook and the take both go through it instead of
+    -- one of them being "the" moment.
+    function ENT:CargoRestore()
+        local entry = self.CargoEntry
+        if not istable(entry) or entry.uid == nil then return end
+        local CARGO = Corpus and Corpus.GetModule and Corpus.GetModule("cargo")
+        if CARGO == nil or CARGO.Instances.Get(entry.uid) ~= nil then return end
+
+        local revived = CARGO.Instances.Remint({ entry }, self.CargoInstances)
+        if revived[1] == nil then
+            -- honest degradation (cites COR-5), the same discard both owner
+            -- files apply: an entry with a uid and no blob is a ghost, and a
+            -- ghost is not handed to a player — the drop goes with it.
+            Corpus.Log("cargo", "corpus_cargo_item: drop sin blob tras cargar, descartado")
+            self:Remove()
+            return
+        end
+
+        self.CargoEntry = revived[1]
+        self:CargoBuild() -- the def may resolve a model the constructor could not
+    end
+
+    function ENT:PostEntityPaste()
+        self:CargoRestore()
+    end
+
     function ENT:Use(activator)
         if not IsValid(activator) or not activator:IsPlayer() then return end
+        self:CargoRestore()
+        if not IsValid(self) then return end -- a ghost drop removes itself
         local CARGO = Corpus and Corpus.GetModule and Corpus.GetModule("cargo")
         if CARGO == nil or not istable(self.CargoEntry) then return end
 

@@ -16,10 +16,18 @@
 -- it does table.Merge(data, ent:GetTable()) stripping only functions, so an
 -- Entity field and a set keyed by Player would ride into every duplication and
 -- every gm_save. Cleaning that up in a PreEntityCopy would be a patch at the
--- exit point — any other route reading ent:GetTable() still sees the garbage —
--- and it would burn the very hook the savegame block needs free for its own
--- blob. `_live` means the same thing here as in Instances._live: the half that
+-- exit point — any other route reading ent:GetTable() still sees the garbage.
+-- `_live` means the same thing here as in Instances._live: the half that
 -- exists only at runtime and never reaches disk.
+--
+-- AND BECAUSE that merge carries the flat half wholesale, the flat half IS the
+-- savegame blob (CRG-60). `Containers.Save` renders `instances` on every write
+-- — persistent or not — so the marker an entity carries is a complete,
+-- self-contained owner at ALL times, and `Attach` mints it again with fresh
+-- uids when it comes back from another session. Nothing writes it from a
+-- PreEntityCopy, and that is the same argument as above read forwards: a blob
+-- that is only correct inside the copy hook is a blob that is wrong everywhere
+-- else ent:GetTable() is read.
 
 local CARGO = Corpus.GetModule("cargo")
 
@@ -60,12 +68,51 @@ local function Live(cont)
 end
 
 -- Public because a cont alone no longer names its entity, and callers outside
--- this file (the trade layer today, the savegame block tomorrow) need the way
+-- this file (the trade layer, the content addon's trader) need the way
 -- back. Returns nil when the container is gone; every caller already guards
 -- with IsValid.
 function CARGO.Containers.EntityOf(cont)
     local live = Live(cont)
     return live and live.ent or nil
+end
+
+-- ------------------------------------------------------------------
+-- THE SAVEGAME SIDE OF THE MARKER (CRG-60).
+--
+-- A marker that did NOT validate came back from another session — a gm_load or
+-- a duplicator paste — and it carries a whole owner blob: its entries plus the
+-- `instances` map Containers.Save renders on every write. The uid cannot be
+-- reused, so the blobs are minted again and the entries rewritten
+-- (Instances.Remint).
+--
+-- WHY IT LIVES HERE and not in a PostEntityPaste of each entity: Attach is the
+-- one door into the primitive (CRG-21), so every entity that becomes a
+-- container — the demo crate, the demo trader, the Sidorovich of the content
+-- addon, tomorrow's corpse — gets this for free, without a line of its own and
+-- without the hook having to fire in any particular order. It is also the only
+-- place where the container is BORN, which is what makes the replacement below
+-- meaningful.
+--
+-- AUTHOR'S CALL 2026-07-26 (A): THE SAVEGAME WINS over the owner file. A
+-- persistent container may hold both — `Attach` read `cont_<key>` just above —
+-- and they can disagree. `cont_<key>` declares scope `save`: it is game state,
+-- not server config (COR-19), and B6's layout puts it under
+-- `saves/<perfil>/maps/<mapa>/`. So loading a game is going back to that
+-- moment, contents included, and the file is reconciled to match.
+--
+-- Replacing (never appending) is also what makes this idempotent: run it twice
+-- and the list is the same. That matters because the order in which the
+-- duplicator writes the flat fields is not observable from outside the game —
+-- the invariant has to be of VALUE, not of moment (B3, six rounds).
+-- ------------------------------------------------------------------
+
+local function AdoptSavedState(cont, prior)
+    if not istable(prior) or not istable(prior.items) then return end
+
+    cont.items = CARGO.Instances.Remint(prior.items, prior.instances)
+    CARGO.Containers.Save(cont) -- renders, and reconciles `cont_<key>` when persistent
+    Corpus.Log("cargo", "Containers.Attach: estado restaurado de un savegame ("
+        .. #cont.items .. " entradas)")
 end
 
 -- ------------------------------------------------------------------
@@ -88,10 +135,10 @@ function CARGO.Containers.Attach(ent, opts)
     -- already minted, which is why the entity has to match too: without that,
     -- the crate would open somebody else's contents.
     -- In-game report 2026-07-26: after gm_load, crate and trader did nothing on
-    -- USE. Restoring what the marker CARRIED (its item list) is not this
-    -- block's job — those entries point at instances that died with the map;
-    -- a persistent container reloads its own file below, and the savegame
-    -- block owns the rest.
+    -- USE. What the marker CARRIED is no longer thrown away, and that is what
+    -- CRG-60 buys: its entries name instances that died with the map, so they
+    -- are minted again from the blobs that travelled with them
+    -- (AdoptSavedState, below the persistKey block).
     local prior = ent.CargoContainer
     if prior ~= nil then
         local live = CARGO.Containers._live[prior.id]
@@ -157,6 +204,11 @@ function CARGO.Containers.Attach(ent, opts)
         end
     end
 
+    -- LAST, on purpose: whatever the savegame carried outranks the file (see
+    -- the header of AdoptSavedState). A container with no prior marker, or one
+    -- that validated and returned above, never reaches this.
+    AdoptSavedState(cont, prior)
+
     ent.CargoContainer = cont
     CARGO.Containers._byId[cont.id] = cont
     CARGO.Containers._live[cont.id] = { ent = ent, viewers = {} }
@@ -189,10 +241,20 @@ end
 -- decisions the caller of Attach makes at attach time, not saved state. What
 -- goes to disk is what an owner file is: entries plus the blobs they reach.
 function CARGO.Containers.Save(cont)
-    if not istable(cont) or not isstring(cont.persistKey) then return end
+    if not istable(cont) then return end
 
-    -- RENDER (CRG-56/57), the same routine the player record runs.
+    -- RENDER (CRG-56/57), the same routine the player record runs — and it runs
+    -- for EVERY container, persistent or not. That is what makes the flat
+    -- marker the entity carries a self-contained owner blob at all times, and
+    -- that marker is exactly what a savegame takes with it (CRG-60): rendering
+    -- only for the ones that reach disk would leave a session crate saving
+    -- entries whose blobs stayed behind. It is deliberately NOT written from a
+    -- PreEntityCopy — patching state at the exit point is what the entry-45
+    -- saneo already rejected: any other route reading ent:GetTable() (the dupe
+    -- tool, a third-party save) would see the incomplete half.
     CARGO.Instances.RenderOwner(cont)
+
+    if not isstring(cont.persistKey) then return end -- CRG-59: no declared owner, no disk
     Corpus.Data.Save("cargo", "cont_" .. cont.persistKey,
         { items = cont.items, instances = cont.instances })
 end
