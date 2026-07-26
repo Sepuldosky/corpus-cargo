@@ -425,9 +425,12 @@ end
 -- Net
 -- ------------------------------------------------------------------
 
+-- The stock column shows what the TRADER has, which the buyer may never have
+-- held: captured-weapon defs are server-side only and ride the snapshot.
 net.Receive(NET_TRADE_OPEN, function()
     tradeState = CARGO.Util.ReadBlob()
     if tradeState == nil then return end
+    CARGO.Items.AbsorbDefs(tradeState)
     CARGO.Trade.BasketClear()
     CARGO.UI.OpenTrade()
 end)
@@ -437,6 +440,7 @@ net.Receive(NET_TRADE_SYNC, function()
     local snap = CARGO.Util.ReadBlob()
     if snap == nil or tradeState == nil then return end
     if snap.traderId ~= tradeState.traderId then return end
+    CARGO.Items.AbsorbDefs(snap)
     tradeState = snap
     -- a deal that WENT THROUGH empties the basket; a rejected one keeps it
     -- intact (§3) and only drops whatever went stale meanwhile

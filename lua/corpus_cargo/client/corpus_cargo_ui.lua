@@ -1297,26 +1297,8 @@ net.Receive(NET_SYNC, function()
     snap.belt = CARGO.Util.NumberKeys(snap.belt)
 
     -- server-side auto-generated defs (captured engine weapons) arrive with
-    -- the snapshot; engine names come as localization tokens ("#HL2_Pistol")
-    for id, def in pairs(snap.defs or {}) do
-        local known = CARGO.Items.Get(id)
-        if known == nil then
-            if isstring(def.name) and def.name:sub(1, 1) == "#" then
-                def.name = language.GetPhrase(def.name:sub(2))
-            end
-            CARGO.Items.Register(def)
-        elseif known ~= def then
-            -- def-level icon override data rides this same channel
-            -- (Cargo_ItemImages §10): merge in place (by-ref invariant) and
-            -- drop that def's icon caches only if it actually changed
-            local before = known.icon_override and util.TableToJSON(known.icon_override) or ""
-            local after = def.icon_override and util.TableToJSON(def.icon_override) or ""
-            if before ~= after then
-                known.icon_override = def.icon_override
-                CARGO.Icons.Invalidate(id)
-            end
-        end
-    end
+    -- the snapshot; the container and the trader carry them the same way
+    CARGO.Items.AbsorbDefs(snap)
 
     CARGO.ClientState = snap
     if pendingOpen then

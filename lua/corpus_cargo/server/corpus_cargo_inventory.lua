@@ -19,7 +19,9 @@
 --            (CRG-56). This file is self-contained: no entry of it points at
 --            another file. The field is a RENDER of Instances._live rebuilt on
 --            every save, and on load it hydrates back into _live BY REFERENCE
---            (CRG-57) — same table, never a parallel copy.
+--            (CRG-57) — same table, never a parallel copy. Both directions go
+--            through Instances.RenderOwner/HydrateOwner, the SINGLE routine
+--            this record shares with the persistent container.
 --
 -- The server owns the inventory; the client only renders snapshots and
 -- sends intents. Every mutation ends in Save + Sync + movement refresh.
@@ -72,18 +74,23 @@ local function SteamKey(ply)
     return ply:SteamID64() or ("bot" .. ply:EntIndex())
 end
 
--- Every uid a record can REACH: grid entries, equipped uniques (a STACK slot
+-- Every uid an OWNER can REACH: grid entries, equipped uniques (a STACK slot
 -- holds a table, not a uid — §4 amendment) and, recursively, whatever hangs in
 -- their sub-slots. The belt is stacks today and carries no uid; it is walked
 -- anyway, in case it ever stops being stacks-only. Cycle guard: the visited
 -- set, since nothing forbids a blob graph from closing on itself.
 --
--- This is the single reachability primitive of CRG-56: the render (SaveRecord),
--- the prune on disconnect and anything that has to ask "what does this owner
--- carry?" all walk with it.
-function CARGO.Inventory.CollectInstances(rec)
+-- This is the single reachability primitive of CRG-56: the render
+-- (Instances.RenderOwner), the prune on disconnect and anything that has to ask
+-- "what does this owner carry?" all walk with it.
+--
+-- The parameter is an OWNER, not a player record: every list is guarded by its
+-- own istable(), so a persistent container — which has `items` and nothing
+-- else — walks through this untouched. That genericity is why the single
+-- serializer of CRG-58's second owner needed no second walker.
+function CARGO.Inventory.CollectInstances(owner)
     local seen = {}
-    if not istable(rec) then return seen end
+    if not istable(owner) then return seen end
 
     local function visit(uid)
         if not isstring(uid) or seen[uid] then return end
@@ -100,18 +107,18 @@ function CARGO.Inventory.CollectInstances(rec)
         end
     end
 
-    if istable(rec.items) then
-        for _, entry in ipairs(rec.items) do
+    if istable(owner.items) then
+        for _, entry in ipairs(owner.items) do
             if istable(entry) then visit(entry.uid) end
         end
     end
-    if istable(rec.equip) then
-        for _, val in pairs(rec.equip) do
+    if istable(owner.equip) then
+        for _, val in pairs(owner.equip) do
             if isstring(val) then visit(val) end
         end
     end
-    if istable(rec.belt) then
-        for _, entry in pairs(rec.belt) do
+    if istable(owner.belt) then
+        for _, entry in pairs(owner.belt) do
             if istable(entry) then visit(entry.uid) end
         end
     end
@@ -137,32 +144,25 @@ function CARGO.Inventory.GetRecord(ply)
         rec.belt = CARGO.Util.NumberKeys(rec.belt)
         rec.wallet = istable(rec.wallet) and rec.wallet or {}
 
-        -- HYDRATION (CRG-56/57). The blobs came inside this file: push them
-        -- into _live WITHOUT COPYING, so rec.instances[uid] and _live[uid] stay
-        -- THE SAME TABLE. That identity is what makes the divergence CRG-57
-        -- forbids impossible — a module mutating one mutates the other. Same
-        -- spirit as the by-ref invariant COR-7: a "defensive" copy here breaks
-        -- persistence in silence. It runs BEFORE the legacy remaps below, which
-        -- read blobs through Instances.Get (i.e. through _live).
-        rec.instances = istable(rec.instances) and rec.instances or {}
-        for uid, blob in pairs(rec.instances) do
-            if isstring(uid) and istable(blob) then
-                CARGO.Instances._live[uid] = blob
-            end
-        end
+        -- HYDRATION (CRG-56/57), the same routine the persistent container
+        -- runs: the blobs came inside this file and land in _live BY REFERENCE.
+        -- It runs BEFORE the legacy remaps below, which read blobs through
+        -- Instances.Get (i.e. through _live).
+        local arrived = CARGO.Instances.HydrateOwner(rec)
 
         -- Honest degradation (cites COR-5): an entry whose blob did NOT come in
         -- the file is dropped with a log — an item with no blob is never
-        -- half-rendered.
+        -- half-rendered. The drop lives here, not in HydrateOwner: only this
+        -- owner knows that `equip` is one of its lists.
         for i = #rec.items, 1, -1 do
             local uid = istable(rec.items[i]) and rec.items[i].uid or nil
-            if uid ~= nil and rec.instances[uid] == nil then
+            if uid ~= nil and not arrived[uid] then
                 Corpus.Log("cargo", "GetRecord: entrada sin blob (uid " .. tostring(uid) .. "), descartada")
                 table.remove(rec.items, i)
             end
         end
         for slotId, val in pairs(rec.equip) do
-            if isstring(val) and rec.instances[val] == nil then
+            if isstring(val) and not arrived[val] then
                 Corpus.Log("cargo", "GetRecord: entrada sin blob (uid " .. val .. "), descartada")
                 rec.equip[slotId] = nil
             end
@@ -228,18 +228,11 @@ function CARGO.Inventory.SaveRecord(ply)
     local rec = CARGO.Inventory._records[SteamKey(ply)]
     if rec == nil then return end
 
-    -- RENDER (CRG-56/57): rebuild `instances` FROM SCRATCH on every save,
-    -- taking each blob from _live by reference. Rebuilding — instead of
-    -- patching — is the point: a uid that stopped being referenced (dropped to
-    -- the world, sold, eaten by a sub-slot detach) leaves the file on its own,
-    -- with no explicit delete and no sweeper. That is why the orphan class
-    -- cannot exist any more.
-    local instances = {}
-    for uid in pairs(CARGO.Inventory.CollectInstances(rec)) do
-        local blob = CARGO.Instances._live[uid]
-        if istable(blob) then instances[uid] = blob end
-    end
-    rec.instances = instances
+    -- RENDER (CRG-56/57), the same routine the persistent container runs:
+    -- `instances` is rebuilt from scratch out of _live on every save, so a uid
+    -- that stopped being referenced (dropped to the world, sold, eaten by a
+    -- sub-slot detach) leaves the file on its own.
+    CARGO.Instances.RenderOwner(rec)
 
     Corpus.Data.Save("cargo", "inv_" .. SteamKey(ply), rec)
 end
@@ -526,30 +519,12 @@ function CARGO.Inventory.BuildSnapshot(ply)
     end
 
     -- defs auto-generated server-side (captured engine weapons) don't exist
-    -- on the client until it sees them here and registers them. Defs with an
-    -- icon override ride the same channel (Cargo_ItemImages §10): the
-    -- override is def-level data, the client merges it and re-renders local
-    for _, entry in ipairs(snap.items) do
-        local def = CARGO.Items.Get(entry.id)
-        if def and (def.autogen or def.icon_override ~= nil) then
-            snap.defs = snap.defs or {}
-            snap.defs[def.id] = def
-        end
-    end
-    for _, slotEntry in pairs(snap.equip) do
-        local def = CARGO.Items.Get(slotEntry.id)
-        if def and (def.autogen or def.icon_override ~= nil) then
-            snap.defs = snap.defs or {}
-            snap.defs[def.id] = def
-        end
-    end
-    for _, entry in pairs(rec.belt or {}) do
-        local def = CARGO.Items.Get(entry.id)
-        if def and (def.autogen or def.icon_override ~= nil) then
-            snap.defs = snap.defs or {}
-            snap.defs[def.id] = def
-        end
-    end
+    -- on the client until a snapshot carries them (Items.PackDefs, which the
+    -- container and the trader now call too — the client learns a def from
+    -- whichever snapshot shows it first)
+    CARGO.Items.PackDefs(snap, snap.items)
+    CARGO.Items.PackDefs(snap, snap.equip)
+    CARGO.Items.PackDefs(snap, rec.belt or {})
 
     local bodyDef
     if snap.equip.body then bodyDef = CARGO.Items.Get(snap.equip.body.id) end

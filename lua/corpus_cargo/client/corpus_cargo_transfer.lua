@@ -78,15 +78,21 @@ function CARGO.Transfer.NotifyClosed()
     contState = nil
 end
 
+-- The loot column can show an item this client never held — a captured
+-- weapon's def is minted server-side, so it rides the snapshot or the cell
+-- draws blank and 1×1 (in-game report 2026-07-26, a persisted crate).
 net.Receive(NET_CONT_OPEN, function()
     contState = CARGO.Util.ReadBlob()
-    if contState then CARGO.UI.OpenLoot() end
+    if contState == nil then return end
+    CARGO.Items.AbsorbDefs(contState)
+    CARGO.UI.OpenLoot()
 end)
 
 net.Receive(NET_CONT_SYNC, function()
     local snap = CARGO.Util.ReadBlob()
     if snap == nil or contState == nil then return end
     if snap.contId == contState.contId then
+        CARGO.Items.AbsorbDefs(snap)
         contState = snap
         CARGO.UI.RefreshLoot()
     end

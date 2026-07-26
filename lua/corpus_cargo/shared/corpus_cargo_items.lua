@@ -257,6 +257,68 @@ function CARGO.Items.Get(id)
 end
 
 -- ------------------------------------------------------------------
+-- Def piggyback (Cargo_ItemImages §10) — ONE routine, every snapshot.
+--
+-- Autogen defs (captured engine weapons) are minted SERVER-side and the
+-- client has no registry of its own for them: it learns each one from the
+-- first snapshot that carries it. So ANY snapshot that can show an item the
+-- viewer never held has to bring the def along — otherwise the cell resolves
+-- to nil and renders as an unknown def: blank, 1×1, not even the placeholder
+-- letter (grid.lua PaintCell bails, Icons.GetFootprint falls back to 1×1).
+--
+-- The inventory did this inline and the container and the trader did not,
+-- which stayed invisible while a persisted crate could not return a unique at
+-- all. It surfaced the moment it could: in-game report 2026-07-26 — a crate
+-- reopened after a map reload showed its two captured weapons as empty 1×1
+-- cells, while the dev ammo next to them (a SHARED def, registered in both
+-- realms) drew fine.
+-- ------------------------------------------------------------------
+
+-- SERVER: fills snap.defs with the defs `entries` needs the client to know.
+-- Only autogen defs and defs carrying an icon override travel: everything
+-- else is registered in a shared file and already exists on both sides.
+function CARGO.Items.PackDefs(snap, entries)
+    if not istable(snap) or not istable(entries) then return snap end
+    for _, entry in pairs(entries) do
+        local def = istable(entry) and CARGO.Items.Get(entry.id or "") or nil
+        if def ~= nil and (def.autogen or def.icon_override ~= nil) then
+            snap.defs = snap.defs or {}
+            snap.defs[def.id] = def
+        end
+    end
+    return snap
+end
+
+-- CLIENT: registers what arrived. Engine names travel as localization tokens
+-- ("#HL2_Pistol") and resolve here, once, on first sight.
+function CARGO.Items.AbsorbDefs(snap)
+    if not CLIENT then return end
+    if not istable(snap) or not istable(snap.defs) then return end
+
+    for id, def in pairs(snap.defs) do
+        local known = CARGO.Items.Get(id)
+        if known == nil then
+            if isstring(def.name) and def.name:sub(1, 1) == "#" then
+                def.name = language.GetPhrase(def.name:sub(2))
+            end
+            CARGO.Items.Register(def)
+        elseif known ~= def then
+            -- def-level icon override data rides this same channel: merge in
+            -- place (by-ref invariant) and drop that def's icon caches only
+            -- if it actually changed
+            local before = known.icon_override and util.TableToJSON(known.icon_override) or ""
+            local after = def.icon_override and util.TableToJSON(def.icon_override) or ""
+            if before ~= after then
+                known.icon_override = def.icon_override
+                if CARGO.Icons and isfunction(CARGO.Icons.Invalidate) then
+                    CARGO.Icons.Invalidate(id)
+                end
+            end
+        end
+    end
+end
+
+-- ------------------------------------------------------------------
 -- Model substitution point (CHANGELOG #34, author call 2026-07-23).
 --
 -- A def registered WITHOUT a model is the honest default for

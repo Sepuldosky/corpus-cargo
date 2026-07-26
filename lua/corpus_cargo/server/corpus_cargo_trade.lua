@@ -17,11 +17,19 @@
 --     trader — nothing crosses a trader except through Confirm.
 --   · the atomic basket: validate EVERYTHING, then move. There is no rollback
 --     path because nothing mutates until every check has passed.
+--
+-- Like the container it sits on, the trader keeps FLAT STATE on the entity and
+-- nothing else: no Entity field, no viewers set, and not even the container
+-- table (which would drag the whole stock and its own live half along). It
+-- keeps the container's SESSION ID and resolves it — same reason, spelled out
+-- in the header of corpus_cargo_containers.lua: duplicator.CopyEntTable merges
+-- ent:GetTable() wholesale.
 
 local CARGO = Corpus.GetModule("cargo")
 
 CARGO.Trade = CARGO.Trade or {}
-CARGO.Trade._traders = CARGO.Trade._traders or {}
+CARGO.Trade._traders = CARGO.Trade._traders or {}    -- contId -> trader (flat state)
+CARGO.Trade._live = CARGO.Trade._live or {}          -- contId -> { ent, viewers }
 
 local NET_TRADE_OPEN    = Corpus.Net.Register("cargo", "trade_open")
 local NET_TRADE_SYNC    = Corpus.Net.Register("cargo", "trade_sync")
@@ -29,6 +37,50 @@ local NET_TRADE_CLOSE   = Corpus.Net.Register("cargo", "trade_close")
 local NET_TRADE_CONFIRM = Corpus.Net.Register("cargo", "trade_confirm")
 
 local USE_RANGE = 160 -- same reach the container session uses
+
+-- The trader's storage. A trader IS a container with a price layer (CRG-21),
+-- so its stock is that container's item list — resolved through the container
+-- registry, never held as a reference on the entity.
+local function ContOf(trader)
+    return istable(trader) and CARGO.Containers._byId[trader.contId] or nil
+end
+
+-- The live half of a trade session: the entity and who has the screen open.
+local function Live(trader)
+    return istable(trader) and CARGO.Trade._live[trader.contId] or nil
+end
+
+-- ------------------------------------------------------------------
+-- Public accessors. A trader entity used to reach into `trader.cont` and
+-- `trader.viewers` directly; with the live half moved off the entity those
+-- are gone, and reaching into `Containers._byId` from outside would just move
+-- the coupling to a private table. These three are the supported way in — the
+-- content addon that owns Sidorovich is the first consumer, and the corpse
+-- Cortex will bring is the next.
+-- ------------------------------------------------------------------
+
+-- The trader's stock. It IS the container's item list (CRG-21), returned by
+-- reference so a caller can mutate it exactly as it always did.
+function CARGO.Trade.StockOf(trader)
+    local cont = ContOf(trader)
+    return cont and cont.items or nil
+end
+
+-- Is this player's trade screen open? The demo trader asks it to decide
+-- whether to nag someone who is standing around: a player mid-deal must not be
+-- nagged.
+function CARGO.Trade.HasViewer(trader, ply)
+    local live = Live(trader)
+    return live ~= nil and live.viewers[ply] == true
+end
+
+-- Drops every open session. For an entity that dies with screens open: the
+-- clients keep a stale panel and degrade honestly on the next action (the
+-- server re-validates every intent against the live state — CRG-6).
+function CARGO.Trade.ClearViewers(trader)
+    local live = Live(trader)
+    if live then live.viewers = {} end
+end
 
 -- ------------------------------------------------------------------
 -- Attach: turns any entity into a trader. Public contract.
@@ -41,7 +93,16 @@ function CARGO.Trade.AttachTrader(ent, opts)
     if not IsValid(ent) then
         error("Cargo.Trade.AttachTrader: invalid entity", 2)
     end
-    if ent.CargoTrader ~= nil then return ent.CargoTrader end
+    -- Same stale-marker guard the container runs, and for the same reason:
+    -- `ent.CargoTrader` is flat data and a savegame brings it back naming a
+    -- session that no longer exists. See Containers.Attach.
+    local prior = ent.CargoTrader
+    if prior ~= nil then
+        local live = CARGO.Trade._live[prior.contId]
+        if live ~= nil and live.ent == ent then return prior end
+        ent.CargoTrader = nil
+    end
+
     opts = opts or {}
 
     -- storage, persistence and the spill-on-remove rule come from the
@@ -53,14 +114,12 @@ function CARGO.Trade.AttachTrader(ent, opts)
     })
 
     local trader = {
-        cont = cont,
-        ent = ent,
+        contId = cont.id,
         name = opts.name or "Trader",
         buyMult = isnumber(opts.buy_mult) and opts.buy_mult or CARGO.Trade.DEFAULT_BUY_MULT,
         sellMult = isnumber(opts.sell_mult) and opts.sell_mult or CARGO.Trade.DEFAULT_SELL_MULT,
         money = opts.money, -- nil = bottomless (an NPC that always can pay)
         persistKey = opts.persistKey,
-        viewers = {},
     }
 
     -- the wallet persists next to the stock when the trader is persistent
@@ -90,17 +149,26 @@ function CARGO.Trade.AttachTrader(ent, opts)
 
     ent.CargoTrader = trader
     CARGO.Trade._traders[cont.id] = trader
+    CARGO.Trade._live[cont.id] = { ent = ent, viewers = {} }
 
     ent:CallOnRemove("corpus_cargo_trader", function()
         CARGO.Trade._traders[cont.id] = nil
+        CARGO.Trade._live[cont.id] = nil
     end)
 
     return trader
 end
 
+-- TWO FILES, ONE WRITER EACH (author's call, this pass). The stock is the
+-- CONTAINER's and goes out through the container's own writer — the trader no
+-- longer writes `cont_<key>` behind its back, which is what used to decide the
+-- fate of the blobs by who saved last. The wallet is the TRADER's and stays in
+-- its own file: CRG-21 says a trader is the container plus a price layer, so
+-- folding money into the storage primitive would put economy inside the thing
+-- the corpse and the stash will reuse.
 local function SaveTrader(trader)
+    CARGO.Containers.Save(ContOf(trader))
     if not isstring(trader.persistKey) then return end
-    Corpus.Data.Save("cargo", "cont_" .. trader.persistKey, { items = trader.cont.items })
     Corpus.Data.Save("cargo", "trader_" .. trader.persistKey, { money = trader.money })
 end
 
@@ -119,8 +187,9 @@ local function StockEntrySnapshot(entry)
 end
 
 local function Snapshot(trader)
+    local cont = ContOf(trader)
     local snap = {
-        traderId = trader.cont.id,
+        traderId = trader.contId,
         name = trader.name,
         buyMult = trader.buyMult,
         sellMult = trader.sellMult,
@@ -128,11 +197,15 @@ local function Snapshot(trader)
         moneyText = trader.money and CARGO.Money.Format(trader.money) or nil,
         items = {},
     }
-    for _, entry in ipairs(trader.cont.items) do
+    for _, entry in ipairs(cont and cont.items or {}) do
         local e = StockEntrySnapshot(entry)
         e.price = CARGO.Trade.PriceOfEntry(e, trader.sellMult)
         snap.items[#snap.items + 1] = e
     end
+
+    -- same reason as the container's (this IS its stock): a captured weapon on
+    -- the shelf has a server-side-only def, and the buyer may never have held one
+    CARGO.Items.PackDefs(snap, snap.items)
     return snap
 end
 
@@ -140,15 +213,18 @@ end
 -- basket; a failed confirm re-syncs with dealt = false and the basket survives
 -- intact, which is what §3 means by "rollback limpio".
 local function SyncViewers(trader, dealtFor)
+    local live = Live(trader)
+    if live == nil then return end
+
     local snap = Snapshot(trader)
-    for ply in pairs(trader.viewers) do
+    for ply in pairs(live.viewers) do
         if IsValid(ply) then
             net.Start(NET_TRADE_SYNC)
             net.WriteBool(ply == dealtFor)
             CARGO.Util.WriteBlob(snap)
             net.Send(ply)
         else
-            trader.viewers[ply] = nil
+            live.viewers[ply] = nil
         end
     end
 end
@@ -156,9 +232,11 @@ end
 function CARGO.Trade.OpenFor(ply, ent)
     if not IsValid(ply) or not IsValid(ent) or ent.CargoTrader == nil then return end
     local trader = ent.CargoTrader
+    local live = Live(trader)
+    if live == nil then return end
     if ply:GetPos():DistToSqr(ent:GetPos()) > USE_RANGE * USE_RANGE then return end
 
-    trader.viewers[ply] = true
+    live.viewers[ply] = true
     net.Start(NET_TRADE_OPEN)
     CARGO.Util.WriteBlob(Snapshot(trader))
     net.Send(ply)
@@ -172,9 +250,10 @@ end
 
 local function ViewedTrader(ply, traderId)
     local trader = CARGO.Trade._traders[traderId]
-    if trader == nil or not trader.viewers[ply] then return nil end
-    if not IsValid(trader.ent)
-        or ply:GetPos():DistToSqr(trader.ent:GetPos()) > USE_RANGE * USE_RANGE then
+    local live = Live(trader)
+    if trader == nil or live == nil or not live.viewers[ply] then return nil end
+    if not IsValid(live.ent)
+        or ply:GetPos():DistToSqr(live.ent:GetPos()) > USE_RANGE * USE_RANGE then
         return nil
     end
     return trader
@@ -297,10 +376,12 @@ end
 
 function CARGO.Trade.Confirm(ply, trader, basket)
     local rec = CARGO.Inventory.GetRecord(ply)
+    local cont = ContOf(trader)
+    if cont == nil then return false, "The trader is out of reach." end
 
     -- BUY: what the player takes from the stock, priced with the trader's sell_mult
     local buys, cost = ResolveSide(basket.buy,
-        function(t) return t.cont.items end, trader, trader.sellMult)
+        function(c) return c.items end, cont, trader.sellMult)
     if buys == nil then return false, cost end
 
     -- SELL: what the player hands over, priced with the trader's buy_mult
@@ -346,7 +427,7 @@ function CARGO.Trade.Confirm(ply, trader, basket)
     -- the stock line the buy resolved against).
     for _, line in ipairs(buys) do
         if line.uid then
-            RemoveEntry(trader.cont.items, line.parts[1].entry)
+            RemoveEntry(cont.items, line.parts[1].entry)
             CARGO.Inventory.GiveEntry(ply, { id = line.id, uid = line.uid }, true)
         else
             -- the line may be backed by SEVERAL stock stacks (max_stack splits
@@ -361,14 +442,14 @@ function CARGO.Trade.Confirm(ply, trader, basket)
                 { id = line.id, count = line.count, condition = line.condition }, true)
         end
     end
-    DropEmptyStacks(trader.cont.items)
+    DropEmptyStacks(cont.items)
 
     -- sold items leave the player and land in the stock (a trader RESELLS what
     -- he buys — that is what makes the spread readable in play)
     for _, line in ipairs(sells) do
         if line.uid then
             RemoveEntry(rec.items, line.parts[1].entry)
-            trader.cont.items[#trader.cont.items + 1] = { id = line.id, uid = line.uid }
+            cont.items[#cont.items + 1] = { id = line.id, uid = line.uid }
         else
             for _, part in ipairs(line.parts) do
                 part.entry.count = (part.entry.count or 1) - part.take
@@ -377,7 +458,7 @@ function CARGO.Trade.Confirm(ply, trader, basket)
             local maxStack = (CARGO.Items.Get(line.id) or {}).max_stack or math.huge
             -- top up the stock's own stacks first, then spill into new ones:
             -- the trader's list obeys the same max_stack the inventory does
-            for _, stock in ipairs(trader.cont.items) do
+            for _, stock in ipairs(cont.items) do
                 if left <= 0 then break end
                 if stock.uid == nil and stock.id == line.id
                     and stock.condition == line.condition
@@ -390,7 +471,7 @@ function CARGO.Trade.Confirm(ply, trader, basket)
             end
             while left > 0 do
                 local put = math.min(left, maxStack)
-                trader.cont.items[#trader.cont.items + 1] = {
+                cont.items[#cont.items + 1] = {
                     id = line.id, count = put, condition = line.condition,
                 }
                 left = left - put
@@ -444,25 +525,26 @@ net.Receive(NET_TRADE_CONFIRM, function(_, ply)
     CARGO.Inventory.Notice(ply, msg)
 
     -- trade-event callback: the deal went through (see OnTradeOpened note)
-    if IsValid(trader.ent) and isfunction(trader.ent.OnTradeDealt) then
-        trader.ent:OnTradeDealt(ply, net_)
+    local live = CARGO.Trade._live[trader.contId]
+    if live and IsValid(live.ent) and isfunction(live.ent.OnTradeDealt) then
+        live.ent:OnTradeDealt(ply, net_)
     end
 end)
 
 net.Receive(NET_TRADE_CLOSE, function(_, ply)
     local traderId = net.ReadUInt(16)
-    local trader = CARGO.Trade._traders[traderId]
-    if trader then
-        trader.viewers[ply] = nil
+    local live = CARGO.Trade._live[traderId]
+    if live then
+        live.viewers[ply] = nil
         -- trade-event callback: the player closed the screen (bought or not)
-        if IsValid(trader.ent) and isfunction(trader.ent.OnTradeClosed) then
-            trader.ent:OnTradeClosed(ply)
+        if IsValid(live.ent) and isfunction(live.ent.OnTradeClosed) then
+            live.ent:OnTradeClosed(ply)
         end
     end
 end)
 
 hook.Add("PlayerDisconnected", "corpus_cargo_trade_viewers", function(ply)
-    for _, trader in pairs(CARGO.Trade._traders) do
-        trader.viewers[ply] = nil
+    for _, live in pairs(CARGO.Trade._live) do
+        live.viewers[ply] = nil
     end
 end)

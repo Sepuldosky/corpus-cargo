@@ -73,6 +73,48 @@ if SERVER then
         return nil
     end
 
+    -- Voice bookkeeping is keyed by SteamID64, never by the Player. This table
+    -- lives ON the entity, and duplicator.CopyEntTable merges ent:GetTable()
+    -- wholesale (minus functions), so a set keyed by Player would ride into
+    -- every duplication and every gm_save — the same reason the trader stopped
+    -- carrying its own viewers (server/corpus_cargo_trade.lua). A string key is
+    -- plain data, and CargoGreeted already used exactly this one.
+    local function VoiceKey(ply)
+        return IsValid(ply) and (ply:SteamID64() or tostring(ply)) or nil
+    end
+
+    -- Session stamp: a NEW table per map load, since this file re-runs on every
+    -- boot. Everything below that is only valid within one session gets marked
+    -- with it, and anything arriving with a different stamp came from a
+    -- savegame — see SessionOk. Resetting in Initialize is NOT enough: the
+    -- duplicator writes the entity's flat fields on its own schedule, and in
+    -- the in-game report of 2026-07-26 it clearly landed AFTER (the sibling
+    -- NextBot of corpus-stalker stayed broken until the check moved to read
+    -- time). Same shape as the container's stale-marker guard: do not trust the
+    -- field, validate it.
+    local SESSION = {}
+
+    local function SessionOk(ent)
+        if ent.CargoSession == SESSION then return end
+        ent.CargoSession = SESSION
+        ent.CargoVoice = {}
+        ent.CargoGreeted = {}
+        ent.CargoTradeGreeted = {}
+        ent.CargoNextSpeak = 0
+        ent.CargoNextIdle = CurTime() + math.Rand(12, 30)
+    end
+
+    -- Is this player's trade screen open? He must not be nagged mid-deal. The
+    -- viewers set is no longer readable off the entity, so it is asked through
+    -- the module — same lazy resolution as the persona.
+    local function IsTrading(ent, ply)
+        local cargo = Corpus and Corpus.GetModule and Corpus.GetModule("cargo")
+        if cargo == nil or cargo.Trade == nil or not isfunction(cargo.Trade.HasViewer) then
+            return false
+        end
+        return cargo.Trade.HasViewer(ent.CargoTrader, ply)
+    end
+
     function ENT:Initialize()
         local persona = ActivePersona() or {}
 
@@ -107,17 +149,18 @@ if SERVER then
         self.CargoNextIdle = CurTime() + math.Rand(12, 30)
 
         -- voice bookkeeping, all per map session: who is in range, who already
-        -- got the first-meeting line, who already opened the trade once
-        self.CargoVoice = {}
-        self.CargoGreeted = {}
-        self.CargoTradeGreeted = {}
-        self.CargoNextSpeak = 0
+        -- got the first-meeting line, who already opened the trade once.
+        -- Stamped, and re-checked on every read (SessionOk): a savegame brings
+        -- these back naming a session that died with the map.
+        self.CargoSession = nil
+        SessionOk(self)
     end
 
     -- One mouth: every line goes out on CHAN_VOICE (a new line replaces the
     -- current one on that channel) and ambient lines respect a small gap so
     -- he does not chatter over himself. Trade events pass force = true.
     function ENT:CargoSpeak(key, force)
+        SessionOk(self)
         local persona = ActivePersona()
         local set = persona and istable(persona.sounds) and persona.sounds[key] or nil
         if not istable(set) or #set == 0 then return false end
@@ -133,6 +176,7 @@ if SERVER then
     -- Leaving needs ~15% more distance than entering (hysteresis): a player
     -- hovering right on the edge must not farm greet/bye pairs.
     function ENT:CargoVoiceThink()
+        SessionOk(self)
         local persona = ActivePersona()
         if persona == nil or not istable(persona.sounds) then return end
 
@@ -140,41 +184,45 @@ if SERVER then
         local waitEvery = isnumber(persona.wait_interval) and persona.wait_interval
             or DEFAULT_WAIT_S
         local r2in, r2out = radius * radius, (radius * 1.15) ^ 2
-        local trader = self.CargoTrader
         local myPos = self:GetPos()
 
         self.CargoVoice = self.CargoVoice or {}
+        local connected = {}
         for _, ply in ipairs(player.GetAll()) do
-            if IsValid(ply) and ply:Alive() then
-                local st = self.CargoVoice[ply]
-                local d2 = ply:GetPos():DistToSqr(myPos)
-                if st == nil then
-                    if d2 <= r2in then
-                        local sid = ply:SteamID64() or tostring(ply)
-                        if not self.CargoGreeted[sid] and self:CargoSpeak("greet_first") then
-                            self.CargoGreeted[sid] = true
-                        else
-                            self:CargoSpeak("greet")
+            local sid = VoiceKey(ply)
+            if sid ~= nil then
+                connected[sid] = true
+                if ply:Alive() then
+                    local st = self.CargoVoice[sid]
+                    local d2 = ply:GetPos():DistToSqr(myPos)
+                    if st == nil then
+                        if d2 <= r2in then
+                            if not self.CargoGreeted[sid] and self:CargoSpeak("greet_first") then
+                                self.CargoGreeted[sid] = true
+                            else
+                                self:CargoSpeak("greet")
+                            end
+                            self.CargoVoice[sid] = { waitNext = CurTime() + waitEvery }
                         end
-                        self.CargoVoice[ply] = { waitNext = CurTime() + waitEvery }
+                    elseif d2 > r2out then
+                        self.CargoVoice[sid] = nil
+                        self:CargoSpeak("bye")
+                    elseif CurTime() >= st.waitNext then
+                        if not IsTrading(self, ply) then self:CargoSpeak("wait") end
+                        st.waitNext = CurTime() + waitEvery
                     end
-                elseif d2 > r2out then
-                    self.CargoVoice[ply] = nil
-                    self:CargoSpeak("bye")
-                elseif CurTime() >= st.waitNext then
-                    if not (trader and trader.viewers and trader.viewers[ply]) then
-                        self:CargoSpeak("wait")
-                    end
-                    st.waitNext = CurTime() + waitEvery
                 end
             end
         end
-        for ply in pairs(self.CargoVoice) do
-            if not IsValid(ply) then self.CargoVoice[ply] = nil end
+        -- a player who LEFT takes his state with him; a dead one keeps it, so
+        -- respawning in front of the trader does not re-trigger the greeting
+        for sid in pairs(self.CargoVoice) do
+            if not connected[sid] then self.CargoVoice[sid] = nil end
         end
     end
 
     function ENT:Think()
+        SessionOk(self)
         -- keeps the idle looping (ResetSequence alone plays it once); when a
         -- loop ends and the rotation timer is due, swap to another plaza idle
         -- so the trader reads alive instead of frozen on one pose
@@ -198,7 +246,7 @@ if SERVER then
     -- ------------------------------------------------------------------
 
     function ENT:OnTradeOpened(ply)
-        local sid = IsValid(ply) and (ply:SteamID64() or tostring(ply)) or "?"
+        local sid = VoiceKey(ply) or "?"
         self.CargoTradeGreeted = self.CargoTradeGreeted or {}
         if not self.CargoTradeGreeted[sid] and self:CargoSpeak("trade_open_first", true) then
             self.CargoTradeGreeted[sid] = true
@@ -206,7 +254,7 @@ if SERVER then
             self:CargoSpeak("trade_open", true)
         end
         -- no nagging while his screen is open; the clock restarts on close
-        local st = self.CargoVoice and self.CargoVoice[ply]
+        local st = self.CargoVoice and self.CargoVoice[sid]
         if st then st.waitNext = math.huge end
     end
 
@@ -218,7 +266,7 @@ if SERVER then
         local persona = ActivePersona()
         local waitEvery = persona and isnumber(persona.wait_interval) and persona.wait_interval
             or DEFAULT_WAIT_S
-        local st = self.CargoVoice and self.CargoVoice[ply]
+        local st = self.CargoVoice and self.CargoVoice[VoiceKey(ply) or "?"]
         if st then st.waitNext = CurTime() + waitEvery end
     end
 
@@ -237,8 +285,13 @@ if SERVER then
             sell_mult = 1.0,  -- charges full value
             money = 50000,    -- a finite wallet: he CAN be drained (§3 check)
             stock = DEMO_STOCK,
-            -- session-only on purpose: a persistent demo trader would carry
-            -- the leftovers of every test session into the next map load
+            -- Session-only as shipped, on purpose: a persistent demo trader
+            -- would carry the leftovers of every test session into the next map
+            -- load, and D1 says a trader RE-SEEDS his stock. The dev convar is
+            -- the only way to make him persistent (his own suffix, so he never
+            -- shares a file with the demo crate) — it exists because otherwise
+            -- the wallet file has no route in game.
+            persistKey = CARGO.Containers.DevPersistKey("trader"),
         })
         CARGO.Trade.OpenFor(activator, self)
     end

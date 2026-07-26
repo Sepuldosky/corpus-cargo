@@ -33,7 +33,15 @@ if SERVER then
         local CARGO = Corpus and Corpus.GetModule and Corpus.GetModule("cargo")
         if CARGO == nil then return end
 
-        CARGO.Containers.Attach(self, { name = "Field Crate", capacity = 50 })
+        CARGO.Containers.Attach(self, {
+            name = "Field Crate",
+            capacity = 50,
+            -- Session-only as shipped (CRG-59: world state does not reach
+            -- disk). No entity of this module declares a persistKey, which
+            -- would leave the owner-file path unreachable in game — the dev
+            -- convar is that route, and it is empty by default.
+            persistKey = CARGO.Containers.DevPersistKey("crate"),
+        })
         CARGO.Containers.OpenFor(activator, self)
     end
 

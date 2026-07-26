@@ -7,7 +7,11 @@
 -- single runtime source of truth — the owner's `instances` field is a RENDER of
 -- it, by reference, never a parallel copy (CRG-57). An instance the world owns
 -- (trader stock, a session crate, a dropped item) never reaches disk at all: it
--- dies with the map, which restarts the Lua state wholesale.
+-- dies with the map, which restarts the Lua state wholesale (CRG-59).
+--
+-- There are TWO owners today and they share ONE routine (RenderOwner /
+-- HydrateOwner, below): the player record and the container that declared a
+-- persistKey. Everything else is world state and stays in _live.
 --
 -- Cargo initializes the generic minimum (condition, zones, sub-slots, ammo
 -- group) and TRANSPORTS everything else — the owner module defines what the
@@ -75,6 +79,64 @@ end
 -- from scratch, so an unreferenced uid leaves the file by itself.
 function CARGO.Instances.Delete(uid)
     CARGO.Instances._live[uid] = nil
+end
+
+-- ------------------------------------------------------------------
+-- OWNER SERIALIZATION — the single routine (CRG-56/57/58)
+--
+-- An owner is anything that holds entries and carries its blobs with it: the
+-- player record (`inv_<steamid64>`) and the persistent container
+-- (`cont_<key>`) serialize through THESE two functions, not through a copy
+-- each. An owner is just a table with the entry lists it happens to have plus
+-- an `instances` map — the reachability walk branches on istable() per list,
+-- so a container, which only has `items`, passes through untouched.
+--
+-- They live HERE and not in the inventory on purpose: they belong to the owner
+-- of the blobs, and the point of this pass is that the inventory stops being
+-- their seat.
+-- ------------------------------------------------------------------
+
+-- Rebuilds `owner.instances` FROM SCRATCH from _live, by reference. Rebuilding
+-- instead of patching is the point (CRG-56): a uid that stopped being
+-- referenced leaves the file on its own, with no explicit delete and no
+-- sweeper. That is why the orphan class cannot exist any more.
+--
+-- The reachability walk is resolved at CALL time: it lives in inventory.lua,
+-- which the manifest loads after this file. Reaching for it at file scope
+-- would read a nil.
+function CARGO.Instances.RenderOwner(owner)
+    if not istable(owner) then return {} end
+
+    local instances = {}
+    for uid in pairs(CARGO.Inventory.CollectInstances(owner)) do
+        local blob = CARGO.Instances._live[uid]
+        if istable(blob) then instances[uid] = blob end
+    end
+    owner.instances = instances
+    return instances
+end
+
+-- Pushes the blobs that came in the file into _live WITHOUT COPYING:
+-- `owner.instances[uid]` and `_live[uid]` stay THE SAME TABLE (CRG-57). That
+-- identity is what makes the divergence CRG-57 forbids impossible — a module
+-- mutating one mutates the other. Same spirit as the by-ref invariant COR-7: a
+-- "defensive" copy here breaks persistence in silence.
+--
+-- Returns the set of uids that ARRIVED, so the caller can drop the entries
+-- whose blob did not (honest degradation, cites COR-5). The drop stays in each
+-- caller because each owner has a different set of lists to sweep.
+function CARGO.Instances.HydrateOwner(owner)
+    local arrived = {}
+    if not istable(owner) then return arrived end
+
+    owner.instances = istable(owner.instances) and owner.instances or {}
+    for uid, blob in pairs(owner.instances) do
+        if isstring(uid) and istable(blob) then
+            CARGO.Instances._live[uid] = blob
+            arrived[uid] = true
+        end
+    end
+    return arrived
 end
 
 -- Weight of an instance = its def + everything mounted in its sub-slots
