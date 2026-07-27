@@ -5,8 +5,47 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-26 (**entries 48-49 `[APLICADO]`, confirmadas en juego con la planilla S en
-5/5** — B5, **export/import LAN**, y con eso el plan de persistencia queda ejecutado salvo B6, que está diferido
+**Última actualización:** 2026-07-27 (**entries 50-51 `[APLICADO]`, confirmadas en juego con la planilla U en 6/6**
+— roadmap **#47**,
+las **61 gafas de Neosun como ítems de primera clase**: se recogen del mundo, pesan, se guardan, se comercian,
+se dropean, sobreviven un relog, y al equiparlas se ven. Es la mitad **POSEER**; la mitad **ACCIONAR** (el
+toggle desde el wheel) es el #46 y va después. Dos archivos nuevos, `shared/` + `server/corpus_cargo_nvg.lua`.
+**El hueco central NO era del mod: era de Cargo** — no existía ninguna señal de "equipé algo", así que el
+primer parche es de `inventory`. **CRG-62 acuñada**: *Cargo difunde que un slot cambió; la semántica vive en
+el consumidor*. **Las puertas resultaron CINCO y no cuatro**: re-greppear mostró que `DropEquipped` no pasa
+por `Unequip` y que el reconciliador de `WeaponDrop` vacía el slot al soltar el arma en la mano; la de
+`DropEquipped` tiene consecuencia visible (dropear el casco con las gafas montadas dejaría al jugador viendo
+a través de gafas que ya no tiene). `RegiveEquipped` difunde con **slot nil** = "se re-aplicó todo", que es la
+puerta del respawn — **no se escribió un segundo re-give**. **CRG-63 acuñada**: *un ordinal de un tercero no
+se persiste jamás* — la NW del mod guarda el ÍNDICE de su tabla, así que un parche que inserte una variante
+haría que un ítem guardado amanezca **siendo otras gafas**; el def lleva el `ShortName` y el ordinal se
+resuelve al equipar. Los **61 defs se DERIVAN** (CRG-41/42): a mano va **una sola tabla, las seis familias**
+— y eso mata solo las dos trampas de nombre del mod (`shades_t` es la TÉRMICA y `shades_teal` la teal; `_hp`
+se muestra "Ruby"). Los **íconos ya estaban hechos**: un PNG por variante, referenciado **por ruta** en
+runtime — el mod es OFF-LIMITS y no se copió una línea ni un asset. El portero de mundo gana una cuarta forma
+**por registro** (`Capture.RegisterWorldPickup`, patrón de `StatusPanel.RegisterBar`), no inline. Ruta C del
+autor: **con casco al sub-slot óptica, sin casco a Head directo** — el filtro pasó a
+`"category:helmets,optics"` y **CRG-8 quedó intacto**. El commit **escribe la NW y jamás llama a
+`ArcticNVGs_SetPlayerGoggles`**, que dropea el par anterior y duplicaría. Harness **574** (eran 504), **70
+nuevos**, y las **14 reversiones verificadas en negativo**. **Un check nació sin distinguir y lo destapó la
+verificación en negativo, no la corrida verde**: probaba que el registro de recogidas existe, no que el
+portero lo consulte. **2.ª pasada, con el reporte del autor en la mano:** el inventario aprendió a **acoplar
+arrastrando** —ítem sobre ítem en el grid, e ítem sobre un slot equipado, donde la regla es *equipar (que
+intercambia) → acoplar al sub-slot del ocupante → dejar que el server redacte el rechazo*— y a **extraer un
+sub-slot con el host EN LA MOCHILA**, que era el hueco real: el server siempre lo permitió y la UI solo
+armaba la lista para el slot equipado, así que un casco guardado retenía su óptica como rehén. Las dos reglas
+son **funciones puras exportadas** (`ResolveSlotDrop`, `MountedEntries`) porque se rompen en silencio. Y el
+**ícono pasó a autogenerarse del world model** (decisión del autor: el arte de spawnmenu del mod se lee mal
+al lado de los renders del resto) — costo declarado: seis modelos para 61 variantes, así que **el color no se
+ve en la celda y el NOMBRE es lo que distingue**. Harness **588**, **21 reversiones en negativo**.
+**La 2.ª pasada no la disparó un check en rojo sino el USO** —la planilla midió lo que se propuso medir y lo
+que faltaba apareció al jugar con lo que ya había dado por bueno—, que es la contracara de la lección de
+B3/B4/B5. **Frontera declarada y medida por el propio U5** (§13): apagar `cargo_nvg_register` con gafas ya en
+el inventario las deja **huérfanas de def** y se destruyen al dropearlas — aceptado; el kill-switch es para un
+servidor que nunca montó el catálogo. Y la otra mitad de ese check vale más: con la convar en 0 el mod
+recupera su comportamiento **entero**, o sea **COR-5 medido**, no declarado.
+Antes, **entries 48-49 `[APLICADO]`, confirmadas en juego con
+la planilla S en 5/5** — B5, **export/import LAN**, y con eso el plan de persistencia queda ejecutado salvo B6, que está diferido
 a Cortex. Que un amigo traiga su personaje a la LAN, **con la puerta cerrada por default**. Archivo nuevo
 `shared/corpus_cargo_lan.lua`. **CRG-61 acuñada**: *el
 import está apagado por default y todo lo que llega del cliente se sanea server-side*. Es el **único** de los 23
@@ -178,7 +217,24 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   `cargo_import_cooldown` (30 s). En un **listen server** el archivo que escribe
   el server es el que lee el cliente, y por eso el ida y vuelta funciona sin
   mover nada a mano; en un dedicated hay que acercárselo al jugador.
-- **Harness offline: 504 checks verdes en ambos realms** (con gate final: un
+- **NVG de Neosun como ítems** (entries 50-51, roadmap #47, **sin confirmar en
+  juego**): las 61 variantes son ítems de Cargo **derivados** de la tabla del
+  mod, se recogen del mundo por WALK+USE y se equipan por **dos rutas** (el
+  sub-slot óptica del casco, o Head directo). El hueco que lo bloqueaba era de
+  Cargo: **CRG-62**, la señal genérica de equipamiento por sus **cinco**
+  puertas. **CRG-63**: el ordinal del tercero no se persiste — se persiste el
+  `ShortName`. Kill-switch `cargo_nvg_register`; inerte sin el mod montado.
+  Referencia: `dev/Cargo_NVG_Neosun_Referencia.md`. **Encenderlas es el #46.**
+- **El inventario acopla y desacopla arrastrando** (entry 50, 2.ª pasada): ítem
+  sobre ítem en el grid monta en el sub-slot; ítem sobre un slot equipado
+  **equipa (e intercambia) si puede, acopla al sub-slot del ocupante si no**, y
+  si ninguna, el rechazo lo redacta el server. **Extraer no depende de que el
+  host esté puesto**: la lista de lo montado es la misma para el menú del slot
+  y para el del ítem en la mochila — antes un casco guardado retenía su óptica.
+  Reglas puras y exportadas (`CARGO.UI.ResolveSlotDrop` / `FreeSubSlotFor` /
+  `MountedEntries`); el grid genérico gana `onCellDrop` **con fall-through** al
+  canvas, sin el cual el loot dejaría de transferir al soltar sobre una celda.
+- **Harness offline: 588 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 83 client / 76 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -186,7 +242,19 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **Nada.** Las entries 48-49 (B5) quedaron confirmadas el 2026-07-26 con la **planilla S en 5/5**, tras dos
+- **Nada.** Las entries 50-51 (roadmap #47) quedaron confirmadas el 2026-07-27 con la **planilla U en 6/6**,
+  en dos pasadas: U1 (las gafas del suelo entran al grid y el mod **no** se las equipa por su cuenta) · U2
+  (con casco, al sub-slot óptica; sacárselas **encendidas** apaga el efecto solo — es del propio mod y la
+  tanda se negó a darlo por hecho) · U3 (sin casco, Head directo; ídem aviators) · U4 (cambio de mapa: siguen
+  puestas y son **las mismas**) · U5 (**el kill-switch**, con su mitad de ausencia) · U6 (acoplar y extraer
+  **arrastrando**, con la negativa del loot: «pasando al cargo crate sin dramas»). Harness **588** (eran
+  504), **84 nuevos** y **21 reversiones verificadas en negativo**; checker limpio, espejo regenerado.
+  **Sin commitear** (GIT-7).
+  **La 2.ª pasada la disparó el USO, no un check en rojo** — la planilla midió lo que se propuso medir, y lo
+  que faltaba (extraer con el host en la mochila, acoplar arrastrando, el ícono) apareció al jugar con lo que
+  ya había dado por bueno.
+  Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+- Antes, las entries 48-49 (B5) quedaron confirmadas el 2026-07-26 con la **planilla S en 5/5**, tras dos
   rondas: S1 (ida y vuelta sin pérdida — condiciones, el NVG en el sub-slot, el cargador, el cinturón, y lo
   agregado en el medio desaparece: REEMPLAZA) · S2 (una def desconocida se descarta con motivo y el resto entra) ·
   S3 y S4 (**los dos de RECHAZO**, cada uno con su línea de motivo en consola) · S5 (negativa: «B5 no ha roto
@@ -266,11 +334,21 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   + convar `cargo_import_admin`, esperando la primitiva de permisos de
   **CRG-45**. Lo provisional es *cómo se pregunta quién es admin* — la convar
   en 0 por default y la whitelist son diseño y se quedan.
+- **Apagar `cargo_nvg_register` con gafas ya en el inventario las deja
+  huérfanas de def** y se destruyen al dropearlas (§13, medido en U5 y
+  **aceptado**): el kill-switch es para un servidor que **nunca** montó el
+  catálogo, no para apagarlo a mitad de partida.
 - Peso nominal de attachments; comandos dev sin gate admin; sin `addon.json`.
 
 ## Próximo paso
 
-1. **Slice 2 del comercio** — el **plan de persistencia quedó cerrado** con B5: B6 (perfiles reales y GC
+1. **Roadmap #46 — TLS: accionar la visión nocturna y las luces desde el wheel.** La otra mitad del frente:
+   #47 POSEE, **#46 ACCIONA** — la linterna del jugador y los dispositivos toggleables de ARC9 junto con las
+   NVG, desde un **tercer grupo de chips** del wheel. Diseñado, con la API verificada contra el código vivo y
+   los defectos del mod inventariados: [`../../dev/Cargo_TLS_Referencia.md`](../../dev/Cargo_TLS_Referencia.md).
+   Decisión del autor ya tomada: la linterna va por **net propio**, con su enmienda explícita a CRG-30 en
+   §17.1. El punto de contacto con #47 es uno solo (§7.4 de su doc hermano) y no se pisan.
+3. **Slice 2 del comercio** — el **plan de persistencia quedó cerrado** con B5: B6 (perfiles reales y GC
    jerárquico) está **diferido a Cortex**, con el diseño congelado en §6 del
    [`plan madre`](../../dev/PLAN_cargo_persistencia_gc.md), y no se ejecuta hasta que Cortex tenga código y
    `CLAUDE.md` — B1-B5 no le cerraron la puerta. Una decisión que B5 dejó ABIERTA para B6 a propósito: qué
@@ -281,12 +359,12 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
    confirm). Semilla del chat nuevo:
    [`../../dev/HANDOFF_cargo_trade_slice2.md`](../../dev/HANDOFF_cargo_trade_slice2.md).
    La entry 27 se confirma de paso en esa pasada (checklist en el artifact).
-3. Remitir el fix de brazos oscuros a Twilight (acción del autor).
-4. **#41 — explosivos ARC9 como stack throwable** (bloque propio, pedido del
+4. Remitir el fix de brazos oscuros a Twilight (acción del autor).
+5. **#41 — explosivos ARC9 como stack throwable** (bloque propio, pedido del
    autor): hoy las granadas de EFT/CS:GO/MW2019 se equipan en Primary. El
    clasificador ya las etiqueta `thrown`; falta el destino (son `unique` y el
    slot Throwable pide un **stack**). Enlaza con el #32.
-5. Cuando se prioricen: **#42** (el lanzagranadas capturado no dispara — perdió
+6. Cuando se prioricen: **#42** (el lanzagranadas capturado no dispara — perdió
    su attachment de munición; sospecha: el puente ARC9 §10), **#36** (slot HL2
    alineado), **#35** (footsteps), **#44** (overlay de máscara
    de gas para cascos cerrados — los sonidos ya están en el banco, SIN DISEÑAR).

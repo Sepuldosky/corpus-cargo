@@ -92,6 +92,16 @@ Cargo.Items.Register({
 
 > **Sustitución de modelos (entry 34, decisión del autor 2026-07-23).** Un def **sin `model`** es el default honesto de un ítem setting-agnostic: dropea como la cajita de cartón (`models/props_junk/cardboard_box004a.mdl`, último eslabón de la cadena de resolución) y su ícono cae a la letra. `Cargo.Items.SetModel(id, model)` es el punto de extensión con el que un addon de **contenido** re-viste cualquier def sin poseerlo: el override se guarda y se aplica en el acto o cuando el def (re-)registre — orden-independiente entre addons (COR-5) y a prueba de re-registro (autogen/lua refresh) —, y gana sobre el `model` declarado. Un path no montado es inofensivo (`ModelUsable` gatea drop e íconos). Los defs siguen siendo del módulo dueño: solo cambia la piel.
 
+### Lo que un def guarda de un tercero
+
+**CRG-63 — Un identificador POSICIONAL de un tercero (un ordinal de su tabla) no se persiste jamás: se persiste su clave estable y el ordinal se resuelve en el momento de usarlo.** Es CRG-42 en otra superficie —"`SWEP.Slot` no es la señal"— y la regla general es la misma: no guardar un dato que el tercero puede reordenar sin avisar.
+
+Sede acá y no en §13 a propósito: §13 es la tabla de **fronteras y deuda declarada**, y una norma vigente no vive en una lista de pendientes (el mismo argumento que sacó a CRG-45 de un roadmap). Esto es una regla sobre **qué campo lleva un def**, así que su lugar es el contrato de ítems.
+
+El caso que la acuñó (roadmap #47, verificado contra el código vivo del mod — cita CRG-24): las 61 gafas de *[VManip] Neosun's Cooler Nightvision* se identifican en runtime por `ply:GetNWInt("nvg")`, que guarda el **índice** de la tabla global `ArcticNVGs`, no un nombre — y el propio mod construye su índice inverso con `pairs` sobre un array. Un parche que inserte una variante en el medio corre todos los índices posteriores, así que un ordinal persistido es un ítem que un día amanece **siendo otras gafas**. El def lleva el `ShortName` (`def.nvg_shortname`, campo que Cargo **transporta y no interpreta** — CRG-1) y el ordinal se resuelve contra la tabla viva en el instante de escribirlo.
+
+Corolario que el mismo call site paga: **el nombre se valida ANTES**. El mod no valida, y un nombre inexistente baja a `SetNWInt("nvg", nil)`, que es un error de argumento.
+
 ### Blob de instancia (ítems únicos)
 
 Cada ítem único persiste un blob propio vía `Corpus.Data`, namespaced por instancia (no por definición — dos TOZ-34 en el mismo inventario tienen historiales independientes). Contenido mínimo genérico: condición (global o por zona, según declare el módulo dueño), sub-slots ocupados (§4), munición bindeada (grupo A/B). Todo lo demás es específico del módulo — Caliber define qué campos lleva la condición por zona de una armadura; Cargo no interpreta ese contenido, solo lo transporta.
@@ -104,7 +114,7 @@ Cada ítem único persiste un blob propio vía `Corpus.Data`, namespaced por ins
 
 | Slot | Contenido | Notas |
 |---|---|---|
-| Head | Casco | sub-slot de accesorio (óptica: NVG, gafas) |
+| Head | Casco **o** una óptica suelta | sub-slot de accesorio (óptica: NVG, gafas) · filtro `"category:helmets,optics"` — *ver "Las dos rutas de una óptica", abajo* |
 | Body | Chaleco/armadura | condición por zona (torso, estómago, brazos, piernas) · sub-slot de accesorio (exo/escudo) · slots de placa |
 | Back | Mochila | modificador de capacidad de peso |
 | Primary / Secondary / Sidearm | Armas | grupo de munición bindeado (A/B) |
@@ -163,6 +173,38 @@ Cargo.Items.DeclareSubSlot(itemDef, {
     maxItems = 1,
 })
 ```
+
+### Las dos rutas de una óptica (decisión del autor 2026-07-26, roadmap #47)
+
+Unas gafas de visión nocturna entran por **dos** caminos, y los dos usan primitivos que ya existían — **CRG-8 intacto, ni una variante ad-hoc**:
+
+- **Con casco:** montan en el **sub-slot óptica** del casco. Cero código nuevo: es exactamente lo que declara el bloque de arriba.
+- **Sin casco:** ocupan **Head directamente**. Cuesta una sola cadena — el filtro del slot pasó de `"category:helmets"` a `"category:helmets,optics"`, y el grammar de `MatchesFilter` ya parseaba listas separadas por coma.
+
+La regla que el jugador percibe es la correcta: *"o el casco con las gafas montadas, o las gafas solas"*. La ruta (A) sola rompía el PVS-14 con montura de cráneo —que el mod modela— y es absurda para unas gafas de sol; la (B) sola obligaba a elegir entre casco y visión nocturna.
+
+**El costo real, y se asume:** un consumidor de esta superficie tiene que escuchar **las dos** señales de abajo, porque las gafas pueden entrar por cualquiera de los dos caminos. Cada ruta se verifica con la otra fuera de juego, o un camino roto pasa desapercibido.
+
+> **Nota:** el campo `equip_slots` sigue disponible para **estrechar** qué slots acepta un def concreto. Si algún día se quisiera que solo ciertas ópticas puedan ir a `accessory1/2`, se resuelve con ese campo y sin tocar nada más.
+
+### Señales de equipamiento
+
+**CRG-62 — Cargo difunde que un slot de equipamiento cambió; la semántica de ese cambio vive en el consumidor, nunca en el inventario.** Es **CRG-1** aplicado al equipamiento: el inventario no sabe qué *significa* que alguien se ponga unas gafas, igual que no sabe qué significa `onUse`.
+
+```lua
+hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, defId_or_nil, blob_or_nil)
+hook.Run("Corpus_Cargo_SubSlotChanged", ply, hostUid, subId)
+```
+
+- `defId` nil = **el slot se vació**. `blob` nil = el valor es una entry de stack (throwable, que no tiene instancia) o el slot se vació.
+- `slotId` **nil** = *se re-aplicó el set entero* (`Inventory.RegiveEquipped`): el oyente re-lee todo en vez de diferenciar un slot. **Es la puerta del respawn**, y existe para que un oyente con estado de jugador no tenga que enganchar `PlayerLoadout` y apostar al orden de hooks — el bug que Quick Loadouts ya le costó a este repo.
+- La señal se dispara **DESPUÉS** de que el record quedó consistente, nunca en el medio: un oyente que leyera `rec.equip` a mitad de camino vería un estado que no existió.
+
+**Las puertas son CINCO, no cuatro.** El diseño contaba `Equip`, `Unequip`, `SubSlotAttach` y `SubSlotDetach`; el árbol mostró que **`DropEquipped` no pasa por `Unequip`** —manipula `rec.equip` y difunde por su cuenta, que es lo que el `Corpus_Cargo_BodyChanged` existente ya hacía en sus dos salidas— y que el reconciliador de `WeaponDrop` de `corpus_cargo_capture.lua` es donde se vacía el slot al soltar el arma **en la mano**. Una puerta que no difunde es un agujero que se descubre en juego seis meses después.
+
+**`Corpus_Cargo_BodyChanged` no se toca y se sigue disparando.** Su firma es contrato vivo (el lector de disfraz del roadmap #10 cuelga de ella); la señal genérica se dispara **ADEMÁS**, jamás en su lugar.
+
+> **Alternativa descartada, con su razón escrita:** `def.onEquip` / `def.onUnequip` en el contrato de ítem. Es más potente, pero mete una closure por def en un contrato que hoy tiene exactamente una (`onUse`) y obliga a que 61 defs derivados carguen la misma función. Una señal única con un solo oyente es menos superficie por el mismo resultado.
 
 ### Eyección obligatoria
 
@@ -435,6 +477,8 @@ Una entrada con `uid` cuyo blob no viene en el archivo se **descarta con log** a
 
 Lo que protege de verdad al destino es el **saneo entrada por entrada**, no la firma. La mitad que sí rechaza es el número de formato.
 
+> **Efecto de borde de la tanda #47, y es la firma funcionando, no un defecto.** Las 61 defs derivadas de las NVG de Neosun son **no autogen** y se registran al boot desde un archivo shared, así que entran de lleno en la mitad `defs` + `defs_hash`: **un servidor con ese mod montado y otro sin él ahora se DETECTAN**. Es exactamente lo que esa mitad promete —ve a los addons de contenido— y por eso avisa en vez de gatear: el saneo sigue descartando entrada por entrada lo que el destino no conoce, y el personaje entra igual sin sus gafas. Lo mismo valdrá para cualquier catálogo derivado que se sume después.
+
 **Tope en vez de chunking, y es una medición, no una estimación.** El plan madre daba por hecho que haría falta trocear el payload. Medido offline: un record pesado pero realista —60 uniques cada uno con un anidado en su sub-slot, más 40 stacks— renderiza a **15.770 bytes** de JSON, y 200 uniques + 100 stacks a **51.310**; comprimido por `Util.WriteBlob` es una fracción de eso, holgado dentro de un mensaje. Así que el chunking sería adorno y lo que hace falta es un **techo que rechace con motivo**: el cable se corta en 64 KiB **antes** de descomprimir un solo byte, y el JSON resultante en 128 KiB, que es lo que ataja una bomba de descompresión. El harness afirma la medición: el día que un blob engorde, el rojo sale offline.
 
 **Fronteras declaradas del bloque, no descuidos:**
@@ -451,16 +495,18 @@ Lo que protege de verdad al destino es el **saneo entrada por entrada**, no la f
 
 **CRG-47 —** Boundary-debt explícito, mismo espíritu que el flag de Scavenger en Caliber — se declara ahora para no perderlo, se resuelve cuando el bloque dueño cierre:
 
+> La fila *"Compatibilidad con mods externos de NVG/ópticas — sub-slot Head ya generalizado; **falta mapear mods concretos**"* estuvo abierta desde el Block 1 y **se cierra el 2026-07-26** (roadmap #47): el mod concreto quedó mapeado (`../../dev/Cargo_NVG_Neosun_Referencia.md`), el hueco que faltaba resultó ser de Cargo y no del mod —no existía señal de equipamiento— y se cerró con **CRG-62**. Las dos rutas de slot están arriba, en §4.
+
 | Pendiente | Dueño futuro | Nota |
 |---|---|---|
 | Efectos de armadura de jugador (mitigación real por Body) | Caliber Block 3 | El ítem existe, pesa y se equipa desde ya; el efecto llega cuando Block 3 cierre |
 | Escudos de energía de jugador vía sub-slot Body | Caliber Block 3 | Punto de acoplamiento (sub-slot) ya definido en este documento |
-| Compatibilidad con mods externos de NVG/ópticas | Cargo (integración) | Sub-slot Head ya generalizado; falta mapear mods concretos |
 | Categoría de materiales de crafteo | Cargo (contrato) + Caliber/Coagulant (contenido) | Reservada, sin schema de recetas — ver `Workbench_Arquitectura.md` |
 | Upgrades de armas ARC9/EFT | Workbench | Bandera parcialmente resuelta: la API de attach/detach de ARC9 es un canal de escritura legítimo (ver §10.3) — los upgrades de arma pueden modelarse como attachments nativos ARC9 en vez de escritura de stats. La API ya está verificada y el puente en producción (§10, §14); lo que sigue abierto es el **diseño del árbol** de upgrades |
 | Attachments no-ARC9 (TFA u otras bases) | Cargo (integración) | Solo con tabla de compatibilidad manual declarada por arma — sin alcance automático en v1 (§10.4) |
 | **Un arma soltada no conserva su instancia a través de un savegame** — **aceptado por el autor**, no pendiente | El engine; decisión cerrada el 2026-07-26 | **Medido, no supuesto** (planilla R, rondas 3-4, `cargo_dev_worldwep` sobre cuatro entidades del mismo save cargado): la tabla Lua vuelve **completa** en las entidades scripteadas de Cargo —la crate con `7 entrada(s), 5 blob(s)`, el drop `corpus_cargo_item` con su entrada y sus 2 blobs— y **no vuelve en absoluto** en el SWEP real que deja el drop de un arma. Lo único de Cargo que aparece encima del arma es `CargoWorldSpawned`, y **no está restaurado: lo re-pone el hook `PlayerSpawnedSWEP`** del world gate cuando el load crea la entidad (efecto colateral afortunado — el gate sigue vigente tras cargar). Consecuencia: al recoger un arma restaurada se acuña un ítem de fábrica, sin condición, sin attachments y sin cargador (degradación honesta, COR-5). **El autor lo acepta como está**: la ruta alternativa existe (`cargo_weapon_world_pickup 0` hace que el drop spawnee `corpus_cargo_item`, que sí conserva su blob) pero esa convar gobierna **también** el world gate de WALK+USE, y el gate más el arma dibujándose a sí misma (roadmap #16/#17) valen más que el cargador. Partir la convar en dos sería la forma de tener ambas cosas, y sería bloque propio; hoy **no se hace**. Instrumento para re-medirlo: `cargo_dev_worldwep` |
 | **El gate de admin del import es LOCAL y provisional** (`ply:IsAdmin()` + convar `cargo_import_admin`) | Corpus — la primitiva de permisos que **CRG-45** espera | Es el primer y único gate de permisos del módulo, y nació porque §12.1 invierte CRG-6 y no podía esperar (**CRG-61**). Se declara local a propósito: el día que Corpus exponga la primitiva, este gate se reemplaza por ella y la convar que lo apaga desaparece con él. **No** es deuda la convar en 0 por default ni la whitelist —ésas son diseño y se quedan—; lo único provisional es *cómo se pregunta quién es admin*. Mientras tanto la capa se puede apagar (`cargo_import_admin 0`), y apagarla deja a la whitelist como único gate: vacía sigue significando NADIE, así que ningún interruptor solo abre la puerta |
+| **Apagar `cargo_nvg_register` con gafas ya en el inventario las deja huérfanas** — **aceptado por el autor**, no pendiente | Cargo; decisión cerrada el 2026-07-27 | **Medido en juego, no supuesto** (planilla U5): con la convar en 0 y cambio de mapa, las entradas que el jugador ya tenía quedan **sin def** —celda sin nombre ni ícono— y **se destruyen al dropearlas**. Es coherente con el resto del módulo (una def que no existe no puede representarse en el mundo, y el saneo del import descarta igual lo que no conoce) y el kill-switch existe para un servidor que **nunca** montó el catálogo, no para apagarlo a mitad de partida. El mismo check dejó la otra mitad, que es la que importa: con la convar en 0 el mod recupera su comportamiento **entero** (E te equipa las gafas y la entidad desaparece) — **COR-5 medido**, no declarado |
 | **Un arma ARC9 en el suelo rompe el savegame del engine** | ARC9 / el engine — **no Cargo** | Medido en juego el 2026-07-26 (ronda 1 de la planilla R). El save del engine recorre la tabla Lua de cada entidad; las defs de attachment de ARC9 declaran `ATT.Icon = Material(...)` y el SWEP se cuelga esas tablas encima (verificado contra `dev/other/`, cita CRG-24). Resultado: `Can't write unknown type IMaterial`, `attempt to serialize structure with cyclic reference` y `CSave BLOCK SIZE OVERFLOW (>65k)` → *"This save will not load correctly"*, para **todo el mapa**. No se arregla desde acá: ARC9 es COMPAT-RUNTIME y no se forkea. Lo que sí es decisión de Cargo es el camino que lo hace alcanzable — el drop de un arma deja el **SWEP real** en el suelo (roadmap #16/#17) para que se dibuje con sus attachments; el precio, ahora medido, es éste. Lo que Cargo cuelga de una entidad son **184 bytes por unique** y **145 por drop**, con guard offline que exige dato plano y acíclico |
 
 ### 13.1 Comandos dev sin gate de admin
@@ -592,6 +638,21 @@ equipadas viven en el cinturón, no en el grid.
 > reordenar el cinturón (drag belt→belt, un slot ocupado a otro) la cerró el Bloque C →
 > **[§16.8](#168-ux-de-munición-bloque-c)**. Lo único que sigue abierto de #19 es el sistema
 > de cargadores rellenables con toggle (fuera del v1).
+
+#### Arrastrar sobre un ítem: qué significa el gesto (1.ª pasada en juego de #47)
+
+Soltar una celda **sobre otro ítem** (no sobre el fondo del grid) tiene significado propio. La regla es **pura y exportada** —`CARGO.UI.ResolveSlotDrop`, `CARGO.UI.FreeSubSlotFor`— porque es de las que se rompen en silencio: un `if` invertido y el gesto deja de significar lo que el jugador espera, sin un solo error en consola.
+
+| Dónde se suelta | Qué pasa |
+|---|---|
+| Ítem del grid **sobre otro ítem del grid** | Si el destino tiene un **sub-slot libre que acepta** la categoría del origen, lo **monta**. Es el mismo intent que el menú *"Insert into…"* — el arrastre es un atajo, no una segunda ruta |
+| Ítem del grid **sobre un slot de equipamiento ocupado** | **1)** Si el ítem puede ocupar el slot → **EQUIPA, e intercambia** (`Equip` devuelve al grid al ocupante anterior). **2)** Si no puede pero el **ocupante** tiene un sub-slot libre que lo acepta → **ACOPLA**. **3)** Si ninguna → se manda el equip igual y **el rechazo lo redacta el servidor** (CRG-6): tragárselo acá cambiaría una negativa legible por un gesto que no hizo nada |
+
+**Equipar se prueba PRIMERO a propósito** (decisión del autor). Cuando las dos lecturas son legales —unas gafas que entran en Head, soltadas sobre un casco que también las aceptaría en su óptica— gana el intercambio.
+
+**Extraer un sub-slot no depende de que el host esté puesto.** La lista de lo montado (`CARGO.UI.MountedEntries`) es la misma para el menú del slot equipado y para el del ítem en el grid: un casco es el mismo objeto en la cabeza que en la mochila, y tenerla solo en el menú del slot hacía que un casco guardado **retuviera su óptica como rehén**. El `index` que viaja al detach es **posicional dentro de su sub-slot**, así que aplanar la lista no lo puede renumerar.
+
+> **Nota de VGUI, y no es opcional:** una celda que además es `Receiver` **tapa** al receiver del canvas (`dragndrop` sube desde el panel bajo el cursor y para en el primero). Por eso `onCellDrop` devuelve un booleano y el grid **cae al `onReceiveDrop`** cuando la celda no es un destino válido — sin ese fall-through, soltar un ítem de un contenedor justo encima de otra celda dejaría de transferir. El comportamiento del canvas no puede depender de **dónde adentro** del canvas soltaste.
 
 ### 15.3 Botón de dinero en el header
 

@@ -680,21 +680,59 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     chemlight / los perfiles de linterna extendida (sus addons no están
     instalados). Para que eso no sea techo, la lista SE REGISTRA
     (RegisterLightSource, patrón de StatusPanel.RegisterBar §11).
-    LA DECISIÓN QUE FALTA (necesita al autor): ply:Flashlight es server-only.
-    Opción (a) RunConsoleCommand("impulse","100") no cuesta nada pero ARC9
-    SECUESTRA ese impulso cuando el arma en mano tiene un dispositivo
-    toggleable (sh_move.lua:360-369) — comportamiento distinto según lo que
-    lleves en la mano. Opción (b), la recomendada: UN net sin payload
-    (Corpus.Net.Register("cargo","torch")), seis líneas de server, sin
-    estado; cuesta una enmienda explícita a CRG-30 en §17.1.
+    DECISIÓN DEL AUTOR (2026-07-26): la opción (b), UN net sin payload
+    (Corpus.Net.Register("cargo","torch")), seis líneas de server y sin
+    estado. Se paga la enmienda explícita a CRG-30 en §17.1 — el commit del
+    wheel deja de ser sólo el intent `slotkey`: también puede ser un TOGGLE.
+    Se descarta la (a), RunConsoleCommand("impulse","100"): no cuesta norma
+    pero ARC9 SECUESTRA ese impulso cuando el arma en mano tiene un
+    dispositivo toggleable (sh_move.lua:360-369), o sea la misma tecla hace
+    cosas distintas según lo que lleves. Un comportamiento que depende de lo
+    que tengas en la mano es peor que una enmienda de norma escrita.
     NUNCA devolver true a "impulse 100" en PlayerBindPress: eso es
     justamente lo que TLS hace y lo que le rompe el toggle de atts a ARC9.
     Diseño completo, API verificada contra el código vivo y defectos del mod
     inventariados en dev/Cargo_TLS_Referencia.md §9. Assets: dos íconos
     propios (linterna, NVG); los de dispositivo los pone ARC9.
 
-47. NVG DE NEOSUN COMO ÍTEMS DEL INVENTARIO [Cargo items/capture] — ABIERTO
-    (pedido del autor 2026-07-26, tras mapear [VManip] Neosun's Cooler
+47. NVG DE NEOSUN COMO ÍTEMS DEL INVENTARIO [Cargo items/capture] — CERRADO
+    2026-07-27, entries 50-51 [APLICADO], planilla U en 6/6 (dos pasadas).
+    LA 2.ª PASADA LA DISPARÓ EL USO, NO UN CHECK EN ROJO: la planilla midió
+    lo que se propuso medir y lo que faltaba —extraer un sub-slot con el host
+    en la MOCHILA, acoplar arrastrando, y el ícono autogenerado en vez del
+    PNG del mod— apareció al jugar con lo que ya había dado por bueno. Es la
+    contracara de la lección de B3/B4/B5 (el hallazgo sale del campo de notas
+    de un check que PASÓ): una planilla mide lo que se propuso medir; el uso
+    mide lo que falta.
+    Frontera declarada y medida (§13): apagar cargo_nvg_register con gafas ya
+    en el inventario las deja huérfanas de def y se destruyen al dropearlas —
+    aceptado, el kill-switch es para un servidor que NUNCA montó el catálogo.
+    La otra mitad de ese mismo check vale más: con la convar en 0 el mod
+    recupera su comportamiento ENTERO, o sea COR-5 medido y no declarado.
+    Lo que la tanda cambió respecto de lo anotado acá abajo, y hay
+    que decirlo porque salió de re-greppear el árbol y no de leer el diseño:
+      · LAS PUERTAS DE LA SEÑAL SON CINCO, NO CUATRO. DropEquipped NO pasa
+        por Unequip (manipula rec.equip y difunde por su cuenta, como el
+        BodyChanged existente ya hacía en sus dos salidas), y el
+        reconciliador de WeaponDrop de capture.lua vacía el slot al soltar
+        el arma en la mano. La de DropEquipped tiene consecuencia visible:
+        dropear el casco con las gafas montadas dejaría al jugador viendo a
+        través de gafas que ya no tiene.
+      · RegiveEquipped difunde con slotId nil = "se re-aplicó todo": es la
+        puerta del respawn, y evita que el oyente enganche PlayerLoadout y
+        apueste al orden de hooks. No se escribió un segundo re-give.
+      · Corpus_Cargo_BodyChanged NO tiene consumidor hoy (grep en las siete
+        raíces): Cortex todavía no tiene código. Su firma se respeta igual —
+        es contrato declarado del roadmap #10 — pero la nota de acá abajo
+        ("Cortex cuelga de él") era una previsión, no un hecho.
+      · La degradación del ícono es a la LETRA, no al render de modelo:
+        ResolveIconSource devuelve "icon" apenas def.icon es un string no
+        vacío. Inalcanzable en la práctica (el mod que trae la tabla trae los
+        67 PNG, contados), pero la afirmación del doc de diseño está mal.
+    Normas acuñadas: CRG-62 (sede Cargo_Architecture.md §4) y CRG-63 (sede
+    §3 — se eligió §3 sobre §13 porque §13 es la tabla de deuda declarada y
+    una norma vigente no vive en una lista de pendientes).
+    (Pedido del autor 2026-07-26, tras mapear [VManip] Neosun's Cooler
     Nightvision). Es la OTRA MITAD de #46: aquel ACCIONA la visión nocturna
     desde el wheel, este la POSEE — recogerla del mundo, guardarla, equiparla.
     Cierra el hueco que Cargo_Architecture.md §13 tiene anotado como

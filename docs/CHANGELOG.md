@@ -4110,4 +4110,312 @@ y pegar varias sentencias separadas por saltos las concatena. Los comandos de me
 **cortos y de a uno**.
 
 Harness **504** verdes en ambos realms (eran 448), checker de IDs limpio, espejo regenerado.
+
+---
+
+## 50. Las NVG de Neosun como ítems de primera clase (y la señal de equipamiento que faltaba) `[APLICADO 2026-07-27]`
+
+Roadmap **#47**, pedido del autor. Que las 61 gafas de *[VManip] Neosun's Cooler Nightvision* se
+recojan del mundo, pesen, se guarden, se comercien, se dropeen, sobrevivan un relog — y al
+equiparlas, **se vean**. Es la mitad **POSEER** de un frente de dos: la mitad **ACCIONAR**
+—encenderlas desde el wheel— es el roadmap #46 y va después, con su propio PROMPT.
+
+Mapa del mod y acople: [`../../dev/Cargo_NVG_Neosun_Referencia.md`](../../dev/Cargo_NVG_Neosun_Referencia.md).
+El mod es **COMPAT-RUNTIME y OFF-LIMITS para modificar**: no se copia una línea de su código ni uno
+de sus assets, y la integración vive **entera** en Cargo, hablándole por su superficie pública.
+
+**EL HUECO CENTRAL NO ERA DEL MOD: ERA DE CARGO.** Hasta hoy no existía ninguna señal de "equipé
+algo". `Equip`/`Unequip` solo daban y quitaban `weapon_class`, la única difusión era
+`Corpus_Cargo_BodyChanged` —exclusiva del slot body— y los sub-slots **no difundían nada**. Sin esa
+señal no hay dónde colgar una integración de equipamiento, y por eso el primer parche es de
+`inventory` y no de compat.
+
+- PARCHE 1 — feat(inventory): **la señal genérica** (**CRG-62**).
+  `Corpus_Cargo_EquipChanged(ply, slotId, defId|nil, blob|nil)` y
+  `Corpus_Cargo_SubSlotChanged(ply, hostUid, subId)`, disparadas **después** de que el record quedó
+  consistente — un oyente que lea `rec.equip` a mitad de camino ve un estado que no existió.
+  `Corpus_Cargo_BodyChanged` **se queda exactamente como está** y se sigue disparando: su firma es
+  contrato vivo del lector de disfraz del roadmap #10, y la señal nueva se dispara **ADEMÁS**.
+  **LAS PUERTAS SON CINCO, NO CUATRO, y esto salió de re-greppear en vez de creerle al diseño.** El
+  doc contaba `Equip`/`Unequip`/`SubSlotAttach`/`SubSlotDetach`; el árbol mostró que
+  **`DropEquipped` no pasa por `Unequip`** —manipula `rec.equip` y difunde por su cuenta, que es lo
+  que el `BodyChanged` existente ya hacía en sus **dos** salidas— y que el reconciliador de
+  `WeaponDrop` de `capture.lua` es donde se vacía el slot al soltar el arma **en la mano**. Las dos
+  se suman. Una puerta que no difunde es un agujero que se descubre en juego seis meses después, y
+  la de `DropEquipped` tiene consecuencia visible: dropear el casco con las gafas montadas dejaría
+  al jugador **viendo a través de unas gafas que ya no tiene**.
+  Y `RegiveEquipped` difunde con **`slotId` nil** = *"se re-aplicó todo"*. Es la puerta del
+  respawn, y existe para que el oyente no tenga que enganchar `PlayerLoadout` y apostar al orden de
+  hooks — el bug que Quick Loadouts ya le costó a este repo. **No se escribió un segundo re-give:**
+  es la rutina única que B5 extrajo y nombró.
+  **Descartado, con su razón escrita:** `def.onEquip`/`def.onUnequip` en el contrato de ítem. Es más
+  potente, pero mete una closure por def en un contrato que hoy tiene exactamente una (`onUse`) y
+  obliga a que 61 defs derivados carguen la misma función.
+- PARCHE 2 — feat(items): **los 61 defs se DERIVAN** (`shared/corpus_cargo_nvg.lua`, ambos realms
+  por COR-12: el grid del cliente renderiza desde defs). Se itera la tabla global `ArcticNVGs` y se
+  registra un def por variante. **61 defs a mano es exactamente el trabajo que CRG-41 y CRG-42
+  existen para evitar** — y este mod tiene **dos trampas de nombre** que un mapeo a mano se
+  equivoca sí o sí: en las cinco familias de NVG `_t` es **teal**, pero en las aviators `shades_t`
+  es la **TÉRMICA** y la teal es `shades_teal`; y `_hp` (hotpink) se muestra **"Ruby"**. Derivado,
+  ninguna de las dos se puede tipear mal: el nombre sale del `PrintName` de la entidad y la
+  etiqueta de display, de los flags `ThermalVision`/`FullColor`/`NoBrightenWorld`, **nunca del
+  sufijo**.
+  **A mano se cataloga UNA sola tabla: las SEIS familias** (peso, valor, footprint). Seis modelos
+  reales para 61 variantes — el color es post-proceso, no un modelo distinto — así que seis filas es
+  el tamaño honesto de la parte escrita a mano. Los números son de arranque, a calibrar en juego.
+  **Los íconos ya estaban hechos**: el mod trae un PNG recortado por variante en
+  `materials/entities/arctic_nvg_*.png`, con el nombre exactamente derivable de la clase (67
+  archivos, las 61 con el suyo — contado, no supuesto). `def.icon` gana en el pipeline. Es la
+  diferencia entre 61 celdas idénticas y 61 legibles **sin copiar un solo archivo**: se referencia
+  una ruta montada en runtime, que es la definición misma de COMPAT-RUNTIME.
+  Convar `cargo_nvg_register` (default 1) para el servidor que no quiera 61 entradas en el catálogo
+  del trader. Sin el mod montado la tabla no existe, no se registra nada y el archivo es **inerte**
+  (COR-5), con una línea de log que lo dice — el corolario de B4: un componente que calla no deja
+  evidencia de que estaba apagado.
+- PARCHE 3 — feat(capture): **`Capture.RegisterWorldPickup(class, spec)`**. Hoy E sobre unas gafas
+  llega al `ENT:Use` del mod y el inventario **nunca se entera**: el portero sale en
+  `if not ent:IsWeapon() then return end`. El portero gana una cuarta forma, pero **por registro y
+  no inline** — mismo patrón que `StatusPanel.RegisterBar`: la cuarta rama inline funcionaba, la
+  quinta ya sería un olor, y el doc hermano (#46) propone un registro gemelo para las fuentes de
+  luz. Semántica idéntica a las otras tres: **WALK+USE toma, USE solo carga**, mismo debounce, y si
+  no entra por peso **se queda en el suelo** con el `Notice` de siempre (la regla viva de las cajas
+  de munición, copiada tal cual). `return false` en los dos caminos: eso es lo que bloquea al engine
+  de alcanzar el `ENT:Use` del mod, y la técnica ya estaba probada (roadmap #27).
+  **El drop es gratis y no se tocó:** un `unique` de Cargo cae como `corpus_cargo_item` con su blob
+  al lado. Spawnear la entidad del mod sería un objeto con dos dueños.
+- PARCHE 4 — feat(items): **las DOS rutas de slot** (decisión del autor, ruta C). Con casco, las
+  gafas montan en su **sub-slot óptica** — ya existía, cero código nuevo. Sin casco, ocupan **Head
+  directo**, y eso cuesta **una cadena**: el filtro del slot pasó a `"category:helmets,optics"` y
+  `MatchesFilter` ya parseaba listas separadas por coma. **Ni un primitivo nuevo: CRG-8 intacto.**
+  La regla que el jugador percibe es *"o el casco con las gafas montadas, o las gafas solas"*. El
+  costo real, asumido y declarado: el compat escucha **dos** señales, y cada ruta se prueba con la
+  otra fuera de juego.
+- PARCHE 5 — feat(capture): **el commit escribe la NW, y JAMÁS llama a
+  `ArcticNVGs_SetPlayerGoggles`** (`server/corpus_cargo_nvg.lua`). Esa función **dropea al mundo el
+  par anterior**: correcto para un mod donde el jugador tiene un par, **DUPLICADOR** para un
+  llamador que ya es dueño del ítem — el jugador terminaría con las gafas en el inventario y una
+  copia en el suelo. Escribir la NW es idempotente: sin entidades, sin sonido, sin efectos
+  colaterales. Y **se valida el nombre corto ANTES**, porque el mod no lo hace y un nombre
+  inexistente baja a `SetNWInt("nvg", nil)`, que es un error de argumento.
+  La resolución es **genérica y determinista**: se recorre `Slots.List` en su orden declarado y, por
+  cada host, sus sub-slots en el orden que declara el def. Nada dice "head" — unas gafas son
+  cualquier def equipado que lleve `nvg_shortname`. Eso hace que la ruta C sea **un solo camino de
+  código** en vez de dos casos especiales, y que dos pares equipados a la vez den siempre la misma
+  respuesta (`pairs` sobre `rec.equip` no tiene orden).
+- PARCHE 6 — feat(capture): **el convar del mod va a 0 y se dice.** `sh_arctic_nvg_losegoggles`
+  viene en 1 y en `PlayerSpawn` hace `SetNWInt("nvg", 0)` sin dropear nada; Cargo tiene su propia
+  regla (`cargo_lose_on_death`) y su reconcile. El orden de hooks *favorece* al reconcile, pero
+  **depender del orden es exactamente el bug de Quick Loadouts**: se apaga el convar y no se
+  discute. Nunca en silencio — una línea de `Corpus.Log` si se lo encuentra en 1.
+
+**CRG-63, y es la regla cara de la tanda: el ORDINAL nunca se persiste.** `ply:GetNWInt("nvg")` no
+guarda un nombre: guarda el **índice** de la tabla del mod. Si Neosun publica un parche que inserta
+una variante en el medio, todos los índices posteriores se corren y **un ítem guardado amanece
+siendo otras gafas**. El def lleva el `ShortName` y el ordinal se resuelve en el momento de
+equipar, contra la tabla viva. Detalle que lo agrava y está verificado contra el código del mod
+(CRG-24): el propio mod construye su índice inverso con `pairs` sobre un array. Norma en la entry
+51.
+
+**LO QUE EL HARNESS NO PUEDE PROBAR, Y HAY QUE DECIRLO** (§0.bis 1 del PROMPT). Acá el entorno es un
+**mod ajeno que el harness no tiene**: `ArcticNVGs`, `ArcticNVGs_ShortNameToID` y las 61 entidades
+son un **stub escrito por nosotros**. Todo lo que los checks afirman es *"la derivación hace lo
+correcto CON esta tabla"*, jamás *"ésta es la tabla que el mod expone"*. Lo segundo lo prueba la
+planilla **U** y nada más. Lo que sí está anclado al mod real: los `PrintName` del stub se leyeron
+de sus archivos de entidad, los seis modelos y sus conteos (12+11+12+11+2+13 = 61) se contaron sobre
+su tabla, y los 67 PNG se contaron en su carpeta. Fuera de cobertura offline por construcción:
+que el `PrintName` llegue a tiempo en el cliente real (`scripted_ents.GetStored` se consulta
+defensivamente y degrada al `ShortName`), que el efecto del mod se **apague solo** al quitar las
+gafas —su `HUDPaintBackground` compara el ordinal contra el anterior y lo hace, pero eso se
+**verifica en juego, no se da por hecho**—, y que la ruta de la entidad de mundo real llegue al
+portero.
+
+Verificación offline: harness **574** (eran 504), **70 checks nuevos**. Los 504 anteriores intactos.
+**Las 14 reversiones se verificaron EN NEGATIVO**, una por una, y las 14 ponen en rojo el check que
+nombra la regla.
+
+**El stub del jugador NO tenía `SetNWInt`/`GetNWInt`, y se agregaron GUARDANDO ESTADO DE VERDAD.**
+Es la lección del PARCHE 6 de B5 aplicada **antes** de volver a pagarla: allá `HasWeapon` estaba
+clavado en `false` y eso volvió indemostrable el re-give durante bloques enteros. Un stub que no
+guarda haría indistinguible *"la NW se escribió"* de *"no pasó nada"*. La reversión que lo prueba
+está en la lista: vaciar el `SetNWInt` del stub pone **siete** checks en rojo.
+
+**UN CHECK NACIÓ SIN DISTINGUIR, y lo destapó la verificación en negativo — no la corrida verde.**
+Había checks de que el registro de recogidas existe y resuelve la clase correcta, pero **ninguno de
+que el portero de `PlayerUse` lo consulte**, que es justamente el `return false` que impide al
+engine alcanzar el `ENT:Use` del mod: cegar el portero dejaba los checks en verde. Ahora se corre
+el **hook real**, como el bloque de las cajas de munición (#32), y de paso se le pusieron
+`IsWeapon`/`GetOwner` a la entidad falsa **a propósito**: sin ellos, el portero ciego se caía con un
+error de método faltante en vez de contestar, y un check que se salva por un crash no aísla su capa.
+
+### 2.ª pasada — lo que el autor pidió tras la primera vuelta en juego (2026-07-26)
+
+Reporte del autor **sin la planilla a la vista**: recoger las gafas del suelo al inventario funciona,
+ponérselas en la cabeza y sacárselas **mientras están encendidas** también, lo mismo metiéndolas
+dentro del casco dev, y lo mismo con las aviators; cambiar de mapa conserva las gafas puestas. O
+sea: **U1, U2 y U3 se comportaron**, y el apagado automático del efecto —que es del propio mod y
+esta tanda se negó a dar por hecho— ocurrió. Lo que faltaba, y son cuatro cosas:
+
+- PARCHE 7 — feat(ui): **extraer un sub-slot con el host EN LA MOCHILA.** La lista de lo montado se
+  armaba solo dentro del menú del slot equipado, así que **un casco guardado retenía su óptica como
+  rehén** — y una armadura guardada, sus placas. El servidor **siempre** lo permitió
+  (`FindOwnedInstance` acepta grid o equipo): el hueco era de la UI y de nadie más. Ahora la lista
+  es una función pura y exportada, `CARGO.UI.MountedEntries`, y **los dos menús la comparten**: un
+  casco es el mismo objeto en la cabeza que en la mochila. El `index` que viaja al detach es
+  **posicional dentro de su sub-slot**, así que aplanar la lista no lo puede renumerar — con dos
+  placas en el mismo sub-slot, sacar la segunda tiene que sacar la segunda.
+- PARCHE 8 — feat(ui): **arrastrar un ítem SOBRE otro ítem lo monta.** El grid genérico gana
+  `onCellDrop`, y con él cada celda es destino además del canvas. Es el mismo intent que el menú
+  *"Insert into…"* ya mandaba: **el arrastre es un atajo, no una segunda ruta**.
+  **La trampa de VGUI, pagada de entrada y no descubierta en juego:** una celda que además es
+  `Receiver` **tapa** al receiver del canvas — `dragndrop` sube desde el panel bajo el cursor y para
+  en el primero que encuentre. Sin un fall-through explícito, soltar un ítem de un contenedor justo
+  encima de otra celda **dejaría de transferir**. Por eso `onCellDrop` devuelve un booleano y el
+  grid cae al `onReceiveDrop` de siempre: el comportamiento del canvas no puede depender de **dónde
+  adentro** del canvas soltaste.
+- PARCHE 9 — feat(ui): **intercambiar o acoplar, y en ese orden.** Soltar sobre un slot de
+  equipamiento ocupado tenía una sola lectura (equipar). Ahora son tres, y la regla vive en
+  `CARGO.UI.ResolveSlotDrop`, pura: **(1)** el ítem puede ocupar el slot → equipa, y eso ya
+  **intercambia** porque `Equip` devuelve al ocupante anterior al grid; **(2)** no puede, pero el
+  **ocupante** tiene un sub-slot libre que lo acepta → **acopla** — es la única forma de que una
+  placa, o una óptica que ningún slot admite sola, llegue a su host arrastrando; **(3)** ninguna de
+  las dos → se manda el equip igual y **el rechazo lo redacta el servidor** (CRG-6), porque
+  tragárselo acá cambiaría una negativa legible por un gesto que no hizo nada.
+  **Equipar se prueba primero a propósito** (decisión del autor): cuando las dos lecturas son
+  legales —gafas que entran en Head, soltadas sobre un casco que también las aceptaría en su
+  óptica— gana el intercambio.
+- PARCHE 10 — feat(items): **el ícono se AUTOGENERA del world model.** La primera pasada usaba el
+  PNG que el mod trae por variante; en juego **su arte de spawnmenu se lee mal al lado de los
+  renders generados del resto del catálogo** (decisión del autor). Se quita `def.icon` y el pipeline
+  renderiza `def.model` como para todo lo demás, así que el catálogo entero parece **un** catálogo.
+  **Costo declarado:** seis modelos para sesenta y una variantes significa que el color **no se ve
+  en la celda** — el NOMBRE es lo que distingue una Green de una Ruby. El encuadre por def sigue
+  siendo ajustable con `cargo_icon_edit`, que escribe un `icon_override` y sobrevive al re-registro.
+
+La regla de arrastre y la lista de montados son **puras y exportadas** justamente porque son de las
+que se rompen en silencio: un `if` invertido y el gesto deja de significar lo que el jugador espera,
+sin un solo error en consola. Harness **588** (eran 574), **14 checks más**, y **7 reversiones más
+verificadas en negativo** — 21 en total en la tanda.
+
+**Lo que sigue sin cobertura offline, y hay que decirlo:** el cableado de `dragndrop` en sí (que la
+celda reciba, que el fall-through se dispare) es VGUI y no existe en el harness. Lo probado offline
+es la **decisión** —qué significa el gesto—, no que el gesto llegue. Eso es planilla.
+
+EN JUEGO: planilla **U** (ver entry 51, que comparte la pasada).
+
+---
+
+## 51. CRG-62 y CRG-63 acuñadas: la señal genérica y el ordinal que no se persiste `[APLICADO 2026-07-27]`
+
+**CRG-62** — *"Cargo difunde que un slot de equipamiento cambió; la semántica de ese cambio vive en
+el consumidor, nunca en el inventario."* Sede: `Cargo_Architecture.md` §4, sección nueva. Fuerza:
+INVARIANTE. Es **CRG-1** aplicado al equipamiento: el inventario no sabe qué *significa* que alguien
+se ponga unas gafas, igual que no sabe qué significa `onUse`. La norma existe porque sin ella la
+próxima integración de equipamiento volvería a no tener dónde colgarse — o peor, la colgarían
+adentro de `Equip`.
+
+**CRG-63** — *"Un identificador de un tercero que sea POSICIONAL (un ordinal de su tabla) no se
+persiste jamás: se persiste su clave estable y el ordinal se resuelve en el momento de usarlo."*
+Sede: `Cargo_Architecture.md` **§3**, y la elección se declara: el PROMPT ofrecía §3 o §13, y **§13
+es la tabla de fronteras y deuda declarada** — una norma vigente no vive en una lista de
+pendientes, que es el mismo argumento que sacó a CRG-45 de un roadmap. Esto es una regla sobre qué
+campo lleva un def, así que su lugar es el contrato de ítems. Mismo espíritu que **CRG-42**.
+
+§4 gana además el párrafo de **las dos rutas de una óptica** (con casco al sub-slot, sin casco a
+Head directo) con su costo declarado: el consumidor escucha dos señales. §13 **pierde la fila**
+*"compat con mods externos de NVG/ópticas — falta mapear mods concretos"*, abierta desde el Block 1
+y ahora mapeada y resuelta; queda la nota de cierre en su lugar. Y **§12.1 gana una nota**: 61 defs
+**no autogen** cambian el `defs_hash` de la firma de compatibilidad de B5, así que dos servidores
+que difieran en este mod **ahora se detectan**. Eso es la firma funcionando —esa mitad promete
+justamente ver a los addons de contenido— y por eso avisa en vez de gatear.
+
+La letra **U** se registra en `familias_excluidas` en el mismo parche, ANTES de usarse (FLU-30), y
+no se recicla (FLU-07). Es la primera sección de planilla de Cargo que **no** es del plan de
+persistencia: P=B1, Q=B3, R=B4, S=B5 lo agotaron. La **T es de corpus y es otra planilla**, no se
+recicla.
+
+**EN JUEGO — planilla `U`** (quinta sección de la planilla de CARGO). Nació con cinco checks y la
+2.ª pasada le sumó el **U6**; los números no se reciclan (FLU-07). **Al menos uno es de RECHAZO o de
+AUSENCIA a propósito**: que sin el mod montado el archivo sea inerte y la consola quede limpia es
+tan verificable como lo demás, y es la mitad que nadie prueba nunca.
+
+- **U1** · **las gafas del mundo se recogen al inventario.** Spawnear unas gafas del menú Q
+  (categoría *"Neosun's Cooler Nightvision"*) y hacerles **WALK+USE**: entran al grid con su peso y
+  con un **ícono generado del world model** —igual que el resto del catálogo, no el PNG del mod
+  (2.ª pasada)—. **Y el mod NO se las equipa por su cuenta**, que es lo que hace hoy: al recogerlas
+  **no se ve nada todavía**. Poseer y llevar puesto son dos verbos distintos. De paso, **USE
+  pelado** debe **cargarlas como prop**, no recogerlas.
+- **U2** · **con casco: montan en el sub-slot óptica y SE VEN.** `cargo_dev_give`, equipar
+  `cargo_dev_helmet` en Head y montar las gafas en su sub-slot `optic`: la NW quedó escrita y la
+  visión nocturna es utilizable. Al **desmontarlas**, el efecto **se cae solo** — eso lo hace el
+  `HUDPaintBackground` del propio mod sin una línea nuestra, y **hay que verificarlo, no darlo por
+  hecho**: si estaban **encendidas** al desmontarlas, tienen que apagarse al siguiente frame.
+- **U3** · **sin casco: ocupan Head directo y se ven igual.** Es la **otra ruta** y **se prueba
+  SOLA**: con el casco **fuera del inventario**, equipar las gafas directamente en Head. Si el
+  casco estuviera puesto, un camino roto pasaría desapercibido tapado por el otro.
+- **U4** · **relog: siguen puestas y son LAS MISMAS.** Desconectar y volver con las gafas
+  equipadas: vuelven puestas y son **la misma variante**, no otra. Es el check de **CRG-63** — lo
+  que sobrevive es el nombre, no el ordinal. **Ojo con la trampa de la medición: hay que usar una
+  variante distinguible a ojo** (una de color raro, o una térmica), porque "hay unas gafas puestas"
+  no distingue "las mismas" de "otras".
+- **U5** · **AUSENCIA + verificación negativa.** Dos mitades.
+  **(a) El kill-switch, y cómo se corre** (la convar se lee **UNA vez, al boot**, así que cambiarla
+  en vivo no hace nada — hace falta cambio de mapa):
+
+      cargo_nvg_register 0          <- en la consola del servidor
+      map gm_construct              <- o el mapa que sea: la convar se relee acá
+
+  Al arrancar, la consola tiene que decir en **una** línea
+  `[Corpus:cargo] neosun nvg: cargo_nvg_register en 0 — el catálogo queda del mod`, **sin un solo
+  error**. Y entonces: `cargo_dev_items nvg` **no lista nada**, las 61 entradas no están en el
+  catálogo del trader, y **E sobre unas gafas del suelo vuelve a hacer lo del mod** —te las equipa
+  sola y la entidad desaparece— porque Cargo dejó de reclamarlas. Eso es lo que prueba que el
+  archivo es **inerte y lo declara** (COR-5), no que esté apagado por accidente. Después,
+  `cargo_nvg_register 1` y otro cambio de mapa para volver.
+  **(b)** Con todo prendido, el inventario normal, el comercio, el savegame y el import de B5
+  **siguen intactos** — esta tanda toca `Equip`/`Unequip` y el portero de mundo, que son dos de las
+  superficies más calientes del módulo.
+- **U6** · **acoplar y desacoplar arrastrando, y con el host en la mochila** (2.ª pasada, lo que el
+  autor pidió tras la primera vuelta). Cuatro gestos, y cada uno prueba una rama distinta:
+  **(a)** con el casco **en la mochila** y las gafas también, **arrastrar las gafas sobre el casco**
+  las monta en su óptica; **(b)** click derecho sobre ese casco **en la mochila** ofrece
+  **"Extract …"** y las devuelve al grid — eso es lo que faltaba, y vale igual para las **placas**
+  dentro de la armadura guardada; **(c)** con el **casco equipado** en Head, arrastrarle las gafas
+  desde el grid las **INTERCAMBIA** (el casco baja al grid, las gafas quedan en Head), porque las
+  gafas también entran en Head; **(d)** con la **armadura equipada**, arrastrarle una **placa**
+  desde el grid la **ACOPLA** a su sub-slot en vez de no hacer nada, porque una placa no puede
+  ocupar Body. **Y la negativa que va con esto:** abrir una crate o un trader y **arrastrar un ítem
+  del contenedor soltándolo justo encima de otra celda** del inventario tiene que **transferir
+  igual** — si la celda de destino se comiera el drop, este parche habría roto el loot.
+
+Planilla (sección nueva de la de Cargo, la misma URL que P, Q, R y S):
+https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+
+### Cierre — planilla `U` en 6/6, dos pasadas (2026-07-27)
+
+**Confirmado en juego por el autor.** U1 (las gafas del suelo entran al grid y el mod **no** se las
+equipa por su cuenta) · U2 (con casco, montan en el sub-slot óptica y se ven; sacárselas
+**encendidas** apaga el efecto solo, que es del propio mod y esta tanda se negó a dar por hecho) ·
+U3 (sin casco, Head directo, y lo mismo con las aviators) · U4 (cambio de mapa: siguen puestas y son
+las mismas) · U5 (el kill-switch) · U6 (acoplar y extraer arrastrando, más la negativa del loot:
+*"pasando al cargo crate sin dramas con drag and drop a los cascos en la misma ventana"*).
+
+**La tanda salió en dos pasadas y la segunda no la disparó un check en rojo, sino el USO.** La
+primera vuelta confirmó lo que la planilla medía; lo que faltaba —extraer un sub-slot con el host en
+la mochila, acoplar arrastrando, y el ícono— apareció al **usar** el inventario, no al verificarlo.
+Es la contracara de la lección de B3/B4/B5 (*el hallazgo sale del campo de notas de un check que
+PASÓ*): acá salió de que el autor jugara con lo que la planilla ya había dado por bueno. **Una
+planilla mide lo que se propuso medir; el uso mide lo que falta.**
+
+**FRONTERA DECLARADA, y la midió el propio U5** (§13, con su fila): apagar `cargo_nvg_register` con
+gafas **ya en el inventario** deja esas entradas **huérfanas de def** —celda sin nombre ni ícono— y
+**se destruyen al dropearlas**. El autor lo verificó y lo acepta como está: *"cambió los ítems por
+una data vacía que se esfumó al hacer drop como corresponde"*. Es coherente con el resto del módulo
+—una def que no existe no puede representarse en el mundo, y el saneo del import descarta igual lo
+que no conoce— y el kill-switch existe para un servidor que **nunca** montó el catálogo, no para
+apagarlo a mitad de partida.
+
+**El otro dato que dejó U5, y vale más que el check:** con la convar en 0 el mod vuelve a funcionar
+**exactamente como el original** —E sobre unas gafas te las equipa y la entidad desaparece—. Eso es
+COR-5 medido, no declarado: el archivo no está *apagado*, está **inerte**, y se nota porque el
+tercero recupera su comportamiento entero.
 **Sin commitear** (GIT-7). Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
