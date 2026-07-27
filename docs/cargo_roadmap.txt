@@ -658,8 +658,22 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     corpus-stalker (el NextBot subclaseable es la otra mitad de "traders
     hechos por usuarios").
 
-46. LISTA DE FUENTES DE LUZ EN EL WHEEL [Cargo ui/arc9] — ABIERTO (pedido del
-    autor 2026-07-26, tras mapear el mod [TLS] Tactical Light Sources).
+46. LISTA DE FUENTES DE LUZ EN EL WHEEL [Cargo ui/arc9] — ABIERTO, y es el
+    PRÓXIMO FRENTE DEL MÓDULO ahora que #47 cerró.
+    PROMPT ESCRITO: dev/PROMPT_cargo_tls_luces.txt (v1, 2026-07-27) —
+    entradas 52-53, planilla V, UNA NORMA PRESUPUESTADA (un indicador de un
+    estado ASÍNCRONO pinta el TRÁNSITO, hermana de CRG-32 en el eje del
+    tiempo; su ID se acuña en el parche que la escribe, no acá — presupuestar
+    no es acuñar, y el checker de IDs lo hace cumplir) y la ENMIENDA a CRG-30,
+    cuyo texto actual ("cero mensajes de red nuevos") deja de ser cierto con
+    el net de la linterna.
+    LA TRAMPA QUE EL PROMPT PONE EN SU PRIMERA PÁGINA: el doc de diseño se
+    escribió ANTES de #47, cuando la NW "nvg" no la escribía nadie más. Hoy
+    la escribe CARGO (server/corpus_cargo_nvg.lua), así que el chip solo
+    puede togglear "nvg_on" — escribir "nvg" sería fabricar la segunda ruta
+    que este repo evita. Y sh_arctic_nvg_losegoggles ya está en 0: lo puso
+    #47 y no se vuelve a tocar.
+    (Pedido del autor 2026-07-26, tras mapear el mod [TLS] Tactical Light Sources).
     El dolor concreto: la G es a la vez el wheel de Cargo y la linterna del
     autor. La solución es meter las luces DENTRO del wheel, que ya es hold.
     TERCER GRUPO DE CHIPS (no un anillo nuevo: el anillo es "equipar", los

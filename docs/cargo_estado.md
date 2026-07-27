@@ -346,8 +346,15 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
    #47 POSEE, **#46 ACCIONA** — la linterna del jugador y los dispositivos toggleables de ARC9 junto con las
    NVG, desde un **tercer grupo de chips** del wheel. Diseñado, con la API verificada contra el código vivo y
    los defectos del mod inventariados: [`../../dev/Cargo_TLS_Referencia.md`](../../dev/Cargo_TLS_Referencia.md).
-   Decisión del autor ya tomada: la linterna va por **net propio**, con su enmienda explícita a CRG-30 en
-   §17.1. El punto de contacto con #47 es uno solo (§7.4 de su doc hermano) y no se pisan.
+   **PROMPT escrito:** [`../../dev/PROMPT_cargo_tls_luces.txt`](../../dev/PROMPT_cargo_tls_luces.txt) —
+   entradas 52-53, planilla **V**, una norma **presupuestada** (un indicador de un estado asíncrono pinta el
+   TRÁNSITO, hermana de CRG-32 en el eje del tiempo; el ID se acuña en su propio parche, no acá) y la
+   **ENMIENDA a CRG-30**, que hoy dice "cero mensajes de red nuevos" y deja de ser cierta.
+   Decisión del autor ya tomada: la linterna va por **net propio** — se descarta `impulse 100` porque ARC9 lo
+   **secuestra** cuando hay un dispositivo toggleable en la mano, y la misma tecla haría cosas distintas según
+   lo que lleves. **La trampa que el PROMPT pone en su primera página:** el doc de diseño se escribió ANTES de
+   #47, cuando la NW `nvg` no la escribía nadie más — hoy la escribe Cargo, y el chip solo puede tocar
+   `nvg_on`.
 3. **Slice 2 del comercio** — el **plan de persistencia quedó cerrado** con B5: B6 (perfiles reales y GC
    jerárquico) está **diferido a Cortex**, con el diseño congelado en §6 del
    [`plan madre`](../../dev/PLAN_cargo_persistencia_gc.md), y no se ejecuta hasta que Cortex tenga código y
