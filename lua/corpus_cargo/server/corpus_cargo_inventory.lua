@@ -1321,6 +1321,42 @@ function CARGO.Inventory.WipeOnDeath(ply)
 end
 
 -- ------------------------------------------------------------------
+-- THE re-give of equipped weapon classes — one routine, every caller.
+--
+-- `rec.equip` names what the player wears; this is what turns that record into
+-- weapons in his hands. TWO callers, and they are the reason it has a name at
+-- all: the spawn hook below, and the LAN import (CRG-61), which replaces the
+-- record from under a player who is standing there alive.
+--
+-- Giving the import a re-give of ITS own would be a second path for something
+-- that already has one — the same argument that put the savegame restore
+-- inside `Containers.Attach`, the primitive's only door (entry 46), and that
+-- put both owner files behind a single serializer (CRG-58). If the re-give
+-- ever changes, it changes here and both callers get it.
+--
+-- A class the player ALREADY holds is left alone. This runs mid-round —
+-- Quick Loadouts fires the whole chain from its net receive, and the import
+-- fires it whenever someone types the command — and re-giving would stomp the
+-- live magazine with the stale blob clip. On a real spawn the player owns
+-- nothing, so nothing is skipped.
+-- ------------------------------------------------------------------
+
+function CARGO.Inventory.RegiveEquipped(ply)
+    if not IsValid(ply) then return end
+    local rec = CARGO.Inventory.GetRecord(ply)
+    for _, val in pairs(rec.equip) do
+        -- stack slot (table): no blob, no default clip — its ammo is the
+        -- stack, the ammopool Push reloads the pool from it
+        local blob = istable(val) and val or CARGO.Instances.Get(val)
+        local def = blob and CARGO.Items.Get(blob.id) or nil
+        if def ~= nil and not (isstring(def.weapon_class)
+            and def.weapon_class ~= "" and ply:HasWeapon(def.weapon_class)) then
+            GiveEquipWeapon(ply, def, istable(val) and nil or blob, istable(val))
+        end
+    end
+end
+
+-- ------------------------------------------------------------------
 -- Lifecycle
 -- ------------------------------------------------------------------
 
@@ -1336,40 +1372,17 @@ end)
 -- through death; cargo_lose_on_death wipes it instead (WipeOnDeath already ran
 -- on PlayerDeath, so rec.equip is empty here and re-gives nothing).
 hook.Add("PlayerLoadout", "corpus_cargo_inv_loadout", function(ply)
-    local rec = CARGO.Inventory.GetRecord(ply)
-    for _, val in pairs(rec.equip) do
-        -- stack slot (table): no blob, no default clip — its ammo is the
-        -- stack, the ammopool spawn Push reloads the pool from it
-        local blob = istable(val) and val or CARGO.Instances.Get(val)
-        local def = blob and CARGO.Items.Get(blob.id) or nil
-        -- a class already in hand is left alone: PlayerLoadout re-runs
-        -- MID-ROUND (Quick Loadouts fires the whole chain from its net
-        -- receive), and re-giving would stomp the live magazine with the
-        -- stale blob clip. On a real spawn the player owns nothing.
-        if def ~= nil and not (isstring(def.weapon_class)
-            and def.weapon_class ~= "" and ply:HasWeapon(def.weapon_class)) then
-            GiveEquipWeapon(ply, def, istable(val) and nil or blob, istable(val))
-        end
-    end
+    CARGO.Inventory.RegiveEquipped(ply)
 
     -- Deferred reconcile (CHANGELOG #6): on spawn the gamemode loadout and
     -- the capture timers land AFTER this hook, and their give/remove churn
     -- can eat the gives above (WeaponEquip may fire deferred, past the
-    -- CargoEquipGive window). One tick after the dust settles, re-give
-    -- whatever equipped class the player still lacks — the capture keeps
-    -- equipped classes now (Capture.Decide), so these gives survive
-    -- flag-free.
+    -- CargoEquipGive window). One tick after the dust settles, run the same
+    -- routine again — it skips whatever the player already holds, so the
+    -- second pass only fills what was eaten. The capture keeps equipped
+    -- classes now (Capture.Decide), so these gives survive flag-free.
     timer.Simple(0.1, function()
-        if not IsValid(ply) then return end
-        local rec2 = CARGO.Inventory.GetRecord(ply)
-        for _, val in pairs(rec2.equip) do
-            local blob = istable(val) and val or CARGO.Instances.Get(val)
-            local def = blob and CARGO.Items.Get(blob.id) or nil
-            if def and isstring(def.weapon_class) and def.weapon_class ~= ""
-                and not ply:HasWeapon(def.weapon_class) then
-                GiveEquipWeapon(ply, def, istable(val) and nil or blob, istable(val))
-            end
-        end
+        CARGO.Inventory.RegiveEquipped(ply)
     end)
 end)
 
