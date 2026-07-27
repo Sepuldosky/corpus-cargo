@@ -226,8 +226,14 @@ if SERVER then
     -- instrument for the weapon set anyway).
     -- ------------------------------------------------------------------
 
+    -- "bulk" = a DERIVED catalogue, not hand-written content: it floods an
+    -- unfiltered listing without telling you anything. Captured weapons and
+    -- ARC9 attachments were the first two; the 61 Neosun NVG variants
+    -- (roadmap #47) are the third, and they are the same shape — one def per
+    -- third-party variant, reachable with a filter like everything else.
     local function IsBulk(id, def)
         return def.arc9_att ~= nil or id:sub(1, 4) == "wpn_"
+            or id:sub(1, 10) == "cargo_nvg_"
     end
 
     -- nil filter: every non-bulk def. With filter: case-insensitive plain
