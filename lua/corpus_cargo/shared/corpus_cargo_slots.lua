@@ -10,7 +10,14 @@ CARGO.Slots = CARGO.Slots or {}
 -- The row order in the fullscreen equipment column is hand-laid in
 -- corpus_cargo_ui.lua (§15.2); this list is the slot DATA.
 CARGO.Slots.List = {
-    { id = "head",      label = "Head",      filter = "category:helmets" },
+    -- Head takes helmets AND loose optics (author's call, route C of
+    -- dev/Cargo_NVG_Neosun_Referencia.md §7.3, roadmap #47): with a helmet
+    -- the goggles mount in its optic sub-slot and Head stays for the helmet;
+    -- with no helmet they occupy Head themselves. The rule the player feels
+    -- is "either the helmet with the goggles on it, or the goggles alone".
+    -- Costs exactly this string — MatchesFilter already parses comma lists
+    -- (items.lua ParseFilter) — and adds no new primitive: CRG-8 intact.
+    { id = "head",      label = "Head",      filter = "category:helmets,optics" },
     { id = "body",      label = "Body",      filter = "category:armor" },
     { id = "back",      label = "Back",      filter = "category:backpacks" },
     { id = "primary",   label = "Primary",   filter = "category:weapons" },
