@@ -3850,3 +3850,264 @@ necesita.
 
 Harness **448** verdes en ambos realms, checker de IDs limpio, espejo regenerado. **Sin commitear**
 (GIT-7). Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+
+---
+
+## 48. Export / import LAN: el único punto donde CRG-6 se invierte, y bajo llave `[APLICADO 2026-07-26]`
+
+B5 del plan de persistencia (`dev/PLAN_cargo_persistencia_gc.md` §4). Que un amigo del autor pueda
+traer su personaje a la LAN, **con la puerta cerrada por default**.
+
+Es barato en formato y caro en política: el record ya es autocontenido desde la entry 41 (CRG-56) y
+el re-acuñado ya existe desde la 46 (`Instances.Remint`). Lo único que faltaba era **transporte y
+permiso**. Archivo nuevo: `shared/corpus_cargo_lan.lua` — shared porque el import tiene dos mitades,
+y el cliente no posee ninguna decisión: lee su propio archivo y lo manda.
+
+**Y hay que decir en voz alta lo que el bloque hace:** de los **23** `net.Receive` de servidor del
+módulo (contados por grep, FLU-27), 21 no necesitan gate porque los protege **CRG-6** —el server
+posee el inventario, el cliente manda *intents*, y un intent hostil se valida contra el estado real
+y no fabrica nada—. Éste recibe **estado**. Es la única inversión de CRG-6 del módulo, y la convar
+apagada, el gate de admin y la whitelist son lo que la hace aceptable.
+
+- PARCHE 1 — feat(inventory): **`cargo_export`** (server). El record renderizado por
+  `Instances.RenderOwner` —la rutina de B3, autocontenida y con los sub-slots anidados adentro— a un
+  archivo por `Corpus.Data` (COR-18), con **cabecera**: número de formato, SteamID64 de origen,
+  provider de dinero y firma de compatibilidad. El payload es una `table.Copy`, y ése es el único
+  lugar donde copiar es lo correcto: es dato muerto camino a un archivo, así que recortarlo no puede
+  tocar el record vivo (CRG-57 gobierna la ruta de RUNTIME, no ésta). El **número de formato NO es
+  una ruta de migración** (D2 del plan): existe para RECHAZAR con un motivo legible.
+- PARCHE 2 — feat(inventory): **la cerradura**, y va ANTES del transporte, porque cada capa hace
+  inútil un ataque que la siguiente ya no tiene que considerar. `cargo_import_enabled` en **0** ·
+  gate de admin · whitelist de SteamID64 donde **vacía significa NADIE** · rate-limit por jugador ·
+  y recién ahí el tope, el formato, el origen, la firma y el saneo.
+  **DECISIÓN, y se declara: el receptor se registra SIEMPRE y descarta en la primera línea.** No
+  registrarlo sería más fuerte, pero `util.AddNetworkString` corre al boot y una convar cambiada en
+  vivo no tendría efecto sin cambio de mapa. Lo decisivo es otra cosa: **un receptor que no existe no
+  tiene dónde imprimir por qué rechazó**, y el corolario que dejó B4 es que cada rechazo se loguea
+  con su MOTIVO. El motivo entero va a la consola del servidor; al jugador le llega una línea corta
+  en inglés (CRG-48) — una cerradura no le narra sus tripas a quien golpea.
+- PARCHE 3 — feat(inventory): **el saneo, entrada por entrada** (cita COR-5 y CRG-46, cuyo saneo del
+  override de íconos es el precedente de forma). Def desconocida ⇒ se descarta la entrada · condición
+  ⇒ clampeada · counts ⇒ recortados al `max_stack` de la def **real**, no al que vino · `ammo_group`
+  fuera del set ⇒ el campo se descarta · sub-slots ⇒ **el filtro de la def manda** y lo que pasa de
+  `maxItems` se recorta · claves numéricas ⇒ `Util.NumberKeys` (COR-8) · **NaN e infinito ⇒ se
+  descartan**, que el JSON los expresa y toda comparación río abajo contestaría `false` en silencio.
+  Lo que el módulo dueño puso en el blob **viaja intacto** (CRG-1: Cargo transporta, no interpreta)
+  una vez probado que es dato plano.
+  Dos reglas que no estaban en el PROMPT y que el árbol pidió: **un uid puede estar reclamado
+  exactamente UNA vez** en todo el record —dos entradas nombrando el mismo blob es la duplicación que
+  este bloque existe para evitar, y `Remint` llamado dos veces sobre el mismo uid lo acuñaría dos
+  veces—; y un ítem que **no entra en el slot en el que llegó cae al grid** en vez de morir, que es
+  exactamente lo que ya hace `ReconcileEquipSlots` al spawn (CRG-9: nada se pierde como efecto
+  colateral de una regla que incumplió).
+  **El peso NO es un gate del import**, igual que no lo es en una compra (CRG-18): el jugador puede
+  llegar sobrecargado y la curva se lo cobra en velocidad. Decidido y escrito.
+- PARCHE 4 — feat(inventory): **el import REEMPLAZA, y se re-acuña con `Instances.Remint`.**
+  Decisión del autor previa al código (§5.4 del PROMPT): "traigo mi personaje" es literal y es el
+  inverso exacto del export; fusionar es la ruta de la duplicación infinita. El record del destino se
+  escribe **antes** a `import_backup_<steamid64>` —una sola escritura, destino primero, el mismo
+  orden de **CRG-58** donde duplicar es el modo de falla seguro—, y el respaldo **obedece
+  `cargo_persistence`**: con la persistencia en 0 nada de Cargo toca el disco (planilla P4) y el
+  respaldo sería la excepción que vuelve falsa esa frase.
+  El re-uid es el de B4 y **no se escribió un segundo**: `Remint` acuña uid nuevo, es recursivo por
+  sub-slots y aplica la degradación honesta de COR-5. Escribir otro sería fabricar la clase de
+  duplicación que B3 mató con el escritor único.
+  El desarme de lo que sale copia la forma de `WipeOnDeath` —stripear las clases de arma equipadas y
+  sacar los blobs viejos de `_live`—, porque un record reemplazado es un record que dejó de tener
+  dueño. Y cierra con `AmmoPool.Push`: **el cinturón ES el pool** (§16), así que sin asignar la
+  reserva desde el cinturón nuevo, el reconciliador de 4 Hz leería el pool viejo como verdad y
+  arrastraría la munición del record anterior al cinturón recién importado.
+- PARCHE 5 — feat(money): **el dinero viaja sólo con el provider NATIVO en AMBOS lados.** Decisión
+  del autor (§4.2). El wallet vive *dentro* del record (`rec.wallet.usd`), así que viaja solo salvo
+  que se lo saque a propósito; `Money` es una interfaz con providers (§6) y exportar un wallet que
+  otro provider posee es fabricar plata en el destino. La cabecera estampa el provider de origen y el
+  destino sólo lo acepta si los dos dicen `usd`.
+
+**MEDICIÓN QUE CAMBIÓ EL DISEÑO: no hay chunking, hay TOPE.** El plan madre daba por hecho que habría
+que trocear el payload ("~64 KB por mensaje"). Medido offline con el harness, que ya construye
+records realistas: 60 uniques —cada uno con un anidado en su sub-slot— más 40 stacks son **15.770
+bytes** de JSON, y 200 uniques + 100 stacks **51.310**; comprimido por `Util.WriteBlob` es una
+fracción de eso. O sea el chunking era **adorno** y lo que hacía falta era un **techo que rechace con
+motivo**: 64 KiB en el cable, cortados **antes** de descomprimir un solo byte, y 128 KiB de JSON al
+abrirlo, que es lo que ataja una bomba de descompresión. El harness afirma la medición, así que el
+día que un blob engorde el rojo sale offline y no en la partida de alguien.
+
+**LA FIRMA AVISA, NO GATEA, Y SE DICE QUÉ PUEDE PROMETER** (§3.d del PROMPT: una firma que promete lo
+que no puede cumplir es peor que no tenerla). Se parte en tres mitades con honestidad distinta: la
+lista de **módulos** registrados es estable (pero no ve a `corpus-stalker`, que es addon de contenido
+y no registra módulo); el **hash de las defs NO autogen** es estable *y* sí ve a los addons de
+contenido, porque esas defs se registran al boot desde archivos shared y el conjunto es función de lo
+montado; y el **contador de autogen** viaja pelado porque **NO** es estable — `autogen_defs` acumula
+a lo largo de la vida del servidor (leído de `capture.lua`, no supuesto), así que dos servidores con
+los mismos mods hoy pueden tener conjuntos distintos según qué capturó cada uno. Lo que protege de
+verdad al destino es el saneo entrada por entrada; la mitad que sí rechaza es el número de formato.
+
+**UNA REGLA QUE NO ESTABA EN EL PROMPT: el import trae TU personaje.** El `origin` de la cabecera
+tiene que ser el SteamID64 de quien lo manda. Cierra la duplicación entre dos invitados de la misma
+whitelist sin necesidad de una convar más, y ningún flujo legítimo se rompe: el personaje del amigo
+se acuñó bajo su propio SteamID64 en su propio listen server.
+
+- PARCHE 6 — fix(inventory): **una sola rutina de re-give, con tres llamadores.** Lo destapó la
+  planilla **S1 EN JUEGO**, y es el defecto que la pasada del autor encontró: el import dejaba al
+  jugador parado con un wheel lleno de armas que **no podía sacar hasta el próximo respawn**.
+  El bucle que convierte `rec.equip` en armas en la mano vivía **adentro** del hook `PlayerLoadout`;
+  ahora es `Inventory.RegiveEquipped(ply)`, pública, y la corren el hook, su reconcile diferido de
+  0,1 s y el import (si el jugador está vivo — al muerto se la va a correr el hook igual).
+  **No es un segundo camino: es el mismo camino con nombre**, que es el argumento de la entry 46 al
+  poner la restauración del savegame dentro de `Containers.Attach`, y el de CRG-58 al poner los dos
+  archivos de dueño detrás de un solo serializador. La entry 48 había declarado la espera del respawn
+  como frontera aceptable en §13; **la planilla mostró que no lo era, y la fila de §13 desaparece**
+  en vez de quedar como excusa escrita.
+  El guard que se conserva —no re-dar una clase que el jugador ya tiene— es el que impide que el clip
+  viejo del blob pise el cargador vivo, y ahora tiene check propio.
+
+**FRONTERA DECLARADA** (§13, con su fila): el gate de admin es **local y provisional** — CRG-45
+sigue esperando la primitiva de permisos de Corpus, y lo provisional es *cómo se pregunta quién es
+admin*, no la convar ni la whitelist.
+
+Verificación offline: harness **504** (eran 448), **56 checks nuevos**. Los 448 anteriores intactos.
+**Las 28 reversiones se verificaron EN NEGATIVO**, una por una, y las 28 ponen en rojo el check que
+nombra la regla — incluida la del PARCHE 6, cuya reversión **reproduce exactamente** el síntoma que el
+autor reportó en juego.
+
+**El stub del jugador del harness tenía una constante que hacía indemostrable el re-give**, y salió a
+la luz al escribir el check del PARCHE 6: `HasWeapon` contestaba `false` para siempre y `Give` era un
+no-op, así que "el arma quedó puesta" era indistinguible de "no pasó nada". Ahora `Give`/`Strip`
+llevan el set de armas y un contador de gives — el contador es lo que hace observable el guard.
+`GetWeapon` sigue devolviendo `NULL` a propósito: la entidad del SWEP no existe offline y la ruta del
+cargador tiene que seguir degradando por `IsValid` como lo hace en juego.
+
+**Tres de esos checks nacieron VACUOS y hay que decirlo, porque es el método y no la anécdota.** El
+primero marcaba verde un rate-limit que la consola mostraba `import ACEPTADO`: el check comparaba el
+CONTEO de entradas, y un archivo que trae lo mismo que ya hay da el mismo conteo entrado o
+rechazado. Lo destapó leer la línea de log al lado del verde — la misma lección que B4 sacó de una
+ausencia. Se arreglaron comparando el **uid**, que un import aceptado re-acuña siempre. Los otros dos
+eran de la misma familia (la firma que no coincide, y el pack faltante). Y la verificación en
+negativo destapó una cuarta: reventar la convar dejaba el check de S3 **verde**, porque el gate de
+admin lo tapaba — defensa en profundidad funcionando, pero un check que no aísla su capa no prueba
+que esa capa exista. Ahora cada capa se prueba con las otras tres ABIERTAS. La quinta fue un hueco
+liso: no había ningún check de que el wallet se rechace **en el import** con un provider ajeno; el
+que había probaba el export.
+
+**LO QUE EL HARNESS NO PUEDE PROBAR, Y HAY QUE DECIRLO** (§0.bis 2 del PROMPT, la lección cara de la
+ronda 3 de la planilla R): un check offline verde prueba que la **ruta de código** hace lo correcto
+CON esta entrada. Jamás que ésta sea la entrada que llega. Acá el entorno es la RED y un cliente que
+es hostil por definición, así que lo que **no** está cubierto offline es:
+
+- que `util.Compress`/`util.Decompress` del engine se comporten como el stub, que es identidad. Los
+  dos topes se ejercen con largos declarados a mano; la relación real entre bytes comprimidos y JSON
+  la pone el engine.
+- que el tope de un mensaje de net del engine sea el que se supone. No hay fuente de garrysmod en
+  `dev/other/` (cita **CRG-24**), así que el número del plan no se verificó contra código local: lo
+  que sí está medido es cuánto pesa un record, y por eso el techo propio del módulo es el que manda.
+- que `ply:IsAdmin()` responda lo que el servidor real cree. El stub contesta `false` a propósito.
+- que un cliente **modificado** mande exactamente lo que el cliente de Cargo manda. Ésa es la premisa
+  entera del bloque, y por eso el saneo se escribe para la entrada que no se probó.
+
+EN JUEGO: planilla **S** (ver entry 49, que comparte la pasada).
+
+---
+
+## 49. CRG-61 acuñada: la puerta cerrada por default `[APLICADO 2026-07-26]`
+
+**CRG-61 acuñada** — "El import está apagado por default y todo lo que llega del cliente se sanea
+server-side". Sede: `Cargo_Architecture.md` §12.1, sección nueva. Fuerza: INVARIANTE.
+
+La norma existe porque es el **único** punto del módulo donde **CRG-6** se invierte, y porque sin
+escribirla la próxima pasada leería la convar en 0 como un default conservador que se puede subir de
+un plumazo. No lo es: es la condición de que la inversión sea aceptable, junto con la whitelist
+—donde **vacía significa NADIE, jamás "vacía = todos"**— y el gate de admin.
+
+§12 gana la subsección **12.1** con qué viaja, qué se rechaza y por qué la puerta está cerrada,
+incluida la tabla de las cinco capas y la tabla de las tres mitades de la firma con lo que cada una
+puede prometer. §13 gana **dos filas** de deuda de frontera: el gate de admin local a la espera de
+CRG-45, y el arma equipada que vuelve a la mano en el próximo respawn. §13.1 se re-deriva del árbol:
+eran 22 `net.Receive` de servidor y ahora son **23** — 21 protegidos por CRG-6, uno
+(`NET_ICON_OVERRIDE`) que necesita gate y no lo tiene, y uno (`NET_IMPORT`) que invierte CRG-6 y es
+el único del módulo que sí trae gate.
+
+La letra **S** se registra en `familias_excluidas` en el mismo parche, ANTES de usarse (FLU-30), y no
+se recicla (FLU-07). Con ella el plan de persistencia agota su presupuesto de planilla: P=B1, Q=B3,
+R=B4, S=B5.
+
+**EN JUEGO — planilla `S`** (cuarta sección de la planilla de CARGO; la T es de corpus y es otra
+planilla, no reciclar). **Al menos DOS de los cinco son de RECHAZO a propósito: una planilla donde
+todo pasa no prueba que la cerradura exista** — acá son tres.
+
+**LA PLANILLA S SE CORRE SOLO, y no es un atajo: es la única forma que el check tiene.** La regla
+"un import trae TU personaje" (el `origin` de la cabecera contra el SteamID64 de quien manda) hace que
+el archivo de otro jugador se RECHACE. El flujo real —el amigo exporta en su máquina e importa en la
+del autor— usa la MISMA SteamID64 las dos veces, así que probarlo solo ejerce idéntica ruta de código.
+Todo pasa en el **listen server**, donde el `garrysmod/data/` que escribe el server es el que lee el
+cliente. El reparto de realms tiene precedente en el repo y no se afirma de memoria: `cargo_export` es
+server-only como `cargo_dev_give`, y `cargo_import` es client-only como `cargo_icon_edit`.
+
+- **S1** · **ida y vuelta local sin pérdida, y de paso REEMPLAZA.** Preparación: `cargo_dev_give`,
+  ponerse el **casco con el NVG en su sub-slot** (`cargo_dev_helmet` declara `optic`, y
+  `cargo_dev_nvg` es `category:optics`) y **disparar el SMG hasta un cargador que NO sea el lleno**,
+  después desequiparlo para que la cosecha lo baje al blob. `cargo_export`. Ahora **cambiar el
+  inventario EN VIVO** —dropear cosas, `cargo_dev_give` otra vez— y recién ahí `cargo_import`.
+  Vuelve el estado exportado: el casco **con el NVG adentro** —un ítem acuñado de cero vuelve
+  vacío, igual que en R1— y el SMG **con el cargador que se le dejó**, no con su `DefaultClip`. Y lo
+  que se agregó en el medio **tiene que haber desaparecido**: eso es lo que prueba que REEMPLAZA y no
+  fusiona. **Ojo con la trampa de la condición: si todo está en 100, "volvió con su condición" no
+  prueba nada** — 100 es también lo que da un ítem recién acuñado. Por eso la señal numérica es el
+  cargador, que no tiene un valor por default que coincida. **Y ojo con lo declarado:** el arma
+  equipada vuelve a la mano en el **próximo respawn**, no en el acto.
+  No hace falta borrar `inv_<steamid64>.json` ni reiniciar: cambiar el inventario en vivo prueba
+  más que borrarlo, y el respaldo queda en `import_backup_<steamid64>.json` por si algo sale mal.
+- **S2** · **import con defs que este servidor no conoce.** Dos rutas, y prueban cosas distintas:
+  editar a mano el `id` de una entrada del `export_*.json` por uno inventado ejerce el saneo —que es
+  lo que S2 mide, porque para `Items.Get` una def desmontada y una inventada son lo mismo— y no pide
+  reiniciar; desmontar de verdad un pack ARC9 prueba además que el desmontaje no rompe otra cosa,
+  pero exige reinicio. Con cualquiera de las dos: descarta **esas** entradas con **log de motivo** en
+  la consola del servidor y **no rompe el resto**.
+- **S3** · **RECHAZO — import con la convar en 0.** Con `cargo_import_enabled 0`, `cargo_import` se
+  rechaza **y la consola del servidor dice por qué** (§0.bis 4). Es el check que prueba que el
+  default es real.
+- **S4** · **RECHAZO — SteamID64 fuera de la whitelist.** Con la convar en 1 y
+  `cargo_import_whitelist` vacía, se rechaza con motivo. Repetir con la lista puesta pero con OTRA
+  id: se rechaza igual.
+- **S5** · **verificación negativa: el inventario normal, el comercio y el savegame siguen intactos.**
+  Equipar/dropear/recoger, una compra a Sidorovich, y un `gm_save`/`gm_load` con una crate con loot.
+  Este bloque toca el record, que es la superficie más caliente del módulo, así que lo que hay que
+  mirar es que nada de lo confirmado en P, Q y R se haya movido.
+
+Planilla (sección nueva de la de Cargo, la misma URL que la P, la Q y la R):
+https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+
+### Cierre — planilla `S` en 5/5, dos rondas (2026-07-26)
+
+**Confirmado en juego por el autor.** S1 (ida y vuelta sin pérdida: condiciones, el NVG en el
+sub-slot del casco, el cargador y el cinturón, y lo agregado en el medio desaparece — REEMPLAZA) ·
+S2 (una def que este servidor no conoce descarta esa entrada con motivo y el resto entra) · S3
+(RECHAZO con la convar en 0) · S4 (RECHAZO fuera de la whitelist) · S5 (inventario, comercio,
+crate y morir-con-el-arma-en-la-mano intactos: «B5 no ha roto nada»).
+
+**Las tres capas de la cerradura dejaron su línea en consola**, que es lo que vuelve citable la
+evidencia:
+
+    import RECHAZADO — SEPULDOSKY (…): el import está apagado en este servidor (cargo_import_enabled 0)
+    import RECHAZADO — SEPULDOSKY (…): el SteamID64 no está en cargo_import_whitelist
+    import saneo    — SEPULDOSKY (…): blob 'i1785110922_1': def desconocida 'wpn_arc9_eft_m19a1', descartado
+    import saneo    — SEPULDOSKY (…): grid 'wpn_arc9_eft_m16a1': uid 'i1785110922_1' sin blob en el archivo, descartada
+
+**EL HALLAZGO DE LA RONDA 1 SALIÓ DE UN CHECK QUE PASÓ, y es el tercer bloque seguido.** S1 marcó
+el ida y vuelta correcto en todo lo que medía; el defecto —el arma equipada que no se podía sacar—
+estaba en el campo de notas al costado. Lo arregla el PARCHE 6, y la fila de §13 que declaraba esa
+espera como frontera aceptable **desaparece**: la planilla mostró que no lo era.
+
+**Y dejó una lección de método propia, que es sobre CÓMO SE MIDE.** Dos rondas se fueron en
+distinguir «el re-give está roto» de «no hubo respawn», y el error fue de esta sesión, no del autor:
+se afirmó que la declaración de §13 era falsa **antes** de tener el dato que lo probara. Lo desempató
+el experimento más barato de todos —un `kill`— que separaba las dos lecturas de una: si el arma vuelve
+en el segundo respawn, el mecanismo está sano. **Un instrumento chico y decisivo antes que una
+hipótesis elaborada**, que es la misma conclusión a la que B4 llegó con `cargo_dev_worldwep`.
+
+De paso, dos correcciones a los comandos de diagnóstico que valen para la próxima pasada: la consola
+de GMod **trunca** una línea larga de `lua_run` sin decir que la truncó (el error sale como sintaxis),
+y pegar varias sentencias separadas por saltos las concatena. Los comandos de medición se mandan
+**cortos y de a uno**.
+
+Harness **504** verdes en ambos realms (eran 448), checker de IDs limpio, espejo regenerado.
+**Sin commitear** (GIT-7). Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9

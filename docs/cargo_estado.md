@@ -5,21 +5,34 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-26 (**entries 46-47 `[APLICADO]`, confirmadas en juego con la planilla R en 5/5** — B4, el
-savegame de GMod: `gm_save`/`gm_load` conservan el estado de partida de Cargo que vive en entidades. Una crate
-vuelve **con su loot y sus condiciones**, un trader con su **stock mermado y su wallet**, y un ítem tirado en el
-suelo sobrevive el ciclo — por las **dos** rutas de drop, la entidad de ítem y el arma soltada. **CRG-60
-acuñada**: *el savegame guarda el MUNDO, no al jugador* — la mochila NO retrocede, que es la contrapartida
-declarada de CRG-43. La forma, y es la decisión de diseño de la tanda: **no hay `PreEntityCopy`**. El estado
-plano de la entidad YA viaja y la entry 45 lo dejó limpio, así que `Containers.Save` **renderiza siempre** y ese
-marcador ES el blob; al volver, `Containers.Attach` lo re-acuña con **uid nuevo** (`Instances.Remint`,
-recursivo por los sub-slots). Como vive en la única puerta del primitivo, **Sidorovich lo hereda sin tocar su
-repo** — no hubo cuarta raíz. Decisión del autor previa al código (§5.2): con `persistKey`, **manda el
-savegame** sobre el archivo de dueño, y el archivo se reconcilia. Harness **448** (eran 425), los nuevos
-verificados **en negativo**. **Cuatro rondas** dejaron además una frontera **medida y aceptada por el autor**:
-la tabla Lua vuelve completa en las entidades scripteadas de Cargo y **no vuelve en absoluto** en el SWEP real
-que deja el drop de un arma, así que un arma soltada vuelve de fábrica (§13; instrumento
-`cargo_dev_worldwep`). Antes, **entries 44-45 `[APLICADO]`, confirmadas en juego con la planilla Q en
+**Última actualización:** 2026-07-26 (**entries 48-49 `[APLICADO]`, confirmadas en juego con la planilla S en
+5/5** — B5, **export/import LAN**, y con eso el plan de persistencia queda ejecutado salvo B6, que está diferido
+a Cortex. Que un amigo traiga su personaje a la LAN, **con la puerta cerrada por default**. Archivo nuevo
+`shared/corpus_cargo_lan.lua`. **CRG-61 acuñada**: *el
+import está apagado por default y todo lo que llega del cliente se sanea server-side*. Es el **único** de los 23
+`net.Receive` de servidor del módulo que **invierte CRG-6** —recibe estado, no un intent—, y la convar en 0, el
+gate de admin y la whitelist (**vacía = NADIE**) son lo que hace aceptable la inversión. Barato en formato y caro
+en política: el record ya era autocontenido (CRG-56) y el re-acuñado ya existía (`Instances.Remint`, B4) — **no
+se escribió un segundo re-uid**. Decisiones del autor previas al código: el import **REEMPLAZA** el record (con
+respaldo a `import_backup_<sid>` antes de tocar nada, destino primero como CRG-58) y el **dinero viaja sólo con
+el provider nativo en AMBOS lados**. **Una medición cambió el diseño:** el plan pedía chunking y un record
+pesado pero realista mide **15.770 bytes** (60 uniques con anidado + 40 stacks), así que no hay chunking sino un
+**tope** — 64 KiB en el cable, cortados antes de descomprimir, y 128 KiB de JSON al abrirlo. La firma de
+compatibilidad **avisa y no gatea**, con las tres mitades declaradas por lo que cada una puede prometer. **La
+planilla corrigió una declaración de la tanda:** el import deja las armas equipadas **en la mano en el acto**,
+corriendo `Inventory.RegiveEquipped` —la MISMA rutina del hook de spawn, extraída y nombrada, no una segunda
+ruta—, y la fila de §13 que declaraba la espera del respawn como frontera aceptable desapareció. Harness
+**504** (eran 448), **56 nuevos**, y las **28 reversiones verificadas en negativo**. Antes, **entries 46-47
+`[APLICADO]`, confirmadas en juego con la planilla R en 5/5** — B4, el savegame de GMod: `gm_save`/`gm_load`
+conservan el estado de partida de Cargo que vive en entidades. Una crate vuelve **con su loot y sus
+condiciones**, un trader con su **stock mermado y su wallet**, y un ítem tirado en el suelo sobrevive el ciclo.
+**CRG-60 acuñada**: *el savegame guarda el MUNDO, no al jugador* — la mochila NO retrocede, contrapartida
+declarada de CRG-43. La forma: **no hay `PreEntityCopy`** — el estado plano de la entidad YA viaja, así que
+`Containers.Save` **renderiza siempre** y ese marcador ES el blob; al volver, `Containers.Attach` lo re-acuña con
+uid nuevo. Como vive en la única puerta del primitivo, **Sidorovich lo hereda sin tocar su repo**. Cuatro rondas
+dejaron una frontera **medida y aceptada**: la tabla Lua vuelve completa en las entidades scripteadas de Cargo y
+**no vuelve en absoluto** en el SWEP real del drop de un arma (§13; instrumento `cargo_dev_worldwep`).
+Antes, **entries 44-45 `[APLICADO]`, confirmadas en juego con la planilla Q en
 5/5**: un solo serializador de dueño (`Instances.RenderOwner`/`HydrateOwner`), **`cont_<key>` como archivo de
 dueño de primera clase** con un solo escritor —eso sacó a **CRG-58 de INTENCION** y arregló que una crate
 persistente perdiera sus uniques al reiniciar—, **CRG-59 acuñada**, el wallet aparte en `trader_<key>` por
@@ -157,7 +170,15 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   un addon de contenido) + callbacks `OnTradeOpened/Dealt/Closed` + idles de
   plaza rotados + voz por proximidad (saludo/espera 1 min/despedida). Sin
   persona: citizen mudo; sin banco: UI muda, consola limpia.
-- **Harness offline: 448 checks verdes en ambos realms** (con gate final: un
+- **Llevar un personaje a otro servidor** (entry 48, §12.1):
+  `cargo_export` escribe el record + cabecera (formato, origen, provider de
+  dinero, firma) por `Corpus.Data`; `cargo_import` lo manda desde el cliente y
+  **el server decide todo**. Convars: `cargo_import_enabled` (**0**),
+  `cargo_import_admin` (1), `cargo_import_whitelist` (**vacía = nadie**),
+  `cargo_import_cooldown` (30 s). En un **listen server** el archivo que escribe
+  el server es el que lee el cliente, y por eso el ida y vuelta funciona sin
+  mover nada a mano; en un dedicated hay que acercárselo al jugador.
+- **Harness offline: 504 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 83 client / 76 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
@@ -165,7 +186,17 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **Nada.** Las entries 46-47 (B4) quedaron confirmadas el 2026-07-26 con la **planilla R en 5/5**, tras
+- **Nada.** Las entries 48-49 (B5) quedaron confirmadas el 2026-07-26 con la **planilla S en 5/5**, tras dos
+  rondas: S1 (ida y vuelta sin pérdida — condiciones, el NVG en el sub-slot, el cargador, el cinturón, y lo
+  agregado en el medio desaparece: REEMPLAZA) · S2 (una def desconocida se descarta con motivo y el resto entra) ·
+  S3 y S4 (**los dos de RECHAZO**, cada uno con su línea de motivo en consola) · S5 (negativa: «B5 no ha roto
+  nada»). **El hallazgo de la ronda 1 salió otra vez de un check que PASÓ** —el arma equipada que no se podía
+  sacar, anotada al costado de un S1 correcto—, y lo arregló el PARCHE 6. De paso quedó una lección de método
+  propia: dos rondas se fueron en distinguir «el re-give está roto» de «no hubo respawn», y lo desempató el
+  experimento más barato posible, un `kill`. Harness **504**, checker limpio, espejo regenerado. **Sin
+  commitear** (GIT-7).
+  Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+- Antes, las entries 46-47 (B4) quedaron confirmadas el 2026-07-26 con la **planilla R en 5/5**, tras
   cuatro rondas: R1 (la crate vuelve con su loot y el casco con el NVG en su sub-slot) · R2 (los dos
   traders con stock mermado y wallet — el de Sidorovich **sin tocar `corpus-stalker`**) · R3 (**CRG-60**:
   la mochila no retrocede) · R4 (el drop `corpus_cargo_item` vuelve con su blob) · R5 (Sidorovich
@@ -231,16 +262,20 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   de mundo sin bajar al spec de `Cargo_ItemImages_Arquitectura.md`.
 - **Remitir el fix de brazos oscuros a Twilight** (ya confirmado, acción del
   autor).
+- **El gate de admin del import es local y provisional** (§13): `ply:IsAdmin()`
+  + convar `cargo_import_admin`, esperando la primitiva de permisos de
+  **CRG-45**. Lo provisional es *cómo se pregunta quién es admin* — la convar
+  en 0 por default y la whitelist son diseño y se quedan.
 - Peso nominal de attachments; comandos dev sin gate admin; sin `addon.json`.
 
 ## Próximo paso
 
-1. **B5 — export/import LAN** ([`../../dev/PLAN_cargo_persistencia_gc.md`](../../dev/PLAN_cargo_persistencia_gc.md) §4),
-   con PROMPT escrito: [`../../dev/PROMPT_cargo_b5_export_lan.txt`](../../dev/PROMPT_cargo_b5_export_lan.txt).
-   Comparte el serializador con B4 y solo le agrega **transporte y política**: convar en 0 por default,
-   whitelist de SteamIDs, gate de admin, saneo server-side, firma de compatibilidad y **re-uid al
-   importar** — el mismo `Instances.Remint` que la entry 46 estrenó y que la planilla R confirmó.
-2. **Slice 2 del comercio** (desplazado por decisión del autor el 2026-07-25, D4 del plan
+1. **Slice 2 del comercio** — el **plan de persistencia quedó cerrado** con B5: B6 (perfiles reales y GC
+   jerárquico) está **diferido a Cortex**, con el diseño congelado en §6 del
+   [`plan madre`](../../dev/PLAN_cargo_persistencia_gc.md), y no se ejecuta hasta que Cortex tenga código y
+   `CLAUDE.md` — B1-B5 no le cerraron la puerta. Una decisión que B5 dejó ABIERTA para B6 a propósito: qué
+   scope lleva un archivo de export, que no es ni `config` ni `save` (§12.1).
+   (Desplazado por decisión del autor el 2026-07-25, D4 del plan
    madre): el dinero como entidad (`Cargo_Trade` §7 — botar efectivo desde el botón $,
    línea de solo-dinero en el basket). Después el slice 3 (jugador-trader con doble
    confirm). Semilla del chat nuevo:

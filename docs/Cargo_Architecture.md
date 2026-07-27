@@ -395,6 +395,56 @@ Todo vía `Corpus.Data` (namespace `cargo`), sin necesidad de SQLite: no hay con
 
 Una entrada con `uid` cuyo blob no viene en el archivo se **descarta con log** al cargar: un ítem sin blob no se renderiza a medias (degradación honesta, cita COR-5).
 
+### 12.1 Llevar un personaje a otro servidor (export / import LAN)
+
+**CRG-61 — El import está apagado por default y todo lo que llega del cliente se sanea server-side.** Es el **único** punto del módulo donde CRG-6 —el server posee el inventario— se **invierte**: los otros 21 `net.Receive` reciben *intents*, que se validan contra el estado real y no pueden fabricar nada; éste recibe **estado**. La convar en 0, el gate de admin y la whitelist no son adorno: son lo que hace aceptable la inversión. Si la inversión existiera y la llave no, este archivo sería un agujero.
+
+**Es barato en formato y caro en política.** El record ya es autocontenido desde CRG-56 y el re-acuñado ya existe desde CRG-60: lo único que faltaba era **transporte y permiso**.
+
+**El export** (`cargo_export`, server) escribe el record renderizado por `Instances.RenderOwner` a un archivo por `Corpus.Data` (`export_<steamid64>`, o el nombre que se le pase), con una **cabecera**: número de formato, SteamID64 de origen, provider de dinero y firma de compatibilidad. **El número de formato NO es una ruta de migración** (D2 del plan: sin migraciones) — existe para **rechazar** con un motivo legible en vez de aceptar basura de otra época.
+
+**El import** (`cargo_import`, client) lee ese archivo del disco del propio cliente y lo manda; **todas** las decisiones se toman en el server, en este orden, porque cada capa hace inútil un ataque que la siguiente ya no tiene que considerar:
+
+| # | Capa | Convar | Default |
+|---|---|---|---|
+| 1 | La puerta | `cargo_import_enabled` | **0** — apagada |
+| 2 | Gate de admin | `cargo_import_admin` | 1 |
+| 3 | Whitelist de SteamID64 | `cargo_import_whitelist` | **vacía = NADIE**, jamás "vacía = todos" |
+| 4 | Rate-limit | `cargo_import_cooldown` | 30 s |
+| 5 | Tope, formato, origen, firma y **saneo entrada por entrada** | — | — |
+
+**El receptor se registra SIEMPRE, aun con la convar en 0, y descarta en la primera línea.** No registrarlo sería la forma más fuerte, pero `util.AddNetworkString` corre al boot —una convar cambiada en vivo no tendría efecto sin cambio de mapa— y, decisivo: **un receptor que no existe no tiene dónde imprimir por qué rechazó**. Cada rechazo loguea su **motivo** en la consola del servidor; al jugador le llega una línea corta en inglés (CRG-48), porque una cerradura no le narra sus tripas a quien golpea.
+
+**El saneo** (precedente de forma: CRG-46, el override de íconos). Def desconocida ⇒ la entrada se descarta con log · condición ⇒ se clampea al rango legal · counts ⇒ se recortan al `max_stack` de la def **real**, no al que vino · `ammo_group` fuera del set ⇒ se descarta el campo · sub-slots ⇒ **el filtro de la def manda** y lo que sobra de `maxItems` se recorta · claves numéricas ⇒ `Util.NumberKeys` (cita **COR-8**) · NaN e infinito ⇒ se descartan, que el JSON los expresa y toda comparación río abajo contestaría `false` en silencio. Lo que el **módulo dueño** puso en el blob viaja intacto (cita **CRG-1**: Cargo transporta, no interpreta) una vez probado que es dato plano. **Un uid puede estar reclamado exactamente UNA vez** en todo el record: dos entradas nombrando el mismo blob es la duplicación que este bloque existe para evitar. Un ítem que no entra en el slot en el que llegó **cae al grid** en vez de morir, que es lo que ya hace `ReconcileEquipSlots` al spawn (cita **CRG-9**).
+
+**El peso NO es un gate del import**, igual que no lo es en una compra (cita **CRG-18**): el jugador puede llegar sobrecargado y la curva se lo cobra en velocidad.
+
+**El uid se re-acuña con `Instances.Remint`**, el mismo que estrenó CRG-60 y confirmó la planilla R — no hay un segundo re-acuñado. Dos records de servidores distintos pueden traer uids colisionantes: el uid es único **por boot**, no globalmente.
+
+**El import REEMPLAZA, no fusiona** (decisión del autor, 2026-07-26). "Traigo mi personaje" es literal y es el inverso exacto del export; fusionar es la ruta de la duplicación infinita —importar dos veces duplicaría todo y el peso dejaría de significar algo—. El record del destino se escribe **antes** a `import_backup_<steamid64>`: una sola escritura, destino primero, el mismo orden de **CRG-58** donde duplicar es el modo de falla seguro. El respaldo obedece `cargo_persistence`: con la persistencia en 0 **nada** de Cargo toca el disco (planilla P4) y el respaldo sería la excepción que vuelve falsa esa frase.
+
+**El dinero viaja sólo con el provider nativo en AMBOS lados** (decisión del autor, 2026-07-26). El wallet vive **dentro** del record (`rec.wallet.usd`), así que viaja solo salvo que se lo saque a propósito: `Money` es una interfaz con providers (§6) y exportar un wallet que otro provider posee es **fabricar plata en el destino**. La cabecera estampa el provider de origen y el destino sólo lo acepta si los dos dicen `usd`.
+
+**La firma de compatibilidad AVISA, no gatea, y hay que decir qué puede prometer** — una firma que promete lo que no cumple es peor que no tenerla:
+
+| Mitad | ¿Estable entre dos servidores con los mismos mods? | Qué ve |
+|---|---|---|
+| `modules` | **Sí** | Qué módulos Corpus registraron. `corpus-stalker` es addon de **contenido** y no registra módulo, así que esta mitad no lo ve |
+| `defs` + `defs_hash` | **Sí**, y es la mitad que sí ve a los addons de contenido | Hash de la lista **ordenada** de ids de defs NO autogen: se registran al boot desde archivos shared, así que el conjunto es función de los addons montados y de nada más |
+| `autogen` | **No**, y por eso viaja como número pelado | `autogen_defs` **acumula a lo largo de la vida del servidor** (leído de `capture.lua`, no supuesto): dos servidores con los mismos mods hoy pueden tener conjuntos distintos según qué capturó cada uno |
+
+Lo que protege de verdad al destino es el **saneo entrada por entrada**, no la firma. La mitad que sí rechaza es el número de formato.
+
+**Tope en vez de chunking, y es una medición, no una estimación.** El plan madre daba por hecho que haría falta trocear el payload. Medido offline: un record pesado pero realista —60 uniques cada uno con un anidado en su sub-slot, más 40 stacks— renderiza a **15.770 bytes** de JSON, y 200 uniques + 100 stacks a **51.310**; comprimido por `Util.WriteBlob` es una fracción de eso, holgado dentro de un mensaje. Así que el chunking sería adorno y lo que hace falta es un **techo que rechace con motivo**: el cable se corta en 64 KiB **antes** de descomprimir un solo byte, y el JSON resultante en 128 KiB, que es lo que ataja una bomba de descompresión. El harness afirma la medición: el día que un blob engorde, el rojo sale offline.
+
+**Fronteras declaradas del bloque, no descuidos:**
+
+- Las **armas equipadas** que llegan en el import quedan **en la mano en el acto** si el jugador está vivo. No por una ruta propia: el import corre `Inventory.RegiveEquipped`, **la misma rutina** que el hook `PlayerLoadout` y su reconcile diferido — un solo re-give con tres llamadores, por el mismo argumento que puso la restauración del savegame dentro de `Containers.Attach` y los dos archivos de dueño detrás de un solo serializador (CRG-58). Un jugador muerto no es una omisión: el hook de spawn está por llamar a esa misma función. **Se llegó acá por la planilla S1**, que midió el defecto contrario: hasta entonces el import dejaba un wheel lleno de armas que no se podían sacar hasta el próximo respawn.
+- El gate de admin es **local y provisional** — ver §13.1: **CRG-45** sigue esperando la primitiva de permisos de Corpus.
+- El export escribe en el disco del **servidor**. En un listen server —el caso de la LAN del autor— ése es el mismo `garrysmod/data/` que el cliente lee, y por eso el ida y vuelta funciona sin mover un archivo a mano. En un dedicated no: ahí el archivo queda en el host y alguien tiene que acercárselo al jugador.
+- Un import trae **TU** personaje: el `origin` de la cabecera tiene que ser el SteamID64 de quien lo manda. Cierra la duplicación entre dos invitados de la misma whitelist sin necesidad de una convar más.
+- **Qué scope lleva un archivo de export es decisión de B6, y se deja abierta a propósito.** COR-19 tiene dos: `config` (catálogo de servidor, sobrevive a borrar una partida) y `save` (estado de partida, muere con ella). Un export es honestamente **ninguno de los dos** — es un artefacto de transporte cuyo propósito entero es cruzar perfiles y servidores. Hoy los dos scopes resuelven a la misma carpeta y por eso no se mueve nada; el día que el layout de perfiles los separe, un export bajo `saves/<perfil>/cargo/` moriría con la campaña que venía a sobrevivir. Queda **con el default (`save`) y con la pregunta escrita**, que es lo que "dejar posible sin implementarlo" significa: inventar acá una norma sobre un scope que no encaja sería peor que nombrar la decisión. El **respaldo** (`import_backup_<steamid64>`) no tiene esa duda: es estado de partida del destino y `save` le corresponde.
+
 ---
 
 ## 13. Fronteras y pendientes declarados
@@ -410,6 +460,7 @@ Una entrada con `uid` cuyo blob no viene en el archivo se **descarta con log** a
 | Upgrades de armas ARC9/EFT | Workbench | Bandera parcialmente resuelta: la API de attach/detach de ARC9 es un canal de escritura legítimo (ver §10.3) — los upgrades de arma pueden modelarse como attachments nativos ARC9 en vez de escritura de stats. La API ya está verificada y el puente en producción (§10, §14); lo que sigue abierto es el **diseño del árbol** de upgrades |
 | Attachments no-ARC9 (TFA u otras bases) | Cargo (integración) | Solo con tabla de compatibilidad manual declarada por arma — sin alcance automático en v1 (§10.4) |
 | **Un arma soltada no conserva su instancia a través de un savegame** — **aceptado por el autor**, no pendiente | El engine; decisión cerrada el 2026-07-26 | **Medido, no supuesto** (planilla R, rondas 3-4, `cargo_dev_worldwep` sobre cuatro entidades del mismo save cargado): la tabla Lua vuelve **completa** en las entidades scripteadas de Cargo —la crate con `7 entrada(s), 5 blob(s)`, el drop `corpus_cargo_item` con su entrada y sus 2 blobs— y **no vuelve en absoluto** en el SWEP real que deja el drop de un arma. Lo único de Cargo que aparece encima del arma es `CargoWorldSpawned`, y **no está restaurado: lo re-pone el hook `PlayerSpawnedSWEP`** del world gate cuando el load crea la entidad (efecto colateral afortunado — el gate sigue vigente tras cargar). Consecuencia: al recoger un arma restaurada se acuña un ítem de fábrica, sin condición, sin attachments y sin cargador (degradación honesta, COR-5). **El autor lo acepta como está**: la ruta alternativa existe (`cargo_weapon_world_pickup 0` hace que el drop spawnee `corpus_cargo_item`, que sí conserva su blob) pero esa convar gobierna **también** el world gate de WALK+USE, y el gate más el arma dibujándose a sí misma (roadmap #16/#17) valen más que el cargador. Partir la convar en dos sería la forma de tener ambas cosas, y sería bloque propio; hoy **no se hace**. Instrumento para re-medirlo: `cargo_dev_worldwep` |
+| **El gate de admin del import es LOCAL y provisional** (`ply:IsAdmin()` + convar `cargo_import_admin`) | Corpus — la primitiva de permisos que **CRG-45** espera | Es el primer y único gate de permisos del módulo, y nació porque §12.1 invierte CRG-6 y no podía esperar (**CRG-61**). Se declara local a propósito: el día que Corpus exponga la primitiva, este gate se reemplaza por ella y la convar que lo apaga desaparece con él. **No** es deuda la convar en 0 por default ni la whitelist —ésas son diseño y se quedan—; lo único provisional es *cómo se pregunta quién es admin*. Mientras tanto la capa se puede apagar (`cargo_import_admin 0`), y apagarla deja a la whitelist como único gate: vacía sigue significando NADIE, así que ningún interruptor solo abre la puerta |
 | **Un arma ARC9 en el suelo rompe el savegame del engine** | ARC9 / el engine — **no Cargo** | Medido en juego el 2026-07-26 (ronda 1 de la planilla R). El save del engine recorre la tabla Lua de cada entidad; las defs de attachment de ARC9 declaran `ATT.Icon = Material(...)` y el SWEP se cuelga esas tablas encima (verificado contra `dev/other/`, cita CRG-24). Resultado: `Can't write unknown type IMaterial`, `attempt to serialize structure with cyclic reference` y `CSave BLOCK SIZE OVERFLOW (>65k)` → *"This save will not load correctly"*, para **todo el mapa**. No se arregla desde acá: ARC9 es COMPAT-RUNTIME y no se forkea. Lo que sí es decisión de Cargo es el camino que lo hace alcanzable — el drop de un arma deja el **SWEP real** en el suelo (roadmap #16/#17) para que se dibuje con sus attachments; el precio, ahora medido, es éste. Lo que Cargo cuelga de una entidad son **184 bytes por unique** y **145 por drop**, con guard offline que exige dato plano y acíclico |
 
 ### 13.1 Comandos dev sin gate de admin
@@ -418,7 +469,10 @@ Una entrada con `uid` cuyo blob no viene en el archivo se **descarta con log** a
 
 Es **deuda declarada, no una norma cumplida**: lo normativo es que el `TODO` esté anotado y espere la primitiva, no que los comandos estén protegidos. Se dice acá para que nadie lea la ausencia de gate como un descuido.
 
-De los 22 `net.Receive` del módulo, el único que necesita gate y no lo tiene es `NET_ICON_OVERRIDE`, hoy **abierto a cualquier jugador** y contenido solo por el saneo de entrada de **CRG-46** (def desconocida se ignora, footprint fuera del set permitido se descarta). Los otros 21 no lo necesitan por diseño: los protege **CRG-6** — el server posee el inventario y el cliente solo manda intents, así que un intent hostil se valida contra el estado real y no puede fabricar nada.
+De los **23** `net.Receive` de SERVIDOR del módulo (derivado por grep del árbol, cita FLU-27), **21 no necesitan gate por diseño**: los protege **CRG-6** — el server posee el inventario y el cliente solo manda intents, así que un intent hostil se valida contra el estado real y no puede fabricar nada. Los dos que quedan son de otra naturaleza:
+
+- `NET_ICON_OVERRIDE` — necesita gate y **no lo tiene**: hoy está **abierto a cualquier jugador** y contenido solo por el saneo de entrada de **CRG-46** (def desconocida se ignora, footprint fuera del set permitido se descarta).
+- `NET_IMPORT` (§12.1, **CRG-61**) — el único que **invierte** CRG-6, y por eso es el único del módulo que **sí** trae gate de admin. Ese gate es **local y provisional**, y se declara como tal en vez de disimularlo: cuando Corpus exponga la primitiva de permisos, este `ply:IsAdmin()` y la convar `cargo_import_admin` que lo gobierna se reemplazan por ella. La whitelist y la convar apagada por default **no** son deuda: son diseño y se quedan.
 
 > **Sede movida el 2026-07-19** (deuda D-3/D-13). Vivía en `cargo_roadmap.txt` (ítem 12 de su lista de deuda propia), y un roadmap es **intención pura, nivel 6** — no puede ser sede de una norma vigente. Peor: el archivo ni siquiera contenía la etiqueta `CRG-45`, así que era una sede rota que el gate LLM no vio y el checker tampoco, porque la ruta existía. El roadmap ahora **cita** esta sección.
 

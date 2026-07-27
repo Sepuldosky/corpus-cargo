@@ -132,9 +132,14 @@ INTEGRACIONES / DEUDA PROPIA
     Alcanza también a los comandos dev nuevos: cargo_icon_edit / regen_all (#5)
     y el spawn del NPC trader de ejemplo (Trade §10).
     La norma es CRG-45 y su SEDE es Cargo_Architecture.md §13.1 — acá solo se
-    ordena el trabajo. Ojo con el matiz que la sede enuncia: el único net.Receive
-    que hoy espera gate es NET_ICON_OVERRIDE (contenido por CRG-46); los otros 21
-    no lo necesitan porque los protege CRG-6.
+    ordena el trabajo. Ojo con el matiz que la sede enuncia, y que la tanda B5
+    del 2026-07-26 cambió: de los net.Receive de SERVIDOR del módulo, casi todos
+    no necesitan gate porque los protege CRG-6; el que lo espera y no lo tiene
+    sigue siendo NET_ICON_OVERRIDE (contenido por CRG-46), y ahora hay UNO que
+    sí trae gate porque invierte CRG-6 — NET_IMPORT (CRG-61, §12.1). Ese gate es
+    LOCAL y provisional: es el primer consumidor que la primitiva va a tener el
+    día que exista, y tiene su fila propia en §13. Los conteos exactos se leen
+    de la sede, que se re-deriva del árbol (FLU-27); acá no se repiten.
 13. Corpus.Data.Delete como primitiva del framework.
     [CERRADO por CHANGELOG #41 (2026-07-25): el file.Delete crudo de
      Instances.Delete YA NO EXISTE — el blob dejó de tener archivo propio
