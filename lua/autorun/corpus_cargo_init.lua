@@ -63,6 +63,7 @@ local SHARED = {
     "shared/corpus_cargo_movecompat.lua", -- curve vs speed-stomping movement mods (#34)
     "shared/corpus_cargo_ammo.lua",     -- HL2 ammo items + caliber map (§16)
     "shared/corpus_cargo_supplies.lua", -- HL2 health/suit items + generic backpacks (#34)
+    "shared/corpus_cargo_nvg.lua",      -- Neosun NVG compat: 61 DERIVED defs (inert without the mod)
     "shared/corpus_cargo_arc9.lua",     -- ARC9 bridge (realm-guarded inside)
     "shared/corpus_cargo_lan.lua",      -- export/import of a record between servers (CRG-61)
     "shared/corpus_cargo_dev.lua",      -- selftest + dev item kit (verification)
@@ -81,6 +82,8 @@ local SERVER_FILES = {
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)
     "server/corpus_cargo_holster.lua",    -- STALKER weapon order + holster + default hands (#22/#4)
     "server/corpus_cargo_icons.lua",      -- icon cam/footprint override registry (ItemImages §4.3/§10)
+    -- AFTER capture.lua: it registers its world pickups through Capture.RegisterWorldPickup
+    "server/corpus_cargo_nvg.lua",        -- Neosun NVG compat: world pickup + NW commit (inert without the mod)
     -- LAST on purpose: its PlayerLoadout wrapper must run after every Cargo
     -- loadout hook so the heals are scheduled before Quick Loadouts strips
     "server/corpus_cargo_quickloadout.lua", -- Quick Loadouts compat: the loadout is an item delivery (no UI)
