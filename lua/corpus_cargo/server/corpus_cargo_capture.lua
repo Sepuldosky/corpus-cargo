@@ -768,7 +768,43 @@ hook.Add("PlayerCanPickupWeapon", "corpus_cargo_world_gate", function(ply, wep)
     return false
 end)
 
--- Look at a world weapon — or a dropped Cargo item, or a world ammo box —
+-- ------------------------------------------------------------------
+-- World pickup registry (roadmap #47). A third-party entity that is NOT a
+-- weapon, not a Cargo drop and not an ammo box has no way into the gate
+-- below: it bails at `ent:IsWeapon()` and the engine reaches the mod's own
+-- ENT:Use. Registering a class here gives it the FOURTH shape, with the
+-- same semantics as the other three — WALK+USE takes, plain USE carries,
+-- same debounce, too heavy leaves it on the floor.
+--
+-- Same registration pattern as StatusPanel.RegisterBar (§11): the fourth
+-- shape inline would work, the fifth would be a smell, and a helmet or
+-- backpack mod lands afterwards without editing the gate again.
+--
+--   spec = { id = <itemId>, count = <n> | nil }
+-- count is for STACKABLE defs only — a unique takes nil (GiveItem reads the
+-- third argument as a blob seed for uniques, never as a quantity).
+-- ------------------------------------------------------------------
+
+CARGO.Capture._worldPickups = CARGO.Capture._worldPickups or {}
+
+function CARGO.Capture.RegisterWorldPickup(class, spec)
+    if not isstring(class) or class == "" then
+        error("Cargo.Capture.RegisterWorldPickup: 'class' must be a non-empty string", 2)
+    end
+    if not istable(spec) or not isstring(spec.id) or spec.id == "" then
+        error("Cargo.Capture.RegisterWorldPickup: 'spec.id' must be a non-empty string (class '" .. class .. "')", 2)
+    end
+    CARGO.Capture._worldPickups[class] = spec
+    return spec
+end
+
+-- nil when the class was never registered. Read ONCE per gate pass.
+function CARGO.Capture.WorldPickupSpec(class)
+    return CARGO.Capture._worldPickups[class or ""]
+end
+
+-- Look at a world weapon — or a dropped Cargo item, or a world ammo box, or
+-- a registered third-party pickup —
 -- and press USE (PlayerUse repeats every tick while +USE is held: debounced
 -- per player). Plain USE = HL2 carry; WALK+USE = deliberate take. For
 -- weapons that is a one-shot grant + engine pickup (the capture hook
@@ -783,12 +819,15 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
     if not IsValid(ent) then return end
 
     local isItem = ent:GetClass() == "corpus_cargo_item"
-    local ammoSpec
+    local ammoSpec, pickSpec
     if not isItem then
         ammoSpec = CARGO.AmmoPool and CARGO.AmmoPool.WorldAmmoSpec
             and CARGO.AmmoPool.WorldAmmoSpec(ent:GetClass()) or nil
+        if ammoSpec == nil then
+            pickSpec = CARGO.Capture.WorldPickupSpec(ent:GetClass())
+        end
     end
-    if not isItem and ammoSpec == nil then
+    if not isItem and ammoSpec == nil and pickSpec == nil then
         if not cvWorldGuns:GetBool() then return end
         if not ent:IsWeapon() then return end
         if IsValid(ent:GetOwner()) then return end   -- someone is holding it
@@ -822,6 +861,23 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
                 SafeRemoveEntityDelayed(ent, 0)
             else
                 -- too heavy: it stays on the floor, where he can come back for it
+                CARGO.Inventory.Notice(ply, "You can't carry that.")
+            end
+            return false
+        end
+        if pickSpec ~= nil then
+            -- registered third-party pickup: the give is ours and the
+            -- `return false` below is what keeps the engine from reaching
+            -- the mod's own ENT:Use (roadmap #27 technique, already proven).
+            -- The flag guards the frames until the delayed remove lands.
+            if ent.CargoPickupTaken then return false end
+            local okPick = CARGO.Inventory.GiveItem(ply, pickSpec.id, pickSpec.count)
+            if okPick then
+                ent.CargoPickupTaken = true
+                CARGO.Inventory.NotifyPickup(ply, pickSpec.id, pickSpec.count or 1)
+                SafeRemoveEntityDelayed(ent, 0)
+            else
+                -- same rule as the ammo box: it stays on the floor
                 CARGO.Inventory.Notice(ply, "You can't carry that.")
             end
             return false
@@ -1134,6 +1190,10 @@ hook.Add("PlayerDroppedWeapon", "corpus_cargo_drop_reconcile", function(ply, wep
     wep.CargoInstanceUid = uid
     wep.CargoInstances = CARGO.Instances.RenderEntry({ uid = uid }) -- CRG-60, as above
     wep.CargoWorldSpawned = true
+    -- fifth door of a first-level slot, and the only one outside
+    -- inventory.lua: dropping the weapon IN HAND empties the slot here, not
+    -- in DropEquipped (CRG-62 — a door that does not broadcast is a hole)
+    hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, nil, nil)
     CARGO.Inventory.Touch(ply)
 end)
 
