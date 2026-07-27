@@ -117,6 +117,13 @@ end
 --   onRightClick  function(entry, cell)?
 --   dragSource    string tag stored on cells ("own"/"cont"/"stock"), nil = no drag
 --   onReceiveDrop function(droppedCell)? — makes the canvas a drop target
+--   onCellDrop    function(targetEntry, droppedCell) -> handled? — makes every
+--                 CELL a drop target too, so an item can be dropped ON another
+--                 item (mounting into a sub-slot, roadmap #47). Returning
+--                 false falls through to onReceiveDrop, which is what keeps
+--                 the container/trade transfer working when the cell under the
+--                 cursor is not a valid host: the canvas behaviour must never
+--                 depend on WHERE inside the canvas you let go.
 --   priceOf       function(entry) -> number|nil — trade: unit price tag
 --   basketOf      function(entry) -> n — trade: units pending in the basket
 -- ------------------------------------------------------------------
@@ -235,6 +242,22 @@ function CARGO.Grid.Create(parent, opts)
 
                 if opts.dragSource then
                     cell:Droppable("cargo_item")
+                end
+
+                -- A cell that is ALSO a receiver shadows the canvas receiver
+                -- (dragndrop walks up from the hovered panel and stops at the
+                -- first one), so the fall-through below is not optional: skip
+                -- it and dropping an item onto another item inside a loot
+                -- panel would silently do nothing instead of transferring.
+                if isfunction(opts.onCellDrop) then
+                    cell:Receiver("cargo_item", function(self, panels, dropped)
+                        if not dropped or not IsValid(panels[1]) then return end
+                        if panels[1] == self then return end -- dropped on itself
+                        if opts.onCellDrop(entry, panels[1]) then return end
+                        if isfunction(opts.onReceiveDrop) then
+                            opts.onReceiveDrop(panels[1])
+                        end
+                    end)
                 end
             end
         end

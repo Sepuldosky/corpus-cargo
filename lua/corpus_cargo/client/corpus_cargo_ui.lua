@@ -129,6 +129,95 @@ local function OwnedHosts()
     return out
 end
 
+-- First sub-slot of `hostEntry` that ACCEPTS `def` and still has room, or nil.
+-- Mirrors the server's own guard in SubSlotAttach (filter + maxItems) — not to
+-- replace it (CRG-6: the server decides) but so the UI can tell "this drop
+-- means mount" from "this drop means something else" before sending anything.
+-- Exported: it is pure, and the drop rule below is the kind that breaks in
+-- silence, so it gets offline coverage instead of only an in-game pass.
+function CARGO.UI.FreeSubSlotFor(hostEntry, def)
+    if not istable(hostEntry) or not istable(def) or hostEntry.uid == nil then return nil end
+    local hostDef = CARGO.Items.Get(hostEntry.id)
+    if hostDef == nil or not istable(hostDef.subslots) then return nil end
+    local mounted = istable(hostEntry.blob) and istable(hostEntry.blob.subslots)
+        and hostEntry.blob.subslots or {}
+    for _, spec in ipairs(hostDef.subslots) do
+        if CARGO.Items.MatchesFilter(def, spec.filter) then
+            local occupied = istable(mounted[spec.id]) and #mounted[spec.id] or 0
+            if occupied < (spec.maxItems or 1) then return spec.id end
+        end
+    end
+    return nil
+end
+local FreeSubSlotFor = CARGO.UI.FreeSubSlotFor
+
+-- Pure: what does dropping `entry` on the equipment slot `slotId` MEAN, given
+-- what the slot currently holds? Author's rule, first in-game pass of #47:
+--
+--   "equip"  the item can take the slot -> it SWAPS with whatever is there
+--            (Inventory.Equip returns the previous occupant to the grid). Goggles
+--            onto a Head wearing a helmet trade one for the other.
+--   "mount"  it cannot take the slot, but the OCCUPANT has a free sub-slot that
+--            accepts it (2nd return = the sub-slot id). The only way a plate, or
+--            an optic that no slot admits on its own, reaches its host by drag.
+--   "reject" neither. The caller still sends the equip: the refusal and its
+--            wording belong to the server (CRG-6), and a readable "that does not
+--            fit" beats a gesture that silently did nothing.
+--
+-- Equip is tried FIRST on purpose. When both readings are legal — goggles that
+-- fit Head onto a helmet that would also take them in its optic — the author
+-- wants the swap.
+function CARGO.UI.ResolveSlotDrop(slotId, entry, hostEntry)
+    local slot = CARGO.Slots.ById[slotId or ""]
+    local def = istable(entry) and CARGO.Items.Get(entry.id or "") or nil
+    if slot == nil or def == nil then return "reject" end
+
+    if CARGO.Slots.CanEquip(def, slotId) and (entry.uid ~= nil or slot.stack) then
+        return "equip"
+    end
+    local subId = CARGO.UI.FreeSubSlotFor(hostEntry, def)
+    if subId ~= nil then return "mount", subId end
+    return "reject"
+end
+
+-- What is mounted inside `hostEntry`, flattened and IN DECLARATION ORDER:
+--   { { subId = "optic", index = 1, id = "cargo_nvg_...", name = "..." }, ... }
+-- `index` is the position WITHIN its sub-slot, which is what SubSlotDetach
+-- takes — flattening must not renumber it.
+-- Pure and exported so the offline harness can hold it: the gap this closes is
+-- data, not decoration.
+function CARGO.UI.MountedEntries(hostEntry)
+    local out = {}
+    if not istable(hostEntry) or hostEntry.uid == nil then return out end
+    local def = CARGO.Items.Get(hostEntry.id)
+    if def == nil or not istable(def.subslots) then return out end
+    if not (istable(hostEntry.blob) and istable(hostEntry.blob.subslots)) then return out end
+    for _, spec in ipairs(def.subslots) do
+        local entries = hostEntry.blob.subslots[spec.id]
+        if istable(entries) then
+            for i, sub in ipairs(entries) do
+                local subDef = CARGO.Items.Get(sub.id)
+                out[#out + 1] = { subId = spec.id, index = i, id = sub.id,
+                    name = subDef and subDef.name or sub.id }
+            end
+        end
+    end
+    return out
+end
+
+-- "Extract X" per mounted sub-slot entry. Shared by BOTH menus on purpose: a
+-- host with things mounted in it is the same object whether it sits in an
+-- equipment slot or in the grid, and having the extraction only on the slot
+-- menu meant a helmet in the bag held its optic hostage (author's report,
+-- first in-game pass of #47).
+local function AddExtractOptions(menu, hostEntry)
+    for _, m in ipairs(CARGO.UI.MountedEntries(hostEntry)) do
+        menu:AddOption("Extract " .. m.name, function()
+            SendSubDetach(hostEntry.uid, m.subId, m.index)
+        end)
+    end
+end
+
 local function OpenItemMenu(entry)
     local def = CARGO.Items.Get(entry.id)
     if def == nil then return end
@@ -176,6 +265,9 @@ local function OpenItemMenu(entry)
             end
         end
     end
+
+    -- and the way back out, with the host still in the bag
+    AddExtractOptions(menu, entry)
 
     -- ARC9 attach flow (§10.2 route 1: context menu). Targets: held weapons.
     if def.category == "attachments" and CARGO.ARC9.Available() then
@@ -237,20 +329,8 @@ local function OpenSlotMenu(slotId)
         end
     end
 
-    -- extract mounted sub-slot entries
-    if def and istable(def.subslots) and slotEntry.blob and istable(slotEntry.blob.subslots) then
-        for _, spec in ipairs(def.subslots) do
-            local entries = slotEntry.blob.subslots[spec.id]
-            if istable(entries) then
-                for i, sub in ipairs(entries) do
-                    local subDef = CARGO.Items.Get(sub.id)
-                    menu:AddOption("Extract " .. (subDef and subDef.name or sub.id), function()
-                        SendSubDetach(slotEntry.uid, spec.id, i)
-                    end)
-                end
-            end
-        end
-    end
+    -- extract mounted sub-slot entries (same builder the grid menu uses)
+    AddExtractOptions(menu, slotEntry)
 
     if slotEntry.blob and slotEntry.blob.ammo_group ~= nil then
         local now = slotEntry.blob.ammo_group
@@ -405,8 +485,14 @@ local function MakeSlotCell(parent, slot, tall)
             end
         end
 
-        -- stack slots (throwable) take whole stacks; the rest need a uid
-        if entry.uid or slot.stack then
+        -- equip / mount / reject — the rule is pure and lives in
+        -- CARGO.UI.ResolveSlotDrop, where the harness can reach it
+        local hostEntry = SlotEntryOf(slot.id)
+        local action, subId = CARGO.UI.ResolveSlotDrop(slot.id, entry, hostEntry)
+        if action == "mount" then
+            SendSubAttach(hostEntry.uid, subId, CARGO.Grid.RefOf(entry))
+        elseif entry.uid or slot.stack then
+            -- "equip", and also "reject": the server owns the refusal
             SendEquip(CARGO.Grid.RefOf(entry), slot.id)
         end
     end)
@@ -1205,6 +1291,21 @@ function BuildFrame(state)
                 CARGO.Transfer.Send("take", CARGO.Grid.RefOf(cell.cargoEntry),
                     cell.cargoEntry.count or 1)
             end
+        end,
+        -- item ONTO item, both in the bag: mount it in the host's sub-slot.
+        -- Same intent the "Insert into..." menu sends — the drag is a shortcut
+        -- for it, not a second route. Anything else returns false and falls
+        -- through to onReceiveDrop above, so a loot transfer that happens to
+        -- land on top of a cell still transfers.
+        onCellDrop = function(targetEntry, cell)
+            if cell.cargoSource ~= "own" or not istable(cell.cargoEntry) then return false end
+            if not istable(targetEntry) or targetEntry.uid == nil then return false end
+            if cell.cargoEntry.uid == targetEntry.uid then return false end
+            local def = CARGO.Items.Get(cell.cargoEntry.id)
+            local subId = FreeSubSlotFor(targetEntry, def)
+            if subId == nil then return false end
+            SendSubAttach(targetEntry.uid, subId, CARGO.Grid.RefOf(cell.cargoEntry))
+            return true
         end,
     })
     grid.panel:Dock(FILL)
