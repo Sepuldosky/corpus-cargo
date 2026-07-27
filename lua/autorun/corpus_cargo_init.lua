@@ -64,6 +64,7 @@ local SHARED = {
     "shared/corpus_cargo_ammo.lua",     -- HL2 ammo items + caliber map (§16)
     "shared/corpus_cargo_supplies.lua", -- HL2 health/suit items + generic backpacks (#34)
     "shared/corpus_cargo_arc9.lua",     -- ARC9 bridge (realm-guarded inside)
+    "shared/corpus_cargo_lan.lua",      -- export/import of a record between servers (CRG-61)
     "shared/corpus_cargo_dev.lua",      -- selftest + dev item kit (verification)
 }
 local SERVER_FILES = {
