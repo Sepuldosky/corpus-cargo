@@ -25,6 +25,27 @@
 --
 -- The server owns the inventory; the client only renders snapshots and
 -- sends intents. Every mutation ends in Save + Sync + movement refresh.
+--
+-- EQUIPMENT SIGNALS (CRG-62, roadmap #47). Cargo broadcasts THAT an
+-- equipment slot changed; what the change MEANS lives in the consumer
+-- (CRG-1). Two hooks, fired only after the record is already consistent —
+-- a listener reading rec.equip mid-way would see a state that never existed:
+--
+--   Corpus_Cargo_EquipChanged(ply, slotId, defId | nil, blob | nil)
+--       every first-level slot door: Equip, Unequip and DropEquipped.
+--       defId nil = the slot emptied. blob nil = the value is a stack entry
+--       (throwable) or the slot emptied — a stack has no instance.
+--       slotId nil = the WHOLE set was re-applied (RegiveEquipped): the
+--       listener re-reads everything instead of diffing one slot. That is
+--       the respawn door, and it is why a listener owning player-side state
+--       does not have to hook PlayerLoadout and race the order.
+--
+--   Corpus_Cargo_SubSlotChanged(ply, hostUid, subId)
+--       SubSlotAttach / SubSlotDetach. The host blob is already mutated.
+--
+-- Corpus_Cargo_BodyChanged is UNTOUCHED and still fires: its signature is
+-- live contract (the roadmap #10 disguise reader). The generic signal fires
+-- IN ADDITION, never in its place.
 
 local CARGO = Corpus.GetModule("cargo")
 
@@ -678,6 +699,7 @@ function CARGO.Inventory.Unequip(ply, slotId)
         local def = CARGO.Items.Get(entry.id)
         if def then StripEquipWeapon(ply, def, nil) end
         AddStack(rec, entry.id, entry.count or 1, entry.condition)
+        hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, nil, nil)
         CARGO.Inventory.Touch(ply)
         if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
         return true
@@ -696,6 +718,7 @@ function CARGO.Inventory.Unequip(ply, slotId)
         -- until Cortex's block lands
         hook.Run("Corpus_Cargo_BodyChanged", ply, nil, nil)
     end
+    hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, nil, nil)
     CARGO.Inventory.Touch(ply)
     return true
 end
@@ -732,6 +755,8 @@ function CARGO.Inventory.Equip(ply, ref, slotId)
 
         -- noAmmo: the stack IS the reserve; the Push loads the pool from it
         GiveEquipWeapon(ply, def, nil, true)
+        -- no blob: a stack slot holds an entry table, never an instance
+        hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, def.id, nil)
         CARGO.Inventory.Touch(ply)
         if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
         return true
@@ -761,6 +786,7 @@ function CARGO.Inventory.Equip(ply, ref, slotId)
     if slotId == "body" then
         hook.Run("Corpus_Cargo_BodyChanged", ply, def.id, blob)
     end
+    hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, def.id, blob)
     CARGO.Inventory.Touch(ply)
     return true
 end
@@ -885,6 +911,7 @@ function CARGO.Inventory.DropEquipped(ply, slotId)
         local def = CARGO.Items.Get(val.id)
         if def then StripEquipWeapon(ply, def, nil) end
         spawnItemEnt({ id = val.id, count = val.count or 1, condition = val.condition })
+        hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, nil, nil)
         CARGO.Inventory.Touch(ply)
         if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
         return true
@@ -926,6 +953,7 @@ function CARGO.Inventory.DropEquipped(ply, slotId)
         if slotId == "body" then
             hook.Run("Corpus_Cargo_BodyChanged", ply, nil, nil)
         end
+        hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, nil, nil)
         CARGO.Inventory.Touch(ply)
         return true
     end
@@ -937,6 +965,7 @@ function CARGO.Inventory.DropEquipped(ply, slotId)
     if slotId == "body" then
         hook.Run("Corpus_Cargo_BodyChanged", ply, nil, nil)
     end
+    hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, nil, nil)
     CARGO.Inventory.Touch(ply)
     return true
 end
@@ -1171,6 +1200,7 @@ function CARGO.Inventory.SubSlotAttach(ply, hostUid, subId, ref)
     end
 
     table.insert(hostBlob.subslots[subId], mounted)
+    hook.Run("Corpus_Cargo_SubSlotChanged", ply, hostUid, subId)
     CARGO.Inventory.Touch(ply)
 end
 
@@ -1184,6 +1214,7 @@ function CARGO.Inventory.SubSlotDetach(ply, hostUid, subId, entryIndex)
 
     local entry = table.remove(entries, entryIndex)
     CARGO.Inventory.GiveEntry(ply, entry, true) -- ejection path: never blocked
+    hook.Run("Corpus_Cargo_SubSlotChanged", ply, hostUid, subId)
     CARGO.Inventory.Touch(ply)
 end
 
@@ -1354,6 +1385,14 @@ function CARGO.Inventory.RegiveEquipped(ply)
             GiveEquipWeapon(ply, def, istable(val) and nil or blob, istable(val))
         end
     end
+
+    -- The whole set was just (re-)applied to this player entity, so the
+    -- generic signal fires with NO slot: "re-read everything" (see header).
+    -- A listener that owns player-side state — the NVG compat writes a
+    -- networked var — gets the respawn door here instead of hooking
+    -- PlayerLoadout and betting on hook order, which is the bug Quick
+    -- Loadouts already cost this repo.
+    hook.Run("Corpus_Cargo_EquipChanged", ply, nil, nil, nil)
 end
 
 -- ------------------------------------------------------------------
