@@ -845,3 +845,59 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Mapeo completo, API verificada contra el código vivo y defectos del mod
     inventariados en dev/Cargo_NVG_Neosun_Referencia.md. El mod es OFF-LIMITS
     para modificar (dato del autor): integración en runtime y nada más.
+
+48. LA CELDA ANCHA Y EL CLICK EN EL WHEEL [Cargo UI] — ABIERTO (pedido del
+    autor 2026-07-29, al cerrar el #46 con la planilla V en 10/10).
+    PROMPT: ../../dev/PROMPT_cargo_wheel_celda_ancha_y_click.txt
+    DOS COSAS, y la primera NO es diseño nuevo: es la DIFERIDA (g) del #46,
+    aprobada por el autor el 2026-07-27 con el mock como sede
+    (mockups/cargo_wheel_lights_mock_v1_1.html, bloque 06).
+
+    (A) CELDA ANCHA — variante (B) del mock, 150x56, SOLO para el grupo de
+        luces. Configurable por convar. Las dos condiciones duras son del
+        mock y no se negocian:
+          * SOLO con anclaje izquierda o derecha. Con anclaje arriba/abajo el
+            grupo DEGRADA SOLO a 56x56 en el MISMO build — las dos anatomias
+            de celda coexisten, no es un modo que se elige una vez.
+          * QUICK Y TOOLS SIGUEN CUADRADOS SIEMPRE. La celda ancha es la
+            excepcion del panel de luces, no un modo nuevo del menu.
+        Impacto real, ya localizado: GroupCells (client/corpus_cargo_wheel.lua)
+        cierra hoy sobre UNA constante de celda; pasa a (w,h) por grupo, con w
+        clampeado a h cuando el eje es horizontal. ResolveAnchors no se toca.
+        LA ADVERTENCIA DEL MOCK SOBRE EL DESBORDE ESTA MAL Y SE CORRIGE CON LA
+        CUENTA, no con una opinion: el mock dice que con empuje la columna
+        "se sale de pantalla en 1280x720". El grupo crece hacia AFUERA desde la
+        misma linea de anclaje, y el extremo queda en 305 (anillo) + 46
+        (margen) + push*(56+24) + 150 (celda) = 501 con push 0 y 581 con push 1,
+        en unidades @1080 que el layout ESCALA por altura. A 1280x720 son ~334 y
+        ~387 px reales contra 640 de media pantalla; el caso apretado no es
+        16:9 sino 4:3, y el push=2 que dispara el peor numero (661) es
+        INALCANZABLE por convars — ResolveAnchors nunca deja a quick y tools en
+        el mismo lado. Se fija con un check de harness sobre la pura, para que
+        nadie re-herede la advertencia sin recalcularla.
+
+    (B) CLICK EN EL WHEEL — ADITIVO, decision del autor: soltar la tecla sobre
+        algo sigue comiteando EXACTAMENTE como hoy (CRG-31 intacta) y ademas,
+        con el wheel abierto, un click comitea. No se reemplaza el gesto que ya
+        esta en el musculo; se suma el pausado.
+        DOS COSAS QUE NO SE ASUMEN, y es la leccion que el #46 pago TRES veces
+        (una API del engine asumida en vez de medida):
+          * COMO se detecta el click. NO se estrena un hook de mouse de GMod de
+            memoria: no hay dev/other/ contra el cual verificarlo. Se pollea
+            con deteccion de flanco, que es el patron que el wheel YA usa para
+            su tecla (input.IsButtonDown en Think) — precedente dentro del
+            propio archivo en vez de API nueva.
+          * SI el screen clicker deja ver el estado del mouse por debajo. Hoy
+            gui.EnableScreenClicker se traga los clicks A PROPOSITO (§17.4:
+            nada dispara mientras apuntas el wheel). Que input.IsMouseDown siga
+            reportando es PLAUSIBLE y NO ESTA VERIFICADO. Es lo PRIMERO que
+            mide la planilla, no algo que se descubre a mitad de la
+            implementacion; si no reporta, el plan B se decide con el autor.
+
+    NO ENTRA EN ESTA TANDA: las otras dos diferidas del #46 — (h) fades, ciclo
+    de cierre y estado BLOQUEADO de rechazo visible, e (i) baterias 0-100.
+    Siguen aprobadas y diferidas, con el mock como sede. DE (h) SE ACTUALIZA
+    UNA COSA: arrastraba una verificacion pendiente —si el mod de NVG bloquea
+    la linterna durante su animacion— y la planilla V la CONTESTO en V7: NO la
+    bloquea, la linterna encendio en pleno transito. Si (h) se ejecuta algun
+    dia, arranca sin esa incognita.
