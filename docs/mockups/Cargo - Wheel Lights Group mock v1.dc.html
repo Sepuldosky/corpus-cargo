@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Cargo — Wheel Lights Group mock v1</title>
+<style>
+:root{
+  /* ── TEMA (único origen de color; en juego se re-tiñe desde el acento) ── */
+  --bg-rgb: 8 10 12;          --bg: rgb(8 10 12);
+  --scrim-rgb: 8 10 12;
+  --panel-rgb: 38 42 48;      --panel: rgb(38 42 48);
+  --panel-alt-rgb: 46 51 58;  --panel-alt: rgb(46 51 58);
+  --cell-rgb: 24 27 31;       --cell: rgb(24 27 31);
+  --cell-hover-rgb: 52 58 66; --cell-hover: rgb(52 58 66);
+  --border-rgb: 74 80 88;     --border: rgb(74 80 88);
+  --border-hi-rgb: 104 112 122; --border-hi: rgb(104 112 122);
+  --text-rgb: 223 226 229;    --text: rgb(223 226 229);
+  --text-dim-rgb: 139 146 153;--text-dim: rgb(139 146 153);
+  --accent-rgb: 79 155 214;   --accent: rgb(79 155 214);
+  --accent-dim-rgb: 46 90 124;--accent-dim: rgb(46 90 124);
+  --green-rgb: 108 191 90;    --green: rgb(108 191 90);
+  --amber-rgb: 214 165 79;    --amber: rgb(214 165 79);
+  --orange-rgb: 214 130 60;   --orange: rgb(214 130 60);
+  --red-rgb: 207 80 64;       --red: rgb(207 80 64);
+  --ff: 'Roboto Condensed', Roboto, Tahoma, sans-serif;
+  /* ── ESCENOGRAFÍA (no es especificación: sólo simula el mundo detrás) ── */
+  --world-a: rgb(26 23 21); --world-b: rgb(20 18 17);
+}
+html,body{margin:0;padding:0}
+body{background:repeating-linear-gradient(115deg,var(--world-a) 0 90px,var(--world-b) 90px 180px);color:var(--text);font-family:var(--ff);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--text)}
+</style>
+</helmet>
+
+<div style="min-height:100vh;padding:40px 40px 72px;display:flex;flex-direction:column;align-items:center;gap:40px">
+
+  <div style="width:100%;max-width:1240px;display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid rgb(var(--border-rgb) / .5);padding-bottom:14px">
+    <div style="font:700 20px var(--ff);color:var(--text);letter-spacing:.01em">Cargo — Wheel Lights Group mock v1</div>
+    <div style="font:500 12px var(--ff);color:var(--text-dim)">documento de especificación · autorado a 1080p · fuentes de tamaño fijo · el mock manda hasta que exista el código</div>
+  </div>
+
+  <!-- ══════════ 1 · ESCENA COMPLETA ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--border-rgb) / .35);background:rgb(var(--bg-rgb) / .5);padding:18px 22px 26px;box-sizing:border-box">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+      <div style="font:700 11px var(--ff);color:var(--accent);letter-spacing:.16em">01</div>
+      <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.16em;text-transform:uppercase">Escena completa · luces ancladas a la izquierda · caso cargado (4 chips) · hover sobre NVG en tránsito</div>
+    </div>
+
+    <div style="position:relative;width:880px;height:800px;margin:0 auto;background:rgb(var(--scrim-rgb) / .55);overflow:hidden">
+
+      <!-- anillo de sectores -->
+      <div style="position:absolute;left:135px;top:115px;width:610px;height:610px;border-radius:50%;background:rgb(var(--panel-rgb) / .42);border:1px solid rgb(var(--border-rgb) / .45);box-sizing:border-box"></div>
+      <div style="position:absolute;left:437px;top:115px;width:6px;height:185px;background:rgb(var(--scrim-rgb) / .92);transform-origin:3px 305px;transform:rotate(22.5deg)"></div>
+      <div style="position:absolute;left:437px;top:115px;width:6px;height:185px;background:rgb(var(--scrim-rgb) / .92);transform-origin:3px 305px;transform:rotate(67.5deg)"></div>
+      <div style="position:absolute;left:437px;top:115px;width:6px;height:185px;background:rgb(var(--scrim-rgb) / .92);transform-origin:3px 305px;transform:rotate(112.5deg)"></div>
+      <div style="position:absolute;left:437px;top:115px;width:6px;height:185px;background:rgb(var(--scrim-rgb) / .92);transform-origin:3px 305px;transform:rotate(157.5deg)"></div>
+      <div style="position:absolute;left:437px;top:115px;width:6px;height:185px;background:rgb(var(--scrim-rgb) / .92);transform-origin:3px 305px;transform:rotate(202.5deg)"></div>
+      <div style="position:absolute;left:437px;top:115px;width:6px;height:185px;background:rgb(var(--scrim-rgb) / .92);transform-origin:3px 305px;transform:rotate(247.5deg)"></div>
+      <div style="position:absolute;left:437px;top:115px;width:6px;height:185px;background:rgb(var(--scrim-rgb) / .92);transform-origin:3px 305px;transform:rotate(292.5deg)"></div>
+      <div style="position:absolute;left:437px;top:115px;width:6px;height:185px;background:rgb(var(--scrim-rgb) / .92);transform-origin:3px 305px;transform:rotate(337.5deg)"></div>
+
+      <!-- etiquetas de sector (contexto, no se rediseña) -->
+      <div style="position:absolute;left:340px;top:170px;width:200px;text-align:center;font:700 14px var(--ff);color:var(--text-dim)">PRIMARY</div>
+      <div style="position:absolute;left:600px;top:300px;width:160px;text-align:center;font:700 14px var(--ff);color:var(--text-dim)">SIDEARM</div>
+      <div style="position:absolute;left:120px;top:300px;width:160px;text-align:center;font:700 14px var(--ff);color:var(--text-dim)">RIFLE</div>
+      <div style="position:absolute;left:340px;top:640px;width:200px;text-align:center;font:700 14px var(--ff);color:var(--text-dim)">HANDS</div>
+
+      <!-- hub -->
+      <div style="position:absolute;left:320px;top:300px;width:240px;height:240px;border-radius:50%;background:rgb(var(--bg-rgb) / .93);border:1px solid rgb(var(--accent-rgb) / .7);box-sizing:border-box"></div>
+      <div style="position:absolute;left:344px;top:352px;width:192px;text-align:center">
+        <div style="font:700 16px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Night Vision</div>
+        <div style="font:500 14px var(--ff);color:var(--amber);margin-top:2px">OFF &#8594; ON</div>
+        <div style="display:flex;gap:2px;justify-content:center;margin-top:10px">
+          <div data-seg="0" style="width:12px;height:4px;background:var(--amber)"></div>
+          <div data-seg="1" style="width:12px;height:4px;background:var(--amber)"></div>
+          <div data-seg="2" style="width:12px;height:4px;background:var(--amber)"></div>
+          <div data-seg="3" style="width:12px;height:4px;background:var(--amber)"></div>
+          <div data-seg="4" style="width:12px;height:4px;background:var(--amber)"></div>
+          <div data-seg="5" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+          <div data-seg="6" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+          <div data-seg="7" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+          <div data-seg="8" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+          <div data-seg="9" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+          <div data-seg="10" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+          <div data-seg="11" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+        </div>
+      </div>
+      <div style="position:absolute;left:344px;top:492px;width:192px;text-align:center;font:500 12px var(--ff);color:var(--text-dim)">Release to toggle</div>
+
+      <!-- grupo QUICK (arriba, fila) -->
+      <div style="position:absolute;left:316px;top:13px;display:flex;gap:8px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">M</div>
+          <div style="position:absolute;right:3px;top:2px;font:700 11px var(--ff);color:var(--text-dim)">x2</div>
+          <div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F1</div>
+        </div>
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">B</div>
+          <div style="position:absolute;right:3px;top:2px;font:700 11px var(--ff);color:var(--text-dim)">x2</div>
+          <div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F2</div>
+        </div>
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">A</div>
+          <div style="position:absolute;right:3px;top:2px;font:700 11px var(--ff);color:var(--text-dim)">x2</div>
+          <div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F3</div>
+        </div>
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">K</div>
+          <div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F4</div>
+        </div>
+      </div>
+      <div data-annot style="position:absolute;left:316px;top:75px;width:248px;text-align:center;font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.14em">QUICK · USE · FILA</div>
+
+      <!-- grupo TOOLS (derecha, columna) -->
+      <div style="position:absolute;left:791px;top:328px;display:flex;flex-direction:column;gap:8px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">P</div>
+        </div>
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell-hover);border:1px solid var(--border-hi)">
+          <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text)">S</div>
+        </div>
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">C</div>
+        </div>
+      </div>
+      <div data-annot style="position:absolute;left:759px;top:522px;width:116px;text-align:center;font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.14em">TOOLS · SELECT</div>
+
+      <!-- grupo LIGHTS (izquierda, columna) -->
+      <div style="position:absolute;left:33px;top:296px;display:flex;flex-direction:column;gap:8px">
+        <!-- linterna ON -->
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <!-- NVG en tránsito (hovereado) -->
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell-hover);border:1px solid var(--amber)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .6)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+          </div>
+          <div style="position:absolute;left:1px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+            <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+          </div>
+        </div>
+        <!-- dispositivo de arma: luz + láser verde, ON -->
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+          <div style="position:absolute;left:4px;top:2px;right:4px;bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+          </div>
+          <div style="position:absolute;left:4px;right:4px;bottom:4px;height:3px;display:flex;gap:2px">
+            <div style="flex:1;background:var(--accent)"></div>
+            <div style="flex:1;background:var(--green)"></div>
+          </div>
+        </div>
+        <!-- dispositivo de arma: IR, OFF -->
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+          </div>
+        </div>
+      </div>
+      <div data-annot style="position:absolute;left:5px;top:556px;width:112px;text-align:center;font:700 11px var(--ff);color:var(--accent);letter-spacing:.14em">LIGHTS · TOGGLE</div>
+
+      <!-- cotas -->
+      <div data-annot style="position:absolute;left:89px;top:420px;width:46px;height:1px;background:rgb(var(--text-dim-rgb) / .7)"></div>
+      <div data-annot style="position:absolute;left:79px;top:398px;width:66px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">46</div>
+      <div data-annot style="position:absolute;left:320px;top:420px;width:120px;height:1px;background:rgb(var(--text-dim-rgb) / .45)"></div>
+      <div data-annot style="position:absolute;left:320px;top:424px;width:120px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">r 120</div>
+      <div data-annot style="position:absolute;left:440px;top:420px;width:305px;height:1px;background:rgb(var(--text-dim-rgb) / .35)"></div>
+      <div data-annot style="position:absolute;left:744px;top:410px;width:2px;height:20px;background:rgb(var(--text-dim-rgb) / .5)"></div>
+      <div data-annot style="position:absolute;left:585px;top:400px;width:120px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">r 305</div>
+      <div data-annot style="position:absolute;left:600px;top:700px;width:250px;text-align:right;font:500 12px var(--ff);color:var(--text-dim)">&gt; 305 = cancelar</div>
+    </div>
+  </div>
+
+  <!-- ══════════ 2 · TIRA DE ESTADOS ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--border-rgb) / .35);background:rgb(var(--bg-rgb) / .5);padding:18px 22px 26px;box-sizing:border-box">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+      <div style="font:700 11px var(--ff);color:var(--accent);letter-spacing:.16em">02</div>
+      <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.16em;text-transform:uppercase">Estados del chip de luz · propuesta principal (C) · celda 56&#215;56 intacta</div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start">
+
+      <div style="width:132px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">APAGADO</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">relleno cell, borde border, ícono text-dim. Sin barras de modo.</div>
+      </div>
+
+      <div style="width:132px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">ENCENDIDO</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">relleno accent-dim, borde accent, ícono text. Un solo rect distinto.</div>
+      </div>
+
+      <div style="width:132px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--amber)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .55)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+          </div>
+          <div style="position:absolute;left:1px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+            <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--amber);margin-top:10px">EN TR&#193;NSITO &#183; <span data-pct>40%</span></div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">borde amber, ícono amber al 55% pulsando, barra que se llena contra la duración que reporte el mod (a confirmar en el repo).</div>
+      </div>
+
+      <div style="width:132px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell-hover);border:1px solid var(--border-hi)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">HOVEREADO</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">ortogonal: sólo sube el relleno y el borde. Nunca pisa el color de estado.</div>
+      </div>
+
+      <div style="width:132px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">L</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">SIN &#205;CONO</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">cae a la inicial en título 20/700. Estado real y frecuente.</div>
+      </div>
+
+      <div style="width:212px">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent);flex:none">
+            <div style="position:absolute;left:4px;top:2px;right:4px;bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+            </div>
+            <div style="position:absolute;left:4px;right:4px;bottom:4px;height:3px;display:flex;gap:2px">
+              <div style="flex:1;background:var(--accent)"></div>
+              <div style="flex:1;background:var(--green)"></div>
+            </div>
+          </div>
+          <div style="width:140px;border-left:1px solid rgb(var(--border-rgb) / .5);padding-left:10px">
+            <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.1em">EN EL HUB</div>
+            <div style="width:130px;font:500 14px var(--ff);color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">IR Illuminator + IR Laser + Strobe</div>
+            <div style="width:130px;font:500 12px var(--ff);color:var(--text-dim);margin-top:2px">&#8593; cortado con elipsis a 192 px</div>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">MODO LARGO</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">el chip no cambia de tamaño: el nombre completo vive en el hub y ahí se corta.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:26px;align-items:flex-start;margin-top:26px;padding-top:20px;border-top:1px solid rgb(var(--border-rgb) / .3)">
+      <div style="width:132px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent);border:1px solid var(--border-hi)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--bg)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">HOVER &#215; ON</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">el relleno sube de accent-dim a accent; el borde a border-hi.</div>
+      </div>
+      <div style="width:132px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell-hover);border:1px solid var(--amber)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .8)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+          </div>
+          <div style="position:absolute;left:1px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+            <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">HOVER &#215; TR&#193;NSITO</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">el hover nunca gana sobre el borde amber: el tránsito manda.</div>
+      </div>
+
+      <div style="width:132px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell-hover);border:1px solid var(--red);background-image:repeating-linear-gradient(45deg,rgb(var(--red-rgb) / .85) 0 2px,transparent 2px 8px)">
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--red)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--red);margin-top:10px">BLOQUEADO</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">acción rechazada por un tránsito ajeno: tramado 45&#176;, parpadea 2 veces y el menú se va. Ver 07.</div>
+      </div>
+
+      <div style="flex:1;min-width:420px;border:1px solid rgb(var(--border-rgb) / .4);background:rgb(var(--panel-rgb) / .25);padding:14px 16px">
+        <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.14em;margin-bottom:10px">LÉXICO DE BARRAS DE MODO (propuesta C) · sólo se dibujan los emisores ACTIVOS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:18px 26px">
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:3px;background:var(--accent)"></div><div style="font:500 14px var(--ff);color:var(--text)">Light</div></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:3px;background:var(--green)"></div><div style="font:500 14px var(--ff);color:var(--text)">Green Laser</div></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:3px;background:var(--orange)"></div><div style="font:500 14px var(--ff);color:var(--text)">IR Illuminator</div></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:3px;background:var(--red)"></div><div style="font:500 14px var(--ff);color:var(--text)">IR Laser</div></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:3px;background:rgb(var(--border-rgb) / .35)"></div><div style="font:500 14px var(--ff);color:var(--text-dim)">Off &#8594; ninguna barra</div></div>
+        </div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:12px;text-wrap:pretty">Geometría: franja interior de 46 px (56 &#8722; 2 de borde &#8722; 8 de margen), altura 3 px, base a 4 px del borde inferior. N barras &#8594; ancho = (46 &#8722; 2&#215;(N&#8722;1)) / N &#8594; 46 / 22 / 14 px para 1 / 2 / 3. Sólo la linterna y las NVG nunca llevan barras (no tienen modos).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 3 · TAMAÑOS DE COLUMNA ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--border-rgb) / .35);background:rgb(var(--bg-rgb) / .5);padding:18px 22px 26px;box-sizing:border-box">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+      <div style="font:700 11px var(--ff);color:var(--accent);letter-spacing:.16em">03</div>
+      <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.16em;text-transform:uppercase">Los tres tamaños reales de la columna · lista dinámica, sin slots vacíos</div>
+    </div>
+
+    <div style="display:flex;gap:30px;flex-wrap:wrap">
+
+      <div style="width:280px">
+        <div style="position:relative;width:280px;height:300px;background:rgb(var(--scrim-rgb) / .5);overflow:hidden">
+          <div style="position:absolute;left:275px;top:-155px;width:610px;height:610px;border-radius:50%;background:rgb(var(--panel-rgb) / .4);border:1px solid rgb(var(--border-rgb) / .45);box-sizing:border-box"></div>
+          <div style="position:absolute;left:173px;top:122px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+              </div>
+            </div>
+          </div>
+          <div data-annot style="position:absolute;left:229px;top:150px;width:46px;height:1px;background:rgb(var(--text-dim-rgb) / .7)"></div>
+          <div data-annot style="position:absolute;left:229px;top:128px;width:46px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">46</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">1 CHIP &#183; caso mínimo</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Sólo linterna: sin NVG equipadas y arma sin dispositivos. Grupo de 56&#215;56, centrado en el eje.</div>
+      </div>
+
+      <div style="width:280px">
+        <div style="position:relative;width:280px;height:300px;background:rgb(var(--scrim-rgb) / .5);overflow:hidden">
+          <div style="position:absolute;left:275px;top:-155px;width:610px;height:610px;border-radius:50%;background:rgb(var(--panel-rgb) / .4);border:1px solid rgb(var(--border-rgb) / .45);box-sizing:border-box"></div>
+          <div style="position:absolute;left:173px;top:90px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">2 CHIPS &#183; caso común</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Linterna ON + NVG OFF. Altura 120. Nunca se dibuja un chip de algo que no está.</div>
+      </div>
+
+      <div style="width:280px">
+        <div style="position:relative;width:280px;height:300px;background:rgb(var(--scrim-rgb) / .5);overflow:hidden">
+          <div style="position:absolute;left:275px;top:-155px;width:610px;height:610px;border-radius:50%;background:rgb(var(--panel-rgb) / .4);border:1px solid rgb(var(--border-rgb) / .45);box-sizing:border-box"></div>
+          <div style="position:absolute;left:173px;top:26px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--amber)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .55)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+              </div>
+              <div style="position:absolute;left:1px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+                <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:4px;top:2px;right:4px;bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+              </div>
+              <div style="position:absolute;left:4px;right:4px;bottom:4px;height:3px;display:flex;gap:2px">
+                <div style="flex:1;background:var(--accent)"></div>
+                <div style="flex:1;background:var(--green)"></div>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">4 CHIPS &#183; caso cargado</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Linterna + NVG + dos dispositivos del arma. Altura 248 &#8212; sigue entrando entre los sectores diagonales.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 4 · COLISIÓN DE ANCLAJES ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--border-rgb) / .35);background:rgb(var(--bg-rgb) / .5);padding:18px 22px 26px;box-sizing:border-box">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+      <div style="font:700 11px var(--ff);color:var(--accent);letter-spacing:.16em">04</div>
+      <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.16em;text-transform:uppercase">Colisión de anclajes &#183; empuje hacia afuera en el mismo eje &#183; 46 al anillo, 24 entre grupos</div>
+    </div>
+
+    <div style="display:flex;gap:26px;flex-wrap:wrap">
+
+      <div>
+        <div style="position:relative;width:600px;height:340px;background:rgb(var(--scrim-rgb) / .5);overflow:hidden">
+          <div style="position:absolute;left:575px;top:-135px;width:610px;height:610px;border-radius:50%;background:rgb(var(--panel-rgb) / .4);border:1px solid rgb(var(--border-rgb) / .45);box-sizing:border-box"></div>
+          <div style="position:absolute;left:473px;top:46px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">M</div><div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F1</div></div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">B</div><div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F2</div></div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">A</div><div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F3</div></div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">K</div><div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F4</div></div>
+          </div>
+          <div style="position:absolute;left:393px;top:110px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+              </div>
+            </div>
+          </div>
+          <div data-annot style="position:absolute;left:529px;top:170px;width:46px;height:1px;background:rgb(var(--text-dim-rgb) / .7)"></div>
+          <div data-annot style="position:absolute;left:529px;top:148px;width:46px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">46</div>
+          <div data-annot style="position:absolute;left:449px;top:170px;width:24px;height:1px;background:rgb(var(--text-dim-rgb) / .7)"></div>
+          <div data-annot style="position:absolute;left:436px;top:148px;width:50px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">24</div>
+          <div data-annot style="position:absolute;left:473px;top:300px;width:56px;text-align:center;font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.1em">QUICK</div>
+          <div data-annot style="position:absolute;left:393px;top:300px;width:56px;text-align:center;font:700 11px var(--ff);color:var(--accent);letter-spacing:.1em">LIGHTS</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">UN GRUPO EMPUJADO &#183; quick y lights ambos a la izquierda</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);width:600px;text-wrap:pretty">El grupo preexistente se queda pegado al anillo; las luces se van hacia afuera. Nada se reubica en otro eje.</div>
+      </div>
+
+      <div>
+        <div style="position:relative;width:600px;height:340px;background:rgb(var(--scrim-rgb) / .5);overflow:hidden">
+          <div style="position:absolute;left:575px;top:-135px;width:610px;height:610px;border-radius:50%;background:rgb(var(--panel-rgb) / .4);border:1px solid rgb(var(--border-rgb) / .45);box-sizing:border-box"></div>
+          <div style="position:absolute;left:473px;top:46px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">M</div><div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F1</div></div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">B</div><div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F2</div></div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">A</div><div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F3</div></div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">K</div><div style="position:absolute;right:3px;bottom:1px;font:700 11px var(--ff);color:var(--text-dim)">F4</div></div>
+          </div>
+          <div style="position:absolute;left:393px;top:78px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">P</div></div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">S</div></div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)"><div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--ff);color:var(--text-dim)">C</div></div>
+          </div>
+          <div style="position:absolute;left:313px;top:46px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--amber)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .55)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+              </div>
+              <div style="position:absolute;left:1px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+                <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:4px;top:2px;right:4px;bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+              </div>
+              <div style="position:absolute;left:4px;right:4px;bottom:4px;height:3px;display:flex;gap:2px">
+                <div style="flex:1;background:var(--accent)"></div>
+                <div style="flex:1;background:var(--green)"></div>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+              </div>
+            </div>
+          </div>
+          <div data-annot style="position:absolute;left:529px;top:170px;width:46px;height:1px;background:rgb(var(--text-dim-rgb) / .7)"></div>
+          <div data-annot style="position:absolute;left:529px;top:148px;width:46px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">46</div>
+          <div data-annot style="position:absolute;left:449px;top:170px;width:24px;height:1px;background:rgb(var(--text-dim-rgb) / .7)"></div>
+          <div data-annot style="position:absolute;left:436px;top:148px;width:50px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">24</div>
+          <div data-annot style="position:absolute;left:369px;top:170px;width:24px;height:1px;background:rgb(var(--text-dim-rgb) / .7)"></div>
+          <div data-annot style="position:absolute;left:356px;top:148px;width:50px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">24</div>
+          <div data-annot style="position:absolute;left:473px;top:300px;width:56px;text-align:center;font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.1em">QUICK</div>
+          <div data-annot style="position:absolute;left:393px;top:300px;width:56px;text-align:center;font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.1em">TOOLS</div>
+          <div data-annot style="position:absolute;left:313px;top:300px;width:56px;text-align:center;font:700 11px var(--ff);color:var(--accent);letter-spacing:.1em">LIGHTS</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">DOS GRUPOS EMPUJADOS &#183; los tres del mismo lado (caso que rompe)</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);width:600px;text-wrap:pretty">Orden fijo hacia afuera: quick &#8594; tools &#8594; lights. Extensión total 305+46+56+24+56+24+56 = 567 px desde el centro: entra en 1920&#215;1080 pero se come el borde en 4:3. Sin corchete ni marco: 8 px adentro del grupo contra 24 px entre grupos ya separa (ratio 3:1), y cada grupo tiene su propio léxico &#8212; F1&#8230;F4 en quick, iniciales planas en tools, relleno de acento y barras de modo en lights.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 5 · HUB ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--border-rgb) / .35);background:rgb(var(--bg-rgb) / .5);padding:18px 22px 26px;box-sizing:border-box">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+      <div style="font:700 11px var(--ff);color:var(--accent);letter-spacing:.16em">05</div>
+      <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.16em;text-transform:uppercase">El hub para cada tipo de chip de luz &#183; r 120, ancho útil 192 px, hint &#8220;Release to toggle&#8221;</div>
+    </div>
+
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+
+      <div style="width:240px">
+        <div style="position:relative;width:240px;height:240px;border-radius:50%;background:rgb(var(--bg-rgb) / .93);border:1px solid rgb(var(--accent-rgb) / .7);box-sizing:border-box">
+          <div style="position:absolute;left:24px;top:88px;width:192px;text-align:center">
+            <div style="font:700 16px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Flashlight</div>
+            <div style="font:500 14px var(--ff);color:var(--accent);margin-top:4px">ON</div>
+          </div>
+          <div style="position:absolute;left:24px;top:186px;width:192px;text-align:center;font:500 12px var(--ff);color:var(--text-dim)">Release to toggle</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">LINTERNA</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Principal: nombre. Secundaria: ON / OFF, en acento o text-dim. Sin tercera línea &#8212; no tiene modos.</div>
+      </div>
+
+      <div style="width:240px">
+        <div style="position:relative;width:240px;height:240px;border-radius:50%;background:rgb(var(--bg-rgb) / .93);border:1px solid rgb(var(--accent-rgb) / .7);box-sizing:border-box">
+          <div style="position:absolute;left:24px;top:76px;width:192px;text-align:center">
+            <div style="font:700 16px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Night Vision</div>
+            <div style="font:500 14px var(--ff);color:var(--amber);margin-top:2px">OFF &#8594; ON</div>
+            <div style="display:flex;gap:2px;justify-content:center;margin-top:10px">
+              <div data-seg="0" style="width:12px;height:4px;background:var(--amber)"></div>
+              <div data-seg="1" style="width:12px;height:4px;background:var(--amber)"></div>
+              <div data-seg="2" style="width:12px;height:4px;background:var(--amber)"></div>
+              <div data-seg="3" style="width:12px;height:4px;background:var(--amber)"></div>
+              <div data-seg="4" style="width:12px;height:4px;background:var(--amber)"></div>
+              <div data-seg="5" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+              <div data-seg="6" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+              <div data-seg="7" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+              <div data-seg="8" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+              <div data-seg="9" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+              <div data-seg="10" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+              <div data-seg="11" style="width:12px;height:4px;background:rgb(var(--border-rgb) / .45)"></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:24px;top:186px;width:192px;text-align:center;font:500 12px var(--ff);color:var(--text-dim)">Release to toggle</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">NVG EN TR&#193;NSITO</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Secundaria &#8220;OFF &#8594; ON&#8221;: no afirma ninguno de los dos. Barra segmentada de 12 (12&#215;4, gap 2 = 166 px) contra la duración que reporte el mod, no contra un número horneado.</div>
+      </div>
+
+      <div style="width:240px">
+        <div style="position:relative;width:240px;height:240px;border-radius:50%;background:rgb(var(--bg-rgb) / .93);border:1px solid rgb(var(--accent-rgb) / .7);box-sizing:border-box">
+          <div style="position:absolute;left:24px;top:80px;width:192px;text-align:center">
+            <div style="font:700 16px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Weapon Light</div>
+            <div style="font:500 14px var(--ff);color:var(--accent);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Light + Green Laser</div>
+            <div style="display:flex;gap:2px;justify-content:center;margin-top:8px">
+              <div style="width:22px;height:3px;background:var(--accent)"></div>
+              <div style="width:22px;height:3px;background:var(--green)"></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:24px;top:186px;width:192px;text-align:center;font:500 12px var(--ff);color:var(--text-dim)">Release to toggle</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">DISPOSITIVO ON</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Secundaria: el nombre de modo tal cual lo da el mod. Debajo, las mismas barras del chip &#8212; es lo que enseña el léxico.</div>
+      </div>
+
+      <div style="width:240px">
+        <div style="position:relative;width:240px;height:240px;border-radius:50%;background:rgb(var(--bg-rgb) / .93);border:1px solid rgb(var(--accent-rgb) / .7);box-sizing:border-box">
+          <div style="position:absolute;left:24px;top:88px;width:192px;text-align:center">
+            <div style="font:700 16px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">IR Illuminator + IR Laser</div>
+            <div style="font:500 14px var(--ff);color:var(--text-dim);margin-top:4px">Off</div>
+          </div>
+          <div style="position:absolute;left:24px;top:186px;width:192px;text-align:center;font:500 12px var(--ff);color:var(--text-dim)">Release to toggle</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">DISPOSITIVO OFF &#183; nombre largo</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Si el nombre del dispositivo no entra en 192 px se corta con elipsis; el modo &#8220;Off&#8221; va en text-dim y sin barras.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 6 · ALTERNATIVA B ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--amber-rgb) / .45);background:rgb(var(--bg-rgb) / .5);padding:18px 22px 26px;box-sizing:border-box">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+      <div style="font:700 11px var(--ff);color:var(--amber);letter-spacing:.16em">06</div>
+      <div style="font:700 11px var(--ff);color:var(--amber);letter-spacing:.16em;text-transform:uppercase">Variante (B) &#183; celda ancha 150&#215;56 sólo para lights &#183; HABILITADA como excepción &#183; sólo anclaje izquierda / derecha</div>
+    </div>
+    <div style="font:500 12px var(--ff);color:var(--text-dim);max-width:760px;margin-bottom:18px;text-wrap:pretty">Aprobada como variante configurable del grupo de luces. Dos condiciones duras: <b>sólo vale con anclaje izquierda o derecha</b> (una fila de celdas de 150 arriba o abajo no entra en el eje horizontal, así que en anclaje arriba/abajo el grupo vuelve a 56&#215;56 automáticamente), y <b>quick y tools siguen cuadrados</b> &#8212; la celda ancha es la excepción del panel de luces, no un modo nuevo del menú.</div>
+
+    <div style="display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start">
+      <div style="position:relative;width:520px;height:300px;background:rgb(var(--scrim-rgb) / .5);overflow:hidden">
+        <div style="position:absolute;left:515px;top:-155px;width:610px;height:610px;border-radius:50%;background:rgb(var(--panel-rgb) / .4);border:1px solid rgb(var(--border-rgb) / .45);box-sizing:border-box"></div>
+        <div style="position:absolute;left:319px;top:26px;display:flex;flex-direction:column;gap:8px">
+
+          <div style="position:relative;width:150px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+            <div style="position:absolute;left:4px;top:4px;width:48px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+            </div>
+            <div style="position:absolute;left:56px;right:6px;top:9px">
+              <div style="font:500 14px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Flashlight</div>
+              <div style="font:500 12px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">ON</div>
+            </div>
+          </div>
+
+          <div style="position:relative;width:150px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--amber)">
+            <div style="position:absolute;left:4px;top:4px;width:48px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .55)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+            </div>
+            <div style="position:absolute;left:56px;right:6px;top:7px">
+              <div style="font:500 14px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Night Vision</div>
+              <div style="font:500 12px var(--ff);color:var(--amber);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">OFF &#8594; ON</div>
+            </div>
+            <div style="position:absolute;left:1px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+              <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+            </div>
+          </div>
+
+          <div style="position:relative;width:150px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+            <div style="position:absolute;left:4px;top:4px;width:48px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+            </div>
+            <div style="position:absolute;left:56px;right:6px;top:9px">
+              <div style="font:500 14px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Weapon Light</div>
+              <div style="font:500 12px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">Light + Green Laser</div>
+            </div>
+          </div>
+
+          <div style="position:relative;width:150px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+            <div style="position:absolute;left:4px;top:4px;width:48px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+            </div>
+            <div style="position:absolute;left:56px;right:6px;top:9px">
+              <div style="font:500 14px var(--ff);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">IR Illuminator + IR Laser</div>
+              <div style="font:500 12px var(--ff);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">Off</div>
+            </div>
+          </div>
+        </div>
+        <div data-annot style="position:absolute;left:469px;top:150px;width:46px;height:1px;background:rgb(var(--text-dim-rgb) / .7)"></div>
+        <div data-annot style="position:absolute;left:469px;top:128px;width:46px;text-align:center;font:700 11px var(--ff);color:var(--text-dim)">46</div>
+      </div>
+
+      <div style="width:340px">
+        <div style="font:700 12px var(--ff);color:var(--text)">QUÉ GANA</div>
+        <div style="font:500 14px var(--ff);color:var(--text-dim);margin-top:4px;text-wrap:pretty">El modo se lee sin hoverear, y &#8220;IR Illuminator + IR Laser&#8221; entra casi entero (88 px útiles &#8594; ~24 caracteres en 12 px condensada antes de la elipsis).</div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:16px">QUÉ CUESTA</div>
+        <div style="font:500 14px var(--ff);color:var(--text-dim);margin-top:4px;text-wrap:pretty">Celda no cuadrada &#8594; el resolvedor deja de tener una sola constante de celda. Con empuje hacia afuera el grupo mide 150 de fondo en vez de 56: los tres del mismo lado llegan a 661 px del centro y en 1280&#215;720 se sale de pantalla. No es alternable con los otros ejes: en anclaje arriba/abajo hay que degradar a la celda cuadrada (C) en el mismo build, así que las dos anatomías tienen que existir a la vez.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 7 · CANCELACIÓN + FADES ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--red-rgb) / .45);background:rgb(var(--bg-rgb) / .5);padding:18px 22px 26px;box-sizing:border-box">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+      <div style="font:700 11px var(--ff);color:var(--red);letter-spacing:.16em">07</div>
+      <div style="font:700 11px var(--ff);color:var(--red);letter-spacing:.16em;text-transform:uppercase">Acción cancelada por tránsito ajeno &#183; quinto estado del chip &#183; fade-in / fade-out del menú</div>
+    </div>
+    <div style="font:500 14px var(--ff);color:var(--text-dim);max-width:900px;margin-bottom:20px;text-wrap:pretty">Mientras las NVG están en tránsito el mod no deja tocar la linterna. Si soltás sobre otro chip de luz durante esa ventana, la acción <b>no se ejecuta</b>: el chip que apretaste se pinta BLOQUEADO (rojo + tramado a 45&#176;), parpadea dos veces y el menú se va en fade-out. El chip que está en tránsito no cambia: sigue en amber.</div>
+
+    <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start">
+
+      <div>
+        <div style="display:flex;gap:10px">
+          <div style="width:96px">
+            <div style="width:96px;height:96px;background:rgb(var(--scrim-rgb) / .55);position:relative">
+              <div style="position:absolute;left:20px;top:20px;width:56px;height:56px;box-sizing:border-box;background:var(--cell-hover);border:1px solid var(--red);background-image:repeating-linear-gradient(45deg,rgb(var(--red-rgb) / .85) 0 2px,transparent 2px 8px)">
+                <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--red)">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+                </div>
+              </div>
+            </div>
+            <div style="font:700 11px var(--ff);color:var(--text);margin-top:6px">t = 0 ms</div>
+            <div style="font:500 12px var(--ff);color:var(--text-dim)">rechazo, alpha 1</div>
+          </div>
+
+          <div style="width:96px">
+            <div style="width:96px;height:96px;background:rgb(var(--scrim-rgb) / .55);position:relative">
+              <div style="position:absolute;left:20px;top:20px;width:56px;height:56px;box-sizing:border-box;background:var(--cell-hover);border:1px solid rgb(var(--red-rgb) / .35);background-image:repeating-linear-gradient(45deg,rgb(var(--red-rgb) / .3) 0 2px,transparent 2px 8px)">
+                <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--red-rgb) / .4)">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+                </div>
+              </div>
+            </div>
+            <div style="font:700 11px var(--ff);color:var(--text);margin-top:6px">t = 45 ms</div>
+            <div style="font:500 12px var(--ff);color:var(--text-dim)">valle del parpadeo</div>
+          </div>
+
+          <div style="width:96px">
+            <div style="width:96px;height:96px;background:rgb(var(--scrim-rgb) / .55);position:relative">
+              <div style="position:absolute;left:20px;top:20px;width:56px;height:56px;box-sizing:border-box;background:var(--cell-hover);border:1px solid var(--red);background-image:repeating-linear-gradient(45deg,rgb(var(--red-rgb) / .85) 0 2px,transparent 2px 8px)">
+                <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--red)">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+                </div>
+              </div>
+            </div>
+            <div style="font:700 11px var(--ff);color:var(--text);margin-top:6px">t = 90 ms</div>
+            <div style="font:500 12px var(--ff);color:var(--text-dim)">segundo pico</div>
+          </div>
+
+          <div style="width:96px">
+            <div style="width:96px;height:96px;background:rgb(var(--scrim-rgb) / .3);position:relative">
+              <div style="position:absolute;left:20px;top:20px;width:56px;height:56px;box-sizing:border-box;opacity:.5;background:var(--cell-hover);border:1px solid var(--red);background-image:repeating-linear-gradient(45deg,rgb(var(--red-rgb) / .85) 0 2px,transparent 2px 8px)">
+                <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--red)">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+                </div>
+              </div>
+            </div>
+            <div style="font:700 11px var(--ff);color:var(--text);margin-top:6px">t = 145 ms</div>
+            <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">fade-out del menú entero, alpha .5</div>
+          </div>
+
+          <div style="width:96px">
+            <div style="width:96px;height:96px;background:rgb(var(--scrim-rgb) / .08);position:relative">
+              <div style="position:absolute;left:20px;top:20px;width:56px;height:56px;box-sizing:border-box;opacity:.06;background:var(--cell-hover);border:1px solid var(--red)"></div>
+            </div>
+            <div style="font:700 11px var(--ff);color:var(--text);margin-top:6px">t = 200 ms</div>
+            <div style="font:500 12px var(--ff);color:var(--text-dim)">cerrado</div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;border:1px solid rgb(var(--border-rgb) / .4);background:rgb(var(--panel-rgb) / .25);padding:14px 16px;max-width:520px">
+          <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.14em;margin-bottom:8px">CURVAS (todo lineal contra CurTime, sin transiciones declarativas)</div>
+          <div style="font:500 14px var(--ff);color:var(--text);line-height:1.5;text-wrap:pretty">
+            <div>&#183; fade-in al abrir: alpha 0 &#8594; 1 en <b>90 ms</b>.</div>
+            <div>&#183; fade-out al cerrar (normal o cancelado): alpha 1 &#8594; 0 en <b>200 ms</b>.</div>
+            <div>&#183; parpadeo del bloqueo: dos picos, período <b>90 ms</b>, valle al 30% del tramado y del borde. Corre en paralelo al fade-out, no lo demora.</div>
+            <div>&#183; tramado: líneas de <b>2 px cada 8 px a 45&#176;</b>, en --red al 85%, clipeadas al rect del chip. Es el mismo tramado del quickslot bloqueado.</div>
+            <div>&#183; cue sonoro al rechazar: un click corto y seco, distinto del de confirmar.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:240px">
+        <div style="position:relative;width:240px;height:240px;border-radius:50%;background:rgb(var(--bg-rgb) / .93);border:1px solid rgb(var(--red-rgb) / .7);box-sizing:border-box">
+          <div style="position:absolute;left:24px;top:88px;width:192px;text-align:center">
+            <div style="font:700 16px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Flashlight</div>
+            <div style="font:500 14px var(--ff);color:var(--red);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Blocked</div>
+          </div>
+          <div style="position:absolute;left:24px;top:186px;width:192px;text-align:center;font:500 12px var(--ff);color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Night Vision is switching</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">HUB AL CANCELAR</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Se congela al soltar y se va con el fade-out. El hint deja de prometer &#8220;Release to toggle&#8221; y dice por qué no pasó nada.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 8 · BATERÍA ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--border-rgb) / .35);background:rgb(var(--bg-rgb) / .5);padding:18px 22px 26px;box-sizing:border-box">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+      <div style="font:700 11px var(--ff);color:var(--accent);letter-spacing:.16em">08</div>
+      <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.16em;text-transform:uppercase">Batería / condición 0&#8211;100 &#183; preview, no comprometido &#183; cuarto canal del chip</div>
+    </div>
+    <div style="font:500 14px var(--ff);color:var(--text-dim);max-width:900px;margin-bottom:20px;text-wrap:pretty">Un número de 0 a 100 que <b>vive en el pack, no en el dispositivo</b> (modelo STALKER GAMMA): sacás el pack y el chip queda sin energía, metés uno al 90 y el chip marca 90. Se dibuja como una <b>barra vertical de 3 px pegada al borde interno izquierdo</b> &#8212; x 1&#8594;4, y 1&#8594;55, alto 54, llena de abajo hacia arriba, sin hueco al pie. Para que no se pisen, <b>la que se corre es la de tránsito</b>: si el chip tiene batería arranca en x 6 en vez de x 2 (mismo alto, 2 px menos de largo). Las barras de modo siguen en x 5&#8594;51 y sólo suben 2 px (a y 46&#8594;49) en el caso raro de un chip que esté en tránsito y además tenga modos. El ícono centrado de 24 px empieza en x 16: no toca nada.</div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start">
+
+      <div style="width:120px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+          <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:74%;background:var(--border-hi)"></div></div>
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">ON &#183; 74%</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">arriba de 30: barra en border-hi, neutra. No compite con el acento.</div>
+      </div>
+
+      <div style="width:120px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:100%;background:var(--border-hi)"></div></div>
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">OFF &#183; 100%</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">estado de fábrica de las NVG. Barra llena, chip apagado: son canales independientes.</div>
+      </div>
+
+      <div style="width:120px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+          <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:42%;background:var(--border-hi)"></div></div>
+          <div style="position:absolute;left:4px;top:2px;right:4px;bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+          </div>
+          <div style="position:absolute;left:4px;right:4px;bottom:4px;height:3px;display:flex;gap:2px">
+            <div style="flex:1;background:var(--accent)"></div>
+            <div style="flex:1;background:var(--green)"></div>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">DISPOSITIVO &#183; 42%</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">con barras de modo: la carga las libera, siguen en x 4 y miden 46 / 22 / 14 px según cuántas haya.</div>
+      </div>
+
+      <div style="width:120px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:22%;background:var(--amber)"></div></div>
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--amber);margin-top:10px">AVISO &#183; 22%</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">de 30 para abajo la barra pasa a amber. Nada más cambia.</div>
+      </div>
+
+      <div style="width:120px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+          <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:7%;background:var(--red)"></div></div>
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--red);margin-top:10px">CRÍTICA &#183; 7%</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">bajo 10 la barra es roja y late (1 Hz, entre 40% y 100% de alpha). Único elemento que late fuera del tránsito.</div>
+      </div>
+
+      <div style="width:120px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid rgb(var(--red-rgb) / .55)">
+          <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--red-rgb) / .28)"></div>
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--text-dim-rgb) / .45)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--red);margin-top:10px">SIN ENERGÍA &#183; 0% o sin pack</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">track vacío en rojo, ícono al 45%. Pack agotado y pack ausente se pintan igual &#8212; el hub los distingue. Apretarlo cae en el rechazo del 07.</div>
+      </div>
+
+      <div style="width:120px">
+        <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+          <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div data-batt-bar style="position:absolute;left:0;bottom:0;width:3px;height:74%;background:var(--border-hi)"></div></div>
+          <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--accent);margin-top:10px">AJUSTABLE &#183; <span data-batt-pct>74%</span></div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">movelo con el control &#8220;Carga&#8221; del panel de tweaks para ver los tres umbrales.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:26px;padding-top:20px;border-top:1px solid rgb(var(--border-rgb) / .3)">
+
+      <div>
+        <div style="position:relative;width:200px;height:300px;background:rgb(var(--scrim-rgb) / .5);overflow:hidden">
+          <div style="position:absolute;left:195px;top:-155px;width:610px;height:610px;border-radius:50%;background:rgb(var(--panel-rgb) / .4);border:1px solid rgb(var(--border-rgb) / .45);box-sizing:border-box"></div>
+          <div style="position:absolute;left:93px;top:26px;display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:74%;background:var(--border-hi)"></div></div>
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9.5h9v5H2z"></path><path d="M11 7h4.5v10H11z"></path><path d="M17.5 11h5v2h-5z"></path><path d="M17.2 8.9l4.4-2.5.9 1.6-4.4 2.5z"></path><path d="M18.1 14l4.4 2.5-.9 1.6-4.4-2.5z"></path></svg>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--amber)">
+              <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:100%;background:var(--border-hi)"></div></div>
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .55)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+              </div>
+              <div style="position:absolute;left:5px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+                <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:42%;background:var(--border-hi)"></div></div>
+              <div style="position:absolute;left:4px;top:2px;right:4px;bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+              </div>
+              <div style="position:absolute;left:4px;right:4px;bottom:4px;height:3px;display:flex;gap:2px">
+                <div style="flex:1;background:var(--accent)"></div>
+                <div style="flex:1;background:var(--green)"></div>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--border)">
+              <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:9%;background:var(--red)"></div></div>
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">LA COLUMNA ENTERA CON CARGA</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);width:200px;text-wrap:pretty">Las cuatro barras alineadas en el mismo x hacen una lectura vertical: se ve qué se está por quedar sin batería sin leer nada.</div>
+      </div>
+
+      <div style="width:240px">
+        <div style="position:relative;width:240px;height:240px;border-radius:50%;background:rgb(var(--bg-rgb) / .93);border:1px solid rgb(var(--accent-rgb) / .7);box-sizing:border-box">
+          <div style="position:absolute;left:24px;top:80px;width:192px;text-align:center">
+            <div style="font:700 16px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Flashlight</div>
+            <div style="font:500 14px var(--ff);color:var(--accent);margin-top:2px">ON</div>
+            <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:4px">Battery 74%</div>
+          </div>
+          <div style="position:absolute;left:24px;top:186px;width:192px;text-align:center;font:500 12px var(--ff);color:var(--text-dim)">Release to toggle</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">HUB &#183; TERCERA LÍNEA</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">La carga entra como tercera línea en chico. Sólo aparece si el ítem tiene batería.</div>
+      </div>
+
+      <div style="width:240px">
+        <div style="position:relative;width:240px;height:240px;border-radius:50%;background:rgb(var(--bg-rgb) / .93);border:1px solid rgb(var(--red-rgb) / .7);box-sizing:border-box">
+          <div style="position:absolute;left:24px;top:80px;width:192px;text-align:center">
+            <div style="font:700 16px var(--ff);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Night Vision</div>
+            <div style="font:500 14px var(--ff);color:var(--red);margin-top:2px">No battery pack</div>
+            <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:4px">Insert a pack to use</div>
+          </div>
+          <div style="position:absolute;left:24px;top:186px;width:192px;text-align:center;font:500 12px var(--ff);color:var(--text-dim)">Release to toggle</div>
+        </div>
+        <div style="font:700 12px var(--ff);color:var(--text);margin-top:10px">HUB &#183; SIN ENERGÍA</div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);text-wrap:pretty">Acá se separa pack ausente (&#8220;No battery pack&#8221;) de pack muerto (&#8220;Battery 0%&#8221;). Soltar cae en el rechazo del 07: tramado rojo y se cierra.</div>
+      </div>
+
+      <div style="flex:1;min-width:280px;border:1px solid rgb(var(--border-rgb) / .4);background:rgb(var(--panel-rgb) / .25);padding:14px 16px">
+        <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.14em;margin-bottom:10px">UMBRALES</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px"><div style="width:3px;height:22px;background:var(--border-hi)"></div><div style="font:500 14px var(--ff);color:var(--text)">31&#8211;100 &#183; neutra (border-hi)</div></div>
+          <div style="display:flex;align-items:center;gap:10px"><div style="width:3px;height:22px;background:var(--amber)"></div><div style="font:500 14px var(--ff);color:var(--text)">10&#8211;30 &#183; aviso (amber)</div></div>
+          <div style="display:flex;align-items:center;gap:10px"><div style="width:3px;height:22px;background:var(--red)"></div><div style="font:500 14px var(--ff);color:var(--text)">1&#8211;9 &#183; crítica (red, late a 1 Hz)</div></div>
+          <div style="display:flex;align-items:center;gap:10px"><div style="width:3px;height:22px;background:rgb(var(--red-rgb) / .28)"></div><div style="font:500 14px var(--ff);color:var(--text)">0 &#183; agotada, no se puede encender</div></div>
+        </div>
+        <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:12px;text-wrap:pretty">El chip nunca muestra el número: eso es del hub. La barra es sólo &#8220;cuánto queda&#8221; y &#8220;qué tan urgente es&#8221;. Un ítem sin sistema de batería no dibuja ni la barra ni la tercera línea.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:26px;padding-top:20px;border-top:1px solid rgb(var(--border-rgb) / .3)">
+      <div style="font:700 11px var(--ff);color:var(--text-dim);letter-spacing:.14em;margin-bottom:4px">EXPLORACIÓN &#183; EL CHOQUE CON LA BARRA DE TRÁNSITO</div>
+      <div style="font:500 14px var(--ff);color:var(--text-dim);max-width:900px;margin-bottom:18px;text-wrap:pretty">Con la barra de carga a 54 px de alto, la esquina inferior izquierda quedaba compartida con la barra de tránsito. Tres salidas probadas:</div>
+
+      <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start">
+
+        <div style="width:200px">
+          <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--amber)">
+            <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:64%;background:var(--border-hi)"></div></div>
+            <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .55)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+            </div>
+            <div style="position:absolute;left:5px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+              <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+            </div>
+          </div>
+          <div style="font:700 12px var(--ff);color:var(--accent);margin-top:10px">ELEGIDA &#183; CARGA ENTERA, TRÁNSITO INSETADO</div>
+          <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">La carga baja hasta el piso del chip (54 px, sin hueco flotando) y la que se corre es la de tránsito: cuando hay batería arranca en x 6 en vez de x 2. Un solo condicional al dibujar, cero cambios de layout, y ninguna de las dos pierde escala.</div>
+        </div>
+
+        <div style="width:200px">
+          <div style="position:relative;width:76px;height:56px">
+            <div style="position:absolute;left:13px;top:5px;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:64%;background:var(--border-hi)"></div></div>
+            <div style="position:absolute;left:20px;top:0;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--amber)">
+              <div style="position:absolute;left:4px;top:4px;right:4px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .55)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+              </div>
+              <div style="position:absolute;left:1px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)">
+                <div data-transit style="height:100%;width:40%;background:var(--amber)"></div>
+              </div>
+            </div>
+          </div>
+          <div style="font:700 12px var(--ff);color:var(--text-dim);margin-top:10px">DESCARTADA &#183; AFUERA DEL CHIP</div>
+          <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">Barra a 4 px por fuera del borde. Se ve bien, pero el grupo deja de medir 56 de fondo y el hit-test de caja deja de coincidir con lo dibujado. Además el &#8220;afuera&#8221; cambia de lado según el anclaje: en columna derecha invade el margen de 46 hacia el anillo. Toca el colocador. No.</div>
+        </div>
+
+        <div style="width:200px">
+          <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--cell);border:1px solid var(--amber)">
+            <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:64%;background:var(--border-hi)"></div></div>
+            <div style="position:absolute;right:1px;top:1px;width:4px;height:54px;background:rgb(var(--border-rgb) / .4)"><div data-transit style="position:absolute;left:0;bottom:0;width:4px;height:40%;background:var(--amber)"></div></div>
+            <div style="position:absolute;left:6px;top:4px;right:7px;bottom:4px;display:flex;align-items:center;justify-content:center;color:rgb(var(--amber-rgb) / .55)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.3 1.6h3.4v2.9h-3.4z"></path><path d="M2.4 4.5h19.2v3.3H2.4z"></path><circle cx="7.2" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle><circle cx="16.8" cy="14.9" r="4.7" fill="none" stroke="currentColor" stroke-width="2.1"></circle></svg>
+            </div>
+          </div>
+          <div style="font:700 12px var(--ff);color:var(--text-dim);margin-top:10px">DESCARTADA &#183; TRÁNSITO VERTICAL A LA DERECHA</div>
+          <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">Izquierda = el ítem, derecha = la acción. Mnemónico lindo y las dos barras a 54 px enteros. Pero un progreso vertical de 4 px se lee peor que uno horizontal, y estrangula el ancho útil para las barras de modo a 40 px. Queda anotada por si algún día la carga necesita más escala.</div>
+        </div>
+
+        <div style="width:200px">
+          <div style="display:flex;gap:8px">
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:74%;background:var(--border-hi)"></div></div>
+              <div style="position:absolute;left:4px;top:2px;right:4px;bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+              </div>
+              <div style="position:absolute;left:5px;right:1px;bottom:1px;height:4px;background:rgb(var(--border-rgb) / .4)"></div>
+              <div style="position:absolute;left:5px;right:4px;bottom:6px;height:3px;display:flex;gap:2px">
+                <div style="flex:1;background:var(--accent)"></div>
+                <div style="flex:1;background:var(--green)"></div>
+              </div>
+            </div>
+            <div style="position:relative;width:56px;height:56px;box-sizing:border-box;background:var(--accent-dim);border:1px solid var(--accent)">
+              <div style="position:absolute;left:0;top:0;width:3px;height:54px;background:rgb(var(--border-rgb) / .35)"><div style="position:absolute;left:0;bottom:0;width:3px;height:74%;background:var(--border-hi)"></div></div>
+              <div style="position:absolute;left:4px;top:2px;right:4px;bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--text)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.5"></circle><rect x="11" y="1" width="2" height="4"></rect><rect x="11" y="19" width="2" height="4"></rect><rect x="1" y="11" width="4" height="2"></rect><rect x="19" y="11" width="4" height="2"></rect></svg>
+              </div>
+              <div style="position:absolute;left:5px;right:4px;bottom:4px;height:3px;display:flex;gap:2px">
+                <div style="flex:1;background:var(--accent)"></div>
+                <div style="flex:1;background:var(--green)"></div>
+              </div>
+            </div>
+          </div>
+          <div style="font:700 12px var(--ff);color:var(--red);margin-top:10px">NO &#183; TRACK DE TRÁNSITO SIEMPRE VISIBLE</div>
+          <div style="font:500 12px var(--ff);color:var(--text-dim);margin-top:2px;text-wrap:pretty">Izquierda: track vacío permanente + barras de modo. Son dos líneas horizontales apiladas a 3 px una de otra en el pie del chip, y la de arriba dice &#8220;emisores&#8221; mientras la de abajo no dice nada. Derecha: sin track, como queda. El track vacío sólo existe mientras hay tránsito.</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;border:1px solid rgb(var(--amber-rgb) / .4);background:rgb(var(--panel-rgb) / .25);padding:14px 16px;max-width:900px">
+        <div style="font:700 11px var(--ff);color:var(--amber);letter-spacing:.14em;margin-bottom:8px">POR QUÉ EL TRACK DE TRÁNSITO NO SE DEJA EN 0%</div>
+        <div style="font:500 14px var(--ff);color:var(--text);line-height:1.5;text-wrap:pretty">
+          <div>&#183; El hueco que flotaba ya no existe: la carga vuelve a bajar hasta el piso (54 px) y la que se corre 4 px es la de tránsito. No hace falta un track permanente para tapar nada.</div>
+          <div style="margin-top:8px">&#183; Sí dañaría las barras de modo. En el pie del chip hay un solo renglón y ya está ocupado: <b>una línea horizontal abajo del todo significa &#8220;emisor activo&#8221;</b>. Un track gris permanente mete una segunda línea horizontal a 3 px de la primera que no significa nada &#8212; y en un chip apagado, que no tiene barras de modo, queda una sola línea gris al pie que se lee exactamente como un emisor apagado. Es reintroducir la ambigüedad que el bloque 02 sacó.</div>
+          <div style="margin-top:8px">&#183; Regla que queda: <b>al pie del chip sólo se dibuja lo que está pasando.</b> El track de tránsito aparece con el tránsito y se va con él; las barras de modo sólo existen si hay emisores encendidos. Nada de rieles vacíos esperando.</div>
+          <div style="margin-top:8px">&#183; Caso raro real: chip en tránsito Y con modos activos. Las barras de modo suben 2 px (y 46&#8594;49) para dejar pasar el track. Pasa poco y dura menos de dos segundos.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ NOTAS ══════════ -->
+  <div style="width:100%;max-width:1240px;border:1px solid rgb(var(--border-rgb) / .5);background:rgb(var(--panel-rgb) / .22);padding:24px 26px 28px;box-sizing:border-box">
+    <div style="font:700 16px var(--ff);color:var(--text);margin-bottom:16px">Notas</div>
+
+    <div style="font:700 12px var(--ff);color:var(--accent);letter-spacing:.14em;margin-bottom:6px">DECISIONES</div>
+    <div style="font:500 14px var(--ff);color:var(--text);max-width:900px;line-height:1.5;text-wrap:pretty">
+      <div>&#183; <b>Problema #1 &#8594; (C) híbrido.</b> El chip queda 56&#215;56 y el modo se comprime a barras de color de 3 px en el borde inferior (una por emisor activo); el nombre completo vive en el hub. Gana sobre (A) porque no hay que hoverear cuatro chips para saber si el láser IR está prendido, y gana sobre (B) porque no toca el resolvedor ni rompe la simetría rectangular de los tres grupos.</div>
+      <div style="margin-top:8px">&#183; <b>Ninguna duración está horneada en el mock.</b> El 1,325 s del brief se toma como ejemplo, no como constante: todo lo que se dibuja contra el tiempo usa un t normalizado que da el mod.</div>
+      <div style="margin-top:8px">&#183; <b>Problema #2 &#8594; tres canales separados.</b> Estado = relleno (cell / accent-dim). Tránsito = borde amber + barra de progreso de 4 px pegada al borde inferior interno + ícono al 55%. Hover = relleno y borde suben un escalón. El tránsito es el único que usa amber, así que nunca se confunde con ON (acento) ni con OFF (gris), y el hover no puede disfrazarse de encendido porque no toca el canal de color de estado.</div>
+      <div style="margin-top:8px">&#183; <b>Tránsito ajeno &#8594; la acción se rechaza, no se encola.</b> Mientras las NVG están en su animación el mod bloquea la linterna, así que soltar sobre otro chip de luz no ejecuta nada: el chip apretado se pinta BLOQUEADO (tramado rojo a 45&#176;, el mismo del quickslot bloqueado), parpadea dos veces y el menú se cierra igual. Con cue sonoro propio. Es la única forma de decir &#8220;te escuché y no lo hice&#8221; sin dejar el menú abierto.</div>
+      <div style="margin-top:8px">&#183; <b>Fades cortos, 90 ms al abrir y 200 ms al cerrar.</b> No son decoración: sin ellos el chip bloqueado desaparecería en el mismo frame en que se pinta y nadie vería el rechazo. El parpadeo corre dentro del fade-out.</div>
+      <div style="margin-top:8px">&#183; <b>Problema #3 &#8594; 24 px entre grupos, sin marca de agrupación.</b> 8 adentro contra 24 afuera ya lee como bloques; agregar corchete o marco sería una cuarta forma en una superficie que sólo tiene tres. Orden fijo hacia afuera quick &#8594; tools &#8594; lights, para que la posición sea estable entre partidas.</div>
+      <div style="margin-top:8px">&#183; <b>Problema #4 &#8594; hub de 2 líneas + hint.</b> Principal = qué cosa es; secundaria = en qué estado o modo está; hint = &#8220;Release to toggle&#8221;. Sólo el tránsito agrega la barra segmentada. Ningún chip lleva tooltip.</div>
+      <div style="margin-top:8px">&#183; <b>(B) queda habilitada como variante del grupo de luces</b>, no como reemplazo: sólo en anclaje izquierda/derecha, con quick y tools siempre cuadrados, y con degradación automática a (C) si el anclaje pasa a arriba/abajo. El impacto en el resolvedor está abajo.</div>
+      <div style="margin-top:8px">&#183; <b>Íconos propios, uno solo para todos los dispositivos del arma.</b> Linterna y NVG tienen silueta propia (la NVG es de dos tubos, tipo binocular moderno, con puente y montura). Los dispositivos del arma NO usan el ícono de cada mod ni uno autogenerado: todos comparten un único PNG genérico propio &#8212; el mismo criterio que TLS &#8212; y lo que los distingue son las barras de modo. Los tres íconos ya están exportados a PNG (64 y 32, blanco sobre transparente, listos para teñir).</div>
+      <div style="margin-top:8px">&#183; Colores: ON usa <b>accent</b>, OFF usa <b>text-dim</b>, tránsito usa <b>amber</b>. Las barras de modo son el único lugar donde entran green / orange / red, y son colores de la paleta, no nuevos. Nada de amarillo saturado.</div>
+    </div>
+
+    <div style="height:1px;background:rgb(var(--border-rgb) / .5);margin:22px 0"></div>
+
+    <div style="font:700 12px var(--ff);color:var(--amber);letter-spacing:.14em;margin-bottom:6px">IMPACTO EN EL RESOLVEDOR DE CELDAS &#8212; LEER ESTO PRIMERO</div>
+    <div style="font:500 14px var(--ff);color:var(--text);max-width:900px;line-height:1.5;text-wrap:pretty">
+      <div>&#183; <b>La propuesta principal (C) no toca el resolvedor.</b> Celda 56&#215;56, separación 8, margen 46, anclaje izquierda &#8594; columna: todo igual que quick y tools. Las barras de modo se dibujan dentro del rect del chip, después de que el resolvedor ya devolvió la caja.</div>
+      <div style="margin-top:8px">&#183; <b>Lo único que (C) sí necesita del layout es el empuje hacia afuera</b>, y eso ya no es una propiedad de la celda sino del colocador de grupos: hace falta que resuelva N grupos por eje en vez de uno, con una separación entre grupos (propongo 24) y un orden de prioridad fijo. Si hoy el colocador asume un grupo por anclaje, esto es un cambio real &#8212; chico, pero real, y es independiente de las luces: lo dispara cualquier tercer grupo.</div>
+      <div style="margin-top:8px">&#183; <b>La variante (B), que queda habilitada, sí lo toca:</b> exige ancho de celda por grupo (150&#215;56), lo que convierte la constante de celda en un parámetro y obliga a recalcular el fondo del grupo en el empuje hacia afuera. Además necesita una condición de eje: si el anclaje del grupo de luces es arriba o abajo, el resolvedor tiene que ignorar el ancho pedido y volver a 56&#215;56. Concretamente: la celda pasa a ser (w, h) por grupo, con w clampeado a h cuando el eje es horizontal. Quick y tools quedan fijos en 56&#215;56 por definición, así que conviven dos anatomías de celda &#8212; asumido.</div>
+      <div style="margin-top:8px">&#183; El estado en tránsito necesita, además, que el chip pueda pedir redibujado por frame con un t normalizado (inicio del toggle + duración de la animación del mod). No es layout, pero sí es un dato que el resolvedor/dibujador tiene que poder pasar.</div>
+      <div style="margin-top:8px">&#183; <b>Los fades y el rechazo no tocan el resolvedor, pero sí el dibujador raíz:</b> hace falta un alpha global del menú por frame (hoy el menú se abre y se cierra de golpe) y un ciclo de vida de cierre &#8212; el menú tiene que seguir dibujándose ~200 ms después de soltar la tecla, con el input ya consumido. Eso es lo más invasivo de esta tanda.</div>
+    </div>
+
+    <div style="height:1px;background:rgb(var(--border-rgb) / .5);margin:22px 0"></div>
+
+    <div style="font:700 12px var(--ff);color:var(--text-dim);letter-spacing:.14em;margin-bottom:6px">CONTEXTO DE TERCEROS (dado, no inventado)</div>
+    <div style="font:500 14px var(--ff);color:var(--text);max-width:900px;line-height:1.5;text-wrap:pretty;margin-bottom:22px">
+      <div>&#183; <b>NVG (neosun):</b> animación de equipar y de quitar; durante esa ventana el mod no deja tocar la linterna. Sin baterías de fábrica. Es el único caso asíncrono del grupo y el que justifica el estado EN TRÁNSITO.</div>
+      <div style="margin-top:8px">&#183; <b>Linterna del jugador (impulse 100):</b> inmediata, invierte en el mismo frame. Nunca entra en tránsito salvo que otro mod la anime.</div>
+      <div style="margin-top:8px">&#183; <b>ARC9:</b> cambiar la luz de un attachment dispara una animación corta y recién ahí cambia la luz; el sistema de IR es complejo (varios emisores por dispositivo) &#8212; es la razón de que las barras de modo existan. <b>TFA:</b> attachments más simples.</div>
+      <div style="margin-top:8px">&#183; <b>Alcance de la sección de luces:</b> acá viven la linterna del jugador, las NVG y los attachments de luz. Una batería reemplazable de un dispositivo del arma que NO sea luz no es de esta superficie &#8212; va al inventario y se muestra en la info del arma. Y los avisos de carga son visuales y sólo mientras el menú está abierto: sacar el chip en alerta al DGL4 Customizable Holographic HUD es compatibilidad, deseable, fuera de esta tanda.</div>
+      <div style="margin-top:8px">&#183; Como todos dan feedback propio en el mundo (animación, luz, efecto), no hace falta que el menú siga abierto para mostrar el progreso: cerrar durante el tránsito está bien y deja de ser un problema abierto.</div>
+    </div>
+
+    <div style="font:700 12px var(--ff);color:var(--text-dim);letter-spacing:.14em;margin-bottom:6px">SIN RESOLVER</div>
+    <div style="font:500 14px var(--ff);color:var(--text-dim);max-width:900px;line-height:1.5;text-wrap:pretty">
+      <div>&#183; <b>Baterías: el bloque 08 es un preview, no una decisión cerrada.</b> Dibujado entero sobre el modelo GAMMA: la carga vive en el pack, el dispositivo sólo la refleja, sacar el pack deja el chip sin energía y meter uno al 90 lo pone en 90. Lo que puede tirarlo abajo: consumo distinto por modo (un dispositivo con iluminador + láser IR gastando el doble) o un pack compartido por dos dispositivos. No hay código detrás todavía.</div>
+      <div style="margin-top:8px">&#183; <b>Al pie del chip sólo se dibuja lo que está pasando.</b> Ni track de tránsito vacío ni barras de modo apagadas: una línea horizontal al pie siempre significa algo activo. La carga, en cambio, es vertical y permanente &#8212; por eso puede coexistir sin ambigüedad.</div>
+      <div style="margin-top:8px">&#183; De batería falta: cada cuánto se refresca el número mientras el menú está abierto, y qué pasa si el pack se cambia con el menú abierto (¿la barra salta o interpola?).</div>
+      <div style="margin-top:8px">&#183; <b>Duraciones de animación: no las sé y no las invento.</b> Ni la del NVG de neosun ni las de ARC9. Quedan como dato a sacar del repo &#8212; el mock sólo exige que el chip reciba un t normalizado; el número sale del mod.</div>
+      <div style="margin-top:8px">&#183; Soltar la tecla en el mismo frame en que termina el tránsito: nadie manda todavía. Probablemente haya que congelar la lectura de estado al inicio del frame.</div>
+      <div style="margin-top:8px">&#183; Con un solo ícono genérico para todos los dispositivos del arma, dos dispositivos apagados en la misma columna se ven idénticos (mismo ícono, sin barras). Se distinguen sólo por orden y por el hub. No me parece grave, pero es una pérdida real frente a usar el arte de cada mod.</div>
+      <div style="margin-top:8px">&#183; El léxico de barras de modo depende de que el mod de armas exponga los emisores activos y no sólo el string del modo. Si sólo hay string, hay que parsearlo (frágil) o caer a (A) para esos dispositivos: chip sin barras, modo sólo en el hub. No inventé un fallback visual todavía.</div>
+      <div style="margin-top:8px">&#183; Más de 3 emisores activos a la vez: las barras quedarían de 10 px. No vi un caso real, así que no lo diseñé.</div>
+      <div style="margin-top:8px">&#183; Colisión de anclaje con 4 chips de luces + 4 de quick en un eje horizontal (arriba/abajo): ahí los grupos son FILAS y el empuje es vertical; no lo dibujé, pero la fila de luces mide 248 de ancho y el apilado sigue la misma regla.</div>
+      <div style="margin-top:8px">&#183; Íconos: ya no es un pendiente. Los tres son propios y salen exportados de acá en PNG blanco sobre transparente (64 y 32 px, para teñir con SetDrawColor) &#8212; <b>icons/flashlight, icons/nvg, icons/device</b>. El de dispositivo es el símbolo genérico único para cualquier attachment, al estilo del PNG genérico que usaba TLS: no se usa arte de terceros ni íconos autogenerados.</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:1000},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#4f9bd6&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#4f9bd6&quot;,&quot;#6cbf5a&quot;,&quot;#d6a54f&quot;,&quot;#cf5040&quot;],&quot;section&quot;:&quot;Tema&quot;,&quot;label&quot;:&quot;Color de acento (re-tinte en runtime)&quot;},&quot;transitProgress&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0.4,&quot;min&quot;:0,&quot;max&quot;:1,&quot;step&quot;:0.01,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Estados&quot;,&quot;label&quot;:&quot;Avance del tránsito&quot;},&quot;batteryLevel&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0.74,&quot;min&quot;:0,&quot;max&quot;:1,&quot;step&quot;:0.01,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Estados&quot;,&quot;label&quot;:&quot;Carga del chip ajustable (bloque 08)&quot;},&quot;showAnnotations&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Documento&quot;,&quot;label&quot;:&quot;Mostrar cotas y rótulos de grupo&quot;}}">
+class Component extends DCLogic {
+  rgb(h){
+    h = String(h || '').trim();
+    const m = h.match(/^#?([0-9a-f]{6})$/i);
+    if (m) { const n = parseInt(m[1], 16); return [(n>>16)&255, (n>>8)&255, n&255]; }
+    const p = h.match(/(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+    if (p) return [+p[1], +p[2], +p[3]];
+    return [79, 155, 214];
+  }
+  apply(){
+    const p = this.props || {};
+    const [r,g,b] = this.rgb(p.accentColor || '#4f9bd6');
+    const s = document.documentElement.style;
+    s.setProperty('--accent-rgb', r+' '+g+' '+b);
+    s.setProperty('--accent', 'rgb('+r+' '+g+' '+b+')');
+    const d = v => Math.round(v * 0.58);
+    s.setProperty('--accent-dim-rgb', d(r)+' '+d(g)+' '+d(b));
+    s.setProperty('--accent-dim', 'rgb('+d(r)+' '+d(g)+' '+d(b)+')');
+
+    const t = Math.max(0, Math.min(1, p.transitProgress == null ? 0.4 : p.transitProgress));
+    document.querySelectorAll('[data-transit]').forEach(e => { e.style.width = (t*100).toFixed(1) + '%'; });
+    document.querySelectorAll('[data-seg]').forEach(e => {
+      const i = +e.getAttribute('data-seg');
+      e.style.background = (i / 12) < t ? 'var(--amber)' : 'rgb(var(--border-rgb) / .45)';
+    });
+    document.querySelectorAll('[data-pct]').forEach(e => { e.textContent = Math.round(t*100) + '%'; });
+
+    const bat = Math.max(0, Math.min(1, p.batteryLevel == null ? 0.74 : p.batteryLevel));
+    const batColor = bat <= 0 ? 'transparent' : (bat < 0.10 ? 'var(--red)' : (bat <= 0.30 ? 'var(--amber)' : 'var(--border-hi)'));
+    document.querySelectorAll('[data-batt-bar]').forEach(e => { e.style.height = (bat*100).toFixed(1) + '%'; e.style.background = batColor; });
+    document.querySelectorAll('[data-batt-pct]').forEach(e => { e.textContent = Math.round(bat*100) + '%'; });
+
+    const show = p.showAnnotations !== false;
+    document.querySelectorAll('[data-annot]').forEach(e => { e.style.visibility = show ? 'visible' : 'hidden'; });
+  }
+  componentDidMount(){ this.apply(); this._iv = setInterval(() => this.apply(), 400); }
+  componentDidUpdate(){ this.apply(); }
+  componentWillUnmount(){ clearInterval(this._iv); }
+  renderVals(){ return {}; }
+}
+</script>
+</body>
+</html>
