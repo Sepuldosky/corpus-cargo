@@ -4419,3 +4419,349 @@ apagarlo a mitad de partida.
 COR-5 medido, no declarado: el archivo no está *apagado*, está **inerte**, y se nota porque el
 tercero recupera su comportamiento entero.
 **Sin commitear** (GIT-7). Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+
+---
+
+## 52. Las luces en el wheel: el tercer grupo de chips (roadmap #46) `[APLICADO 2026-07-29]`
+
+Roadmap **#46**, pedido del autor, la otra mitad del frente de #47: aquella tanda **POSEE** las
+gafas, ésta las **ACCIONA** — junto con la linterna del jugador y cada dispositivo toggleable
+(luz/láser/IR) del arma ARC9 en mano. El motivo, en palabras del autor: **la G era a la vez el
+wheel de Cargo y su linterna**, y ese roce es exactamente lo que esta integración mata: la lista
+viaja en la tecla del wheel —que ya es hold— y la tecla de linterna queda **libre y sin tocar**.
+Cubre además lo que ni TLS ni el radial propio de ARC9 cubren: **un solo dispositivo** (el radial
+exige ≥2) y fuentes que no están en el arma en mano.
+
+Diseño: [`../../dev/Cargo_TLS_Referencia.md`](../../dev/Cargo_TLS_Referencia.md) (TLS es referencia
+de IDEA — escrito contra TFA, ni una línea ni un asset se portan; su premisa sobre el NVG es
+anterior a #47 y se corrigió acá). Forma: **`mockups/cargo_wheel_lights_mock_v1_1.html`** (bloques
+01-05; el 06/07/08 aprobados y **DIFERIDOS** — ver roadmap) con sus dos capturas hermanas. PROMPT:
+`dev/PROMPT_cargo_tls_luces.txt`.
+
+- PARCHE 1 — feat(ui): **el registro de fuentes** (`CARGO.Wheel.RegisterLightSource(id, spec)`,
+  §17.8). **Tercer precedente vivo del patrón** tras `StatusPanel.RegisterBar` (§11) y
+  `Capture.RegisterWorldPickup` (#47) — no se inventó nada. La lista **se registra, no se
+  hardcodea**: un chemlight que mañana sea ítem de Cargo entra sin tocar el wheel, y el dueño de su
+  lógica es su módulo (CRG-1). `available` corre **al abrir** (lo único que TLS hace bien de
+  entrada: su lista se arma en el hold, no por frame); `state` corre por frame porque el tránsito
+  anima; `expand` opcional convierte una fuente en N chips (los dispositivos, uno por slot).
+  **Una fuente que no está NO se adivina** (CRG-32 aplicado a la columna).
+- PARCHE 2 — feat(ui): **el tercer grupo de chips** — un grupo, NO un anillo nuevo (§17.6: los
+  sectores *equipan*, los quick *usan*, las luces *togglean* — tercer verbo, grupo propio, misma
+  forma rectangular y pick no-angular). Convar `cargo_wheel_lights_anchor`, default **`left`**.
+  `ResolveAnchors` **no se tocó** y `GroupCells` se reusa **tal cual** — el empuje se aplica sobre
+  las celdas ya resueltas. La regla nueva es `CARGO.Wheel.LightsPushOut` (pura, cubierta por el
+  harness): las luces **SÍ comparten lado, desplazadas hacia AFUERA** — 0 lado libre / 1 quick o
+  tools visible / 2 los tres (inalcanzable vía convars: `ResolveAnchors` nunca deja a quick y tools
+  juntos; la función igual contesta todo su dominio, que es lo que el mock dibuja en su bloque 04).
+  `gapGrupo` = **24 @1080p** contra los 8 entre celdas, unidad de theme escalada por `L.scale` —
+  jamás un literal suelto. Orden fijo hacia afuera **quick → tools → lights**, sin marca de
+  agrupación (una cuarta forma en una superficie de tres — el mock la rechazó). Aviso único por
+  `Corpus.Log` al activarse el empuje.
+  **El chip: tres canales que no se pisan** (mock bloque 02, §0.ter c): estado = relleno
+  (`accentDim`/`cell`), tránsito = borde `amber` + barra de 4 px + ícono al 55% (único canal que
+  usa amber), hover = sube relleno y borde un escalón y jamás toca el color de estado. **El modo
+  NO va como texto en el chip**: barras de 3 px al pie, una por **emisor activo** (léxico: luz =
+  accent, láser = green, iluminador IR = orange, láser IR = red; 46/22/14 px según N), y el nombre
+  completo vive en el hub. **Regla del pie**: sólo se dibuja lo que está pasando — nada de rieles
+  vacíos. Recorte heredado, colores del theme (el teñido DGL4 re-tiñe gratis), pintado y commit en
+  `pcall` (CRG-25).
+- PARCHE 3 — feat(ui): **las tres fuentes** (`client/corpus_cargo_lights.lua`, header con las
+  firmas verificadas contra `dev/other/` — CRG-24, nada de memoria):
+  **(1) Torch** — pinta `ply:FlashlightIsOn()`; commit por el único net nuevo (PARCHE 4).
+  **(2) NVG** — aparece si `GetNWInt("nvg", 0) ~= 0`. **Decisión declarada** (la primera página
+  del PROMPT la exigía): el chip pregunta por la **NW y no por el ítem equipado** — la NW es lo
+  que `arc_vm_nvg` va a accionar (el mod gatea en ella), y desde #47 **es** la resolución de Cargo
+  replicada; preguntar al snapshot re-implementaría `EquippedShortName` en el cliente, una segunda
+  ruta para la misma verdad. Commit `RunConsoleCommand("arc_vm_nvg")`, cliente puro; **jamás se
+  escribe la NW `nvg`** (es de #47, escritor único). **El toggle es asíncrono y el chip pinta el
+  TRÁNSITO** (CRG-64, entry 53): el delay se lee de la variante viva —`EquipDelay` al encender;
+  ninguna variante declara `UnequipDelay`, así que el apagado invierte sin ventana— y durante la
+  ventana el chip no afirma ni el estado viejo ni el nuevo. El rechazo es **MUDO** en esta tanda
+  (bloque 07 del mock, diferido): re-togglear durante la ventana no ejecuta nada — re-entrar en
+  `ArcticNVGs_Toggle` encolaría un segundo timer dentro del mod.
+  **(3) Dispositivos ARC9** — uno por slot con `.Installed` cuyo att declare `ToggleStats` +
+  `ToggleOnF`. Commit = el del radial propio (`cl_move.lua:153-163`): `wep:ToggleStat(addr)` +
+  `wep:PostModify()`, client-side, replica solo (`SendWeapon`) — el mismo contrato de **CRG-23**,
+  cero lógica de server. **La bifurcación de §0.ter (a) se resolvió a favor de las barras**:
+  `GetFinalAttTable` **fusiona** `ToggleStats[ToggleNum]` sobre la tabla del att
+  (sh_0_stats.lua:86-89), así que los emisores del modo activo (`Flashlight`/`Laser` + flags IR)
+  son **datos** — las barras jamás se fabrican parseando el string del modo, y un att que no
+  exponga emisores va sin barras con el modo sólo en el hub. El nombre del dispositivo se lee de
+  la tabla SIN fusionar (`ARC9.GetAttTable`): el merge pisa `PrintName` con el del modo. **El
+  estado pertenece al slot del arma** (`slottbl.ToggleNum`) — Cargo no persiste nada; guardarlo en
+  el jugador es el defecto de TLS que no se porta.
+- PARCHE 4 — feat(ui): **el único net del grupo** (`server/corpus_cargo_lights.lua`, archivo solo
+  a propósito: la excepción de la **enmienda a CRG-30** se audita de un vistazo).
+  `Corpus.Net.Register("cargo", "torch")`, **sin payload**, y en el server
+  `ply:Flashlight(not ply:FlashlightIsOn())`. Decisión del autor, opción (b) del diseño: la (a),
+  `impulse 100`, quedó descartada **con medición** — ARC9 lo secuestra
+  (`sh_move.lua:360-369`) cuando hay un dispositivo toggleable en la mano y la misma tecla haría
+  cosas distintas según lo que lleves. Sin estado, sin persistencia, sin validación que fabricar:
+  **CRG-6 sigue en pie**. Y `impulse 100` **no se intercepta jamás** — el hallazgo caro de TLS
+  (§6 del diseño): su `return true` incondicional en `PlayerBindPress` mata la linterna del engine
+  para toda la sesión y rompe el toggle de attachments de ARC9.
+- PARCHE 5 — feat(icons): **los TRES íconos propios** (lo cambió el mock, §0.ter b: ninguno sale
+  de `atttbl.Icon` — todos los dispositivos comparten un único símbolo genérico; costo aceptado y
+  declarado: dos dispositivos apagados en la misma columna se ven idénticos y los distingue el
+  orden y el hub). **Decisión de sede, dicha**: viven en **`materials/corpus_cargo/wheel/`**
+  (`flashlight.png`/`nvg.png`/`device.png`, los PNG de 64 exportados del mock — a 1080p la celda
+  pide ~48 y el de 64 sobra) y **se versionan**: son arte propio del proyecto (COR-17 sólo excluye
+  assets de terceros; no suben al banco del framework porque los consume un solo módulo — COR-10).
+  El gate `file.Exists` va igual: sin el PNG montado el chip cae a su inicial, degradación honesta
+  (COR-5), nunca un error. **Los 5 PNG de TLS no se copian** — licencia silenciosa, y no hacen
+  falta.
+
+### 2.ª pasada (planilla V, ronda 2) — la enmienda estaba incompleta
+
+La ronda 1 quedó **contaminada** por un bind doble (la G del autor era wheel **y** `impulse 100`,
+y el wheel pollea la tecla en vez de pasar por binds: cada apretón togleaba la linterna por su
+cuenta y soltar sobre el chip la invertía otra vez — **neto cero**, indistinguible de "no pasó
+nada"). Limpio el bind, la ronda 2 destapó dos cosas.
+
+- PARCHE 6 — fix(ui): **el chip del torch nunca pintaba ON, y el motivo es de diseño.**
+  `ply:Flashlight` es server-only en las **DOS** direcciones; la 1.ª pasada **midió** la
+  escritura y **asumió** la lectura, usando `ply:FlashlightIsOn()` desde el cliente. Medición
+  en juego, con el haz visiblemente pintando una pared y **sin** ARC9 en la mano:
+  `lua_run print(Entity(1):FlashlightIsOn())` → **true**, `lua_run_cl
+  print(LocalPlayer():FlashlightIsOn())` → **false** (el método **existe** en el cliente — lo
+  primero que se descartó —, simplemente no vale ahí). Remedio: el server publica el estado
+  real en **`NW2Bool "cargo_torch"`** (`CARGO.Lights.PublishTorch`), el mismo vehículo que ya
+  usa el multiplicador de peso de #34 — **replicación del engine, no un segundo mensaje: la
+  enmienda a CRG-30 sigue en UN intent**. El espejo lee el **engine y no nuestros toggles**,
+  porque Cargo no es el único escritor por diseño (la tecla libre, y el `PostModify` de ARC9
+  que apaga la linterna con un att `ToggleOnF` en mano); alimentarlo con nuestros commits se
+  desfasaría en cuanto escribiera otro, que es **CRG-64 en el otro tiempo verbal**. 4 Hz, el
+  ritmo del espejo cinturón↔pool de §16, más publicación inmediata en el receiver para que el
+  commit propio no espere un tick. **La lección es de método**: CRG-24 existe para no asumir la
+  API de un tercero, y acá se asumió la del **engine** — el tercero que más fácil se olvida que
+  lo es.
+- PARCHE 7 — fix(ui): **`LightState` dejó de tragarse el error.** Su `pcall` devolvía `{}` sin
+  loguear, así que un `state()` que **tiraba** era pixel por pixel idéntico a uno que decía OFF
+  — y sus dos hermanas de al lado (`available`, `expand`) ya logueaban. Esa asimetría es lo que
+  dejó al defecto del PARCHE 6 sobrevivir una ronda entera de planilla. Log único por error
+  distinto, para que un fallo por frame no inunde la consola. Es la misma lección de la G y la
+  del stub que no guardaba estado, esta vez **adentro del código**: un instrumento que no
+  distingue "roto" de "no pasó nada" no es un instrumento.
+- PARCHE 8 — feat(ui): **la lista de luces se re-arma al cambiar de arma con el wheel abierto**
+  (V8). La lista se arma al abrir y el teclado sigue vivo a propósito, así que un chip de
+  dispositivo de un arma que ya no llevás no puede decir la verdad de nada. Se re-arma cuando
+  —y **solo** cuando— cambia el arma en mano: sigue sin ser por frame, que era la parte de la
+  regla que importaba. **La otra salida que propuso el autor, bloquear las teclas 1-7 mientras
+  el wheel está abierto, se rechazó a propósito**: el wheel no es dueño del teclado, y pisar un
+  bind en silencio es justo lo que este grupo existe para evitar. El tránsito del NVG
+  **sobrevive** el re-armado (vive en un upvalue del archivo de fuentes, no en el chip), así que
+  CRG-64 sigue pintando a través de un cambio de arma a mitad de ventana.
+
+### 3.ª pasada (planilla V, ronda 3) — la sección cierra 9/9, y dos notas de checks que PASARON
+
+- PARCHE 9 — fix(ui): **ARC9 le robaba el cursor al wheel.** Cambiar de arma con 1-7 con el
+  wheel abierto y caer en un arma ARC9 dejaba el cursor muerto: no se podía seleccionar nada.
+  Con un arma HL2 no pasaba, y **ese contraste es lo que señaló la causa** — el `Deploy` de
+  ARC9 llama `gui.EnableScreenClicker(false)` **incondicionalmente** (`sh_deploy.lua:125`). El
+  screen clicker es **estado global** y no somos su único consumidor. `Open` sigue siendo el que
+  lo prende y `Close` el que lo apaga; esto solo lo sostiene mientras ya decidimos que tenía que
+  estarlo. **El defecto era anterior al PARCHE 8**, pero el parche 8 bendijo el gesto y lo volvió
+  alcanzable.
+  **Su primera forma estuvo MAL y la planilla lo agarró (V10, ronda 4).** Re-afirmaba el clicker
+  en **cada frame pintado**, justificado en que *"la llamada es idempotente"* — una **asunción
+  sobre una API del engine que nunca se verificó**, y falsa: el cursor volvía pero **parpadeaba**
+  y no podía clickear nada. Llamarlo por frame **re-inicializa** el clicker en vez de dejarlo
+  quieto. La forma correcta **lee el estado antes de escribirlo** —
+  `if not vgui.CursorVisible() then gui.EnableScreenClicker(true) end` —, que además recupera el
+  cursor ante **cualquier** tercero que lo apague y en cualquier momento, que era el objetivo de
+  la versión por frame. `vgui.CursorVisible` es la misma sonda que `Open` ya usaba unas líneas
+  más abajo. **Es la tercera vez en esta tanda que el defecto es una API asumida en vez de
+  medida** (CRG-24 vale también para el engine), y la única de las tres cometida *escribiendo el
+  parche que documenta las otras dos.**
+- **CORRECCIÓN de doc — `UnequipDelay` sí existe, y el código nunca compartió el error.** El
+  texto afirmaba en cuatro sedes que *"ninguna variante declara `UnequipDelay`, así que el
+  apagado invierte sin ventana"*. **Es falso**: las **12 variantes `shades*`** (las aviators)
+  declaran `UnequipDelay = 0.25`; las de tubo no. La 1.ª pasada leyó las GPNVG y **generalizó de
+  una muestra** — la misma familia de error que CRG-24 nombra, y la hermana del error del PARCHE
+  6, pero al revés: allá la prosa tenía razón y el código asumió, acá **el código tenía razón y
+  la prosa afirmó de más**. La rama por dirección de `client/corpus_cargo_lights.lua` existía
+  justamente para no caer por un `or` encadenado, así que con aviators el chip **ya pintaba** su
+  tránsito de 0,25 s al apagar. Corregidas §17.5, §17.8, el header del archivo y el stub del
+  harness — que **había heredado la afirmación falsa del doc**, y por eso el harness no podía
+  contradecirlo: no existía en el stub un apagado con ventana que medir.
+
+Lo destapó la nota de un check en **PASA** (V7: *"el NVG tiene animación al hacer off también"*),
+que es la cuarta vez en este bloque que el hallazgo sale del campo de notas y no de un rojo.
+
+Harness **639** (eran 636), **3 checks nuevos** (el apagado con ventana de las aviators, su
+etiqueta `ON → OFF`, y la precondición que los separa) y **1 reversión en negativo**: quitar la
+rama por dirección pone en rojo **3** checks a la vez.
+
+**Frontera nueva, medida y NO peleada** (§13): con un arma ARC9 con dispositivo **desplegada**,
+el haz de la linterna del engine **no se dibuja** — y vuelve al cambiar a un arma sin
+dispositivo, con el estado de server en `true` todo el tiempo. Es supresión de **render**, no de
+estado. La línea de ARC9 que lo hace **no quedó ubicada** y se dice así en vez de citar una sin
+verificar. Consecuencia declarada: en ese caso el chip dice ON y no se ve luz, y **el chip no
+miente** — la linterna está encendida.
+
+Verificación offline tras la 2.ª pasada: harness **636** (eran 630), **6 checks nuevos** (2 del
+chip contra el espejo —uno de ellos **en negativo**, que el engine encendido NO alcance para
+pintar ON— y 4 del espejo server, incluido el que fija que sigue al engine y no a nuestros
+commits). **3 reversiones verificadas en negativo**, 5 rojos distintos: el chip leyendo el
+engine otra vez (2), el receiver sin publicar en el acto (2) y el espejo leyendo un cache
+propio en vez del engine (3). El stub de jugador ganó `SetNW2Bool`/`GetNW2Bool` **con estado de
+verdad**, por la misma razón de siempre. Fuera de cobertura, y se dice: el PARCHE 7 vive en la
+ruta de pintado (`HUDPaint`, ya declarada fuera de alcance arriba) — se verifica en juego.
+
+**Interacción de terceros medida y NO peleada** (va a la planilla): el `PostModify` de **server**
+de ARC9 apaga la linterna del engine cuando el arma en mano tiene un att `ToggleOnF`
+(`sh_attach.lua:143-145`, lo dispara `ReceiveWeapon` al replicar) — togglear un dispositivo con la
+linterna prendida la apaga. Es la regla del propio mod sobre su tecla F compartida. Y el regalo
+verificado en código (falta verlo en juego): `cl_light.lua:16-24` lee `nvg_on` para conmutar los
+flashlights `FlashlightIR` a infrarrojo — NVG + luz IR del arma ya se entienden solos.
+
+Verificación offline: harness **630** (eran 588), **42 checks nuevos** (39 client + 3 server: el
+torch se prueba con su capa AISLADA — el receiver contra el estado real del stub, sin wheel en el
+medio, §0.bis 2). **Las 8 reversiones se verificaron EN NEGATIVO**, una por capa, y cada una pone
+en rojo el check que nombra la regla: el gate de `available` cegado (3 rojos, cae "nada se
+adivina"), el empuje anulado (5), el pick ciego a las luces (2), el receiver del torch vaciado (1),
+el tránsito sin rastrear (los 5 de CRG-64), el commit sin `ToggleStat` (3 — "el modo CAMBIÓ de
+verdad" depende de la mutación real del stub), los emisores afirmados sin datos (1, el del
+no-parseo), y **el stub de linterna sin guardar estado** (1 — un stub que no invierte vuelve
+indemostrable lo que mide, §0.bis 3).
+
+**LO QUE EL HARNESS NO PUEDE PROBAR, Y HAY QUE DECIRLO** (§0.bis 6). El entorno son DOS mods
+ajenos: todo ARC9 y todo el NVG corren contra **stubs escritos por nosotros** — los checks afirman
+*"la lógica hace lo correcto CON estas tablas"*, jamás *"éstas son las tablas de los mods"*. Los
+stubs guardan estado de verdad (§0.bis 3): el SWEP falso **cambia de `ToggleNum` con el wrap real**
+y el stub de linterna invierte de verdad — sin eso, "el dispositivo cambió" sería indistinguible de
+"no pasó nada". Fuera de cobertura offline por construcción: que `arc_vm_nvg` exista y anime (VManip
+no está en `dev/other/` — el mod lo hard-depende en `cl:24` sin comprobarlo; en la instalación del
+autor está montado y el toggle funciona, confirmado en la planilla U2, pero acá no se afirma nada de
+su comportamiento), que el secuestro de `impulse 100` ocurra (es un hecho del engine y del mod, no
+de una función pura — está medido, no harnesseado), la replicación real de `SendWeapon`, y el
+render HUDPaint en sí. Todo eso es planilla **V** y nada más.
+
+EN JUEGO: planilla **V** (ver entry 53, que comparte la pasada).
+
+---
+
+## 53. CRG-64 acuñada y CRG-30 enmendada: el tránsito honesto y el intent que costó una norma `[APLICADO 2026-07-29]`
+
+**CRG-64** — *"Un indicador de un estado ASÍNCRONO de un tercero pinta el TRÁNSITO; jamás pinta el
+estado viejo como si fuera el actual."* Sede: `Cargo_Architecture.md` **§17.5**, junto a CRG-32, de
+la que es **la hermana en el eje del TIEMPO**: aquella prohíbe inventar un dato que no se tiene,
+ésta prohíbe afirmar uno que ya no vale. Fuerza: INVARIANTE. El caso que la acuña está **medido
+contra el código vivo del mod** (CRG-24): `ArcticNVGs_Toggle` espera 1,325 s (el `EquipDelay` de la
+variante; 1,41 en las aviators) antes de invertir `nvg_on` — un chip que pintara la NW mentiría más
+de un segundo. La duración jamás se hornea (regla del propio mock): se lee de la tabla viva, por
+variante y por dirección.
+
+**ENMIENDA a CRG-30** — el ID se conserva, no es una norma nueva. Decía: *"cero lógica de server
+nueva, cero mensajes de red nuevos, y jamás intercepta slot8"*. Queda: cero lógica de server nueva
+**para el front-end de ARMAS**; el grupo de LUCES suma **un único intent de toggle sin payload**,
+que no lleva estado ni validación. Lo que la norma protegía —no fabricar rutas paralelas de
+inventario— sigue intacto (CRG-6 en pie). Sede enmendada en §17.1 **con la medición del secuestro
+del impulso como fundamento**, y el `titulo` de `ids.yaml` corregido **en el mismo parche** —
+dejar ahí una frase que el código contradice es exactamente lo que el flujo §7.1 llama un yaml
+desactualizado.
+
+§17 ganó la subsección **§17.8** (el tercer grupo entero: registro, anclaje y empuje, los tres
+canales del chip, las tres patas con su procedencia). **§13.1 se re-derivó del árbol** (FLU-27):
+eran 23 `net.Receive` de servidor y son **24** — el nuevo es un intent sin payload y cae en la
+categoría que CRG-6 ya protege (21 → 22). Y **§10.3 ganó la fila de los toggles**: la API de ARC9
+se usa también para **ACCIONAR**, no solo para attach/detach — mismo contrato CRG-23, client-side,
+replica solo.
+
+La letra **V** se registró en `familias_excluidas` en el MISMO parche, ANTES de usarse (FLU-30), y
+no se recicla (FLU-07). Es la sexta sección de planilla de Cargo y la primera del frente
+ACCIONAR: P=B1, Q=B3, R=B4, S=B5, U=#47.
+
+**EN JUEGO — planilla `V`** (sección nueva de la planilla de CARGO, la misma URL que P-U). **Al
+menos uno es de RECHAZO o de AUSENCIA a propósito** — V5 lo es: que sin ARC9 y sin el NVG la
+columna quede con un solo chip y la consola limpia es tan verificable como lo demás.
+
+- **V1** · **la linterna del jugador** se enciende y se apaga desde el chip, **con un arma ARC9
+  con dispositivo toggleable en la mano** — que es justo el caso donde `impulse 100` fallaba. Y la
+  tecla de linterna del jugador **sigue funcionando por su cuenta**: no se interceptó nada.
+  *Nota esperable, medida en código y no peleada:* togglear un **dispositivo** con la linterna
+  prendida la apaga — es el `PostModify` de server de ARC9 (su regla sobre la tecla F), no un bug
+  nuestro.
+- **V2** · **el NVG**: el chip lo enciende y lo apaga, y **durante el segundo y pico del tránsito
+  el chip NO miente** (CRG-64) — borde amber, barra llenándose, hub en `OFF → ON`, y ni el relleno
+  ON ni el OFF afirmados. Con las gafas puestas por las **DOS rutas de #47** (sub-slot del casco y
+  Head directo), porque el chip no debería notar la diferencia. El apagado, en cambio, invierte
+  **sin ventana** (ninguna variante declara `UnequipDelay`) — que se vea instantáneo no es un bug.
+- **V3** · **los dispositivos ARC9**: un arma con **UN solo dispositivo** —el caso que el radial
+  propio de ARC9 no cubre— cambia de modo desde el chip, y el nombre del modo que muestra **el
+  hub** es el que ARC9 dice (§0.ter a: el nombre va al hub, no al chip). Las **barras de modo al
+  pie** cambian con el modo (los emisores están expuestos y las barras existen); si algún att de
+  otro pack no expusiera emisores, ese chip tiene que estar **SIN barras** y no con barras
+  inventadas. Repetir con un arma de **DOS** y confirmar que son dos chips independientes.
+- **V4** · **el anclaje y el empuje**: con `cargo_wheel_lights_anchor` en el mismo lado que quick
+  o que tools, la columna se **desplaza hacia afuera** (24 px de separación entre grupos, orden
+  quick → tools → lights) y no se pisa nada, con su línea única en consola.
+- **V5** · **AUSENCIA/RECHAZO**: sin arma en la mano (o con una sin dispositivos) la columna tiene
+  **dos chips y ya** — no aparecen chips fantasma (CRG-32). Y `cargo_ui_tools 0` no rompe el
+  empuje. La mitad fuerte: **sin ARC9 y sin el NVG montados**, la columna queda con **un solo
+  chip** (la linterna) y la consola limpia.
+- **V6** · **negativa**: el wheel de armas, los chips quick, los de herramienta, el holster y el
+  inventario siguen intactos. Esta tanda toca el layout del wheel, que es superficie caliente
+  (y los fades/bloqueo del mock — bloque 07 — quedaron DIFERIDOS justamente para no tocar el
+  dibujador raíz: esta pasada tiene que dejarlo intacto).
+
+**Y tres CANDIDATOS DEL USO (V7-V9), sumados al entregar la planilla** — la lección de #47 aplicada
+ANTES de pagarla otra vez: la planilla mide lo que se propuso medir, el uso mide lo que falta. Los
+números no se reciclan (FLU-07):
+
+- **V7** · **la linterna DURANTE el tránsito del NVG.** Encender el NVG y, en plena animación,
+  soltar sobre el chip de la linterna: nada revienta, el wheel cierra normal, consola limpia — el
+  rechazo de esta tanda es MUDO a propósito. **La NOTA vale más que el estado**: decir si la
+  linterna encendió durante la animación o el mod la bloqueó — la diferida (h) del mock **asume**
+  que la bloquea y eso nunca se midió (CRG-24). Esta nota ES esa medición.
+- **V8** · **cambiar de arma con el wheel abierto** y soltar sobre un chip de dispositivo del arma
+  ANTERIOR. La lista se arma al abrir: el toggle aplica al arma que el wheel MOSTRÓ (aunque ya no
+  esté en la mano) o no hace nada — las dos lecturas son honestas. Lo que no puede pasar: un error
+  en consola, o togglear un dispositivo de la nueva arma que nunca se mostró.
+- **V9** · **el regalo verificado en código, confirmado en juego**: con las NVG encendidas, el
+  iluminador/láser **IR** del arma se ve; a ojo desnudo, no — es ARC9 leyendo la señal del mod por
+  su cuenta (`checknvg`), sin una línea nuestra.
+
+**RESULTADO, dos rondas.** Ronda 1: **V2, V4 y V6 en PASA** —V2 pone **CRG-64 en juego** por las
+dos rutas de #47, así que la norma que acuñó esta tanda ya tiene su evidencia—; V1 y V7
+**contaminados** por la G doble-bindeada, V3/V8/V9 sin correr por falta de attachments, V5 sin
+correr. Ronda 2, con el bind limpio y attachments en mano: **V3, V5, V8 y V9 en PASA**, y **V1 y
+V7 en ✗ destapando el defecto del PARCHE 6** (entry 52). Lo que la ronda 2 dejó, y vale más que
+los estados:
+
+- **V7 REFUTÓ la premisa de la diferida (h)** del mock. Asumía que el mod de NVG bloquea la
+  linterna durante su animación; el grep del mod ya mostraba que **no la toca en ninguna línea**,
+  y la medición lo confirmó: **la linterna encendió en pleno tránsito**. La diferida (h) queda
+  sin ese supuesto cuando se ejecute.
+- **V9 pasó a medias y el resto es de ARC9**: el láser IR se ve con las NVG encendidas (el
+  regalo, confirmado en juego), la **luz** IR no. Mecanismo probable, leído en el mod y **no
+  peleado**: `cl_laser.lua` re-evalúa `checknvg` en cada dibujo, pero `cl_light.lua` solo
+  re-crea las luces `if anydrawn and nvgon != checknvg(self)` (:186-187) — la recuperación queda
+  condicionada a que ya se esté dibujando algo, que es lo que está suprimido. Predicción
+  falsable si alguien lo retoma: ciclar el dispositivo con el NVG ya encendido debería
+  destrabarlo.
+- **V5 (c)** —desmontar ARC9 y el NVG— quedó **N/A** por decisión del autor; (a) y (b) alcanzan
+  para el check.
+
+Ronda 3, con los parches de la 2.ª pasada: **los nueve en PASA**. V1 confirma el espejo por sus
+tres caras —el chip enciende, apaga y **sigue en ON al reabrir**; con dispositivo ARC9 se
+mantiene; sin dispositivo el haz vuelve— y V8 confirma que la lista se re-arma. **Las dos notas
+volvieron a valer más que los estados**: la de V7 corrigió una afirmación falsa de cuatro sedes
+del doc (`UnequipDelay`), y la de V8 destapó que **ARC9 le roba el cursor al wheel** en el gesto
+que el PARCHE 8 acababa de bendecir. Las dos están arriba, en la 3.ª pasada de la entry 52.
+Ronda 4, un solo check: **V10 en ✗** — el PARCHE 9 en su primera forma dejaba el cursor vivo pero
+**parpadeando**, y la nota lo describió con precisión suficiente para diagnosticarlo sin volver a
+juego (*"vivo pero parpadeando"* es un síntoma distinto de *"muerto"*, y esa distinción es la que
+señaló al parche en vez de al mod). Ronda 5, con el guard: **V10 en PASA**.
+
+**La sección V cierra 10/10 el 2026-07-29, en cinco rondas.** Los tres defectos que encontró son
+**el mismo error con distinto disfraz — una API asumida en vez de medida**: `FlashlightIsOn`
+supuesta legible en el cliente (no lo es), `UnequipDelay` supuesta ausente en todas las variantes
+(12 la declaran), `EnableScreenClicker` supuesta idempotente (no lo es). **Y la tercera se cometió
+escribiendo el parche que documenta las dos primeras.** Queda dicho así a propósito: CRG-24 manda
+verificar las APIs de terceros contra `dev/other/`, y **el engine también es un tercero** — el que
+más fácil se olvida que lo es.
+
+Planilla (sección nueva de la de Cargo, la misma URL que P, Q, R, S y U):
+https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9

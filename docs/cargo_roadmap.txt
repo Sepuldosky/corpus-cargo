@@ -658,15 +658,65 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     corpus-stalker (el NextBot subclaseable es la otra mitad de "traders
     hechos por usuarios").
 
-46. LISTA DE FUENTES DE LUZ EN EL WHEEL [Cargo ui/arc9] — ABIERTO, y es el
-    PRÓXIMO FRENTE DEL MÓDULO ahora que #47 cerró.
-    PROMPT ESCRITO: dev/PROMPT_cargo_tls_luces.txt (v1, 2026-07-27) —
+46. LISTA DE FUENTES DE LUZ EN EL WHEEL [Cargo ui/arc9] — HECHO 2026-07-29,
+    entries 52-53 [APLICADO], confirmado en juego con la PLANILLA V en 10/10
+    tras CINCO rondas. La ronda 1 se perdió entera por el entorno (la G del
+    autor era wheel Y `impulse 100`, y como el wheel pollea la tecla el toggle
+    daba NETO CERO); las rondas 2-5 encontraron tres defectos y una afirmación
+    falsa del doc, y CUATRO de los cinco hallazgos salieron del campo de NOTAS
+    de checks que PASARON, no de un rojo.
+    LOS TRES DEFECTOS SON EL MISMO ERROR CON DISTINTO DISFRAZ — una API
+    asumida en vez de medida: FlashlightIsOn supuesta legible en el cliente
+    (no lo es; ply:Flashlight es server-only en las DOS direcciones, y por eso
+    el chip nunca pintaba ON — el remedio es un espejo NW2Bool que lee el
+    ENGINE y no nuestros commits), UnequipDelay supuesta ausente en todas las
+    variantes (las 12 aviators la declaran en 0,25 — el CÓDIGO nunca compartió
+    el error, solo la prosa y el stub que la había copiado), y
+    EnableScreenClicker supuesta idempotente (no lo es: llamarla por frame
+    re-inicializa el clicker y el cursor parpadea). La tercera se cometió
+    ESCRIBIENDO EL PARCHE QUE DOCUMENTA LAS DOS PRIMERAS. CRG-24 manda
+    verificar las APIs de terceros contra dev/other/, y EL ENGINE TAMBIÉN ES
+    UN TERCERO — el que más fácil se olvida que lo es.
+    Frontera declarada en §13: con un arma ARC9 con dispositivo desplegada,
+    ARC9 SUPRIME EL RENDER del haz de la linterna del engine aunque el estado
+    siga en true (vuelve al cambiar de arma). No se pelea.
+    Ejecutado 2026-07-28.
+    La norma presupuestada se acuñó (CRG-64: un estado asíncrono de un
+    tercero pinta el TRÁNSITO) y CRG-30 quedó ENMENDADA (un único intent de
+    toggle sin payload; el titulo de ids.yaml corregido en el mismo parche).
+    El mock gobernó la forma: mockups/cargo_wheel_lights_mock_v1_1.html,
+    bloques 01-05 implementados. La bifurcación de las barras de modo se
+    resolvió A FAVOR: GetFinalAttTable fusiona el modo activo, los emisores
+    son DATOS y nada se parsea.
+    TRES DIFERIDAS DEL MOCK — APROBADAS POR EL AUTOR (2026-07-27), NO
+    propuestas; sede: el propio mock. Aprobado-y-sin-anotar es como se
+    pierde un diseño:
+      (g) VARIANTE (B) — celda ancha 150x56 solo para el grupo de luces
+          (bloque 06). Configurable, solo anclaje izquierda/derecha, quick y
+          tools siguen cuadrados, degrada a 56x56 en eje horizontal.
+          Convierte la constante de celda en parametro (w,h) por grupo y
+          hace convivir dos anatomias de celda — GroupCells hoy no se toca.
+      (h) FADES (90 ms abrir / 200 ms cerrar), CICLO DE VIDA DE CIERRE y
+          estado BLOQUEADO de rechazo (tramado rojo + parpadeo + cue sonoro,
+          bloque 07). Toca el dibujador RAIZ del wheel (alpha global por
+          frame y ~200 ms pintando con el input consumido) — la superficie
+          que V6 declara intacta. ARRASTRA UNA VERIFICACION PENDIENTE
+          (CRG-24, contra dev/other/): si el mod de NVG realmente bloquea la
+          linterna durante su animacion — su premisa, hoy NO medida. El
+          rechazo de la tanda ejecutada es MUDO.
+      (i) BATERIAS / condicion 0-100 de las luces (bloque 08). Preview sobre
+          el modelo GAMMA (la carga vive en el pack, el dispositivo la
+          refleja); sin codigo detras, con dos cosas que podrian tirarlo
+          abajo declaradas (consumo por modo, pack compartido).
+    ------------------------------------------------------------------
+    Lo de abajo es el diseño con que se ejecutó, se conserva como historia:
+    PROMPT: dev/PROMPT_cargo_tls_luces.txt (v1, 2026-07-27) —
     entradas 52-53, planilla V, UNA NORMA PRESUPUESTADA (un indicador de un
     estado ASÍNCRONO pinta el TRÁNSITO, hermana de CRG-32 en el eje del
     tiempo; su ID se acuña en el parche que la escribe, no acá — presupuestar
     no es acuñar, y el checker de IDs lo hace cumplir) y la ENMIENDA a CRG-30,
-    cuyo texto actual ("cero mensajes de red nuevos") deja de ser cierto con
-    el net de la linterna.
+    cuyo texto de entonces ("cero mensajes de red nuevos") dejó de ser cierto
+    con el net de la linterna.
     LA TRAMPA QUE EL PROMPT PONE EN SU PRIMERA PÁGINA: el doc de diseño se
     escribió ANTES de #47, cuando la NW "nvg" no la escribía nadie más. Hoy
     la escribe CARGO (server/corpus_cargo_nvg.lua), así que el chip solo
@@ -706,8 +756,9 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     NUNCA devolver true a "impulse 100" en PlayerBindPress: eso es
     justamente lo que TLS hace y lo que le rompe el toggle de atts a ARC9.
     Diseño completo, API verificada contra el código vivo y defectos del mod
-    inventariados en dev/Cargo_TLS_Referencia.md §9. Assets: dos íconos
-    propios (linterna, NVG); los de dispositivo los pone ARC9.
+    inventariados en dev/Cargo_TLS_Referencia.md §9. Assets: TRES íconos
+    propios (linterna, NVG, dispositivo genérico — lo cambió el mock: nada
+    sale de atttbl.Icon), montados en materials/corpus_cargo/wheel/.
 
 47. NVG DE NEOSUN COMO ÍTEMS DEL INVENTARIO [Cargo items/capture] — CERRADO
     2026-07-27, entries 50-51 [APLICADO], planilla U en 6/6 (dos pasadas).
