@@ -81,6 +81,7 @@ local SERVER_FILES = {
     "server/corpus_cargo_weapon_trivia.lua",  -- trivia overrides where ARC9 describes nothing (same class keys)
     "server/corpus_cargo_capture.lua",    -- engine weapons -> inventory (start unarmed)
     "server/corpus_cargo_holster.lua",    -- STALKER weapon order + holster + default hands (#22/#4)
+    "server/corpus_cargo_lights.lua",     -- the ONE payload-free torch intent of the wheel's lights group (#46, CRG-30 amended)
     "server/corpus_cargo_icons.lua",      -- icon cam/footprint override registry (ItemImages §4.3/§10)
     -- AFTER capture.lua: it registers its world pickups through Capture.RegisterWorldPickup
     "server/corpus_cargo_nvg.lua",        -- Neosun NVG compat: world pickup + NW commit (inert without the mod)
@@ -101,7 +102,9 @@ local CLIENT_FILES = {
     "client/corpus_cargo_transfer.lua",    -- container transfer panel (§8)
     "client/corpus_cargo_trade.lua",       -- trade session, basket and its panels
     "client/corpus_cargo_hotkeys.lua",     -- STALKER weapon keys 1-7 (#22)
-    "client/corpus_cargo_wheel.lua",       -- radial weapon wheel (#31)
+    "client/corpus_cargo_wheel.lua",       -- radial weapon wheel (#31) + light source registry (#46)
+    -- AFTER wheel.lua: it registers its sources through Wheel.RegisterLightSource
+    "client/corpus_cargo_lights.lua",      -- the three light sources: torch / NVG / ARC9 devices (#46)
     "client/corpus_cargo_options.lua",     -- Corpus.UI.RegisterTab entry
 }
 

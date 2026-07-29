@@ -2,15 +2,20 @@
 -- Roadmap #31; design closed in Claude Desktop 2026-07-13 and frozen in
 -- docs/mockups/cargo_wheel_menu_mock_v2_1.html (geometry, sector map, hub,
 -- chips, hover states — the mock rules until VGUI exists; on divergence the
--- code rules).
+-- code rules). Third chip group (lights, roadmap #46) frozen in
+-- docs/mockups/cargo_wheel_lights_mock_v1_1.html under the same rule.
 --
--- GOVERNING RULE — zero new server logic. The wheel is an alternative
--- front-end for the 1-7 slot keys: committing a sector sends the SAME
--- slotkey intent corpus_cargo_hotkeys.lua sends and the server resolves it
--- in corpus_cargo_holster.lua exactly as today (intent 8 = throwable,
+-- GOVERNING RULE — zero new server logic for the WEAPON front-end (CRG-30 as
+-- amended by #46). The wheel is an alternative front-end for the 1-7 slot
+-- keys: committing a sector sends the SAME slotkey intent
+-- corpus_cargo_hotkeys.lua sends and the server resolves it in
+-- corpus_cargo_holster.lua exactly as today (intent 8 = throwable,
 -- wheel-only, CARGO.Slots.WheelSlots). The quick chips call the EXISTING
 -- quick-use route (CARGO.UI.QuickUse) and the tool chips the EXISTING
--- selection function (CARGO.UI.SelectTool). No new net messages.
+-- selection function (CARGO.UI.SelectTool). The LIGHTS group commits through
+-- its registered sources (client routes of the mods, plus exactly ONE
+-- payload-free toggle intent for the engine torch — the single net message
+-- the CRG-30 amendment allows; server/corpus_cargo_lights.lua receives it).
 --
 -- Drawn on HUDPaint, no VGUI: the cursor roams free (gui.EnableScreenClicker
 -- swallows mouse clicks, so nothing fires while aiming the wheel), keyboard
@@ -40,6 +45,8 @@ local cvQuickAnchor = CreateClientConVar("cargo_wheel_quick_anchor", "bottom", t
     "Wheel quick-chip group anchor: bottom, top, left or right")
 local cvToolsAnchor = CreateClientConVar("cargo_wheel_tools_anchor", "right", true, false,
     "Wheel tool-chip group anchor: right, left, bottom or top")
+local cvLightsAnchor = CreateClientConVar("cargo_wheel_lights_anchor", "left", true, false,
+    "Wheel light-chip group anchor: left, right, bottom or top (may share a side: the column shifts outward)")
 
 local function S() return CARGO.ClientState end
 
@@ -92,9 +99,25 @@ function CARGO.Wheel.ResolveAnchors(quick, tools)
     end
 end
 
-local warnedAnchors
+-- pure (harness-covered): the THIRD group has its OWN collision rule (#46,
+-- author's call — deliberately NOT ResolveAnchors' rule): lights MAY share a
+-- side, shifted OUTWARD past whoever already sits there. Returns how many
+-- group depths to push: 0 = free side, 1 = quick OR shown tools occupy it,
+-- 2 = both (unreachable through the convars — ResolveAnchors never lets
+-- quick and tools share a side — but the function answers its whole domain;
+-- the mock draws that degenerate case in block 04). Fixed outward order:
+-- quick -> tools -> lights (mock, §0.ter e).
+function CARGO.Wheel.LightsPushOut(lightsAnchor, quickAnchor, toolsAnchor, toolsShown)
+    local push = 0
+    if quickAnchor == lightsAnchor then push = push + 1 end
+    if toolsShown and toolsAnchor == lightsAnchor then push = push + 1 end
+    return push
+end
 
-function CARGO.Wheel.BuildLayout()
+local warnedAnchors
+local warnedPush
+
+function CARGO.Wheel.BuildLayout(lightCount)
     local sw, sh = ScrW(), ScrH()
     local sc = sh / 1080
     local L = {
@@ -144,6 +167,41 @@ function CARGO.Wheel.BuildLayout()
     end
     L.quickCells = GroupCells(quick, CARGO.Slots.QUICK_COUNT)
     L.toolCells = GroupCells(tools, #CARGO.Slots.Tools)
+
+    -- Third group: lights (#46, mock blocks 01/03/04). GroupCells is reused
+    -- UNTOUCHED — the outward push is applied to the finished cells, along
+    -- the anchor axis only. A group is one chip deep in that axis, so each
+    -- occupant costs chip + gapGroup (24 @1080p between groups vs 8 between
+    -- cells — the mock's block separation, §0.ter e). Theme-scaled, never a
+    -- loose literal. The list is dynamic: zero sources -> no cells at all.
+    local lights = cvLightsAnchor:GetString()
+    lights = VALID_ANCHOR[lights] and lights or "left"
+    L.lightsAnchor = lights
+    if lightCount ~= nil and lightCount > 0 then
+        L.lightCells = GroupCells(lights, lightCount)
+        local push = CARGO.Wheel.LightsPushOut(lights, quick, tools, ToolsShown())
+        if push > 0 then
+            local gapGroup = math.Round(24 * sc)
+            local off = push * (chip + gapGroup)
+            local dx, dy = 0, 0
+            if lights == "left" then dx = -off
+            elseif lights == "right" then dx = off
+            elseif lights == "top" then dy = -off
+            else dy = off end
+            for _, c in ipairs(L.lightCells) do
+                c.x, c.y = c.x + dx, c.y + dy
+            end
+            -- one line, never silent, never an error (same pattern as the
+            -- tools fallback warning above)
+            local pushKey = lights .. "/" .. push
+            if warnedPush ~= pushKey then
+                warnedPush = pushKey
+                Corpus.Log("cargo", "wheel: luces comparten lado '" .. lights
+                    .. "' — columna desplazada hacia afuera ("
+                    .. push .. " grupo(s); cargo_wheel_lights_anchor)")
+            end
+        end
+    end
     return L
 end
 
@@ -192,6 +250,13 @@ function CARGO.Wheel.PickAt(L, mx, my, toolsShown)
             end
         end
     end
+    if L.lightCells ~= nil then
+        for i, c in ipairs(L.lightCells) do
+            if mx >= c.x and mx <= c.x + c.w and my >= c.y and my <= c.y + c.h then
+                return { kind = "light", i = i }
+            end
+        end
+    end
 
     local dx, dy = mx - L.cx, my - L.cy
     local dist = math.sqrt(dx * dx + dy * dy)
@@ -205,6 +270,143 @@ function CARGO.Wheel.PickAt(L, mx, my, toolsShown)
         if bestDiff == nil or diff < bestDiff then best, bestDiff = sec, diff end
     end
     return { kind = "sector", sector = best }
+end
+
+-- ------------------------------------------------------------------
+-- Light source registry (#46, Cargo_Architecture.md §17.8). Third live
+-- instance of the registration pattern, after StatusPanel.RegisterBar (§11)
+-- and Capture.RegisterWorldPickup (#47) — nothing here is invented. The list
+-- is REGISTERED, never hardcoded: a chemlight that becomes a Cargo item
+-- tomorrow enters as a source without touching the wheel, and the owner of
+-- its logic is the item's module, not Cargo (CRG-1).
+--
+-- Registration runs once at boot; `available` runs at OPEN (the one thing
+-- TLS did right: its list builds on the hold, not every frame); `state`
+-- runs every painted frame, because transit must animate (CRG-64).
+--
+--   spec = {
+--     label                     display name (hub line 1; letter fallback)
+--     icon                      IMaterial | nil (nil -> initial letter)
+--     available(ply, wep) -> bool     does this source exist RIGHT NOW?
+--                                     absent mod / no device = false, the
+--                                     chip does not exist (CRG-32: nothing
+--                                     is invented, columns shrink honestly)
+--     state(ply, wep) -> {            live paint data:
+--       on       bool|nil             nil while in transit — the chip
+--                                     asserts NEITHER the old nor the new
+--                                     state (CRG-64)
+--       mode     string|nil           current mode name (hub secondary)
+--       emitters {colorKey}|nil       ACTIVE emitters -> 3px foot bars, mock
+--                                     lexicon: "accent" light, "green"
+--                                     visible laser, "orange" IR
+--                                     illuminator, "red" IR laser. Only what
+--                                     is happening is drawn (§0.ter d)
+--       transit  {start,duration}|nil CurTime window of an async third-party
+--                                     toggle (CRG-64 paints it)
+--     }
+--     toggle(ply, wep)          the commit. Mute rejection: if it cannot
+--                               run, it runs nothing (deferred block 07)
+--     expand(ply, wep) -> {chip}|nil  optional: one SOURCE, N CHIPS (ARC9
+--                               devices, one per toggleable slot). Each chip
+--                               carries the same label/icon/state/toggle.
+--   }
+-- ------------------------------------------------------------------
+
+CARGO.Wheel._lightSources = CARGO.Wheel._lightSources or {}
+
+function CARGO.Wheel.RegisterLightSource(id, spec)
+    if not isstring(id) or id == "" then
+        error("Cargo.Wheel.RegisterLightSource: 'id' must be a non-empty string", 2)
+    end
+    if not istable(spec) or not isfunction(spec.available)
+        or not (isfunction(spec.toggle) or isfunction(spec.expand)) then
+        error("Cargo.Wheel.RegisterLightSource: spec needs available (function) and toggle or expand (function) (id '" .. id .. "')", 2)
+    end
+
+    local src = {
+        id = id,
+        label = isstring(spec.label) and spec.label or id,
+        icon = spec.icon,
+        available = spec.available,
+        state = spec.state,
+        toggle = spec.toggle,
+        expand = spec.expand,
+    }
+    -- re-registering an id replaces in place (lua refresh friendly); display
+    -- order = registration order, same as the status bars
+    for i, existing in ipairs(CARGO.Wheel._lightSources) do
+        if existing.id == id then
+            CARGO.Wheel._lightSources[i] = src
+            return src
+        end
+    end
+    CARGO.Wheel._lightSources[#CARGO.Wheel._lightSources + 1] = src
+    return src
+end
+
+-- Builds the flat chip list for THIS open (never per frame). A source that
+-- errors is skipped loudly — one broken registrant must not kill the column
+-- (same defensive rule as the status panel getValue).
+function CARGO.Wheel.BuildLightList()
+    local out = {}
+    local ply = LocalPlayer()
+    local wep = IsValid(ply) and ply:GetActiveWeapon() or nil
+    if not IsValid(wep) then wep = nil end
+    for _, src in ipairs(CARGO.Wheel._lightSources) do
+        local ok, avail = pcall(src.available, ply, wep)
+        if not ok then
+            Corpus.Log("cargo", "wheel: fuente de luz '" .. src.id
+                .. "' falló en available (reportar tal cual): " .. tostring(avail))
+        elseif avail then
+            if src.expand ~= nil then
+                local okx, chips = pcall(src.expand, ply, wep)
+                if not okx then
+                    Corpus.Log("cargo", "wheel: fuente de luz '" .. src.id
+                        .. "' falló en expand (reportar tal cual): " .. tostring(chips))
+                elseif istable(chips) then
+                    for _, chip in ipairs(chips) do
+                        out[#out + 1] = chip
+                    end
+                end
+            else
+                out[#out + 1] = src
+            end
+        end
+    end
+    return out
+end
+
+-- Live paint data of one chip, guarded (the paint hook pcalls too, but a
+-- broken state() must degrade to an empty table, not kill the frame).
+--
+-- IT ALSO LOGS, and that is not decoration (2nd pass, planilla V ronda 2):
+-- the first version swallowed the error silently, so a state() that THREW
+-- was pixel-for-pixel identical to a state() that answered OFF. Its two
+-- siblings — available and expand, right above — already log loudly; this
+-- one not doing so is the asymmetry that let the torch defect survive a
+-- whole round of the planilla. Same lesson the harness paid for in the stub
+-- that did not hold state (§0.bis 3), and the same one the double-bound G
+-- taught in game: an instrument that cannot distinguish "broken" from
+-- "nothing happened" is not an instrument. One line per distinct error, so
+-- a per-frame failure cannot flood the console.
+local warnedState = {}
+
+local function LightState(chip)
+    if not isfunction(chip.state) then return {} end
+    local ply = LocalPlayer()
+    local wep = IsValid(ply) and ply:GetActiveWeapon() or nil
+    if not IsValid(wep) then wep = nil end
+    local ok, s = pcall(chip.state, ply, wep)
+    if not ok then
+        local key = tostring(chip.label) .. "|" .. tostring(s)
+        if not warnedState[key] then
+            warnedState[key] = true
+            Corpus.Log("cargo", "wheel: chip de luz '" .. tostring(chip.label)
+                .. "' falló en state (reportar tal cual): " .. tostring(s))
+        end
+        return {}
+    end
+    return istable(s) and s or {}
 end
 
 -- ------------------------------------------------------------------
@@ -309,13 +511,24 @@ local function SendSlotKey(n)
     net.SendToServer()
 end
 
-local function Commit(hover)
+local function Commit(hover, lights)
     if hover == nil then return end
     if hover.kind == "quick" then
         -- the server re-checks suit lock / empties; this is only the trigger
         CARGO.UI.QuickUse(hover.n)
     elseif hover.kind == "tool" then
         CARGO.UI.SelectTool(CARGO.Slots.Tools[hover.i])
+    elseif hover.kind == "light" then
+        local chip = lights and lights[hover.i] or nil
+        if chip ~= nil and isfunction(chip.toggle) then
+            -- rejection is MUTE in this pass (block 07 deferred): a toggle
+            -- that cannot run runs nothing, and the wheel closes as always.
+            -- Close() already wraps the commit in pcall (CRG-25).
+            local ply = LocalPlayer()
+            local wep = IsValid(ply) and ply:GetActiveWeapon() or nil
+            if not IsValid(wep) then wep = nil end
+            chip.toggle(ply, wep)
+        end
     elseif hover.kind == "sector" then
         local sec = hover.sector
         if sec.intent == 0 then
@@ -351,21 +564,58 @@ function CARGO.Wheel.Open()
         net.SendToServer()
     end
 
-    local L = CARGO.Wheel.BuildLayout()
+    -- the light list builds AT OPEN, never per frame (§17.8 — the one thing
+    -- TLS did right); state() is what reads live afterwards
+    local wep = IsValid(ply) and ply:GetActiveWeapon() or nil
+    if not IsValid(wep) then wep = nil end
+    local lights = CARGO.Wheel.BuildLightList()
+    local L = CARGO.Wheel.BuildLayout(#lights)
     local sectors = {}
     for i, sec in ipairs(SECTORS) do
         sectors[i] = { sec = sec, quads = SectorQuads(L, sec.angle) }
     end
-    state = { L = L, sectors = sectors, hover = { kind = "deadzone" } }
+    state = { L = L, sectors = sectors, lights = lights, lightsWep = wep,
+        hover = { kind = "deadzone" } }
     gui.EnableScreenClicker(true)
     gui.SetMousePos(L.cx, L.cy) -- start in the deadzone, like the mock
+end
+
+-- The list builds AT OPEN (§17.8) — but the weapon in hand CAN change while
+-- the wheel is held, because the keyboard deliberately stays alive (§17.4).
+-- Measured in game (planilla V, V8): swapping from a weapon with a laser to
+-- one without left the old device chip on screen, and a chip of a weapon you
+-- are no longer holding cannot tell the truth about anything. So the list
+-- re-builds when — and ONLY when — the held weapon changes: still never per
+-- frame, which is the part of the rule that mattered.
+--
+-- The author's other option, blocking the 1-7 keys while the wheel is open,
+-- was refused on purpose: the wheel does not own the keyboard, and stomping
+-- a bind in silence is the one thing this whole group exists to avoid.
+--
+-- The NVG transit SURVIVES the rebuild: it lives in an upvalue of
+-- client/corpus_cargo_lights.lua, not in the chip table, so CRG-64 keeps
+-- painting across a weapon swap mid-window.
+local function RefreshLightsIfWeaponChanged()
+    if state == nil then return end
+    local ply = LocalPlayer()
+    local wep = IsValid(ply) and ply:GetActiveWeapon() or nil
+    if not IsValid(wep) then wep = nil end
+    if wep == state.lightsWep then return end
+
+    state.lightsWep = wep
+    state.lights = CARGO.Wheel.BuildLightList()
+    state.L = CARGO.Wheel.BuildLayout(#state.lights)
+    state.sectors = {}
+    for i, sec in ipairs(SECTORS) do
+        state.sectors[i] = { sec = sec, quads = SectorQuads(state.L, sec.angle) }
+    end
 end
 
 -- the pick re-runs at release time: the cursor may have moved since the
 -- last painted frame, and the commit must honor where it actually let go
 function CARGO.Wheel.Close(commit)
     if state == nil then return end
-    local L = state.L
+    local L, lights = state.L, state.lights
     -- read the cursor BEFORE releasing the screen clicker: once it is off,
     -- gui.MousePos is not guaranteed to keep reporting the free-cursor
     -- position (post-1st-pass hardening, 2026-07-13)
@@ -375,7 +625,7 @@ function CARGO.Wheel.Close(commit)
     if commit then
         -- protected: a commit error must never strand the wheel half-closed
         local ok, err = pcall(function()
-            Commit(CARGO.Wheel.PickAt(L, mx, my, ToolsShown()))
+            Commit(CARGO.Wheel.PickAt(L, mx, my, ToolsShown()), lights)
         end)
         if not ok then
             Corpus.Log("cargo", "wheel: error en el commit (reportar tal cual): "
@@ -409,15 +659,43 @@ local function DrawEntryIcon(entry, x, y, size, dim)
 end
 
 -- hub content per hover target (spec 4.5: ONE universal info surface)
-local function DrawHub(L, hover)
+local function DrawHub(L, hover, lights)
     local r = L.rIn - 6 * L.scale
     T.DrawCircleOutlined(L.cx, L.cy, r, T.Colors.panel, T.Colors.borderHi, 2)
 
     local maxW = r * 1.6
     local lines = {} -- { text, font, color }
     local cond, hint
+    local transitFrac, barsRow -- lights only (mock block 05)
 
-    if hover.kind == "sector" and hover.sector.slot == "hands" then
+    if hover.kind == "light" then
+        -- two lines + hint (§0.ter f): principal = what it is, secondary =
+        -- state or mode, hint = the action. Only the transit adds the
+        -- segmented bar. No chip carries its own tooltip (§17.5 intact).
+        local chip = lights and lights[hover.i] or nil
+        local s = chip ~= nil and LightState(chip) or {}
+        lines[1] = { chip and chip.label or "?", "CargoTitle", T.Colors.text }
+        if istable(s.transit) then
+            -- asserts NEITHER of the two states (CRG-64)
+            lines[2] = { isstring(s.transit.label) and s.transit.label or "…",
+                "CargoHeading", T.Colors.amber }
+            local dur = tonumber(s.transit.duration) or 0
+            local t0 = tonumber(s.transit.start) or 0
+            transitFrac = dur > 0 and math.Clamp((CurTime() - t0) / dur, 0, 1) or 1
+        elseif isstring(s.mode) then
+            -- the mode name exactly as the mod gives it — full name lives
+            -- HERE, not on the chip (§0.ter a)
+            lines[2] = { s.mode, "CargoHeading",
+                s.on == true and T.Colors.accent or T.Colors.textDim }
+            if s.on == true and istable(s.emitters) and #s.emitters > 0 then
+                barsRow = s.emitters -- the same bars the chip teaches
+            end
+        else
+            lines[2] = { s.on == true and "ON" or "OFF", "CargoHeading",
+                s.on == true and T.Colors.accent or T.Colors.textDim }
+        end
+        hint = "Release to toggle"
+    elseif hover.kind == "sector" and hover.sector.slot == "hands" then
         lines[1] = { "Hands", "CargoTitle", T.Colors.text }
         hint = "Release to holster"
     elseif hover.kind == "sector" then
@@ -492,7 +770,9 @@ local function DrawHub(L, hover)
         hint = "Dead zone — release to cancel"
     end
 
-    local y = L.cy - (#lines * 22 + (cond ~= nil and 14 or 0)) / 2
+    local extraH = (cond ~= nil and 14 or 0)
+        + (transitFrac ~= nil and 14 or 0) + (barsRow ~= nil and 10 or 0)
+    local y = L.cy - (#lines * 22 + extraH) / 2
     for _, ln in ipairs(lines) do
         draw.SimpleText(T.FitText(ln[1], ln[2], maxW), ln[2],
             L.cx, y + 11, ln[3], TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -505,10 +785,117 @@ local function DrawHub(L, hover)
         T.DrawSegBar(L.cx - bw / 2, y + 4, bw, 5, cond / 100, col)
         y = y + 14
     end
+    if transitFrac ~= nil then
+        -- segmented progress against the duration the MOD reports — nothing
+        -- baked (mock block 05, CRG-64)
+        local bw = maxW * 0.85
+        T.DrawSegBar(L.cx - bw / 2, y + 4, bw, 5, transitFrac, T.Colors.amber)
+        y = y + 14
+    end
+    if barsRow ~= nil then
+        -- the chip's mode-bar lexicon, echoed where the name is (block 05)
+        local n = math.min(#barsRow, 3)
+        local gapB = math.Round(2 * L.scale)
+        local strip = maxW * 0.5
+        local bw = math.floor((strip - gapB * (n - 1)) / n)
+        local x = L.cx - strip / 2
+        for i = 1, n do
+            local col = T.Colors[barsRow[i]] or T.Colors.textDim
+            surface.SetDrawColor(col)
+            surface.DrawRect(x, y + 4, bw, math.max(2, math.Round(3 * L.scale)))
+            x = x + bw + gapB
+        end
+        y = y + 10
+    end
     if hint ~= nil then
         draw.SimpleText(T.FitText(hint, "CargoSmall", maxW), "CargoSmall",
             L.cx, L.cy + r - 26 * L.scale, T.Colors.textDim,
             TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+end
+
+-- One light chip (#46 — mock block 02, §0.ter c/d). Three independent,
+-- never-overlapping channels: STATE is the fill (accentDim on / cell off),
+-- TRANSIT is the only user of amber (border + dimmed pulsing icon + 4px
+-- progress track that exists only while the transit does), HOVER raises
+-- fill and border one step and never touches the state color. At the foot
+-- only what is HAPPENING is drawn: a horizontal line down there always
+-- means something active.
+local function DrawLightChip(L, c, chip, hovered)
+    local s = LightState(chip)
+    local sc = L.scale
+    local transit = istable(s.transit)
+    local frac
+    if transit then
+        local dur = tonumber(s.transit.duration) or 0
+        local t0 = tonumber(s.transit.start) or 0
+        frac = dur > 0 and math.Clamp((CurTime() - t0) / dur, 0, 1) or 1
+    end
+
+    local fill, border
+    if transit then
+        fill = hovered and T.Colors.cellHover or T.Colors.cell
+        border = T.Colors.amber -- hover never wins over the amber border
+    elseif s.on == true then
+        fill = hovered and T.Colors.accent or T.Colors.accentDim
+        border = hovered and T.Colors.borderHi or T.Colors.accent
+    else
+        fill = hovered and T.Colors.cellHover or T.Colors.cell
+        border = hovered and T.Colors.borderHi or T.Colors.border
+    end
+    surface.SetDrawColor(fill)
+    surface.DrawRect(c.x, c.y, c.w, c.h)
+    surface.SetDrawColor(border)
+    surface.DrawOutlinedRect(c.x, c.y, c.w, c.h, 1)
+
+    -- white-on-transparent PNG tinted straight from the theme (DGL4 re-tints
+    -- for free); no icon mounted -> initial letter, title 20/700 (block 02)
+    local pad = math.Round(8 * sc)
+    local box = c.w - pad * 2
+    local iconCol
+    if transit then
+        local a = 140 + 40 * math.sin(CurTime() * 5) -- ~55%, pulsing
+        iconCol = Color(T.Colors.amber.r, T.Colors.amber.g, T.Colors.amber.b, a)
+    else
+        iconCol = s.on == true and T.Colors.text or T.Colors.textDim
+    end
+    if chip.icon ~= nil then
+        surface.SetDrawColor(iconCol)
+        surface.SetMaterial(chip.icon)
+        surface.DrawTexturedRect(c.x + pad, c.y + pad, box, box)
+    else
+        draw.SimpleText(string.upper((chip.label or "?"):sub(1, 1)), "CargoTitle",
+            c.x + c.w / 2, c.y + c.h / 2, iconCol,
+            TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+
+    -- foot: transit track (only while transiting) + mode bars (only active
+    -- emitters — one 3px bar each, mock lexicon geometry 46/22/14 @1080)
+    local barH = math.max(1, math.Round(3 * sc))
+    local footY = c.y + c.h - math.Round(4 * sc) - barH
+    if transit then
+        local tbH = math.max(2, math.Round(4 * sc))
+        local tbX = c.x + math.Round(2 * sc)
+        local tbW = c.w - math.Round(4 * sc)
+        local tbY = c.y + c.h - math.Round(2 * sc) - tbH
+        surface.SetDrawColor(T.Colors.barBack)
+        surface.DrawRect(tbX, tbY, tbW, tbH)
+        surface.SetDrawColor(T.Colors.amber)
+        surface.DrawRect(tbX, tbY, math.Round(tbW * frac), tbH)
+        footY = tbY - math.Round(1 * sc) - barH -- bars step up (block 08 note)
+    end
+    if istable(s.emitters) and #s.emitters > 0 then
+        local n = math.min(#s.emitters, 3) -- the mock designed up to three
+        local gapB = math.Round(2 * sc)
+        local strip = c.w - math.Round(10 * sc) -- 46 @1080: 56 - 2 border - 8 margin
+        local bw = math.floor((strip - gapB * (n - 1)) / n)
+        local x = c.x + math.Round(5 * sc)
+        for i = 1, n do
+            local col = T.Colors[s.emitters[i]] or T.Colors.textDim
+            surface.SetDrawColor(col)
+            surface.DrawRect(x, footY, bw, barH)
+            x = x + bw + gapB
+        end
     end
 end
 
@@ -590,7 +977,7 @@ local function DrawWheel(st)
         end
     end
 
-    DrawHub(L, hover)
+    DrawHub(L, hover, st.lights)
 
     -- quick chips F1-F4 (spec 4.6): rectangular — a different verb (USE,
     -- not equip) gets a different shape, and they never join the angular pick
@@ -643,6 +1030,17 @@ local function DrawWheel(st)
             end
         end
     end
+
+    -- light chips (#46, third group — TOGGLE, a third verb with the same
+    -- rectangular shape; mock blocks 01-03). The list was built at open;
+    -- a source that stopped being available mid-hold still paints (and its
+    -- toggle stays valid), the NEXT open shrinks the column (CRG-32)
+    if st.lights ~= nil and L.lightCells ~= nil then
+        for i, c in ipairs(L.lightCells) do
+            DrawLightChip(L, c, st.lights[i],
+                hover.kind == "light" and hover.i == i)
+        end
+    end
 end
 
 -- Protected paint (post-1st-pass hardening, 2026-07-13): GMod UNHOOKS a
@@ -661,6 +1059,29 @@ hook.Add("HUDPaint", "corpus_cargo_wheel", function()
         return
     end
     local ok, err = pcall(function()
+        -- The screen clicker is GLOBAL state and we are not its only consumer:
+        -- ARC9's Deploy calls gui.EnableScreenClicker(FALSE) unconditionally
+        -- (sh_deploy.lua:125), so switching to an ARC9 weapon with 1-7 while
+        -- the wheel is held killed our cursor mid-hold — measured in game
+        -- (planilla V, ronda 3, V8; an HL2 weapon does NOT do it, which is
+        -- exactly what pointed at the deploy path).
+        --
+        -- RE-ASSERTED ONLY WHEN IT IS ACTUALLY OFF, and that guard is the whole
+        -- fix. The first attempt called EnableScreenClicker(true) every painted
+        -- frame "because the call is idempotent" — an ASSUMPTION about an
+        -- engine API, never verified, and false: measured in game (planilla V,
+        -- ronda 4, V10) the cursor came back but FLICKERED every frame and
+        -- could not click anything. Calling it per frame re-initialises the
+        -- clicker instead of leaving it alone. Same mistake this very batch
+        -- documents twice over (CRG-24 applies to the engine too) — so the
+        -- state is read before it is written. vgui.CursorVisible is the same
+        -- probe Open() already trusts, a few lines below.
+        if isfunction(vgui.CursorVisible) and not vgui.CursorVisible() then
+            gui.EnableScreenClicker(true)
+        end
+        -- before the pick, so the cursor is tested against the layout that is
+        -- about to be painted (a rebuild can change the cell count)
+        RefreshLightsIfWeaponChanged()
         local mx, my = gui.MousePos()
         state.hover = CARGO.Wheel.PickAt(state.L, mx, my, ToolsShown())
         DrawWheel(state)
