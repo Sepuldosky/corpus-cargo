@@ -10,9 +10,19 @@
 --
 -- Changes against the original (everything else is a faithful port):
 --   * Class/print name: apexswep -> corpus_cargo_hands / "Hands".
---   * Sound scripts, net message, convars and icon materials renamed to the
+--   * Sound scripts, net message and convars renamed to the
 --     corpus_cargo/cargo_hands namespace (no collision if the original mod is
 --     mounted alongside).
+--   * ICON: the first port RENAMED the original's three icon VTFs instead of
+--     replacing them — byte-identical Apex hands art under our filenames, which
+--     both looked like the previous mod in the HUD and contradicted the "assets
+--     removed" line above. The three VMT/VTF pairs are deleted; one PNG of the
+--     Cargo logo (materials/corpus_cargo/hands_icon.png) now serves the weapon
+--     selection, the kill icon and the spawnmenu tile. See the CLIENT block.
+--   * MODEL EVENT FOLEY muted: the .mdl fires four Apex_* soundscript events
+--     whose foley the recycle removed, so the console filled with "No such
+--     sound". They are registered against common/null.wav — see the loop after
+--     the sound.Add block.
 --   * GLua C-style operators (&&/||/!=///) rewritten as standard Lua, matching
 --     the repo style and the offline syntax harness.
 --   * DARK ARMS FIX (2nd attempt): the original viewmodel goes dark looking
@@ -53,8 +63,53 @@
 AddCSLuaFile()
 
 if CLIENT then
-    killicon.Add("corpus_cargo_hands", "vgui/corpus_cargo_hands_killicon", Color(251, 85, 25, 255))
-    SWEP.WepSelectIcon = surface.GetTextureID("vgui/corpus_cargo_hands")
+    -- ONE icon for the three surfaces. The port shipped the original's three
+    -- VTFs renamed to our namespace but BYTE-IDENTICAL (verified by hash
+    -- against dev/other/): Apex hands art, i.e. exactly the assets the recycle
+    -- agreement says were removed. They are gone; the replacement is Cargo's
+    -- own logo, rendered from assets/cargo_logo_dark.svg to a PNG — the same
+    -- route the hitmarker below and the wheel icons already take.
+    local ICON = "corpus_cargo/hands_icon.png"
+    local iconMat = Material(ICON, "smooth mips")
+
+    killicon.Add("corpus_cargo_hands", ICON, Color(255, 255, 255, 255))
+
+    -- Spawnmenu tile. Sandbox reads SWEP.IconOverride and otherwise falls back
+    -- to "entities/<class>.png" (verified in the shipped gamemode,
+    -- spawnmenu/creationmenu/content/contenttypes/weapons.lua — CRG-24, the
+    -- engine is a third party too): it never looked at vgui/entities/, so that
+    -- third VTF was already dead weight.
+    SWEP.IconOverride = ICON
+
+    -- Weapon selection. WepSelectIcon is a surface TEXTURE ID and cannot hold a
+    -- PNG material, so the draw is taken over instead of the field being set.
+    -- weapon_base's version (gamemodes/base/entities/weapons/weapon_base/
+    -- cl_init.lua) insets 10 px and draws a 2:1 rect; the logo is square, so it
+    -- takes that rect's HEIGHT and is centred. PrintWeaponInfo is still called
+    -- because the base calls it — this SWEP stubs it to false further down, and
+    -- that stays the stub's decision, not this function's.
+    -- This is ALSO the HUD the author sees: the DGL4 holo HUD does not paint
+    -- the icon itself, its weaponicon component calls this same method for any
+    -- class it has no art for (dev/other/DGL4 .../components/weaponicon.lua).
+    function SWEP:DrawWeaponSelection(x, y, wide, tall, alpha)
+        -- THE HEIGHT OF THIS BOX IS NOT THE HEIGHT YOU CAN DRAW IN. Measured on
+        -- the author's HUD after the 1st pass came out clipped: DGL4 hands us a
+        -- 140x100 box centred on a panel that is only 144x72, and then scissors
+        -- to the PANEL (weaponicon.lua PerformLayout -> _h = size * 100/140;
+        -- animatedpanel.lua:189 -> SetScissorRect over selection_size). 14 px
+        -- above and 14 below never reach the screen, so a square fitted to
+        -- `tall` loses its top and bottom. `wide` is the honest one (140 vs
+        -- 144), and the size weapon_base itself paints is (wide - 20) / 2 — the
+        -- number every stock icon is laid out around, so it is the one that
+        -- fits wherever the base fits. `tall` still clamps, for a box that is
+        -- taller than wide.
+        local size = math.min((wide - 20) * 0.5, tall * 0.8)
+        surface.SetDrawColor(255, 255, 255, alpha)
+        surface.SetMaterial(iconMat)
+        surface.DrawTexturedRect(x + (wide - size) * 0.5, y + (tall - size) * 0.5, size, size)
+        -- same anchor the base passes, resolved against the unshifted args
+        self:PrintWeaponInfo(x + wide + 10, y + tall * 0.95, alpha)
+    end
 end
 
 SWEP.PrintName      = "Hands"
@@ -232,6 +287,29 @@ sound.Add({
     pitch = {80, 115},
     sound = genOrderedTbl("weapons/Pilot_Mvmt_Melee_WallKick_1P_2ch_v1_%i.wav", 3),
 })
+
+-- MODEL EVENT FOLEY. c_arms_apex.mdl fires four animation events BY SOUNDSCRIPT
+-- NAME, baked into the model: Apex_Cloth, Apex_Cloth_Jump, Apex_Gear_Sprint and
+-- Apex_Gear_Jump (read out of the .mdl itself, not assumed). The original
+-- declared them in its own lua/autorun/apexsfx.lua over sound/player/gear/*,
+-- and that gear foley is precisely what the recycle agreement removed (header),
+-- so every sprint and every jump printed
+--     CSoundEmitterSystemBase::GetParametersForSound: No such sound Apex_Cloth
+-- into the console (author repro 2026-07-30). The model is NOT recompiled — the
+-- port keeps the original path — so the events keep firing no matter what: the
+-- only place the spam can die is the soundscript table, which is what this loop
+-- fills. common/null.wav is the engine's own silent sample (verified present in
+-- hl2_sound_misc_dir.vpk, which GMod mounts). MUTE and not re-voiced on
+-- purpose: sounding them again needs cloth/gear foley this repo does not own.
+for _, event in ipairs({"Apex_Cloth", "Apex_Cloth_Jump", "Apex_Gear_Sprint", "Apex_Gear_Jump"}) do
+    sound.Add({
+        name = event,
+        channel = CHAN_AUTO,
+        level = 0,
+        volume = 0,
+        sound = "common/null.wav",
+    })
+end
 
 util.PrecacheSound("corpus_hands.deploy")
 util.PrecacheSound("corpus_hands.inspect")
