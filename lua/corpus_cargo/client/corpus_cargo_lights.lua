@@ -21,7 +21,14 @@
 --                                      fields are exposed as data
 --     SWEP:LocateSlotFromAddress(addr) sh_attach.lua:720 (ToggleStat's own)
 --     SWEP:ToggleStat(addr, val)       sh_attach.lua:718-735 (wraps, val -1
---                                      goes backwards)
+--                                      goes backwards). #50: it is the ONLY
+--                                      definition in all of dev/other/ —
+--                                      grepped across the 20+ mods there, and
+--                                      no weapon pack (ARC9MW, the EFT ones)
+--                                      overrides it. The reverse step does not
+--                                      depend on which pack is mounted, which
+--                                      is a thing worth knowing rather than
+--                                      hoping
 --     SWEP:PostModify()                sh_attach.lua:94 — CLIENT branch calls
 --                                      SendWeapon() (:132): replicates alone,
 --                                      zero new server logic (CRG-23)
@@ -123,14 +130,50 @@ end
 -- No transit is painted here (unlike the NVG): the round trip is a few
 -- frames of engine latency, which this file already calls not-a-lie.
 -- ------------------------------------------------------------------
+-- #51: is the weapon in hand carrying a toggleable light device? If it is,
+-- the engine torch is NOT the light the player is going to see, and the chip
+-- has to say so instead of just reporting a true-but-useless ON.
+--
+-- The predicate is ARC9's OWN test, re-verified against dev/other/ (CRG-24):
+-- sh_attach.lua:143-144 is the single place in the whole base that touches the
+-- engine flashlight, and what it asks is exactly `ToggleOnF` — on PostModify,
+-- a weapon with such an att turns the player's torch OFF. So this is not a
+-- rule we invented about ARC9; it is the rule ARC9 already enforces, read from
+-- the same slot list the device chips already walk. No new API.
+local function WeaponOwnsTheLight(wep)
+    if wep == nil or wep.ARC9 == nil then return false end
+    if not isfunction(wep.GetSubSlotList) or not isfunction(wep.GetFinalAttTable) then
+        return false
+    end
+    local ok, slots = pcall(wep.GetSubSlotList, wep)
+    if not ok or not istable(slots) then return false end
+    for _, slottbl in ipairs(slots) do
+        if istable(slottbl) and slottbl.Installed then
+            local okA, merged = pcall(wep.GetFinalAttTable, wep, slottbl)
+            if okA and istable(merged) and merged.ToggleOnF then return true end
+        end
+    end
+    return false
+end
+
 CARGO.Wheel.RegisterLightSource("torch", {
     label = "Flashlight",
     icon = WheelIcon("flashlight"),
     -- the engine torch always exists as a source (no mod to detect)
     available = function() return true end,
-    state = function(ply)
+    state = function(ply, wep)
         -- NOT ply:FlashlightIsOn(): unreadable client-side (measured above)
-        return { on = IsValid(ply) and ply:GetNW2Bool(NW_TORCH, false) or false }
+        local s = { on = IsValid(ply) and ply:GetNW2Bool(NW_TORCH, false) or false }
+        -- #51, author's report: with such a weapon deployed the engine beam is
+        -- not what lights the room, and a chip that only says ON invites the
+        -- player to reach for a torch that will do nothing visible. `on` is
+        -- NOT faked to false — that would be the lie CRG-32 forbids, and the
+        -- state really is on. The chip gets hatched and the hub says who took
+        -- it over: state and availability are different questions.
+        if WeaponOwnsTheLight(wep) then
+            s.blocked = "The weapon's device owns the light"
+        end
+        return s
     end,
     toggle = function()
         net.Start(NET_TORCH)
@@ -288,6 +331,21 @@ local function DeviceChip(wep, addr, label, hasEmitters)
             -- deferred fake impulse that makes the mod play its own click
             if istable(ARC9) then ARC9.DeferFakeToggleAtts = true end
             wep:ToggleStat(addr)
+            wep:PostModify()
+        end,
+        -- #50, author's request: cycle BACKWARDS on the right button. Same
+        -- commit with ARC9's own step argument — re-verified against the live
+        -- code before writing a line (sh_attach.lua:718-735): `val = val or 1`
+        -- and the wrap is written in BOTH directions, `> #ToggleStats -> 1`
+        -- and `< 1 -> #ToggleStats`, so -1 is a case the base anticipated
+        -- rather than one we are getting away with. It does NOT call
+        -- PostModify itself — the forward commit above already knew that, and
+        -- this one keeps the same pairing. A device with a single mode wraps
+        -- to itself either way: an honest no-op, not an error.
+        toggleBack = function()
+            if not IsValid(wep) then return end
+            if istable(ARC9) then ARC9.DeferFakeToggleAtts = true end
+            wep:ToggleStat(addr, -1)
             wep:PostModify()
         end,
     }
