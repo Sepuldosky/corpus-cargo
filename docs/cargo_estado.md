@@ -9,7 +9,8 @@
 #48-#52 del wheel CERRADO ENTERO**, cinco secciones de planilla (W, X, Y, Z, AA) en **23 checks** y **ni una
 ronda perdida por un defecto de código**: la única que costó una vuelta fue la medición de W1, y por el
 **instrumento**. Harness **639 → 700** (**61 nuevos, 19 reversiones verificadas en negativo**). **Ni una
-norma nueva, ni un mensaje de red, ni una línea de server** en las cinco tandas. **Sin commitear** (GIT-7).
+norma nueva, ni un mensaje de red, ni una línea de server** en las cinco tandas. **Commiteado y pusheado**
+en los dos repos (pedido del autor, 2026-07-30).
 **Qué gana el wheel:** la **celda ancha** del grupo de luces (`cargo_wheel_lights_wide`, default 0 — 150×56,
 sólo en los laterales, y **degrada sola** a 56×56 arriba y abajo porque la regla se escribió como un
 **clamp**, no como un caso especial); el **click** como segunda forma de comitear (`cargo_wheel_click`,
@@ -326,7 +327,7 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 - **Las entries 54-59 (roadmap #48 a #52) quedaron confirmadas los 2026-07-29 y 30 con las planillas
   W (10/10), X (4/4), Y (3/3), Z (3/3) y AA (3/3)** — **23 checks, cinco secciones, ninguna ronda perdida
   por un defecto de código**. Harness **700** (eran 639), **61 nuevos** y **19 reversiones verificadas en
-  negativo**; checker limpio, espejo regenerado. **Sin commitear** (GIT-7).
+  negativo**; checker limpio, espejo regenerado. **Commiteado y pusheado** el 2026-07-30.
   **La sección AA no abrió un bloque nuevo**, y las siete anteriores sí lo habían hecho — la cadena se
   detuvo sola. Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
 - Detalle viejo, para referencia: Lo que el
@@ -370,7 +371,7 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   (los tres canales del chip intactos) · W8 (el click comitea sobre las tres superficies) · W9 (**las dos
   trampas**: un solo commit por apertura, y abrir con el disparo apretado no dispara nada). Harness **676**
   (eran 639), **37 nuevos** y **9 reversiones verificadas en negativo**; checker limpio, espejo regenerado.
-  **Sin commitear** (GIT-7). **La sonda temporal `cargo_probe_mouse.lua` se borra**: ya cumplió.
+  **Commiteado y pusheado** el 2026-07-30. **La sonda temporal `cargo_probe_mouse.lua` se borra**: ya cumplió.
   **La única ronda que costó una vuelta fue la medición, y por el INSTRUMENTO** — la primera sonda contaba
   los clicks pero no dibujaba nada. Y el hallazgo de la tanda —un check que pasaba con la implementación
   buena **y con la mala**— salió de **revertir el arreglo**, no de la corrida verde.
@@ -382,7 +383,7 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   linterna en pleno tránsito del NVG — **refutó la premisa de la diferida (h)**) · V8 (la lista se
   re-arma al cambiar de arma) · V9 (el regalo IR+NVG en el láser) · V10 (**el cursor sobrevive el
   `Deploy` de ARC9**). Harness **639** (eran 588), **51 nuevos** y **4 reversiones en negativo**; checker
-  limpio, espejo regenerado. **Sin commitear** (GIT-7).
+  limpio, espejo regenerado. **Pusheado el 2026-07-30** junto con el arco #48-#52.
   **La ronda 1 se perdió entera por el entorno** —la G era wheel *y* `impulse 100`, y como el wheel
   pollea la tecla el toggle daba **neto cero**, indistinguible de "no pasó nada"— y las rondas 2-5
   encontraron **tres defectos y una afirmación falsa del doc**, todos por notas de checks que PASARON.
