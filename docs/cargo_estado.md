@@ -5,7 +5,35 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-29 (**entries 52-53 `[APLICADO]`, confirmadas en juego con la planilla
+**Última actualización:** 2026-07-30 (**entries 54-59 `[APLICADO]`, confirmadas en juego — el ARCO
+#48-#52 del wheel CERRADO ENTERO**, cinco secciones de planilla (W, X, Y, Z, AA) en **23 checks** y **ni una
+ronda perdida por un defecto de código**: la única que costó una vuelta fue la medición de W1, y por el
+**instrumento**. Harness **639 → 700** (**61 nuevos, 19 reversiones verificadas en negativo**). **Ni una
+norma nueva, ni un mensaje de red, ni una línea de server** en las cinco tandas. **Sin commitear** (GIT-7).
+**Qué gana el wheel:** la **celda ancha** del grupo de luces (`cargo_wheel_lights_wide`, default 0 — 150×56,
+sólo en los laterales, y **degrada sola** a 56×56 arriba y abajo porque la regla se escribió como un
+**clamp**, no como un caso especial); el **click** como segunda forma de comitear (`cargo_wheel_click`,
+default 1 — **CRG-31 intacta**: soltar comitea igual que siempre, y el click **no estrenó una sola API**
+porque `input.IsButtonDown` ya se llamaba por frame ahí); el **modo que no cierra**
+(`cargo_wheel_click_sticky`, default 0 — sólo sobre chips de luz, porque *togglear* es el único verbo
+repetible del wheel, y si hubo click **soltar sólo cierra**); el **botón derecho en reversa**
+(`toggleBack` opcional en el registro; `ToggleStat(addr, -1)`, y **ARC9 anticipó el paso negativo** — el
+wrap está escrito en las dos direcciones); y la **linterna tapada** por el dispositivo del arma, que se
+pinta con el tramado de quickslot y **rechaza el commit** con un destello, **sin falsear `on`** porque
+*estado y disponibilidad son preguntas distintas*.
+**LAS TRES REGLAS DE MÉTODO QUE DEJA EL ARCO, y las tres se pagaron:** (1) **la reversión es el único
+instrumento que audita al instrumento** — siete checks nacieron sin distinguir y **ninguno lo destapó la
+corrida en verde**; (2) **una inferencia no se escribe como una medición** — encontrado dos veces en
+nuestros propios docs (el `UnequipDelay` del #46 y la *"supresión de render de ARC9"* de §13, cuyo mecanismo
+real **sigue sin identificar**); (3) **un argumento sobre el INSTANTE puede ser falso sobre la SECUENCIA**,
+que la trajo el autor corrigiendo la entry 58.
+**Y el dato que cierra el arco: la sección AA no abrió un bloque nuevo.** Las siete anteriores terminaron
+con una nota que abría el siguiente —X salió de W, Y de X, Z de Y, AA de Z—; ésta no. La cadena se detuvo
+sola, y no por dejar de mirar: AA3 recorrió a propósito las cinco tandas y volvió sin nada.
+El harness, además, **dejó de sacar su total de un `grep`**: ahora lo imprime él (`ALL GREEN - N checks`),
+porque el banner de realm corría carreras con los `print` de Lua y el número saltaba ±1.)
+
+Antes, **entries 52-53 `[APLICADO]`, confirmadas en juego con la planilla
 V en 10/10 tras CINCO rondas**. **Sin commitear** (GIT-7).
 Los **tres defectos que encontró la planilla son el mismo error con distinto disfraz — una API asumida
 en vez de medida**: `FlashlightIsOn` supuesta legible en el cliente (no lo es: el server contesta `true`
@@ -34,8 +62,9 @@ sus dos hermanas es lo que escondió el defecto una ronda entera— y **la lista
 con el wheel abierto** (V8; se rechazó bloquear las teclas 1-7: el wheel no es dueño del teclado).
 **V7 REFUTÓ la premisa de la diferida (h)**: la linterna SÍ enciende durante la animación del NVG.
 **Frontera nueva en §13**: con un arma ARC9 con dispositivo desplegada el haz **no se dibuja** —vuelve al
-cambiar de arma, con el server en `true` todo el tiempo—; es supresión de render de ARC9, y el chip no
-miente. Harness **639** (eran 630), 9 nuevos y **4 reversiones en negativo**. La ronda 1 se había perdido
+cambiar de arma, con el server en `true` todo el tiempo—. **El mecanismo que esta línea afirmaba
+("supresión de render de ARC9") quedó CORREGIDO por el #51: el código no lo sostiene** y la causa real
+sigue sin identificar; desde el #51 el chip además se pinta **tapado** y **rechaza el commit**. Harness **639** (eran 630), 9 nuevos y **4 reversiones en negativo**. La ronda 1 se había perdido
 entera por un bind doble: la G era wheel **y** `impulse 100`, y como el wheel pollea la tecla, el toggle
 daba **neto cero**. — roadmap
 **#46, las luces en el wheel**: el **tercer grupo de chips** (verbo *togglear*) acciona la linterna, las
@@ -284,14 +313,68 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   Reglas puras y exportadas (`CARGO.UI.ResolveSlotDrop` / `FreeSubSlotFor` /
   `MountedEntries`); el grid genérico gana `onCellDrop` **con fall-through** al
   canvas, sin el cual el loot dejaría de transferir al soltar sobre una celda.
-- **Harness offline: 636 checks verdes en ambos realms** (con gate final: un
-  FAIL tardío ya no imprime ALL GREEN); `cargo_selftest` 83 client / 76 server.
+- **Harness offline: 700 checks verdes en ambos realms** (con gate final: un
+  FAIL tardío ya no imprime ALL GREEN, y **el total lo imprime el propio script** — no se
+  grepea de stdout, donde el banner de realm corría carreras con los `print` de Lua);
+  `cargo_selftest` 83 client / 76 server.
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
   MIT y el rename `corpus_stalker` en el kit dev).
 
 ## Pendiente de verificar
 
+- **Las entries 54-59 (roadmap #48 a #52) quedaron confirmadas los 2026-07-29 y 30 con las planillas
+  W (10/10), X (4/4), Y (3/3), Z (3/3) y AA (3/3)** — **23 checks, cinco secciones, ninguna ronda perdida
+  por un defecto de código**. Harness **700** (eran 639), **61 nuevos** y **19 reversiones verificadas en
+  negativo**; checker limpio, espejo regenerado. **Sin commitear** (GIT-7).
+  **La sección AA no abrió un bloque nuevo**, y las siete anteriores sí lo habían hecho — la cadena se
+  detuvo sola. Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+- Detalle viejo, para referencia: Lo que el
+  harness prueba: que soltar sobre una linterna **tapada NO manda el intent**, y —la mitad que hace que eso
+  distinga algo— que **destapada el MISMO gesto sobre el MISMO chip sí comitea**. Lo que **no** puede probar:
+  que el destello se vea y se entienda. Planilla: **sección AA** — el espacio de una letra se agotó en la Z y
+  sigue con dos, porque los IDs **no se reciclan** (FLU-07).
+  Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+- La entry 58 (roadmap #51) quedó confirmada con la **planilla Z en 3/3** el 2026-07-29, en UNA ronda:
+  *«se ve tapado tanto en wide como normal»* y *«el tramado desaparece correctamente, sólo aparece con
+  dispositivo»*. Detalle viejo: Lo que el harness
+  prueba: que con un dispositivo `ToggleOnF` en mano el chip se declare **tapado**, que el estado **siga
+  siendo el real** (no se falsea a OFF), y la **ausencia por partida doble** — sin arma, y con un ARC9 **sin**
+  dispositivo. Lo que **no** puede probar: que el tramado se vea bien en las dos anatomías de celda.
+  Planilla: **sección Z**. https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+- La entry 57 (roadmap #50) quedó confirmada con la **planilla Y en 3/3** el 2026-07-29, en UNA ronda:
+  *«está bien»*, *«sí, sólo afecta a ARC9 con dispositivo y a nada más»* y *«no comió nada»*. Detalle viejo: Lo que el
+  harness prueba: la reversa sobre el **dispositivo ARC9 real** (un paso atrás desde `Off` da la vuelta al
+  último modo, y paga el mismo `PostModify`), la **AUSENCIA** —una fuente sin `toggleBack` no responde y
+  **sobre todo no cae hacia adelante**—, que el derecho sobre un sector no comitee ni cierre, y que un
+  derecho **sin efecto no se coma el commit de soltar**. Lo que **no** puede probar: cómo se siente ciclar
+  en los dos sentidos con el arma en la mano. Planilla: **sección Y** (registrada antes de usarse, FLU-30).
+  Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+- La entry 56 (roadmap #49) quedó confirmada con la **planilla X en 4/4** el 2026-07-29, en UNA ronda. Sus
+  tres notas confirman las dos decisiones que el autor tomó antes de que se escribiera una línea:
+  *«se siente como lo quería, es apretar a gusto el NVG y las linternas»*, *«sí sigue cerrando
+  correctamente»* y *«sí funciona intuitivamente»*. **Consultar las dos bifurcaciones se pagó solo.**
+  Detalle viejo, para referencia: Lo que el
+  harness prueba: que N clicks sobre un chip de luz son N ciclos sin reabrir, que **soltar la tecla
+  después sólo cierra**, que sobre un sector el click **sigue comiteando y cerrando** (el alcance), que
+  **sin clicks soltar comitea igual que siempre** (CRG-31 literal), y la negativa con la convar en 0. Lo
+  que **no** puede probar: si ciclar así **se siente** como el autor lo pidió. Planilla: **sección X**
+  (registrada en `familias_excluidas` antes de usarse — FLU-30; no se recicla la W, es otra entrada del
+  roadmap). Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+- **Las entries 54-55 (roadmap #48) quedaron confirmadas el 2026-07-29 con la planilla W en 10/10**, en dos
+  rondas: W1 (**la medición** que desbloqueó el paso 2 — el screen clicker deja leer el estado del botón
+  por debajo) · W2 (la celda ancha en los dos laterales, el modo legible sin hoverear) · W3 (**ausencia**:
+  la degradación sola a 56×56 con `top`/`bottom`, sin aviso) · W4 (el empuje compartiendo lado, **sin
+  salirse de pantalla** — la advertencia del mock refutada en juego, **a 16:9**) · W5 (el tránsito del NVG
+  en la anatomía nueva) · W6 y W10 (**las dos negativas**: con cada convar en 0, el wheel de antes) · W7
+  (los tres canales del chip intactos) · W8 (el click comitea sobre las tres superficies) · W9 (**las dos
+  trampas**: un solo commit por apertura, y abrir con el disparo apretado no dispara nada). Harness **676**
+  (eran 639), **37 nuevos** y **9 reversiones verificadas en negativo**; checker limpio, espejo regenerado.
+  **Sin commitear** (GIT-7). **La sonda temporal `cargo_probe_mouse.lua` se borra**: ya cumplió.
+  **La única ronda que costó una vuelta fue la medición, y por el INSTRUMENTO** — la primera sonda contaba
+  los clicks pero no dibujaba nada. Y el hallazgo de la tanda —un check que pasaba con la implementación
+  buena **y con la mala**— salió de **revertir el arreglo**, no de la corrida verde.
+  Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
 - **Las entries 52-53 (roadmap #46) quedaron confirmadas el 2026-07-29 con la planilla V en 10/10**, tras
   **cinco rondas**: V1 (la linterna desde el chip, y el chip lo DICE) · V2 (**CRG-64 en juego** por las
   dos rutas de #47) · V3 (los dispositivos ARC9, con UN solo dispositivo) · V4 (el empuje de anclaje) ·

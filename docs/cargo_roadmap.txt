@@ -696,6 +696,12 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
           tools siguen cuadrados, degrada a 56x56 en eje horizontal.
           Convierte la constante de celda en parametro (w,h) por grupo y
           hace convivir dos anatomias de celda — GroupCells hoy no se toca.
+          EJECUTADA en el #48 (entry 54, [PENDIENTE]): GroupCells toma (w,h)
+          y la regla salio como pura, GroupCellSize, que CLAMPEA w a h en el
+          eje horizontal — escrita asi, la degradacion no es un caso especial
+          en ninguna parte: ES el clamp. La advertencia de desborde del mock
+          quedo CORREGIDA con la cuenta (entra en 1280x720), fijada en el
+          harness y sin editar el mock.
       (h) FADES (90 ms abrir / 200 ms cerrar), CICLO DE VIDA DE CIERRE y
           estado BLOQUEADO de rechazo (tramado rojo + parpadeo + cue sonoro,
           bloque 07). Toca el dibujador RAIZ del wheel (alpha global por
@@ -846,9 +852,62 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     inventariados en dev/Cargo_NVG_Neosun_Referencia.md. El mod es OFF-LIMITS
     para modificar (dato del autor): integración en runtime y nada más.
 
-48. LA CELDA ANCHA Y EL CLICK EN EL WHEEL [Cargo UI] — ABIERTO (pedido del
-    autor 2026-07-29, al cerrar el #46 con la planilla V en 10/10).
+48. LA CELDA ANCHA Y EL CLICK EN EL WHEEL [Cargo UI] — CERRADO 2026-07-29,
+    entries 54-55 [APLICADO], planilla W en 10/10 (dos rondas). (Pedido del
+    autor 2026-07-29, al cerrar el #46 con la planilla V en 10/10.)
     PROMPT: ../../dev/PROMPT_cargo_wheel_celda_ancha_y_click.txt
+    LO QUE LA TANDA DEJA COMO METODO, y es lo unico que vale reescribir: sus
+    dos lecciones son sobre INSTRUMENTOS, no sobre el motor. (1) La unica
+    ronda que se perdio fue la medicion, y por el instrumento: la primera
+    sonda contaba los clicks pero NO DIBUJABA NADA. (2) El hallazgo de la
+    tanda —un check que pasaba con la implementacion buena Y con la mala—
+    salio de REVERTIR EL ARREGLO, no de la corrida verde. Tercera vez en este
+    bloque, asi que la consigna se endurece: LA REVERSION ES EL UNICO
+    INSTRUMENTO QUE AUDITA AL INSTRUMENTO.
+    El hueco del paso 1 lo cerro el autor: la resolucion es 16:9, o sea que la
+    cuenta del desborde esta MEDIDA en el caso real y no solo calculada. El
+    4:3 sigue declarado como caso apretado y SIN MEDIR — frontera conocida.
+    (A) LA CELDA ANCHA — entry 54
+    [APLICADO], planilla W 6/6 sobre el paso 1, UNA sola ronda y sin
+    defectos. Harness 669 (eran 639), 30 checks nuevos y 5 reversiones
+    verificadas en negativo. La cuenta del desborde quedo confirmada DOS
+    veces: por el harness contra el layout real —GroupOuterExtent lee la tabla
+    REF que usa BuildLayout, asi que 501/581/661 @1080 son los del layout, no
+    numeros que el check se pase a si mismo— y por W4 en juego, donde la
+    columna con empuje no se salio de pantalla. El mock NO se edito.
+    LO QUE LA RONDA NO DEJO: los seis pasaron SIN NOTA, asi que la regla del
+    #46 (pedir la nota aunque el check pase) no se ejercito. El hueco concreto
+    es la RESOLUCION DE PANTALLA que pedia W4: la cuenta esta verificada para
+    16:9 y el caso apretado declarado es 4:3, sin medir.
+    (B) EL CLICK — entry 55 [APLICADO], confirmado en W8/W9/W10.
+    LA INCOGNITA SE MIDIO ANTES DE ESCRIBIR UNA LINEA (W1, en juego) y salio
+    que SI: el screen clicker se traga el click como input de JUEGO pero no
+    impide leer el ESTADO del boton por debajo — misma maquinaria que el menu
+    contextual del propio GMod. Si hubiera salido que no, esta entry no
+    existiria.
+    La medicion costo una ronda por el INSTRUMENTO y no por el motor: la
+    primera sonda que llego a juego era el fragmento abreviado copiado a mano,
+    que contaba los clicks pero NO DIBUJABA NADA. Misma familia que este
+    bloque viene nombrando desde el #46, solo que el que no distinguia "roto"
+    de "no paso nada" era el instrumento. La definitiva mide CON BASELINE
+    (columnas CON y SIN el wheel abierto).
+    Forma: convar cargo_wheel_click (default 1: SUMA un gesto y no cambia
+    ninguno), commit por Close(true) -> Commit, polleo con flanco en el MISMO
+    Think de la tecla. NO ESTRENA API: input.IsButtonDown es la que ese hook
+    ya llamaba por frame, preguntando por MOUSE_LEFT en vez de un KEY_.
+    La trampa (un solo commit por apertura) NO necesito codigo: Close sale por
+    state nil. Necesito probarse en negativo, y se probo.
+    EL FLANCO SE OBSERVA SIEMPRE, abierto o cerrado — si no, abrir el wheel
+    con el boton de disparo apretado comitearia en el acto.
+    Y UN CHECK QUE NO MEDIA LO QUE DECIA, destapado por la reversion y no por
+    la corrida verde: el bloque del click corre ANTES que el de la tecla, asi
+    que en el frame de apertura el state todavia es nil y cualquier version
+    pasaba; el defecto vivia un frame mas tarde. Corregido con un Think de
+    mas. Tercera vez en este bloque que un check nace sin distinguir, y las
+    tres las destapo revertir el arreglo.
+    Harness 676 (eran 669), 7 nuevos y 4 reversiones en negativo.
+    NO ENTRA: el boton derecho / accion alternativa (ToggleStat(addr, -1) de
+    ARC9) — bloque propio.
     DOS COSAS, y la primera NO es diseño nuevo: es la DIFERIDA (g) del #46,
     aprobada por el autor el 2026-07-27 con el mock como sede
     (mockups/cargo_wheel_lights_mock_v1_1.html, bloque 06).
@@ -901,3 +960,184 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     la linterna durante su animacion— y la planilla V la CONTESTO en V7: NO la
     bloquea, la linterna encendio en pleno transito. Si (h) se ejecuta algun
     dia, arranca sin esa incognita.
+
+49. EL CLICK QUE NO CIERRA: CICLAR SIN REABRIR EL WHEEL [Cargo UI] — ESCRITO
+    2026-07-29, entry 56 [PENDIENTE], esperando la planilla (seccion X).
+    (Pedido del autor 2026-07-29, al cerrar el #48 con la planilla W en 10/10.)
+    LAS DOS DECISIONES SE CONSULTARON ANTES DE ESCRIBIR y las dos las tomo el
+    autor: (a) el modo es SOLO para los chips de luz; (b) si hubo un click
+    sostenido en esa apertura, soltar la tecla SOLO cierra. Con (b) CRG-31
+    queda LITERAL en el camino default —sin clicks, soltar comitea— y la
+    excepcion solo existe tras un gesto que el jugador pidio.
+    Convar cargo_wheel_click_sticky, default 0: el default del #48 no cambia.
+    La politica del soltar vive en CloseOnRelease y NO dentro de Close, que
+    sigue siendo un "comitea o no, vos decidis" tonto (el camino del click
+    necesita la respuesta contraria); la consumen el poll de Think Y el
+    concommand -cargo_wheel, que asi no se desincronizan.
+    UN CHECK QUE NO DISTINGUIA, OTRA VEZ: el del alcance pasaba tambien con
+    una version donde el sticky se derramaba a TODOS los objetivos, porque
+    contaba commits y el conteo es identico — lo que cambia es si el menu
+    quedo abierto. Se arreglo con un SEGUNDO click, que sobre un wheel cerrado
+    no comitea nada. Cuarta vez en el arco, y dos seguidas destapadas por la
+    reversion y no por la corrida verde.
+    Y EL HARNESS DEJO DE MENTIR SU PROPIO TOTAL: perseguir un desajuste de +-1
+    destapo que el numero que los docs citan salia de GREPEAR "[ok]" en
+    stdout, donde el banner de realm de Python corre carreras con los print de
+    Lua y llegaba a tragarse una linea entera. Ahora cada pasada cuenta
+    (CHECKS_OK) y el script IMPRIME su total. El valor no cambio (683, y
+    639+44 cuadra exacto): cambio su PROCEDENCIA.
+    Harness 683 (eran 676), 7 nuevos y 3 reversiones en negativo.
+    TEXTUAL: "me gustaria una opcion para que el clic no cierre el wheelmenu,
+    sino para que uno apriete sin cerrar, asi puedo ciclar el attachment de
+    arc9 en una sola pasada sin mover tanto el mouse".
+    ES LA CONTINUACION NATURAL DEL #48(B) y NO estaba en su alcance: aquella
+    tanda declaro explicitamente que el click comitea y CIERRA, y eso se
+    confirmo en W8. Esto es un modo nuevo, con convar propia.
+    POR QUE TIENE SENTIDO, en el vocabulario que el propio wheel ya usa: los
+    sectores EQUIPAN, los quick USAN, las luces TOGGLEAN (§17.6/§17.8). De los
+    tres verbos, TOGGLEAR es el unico REPETIBLE — ciclar el modo de un
+    dispositivo ARC9 es literalmente apretar N veces. Equipar dos veces la
+    misma arma no significa nada (y por el re-press de #22 significa
+    enfundar); usar dos veces un quick GASTA DOS ITEMS, que es el riesgo real
+    del modo.
+    LA DECISION ABIERTA, Y ES DEL AUTOR (§7.5 — no se elige sola):
+      (a) ALCANCE. Sticky para TODO lo que el wheel comitea, o sticky SOLO
+          para los chips de luz (el unico verbo repetible), dejando que el
+          click en sector/quick/tool siga comiteando y cerrando como hoy.
+      (b) QUE HACE SOLTAR LA TECLA DESPUES DE HABER CLICKEADO. Es la pregunta
+          cara, porque CRG-31 dice que soltar comitea: si se respeta al pie de
+          la letra, ciclar 3 veces con clicks y soltar sobre el mismo chip
+          dispara un CUARTO toggle que nadie pidio. Las salidas son suprimir
+          el commit de soltar cuando ya hubo un click en esa apertura (CRG-31
+          intacta en el camino default: sin clicks, soltar comitea igual que
+          siempre), o exigir mover el cursor a la deadzone antes de soltar
+          —que es la regla de cancelacion que YA existe— a costa de pedir
+          justo el movimiento de mouse que el pedido quiere evitar.
+    NO SE TOCA EL DEFAULT: cargo_wheel_click 1 sigue comiteando y cerrando.
+    Lo de acá es una convar mas, apagada por default.
+    HERMANO ANOTADO: el BOTON DERECHO sigue siendo bloque propio (ciclar el
+    modo HACIA ATRAS con ToggleStat(addr, -1), que ARC9 soporta y ya esta
+    anotado en el header de client/corpus_cargo_lights.lua). Si el modo
+    sticky entra, el derecho se vuelve mas util todavia — pero son dos
+    bloques, no uno.
+
+50. EL BOTON DERECHO CICLA EN REVERSA [Cargo UI] — ESCRITO 2026-07-29,
+    entry 57 [PENDIENTE], esperando la planilla (seccion Y).
+    Pedido del autor EN LA NOTA DE X1, un check que PASO — quinta vez en el
+    arco que el hallazgo sale del campo de notas y no de un rojo: "sobre los
+    ARC9 lo unico que pediria seria que con el clic secundario del raton se
+    pudiera ciclar en reversa (No se si ARC9 lo permite, tendrias que
+    investigar)".
+    LA INVESTIGACION QUE PIDIO, CONTRA dev/other/ Y NO DE MEMORIA (CRG-24):
+    SWEP:ToggleStat(addr, val) — sh_attach.lua:718-735. val = val or 1, suma
+    el paso a ToggleNum, y EL WRAP ESTA ESCRITO EN LAS DOS DIRECCIONES
+    (> #ToggleStats -> 1, y < 1 -> #ToggleStats). ARC9 ANTICIPO el paso
+    negativo. Dos cosas mas que salieron de leerla: NO llama a PostModify (el
+    commit lo paga, igual que el de ida) y un dispositivo de UN solo modo
+    envuelve sobre si mismo en ambos sentidos — no-op honesto, jamas error.
+    FORMA: el registro de fuentes gana toggleBack(ply, wep) OPCIONAL, y su
+    ausencia es la respuesta honesta — una linterna no tiene reversa, y nada
+    mas del wheel la tiene (desequipar no es "equipar hacia atras"). El
+    derecho se pollea en el MISMO Think y por el MISMO camino que el
+    izquierdo (ClickCommit(back)): un solo codigo, no una copia que derive.
+    Hereda gratis el modo del #49 y la convar cargo_wheel_click.
+    TRES DEFECTOS DE CHECK, LOS TRES POR LA REVERSION:
+      (1) el and/or que cae hacia adelante. Escribirlo largo parecia
+          redundante y NO lo era: el pick corre DOS veces (una para decidir,
+          otra dentro de Close) y el cursor puede moverse entre ambas. El
+          check ahora mueve el cursor entre pick y pick a proposito.
+      (2) el guard de ausencia media menos de lo que decia: quitarlo no hacia
+          caer nada, porque el no-op "no hace nada" igual — pero SI hace algo
+          invisible, marca que hubo click y entonces soltar deja de comitear.
+          Un boton sin efecto se comia el gesto de siempre.
+      (3) el de siempre: un check que solo cuenta commits no ve si el menu
+          quedo abierto.
+    Harness 694 (eran 683), 11 nuevos —tres sobre el dispositivo ARC9 REAL
+    del bloque del #46, no sobre una fuente sintetica— y 4 reversiones en
+    negativo.
+
+51. LA LINTERNA TAPADA POR EL DISPOSITIVO DEL ARMA [Cargo UI] — ESCRITO
+    2026-07-29, entry 58 [PENDIENTE], esperando la planilla (seccion Z).
+    Pedido del autor EN LA NOTA DE Y3, un check que PASO — SEXTA vez en el
+    arco: "al tener el arma de ARC9 con dispositivo se bloquee visualmente la
+    linterna con tachas, mejor que rojo se puede copiar las tachas que tienen
+    los otros bloques del wheelmenu asi como el quickslot, pues un jugador
+    puede pensar que la linterna del engine esta disponible, cuando en
+    realidad la de ARC9 la captura".
+    EL DIAGNOSTICO CORRIGE UNA AFIRMACION DE NUESTRO PROPIO DOC. §13 y la
+    entry 53 decian que el haz no se dibuja por "supresion de render de ARC9".
+    EL CODIGO NO DICE ESO: grepeada la base entera, ARC9 toca la linterna del
+    ENGINE en UN SOLO lugar (sh_attach.lua:143-144, PostModify la APAGA si el
+    arma tiene un att ToggleOnF) y NO hay ninguna ruta de supresion de render
+    para ella — todos los render.SuppressEngineLighting son de VGUI, FLIR y
+    presets, o sea previews. Su cl_light.lua administra SUS PROPIAS projected
+    textures y nada mas. El mecanismo real NO ESTA IDENTIFICADO; la hipotesis
+    viva es el presupuesto de projected textures del engine, y queda anotada
+    COMO HIPOTESIS. Era una inferencia redactada como medicion — el mismo
+    error que el UnequipDelay del #46.
+    FORMA: state() puede devolver blocked = "<motivo>". El chip se pinta con
+    el tramado de 45° de los quickslots bloqueados, en border y NO en rojo
+    (decision del autor: el rojo lee como error y esto no lo es), scissoreado
+    por CRG-28 y valido en las DOS anatomias. En el hub cambia el HINT, no el
+    estado. El predicado es el de ARC9 y no uno nuestro: ToggleOnF, leido de
+    la misma lista de slots que los chips de dispositivo ya recorren.
+    LA DECISION DE DISENO: `on` NO se falsea a false. La linterna ESTA
+    encendida; decir OFF seria la mentira de CRG-32 y esconderia el estado
+    real al cambiar de arma. "Encendida pero no la vas a ver" es un TERCER
+    hecho y vive en su propio campo — ESTADO Y DISPONIBILIDAD SON PREGUNTAS
+    DISTINTAS, y confundirlas es lo que hacia al chip cierto e inutil a la vez.
+    El toggle SIGUE funcionando: la accion no esta rechazada.
+    Harness 698 (eran 694), 4 nuevos y 2 reversiones en negativo, con la
+    ausencia por partida doble (sin arma, y con un ARC9 sin dispositivo).
+
+52. EL COMMIT SOBRE UNA FUENTE TAPADA SE RECHAZA [Cargo UI] — CERRADO
+    2026-07-30, entry 59 [APLICADO], planilla AA en 3/3 (una ronda).
+    CIERRA EL ARCO #48-#52 ENTERO. Y lo que mas dice esta seccion es lo que NO
+    trajo: las siete anteriores terminaron con una nota que abria el bloque
+    siguiente —X salio de W, Y de X, Z de Y, AA de Z— y esta no abrio ninguno.
+    La cadena se detuvo sola, y no por dejar de mirar: AA3 recorrio a
+    proposito todo lo de las cinco tandas y volvio sin nada.
+    EL ARCO EN NUMEROS: entries 54-59, dos dias, 23 checks de planilla en
+    cinco secciones y NI UNA RONDA PERDIDA POR UN DEFECTO DE CODIGO — la unica
+    que costo una vuelta fue la medicion de W1, y por el INSTRUMENTO. Harness
+    639 -> 700: 61 checks nuevos y 19 REVERSIONES VERIFICADAS EN NEGATIVO. Ni
+    una norma nueva, ni un mensaje de red, ni una linea de server en las cinco.
+    LAS TRES REGLAS DE METODO QUE DEJA, y las tres se pagaron:
+      (1) LA REVERSION ES EL UNICO INSTRUMENTO QUE AUDITA AL INSTRUMENTO.
+          Siete checks nacieron sin distinguir y NINGUNO lo destapo la corrida
+          en verde: los destapo revertir el arreglo y mirar si salia el rojo.
+      (2) UNA INFERENCIA NO SE ESCRIBE COMO UNA MEDICION. Encontrado dos veces
+          en nuestros propios docs: el UnequipDelay del #46 y la "supresion de
+          render de ARC9" de §13.
+      (3) UN ARGUMENTO SOBRE EL INSTANTE PUEDE SER FALSO SOBRE LA SECUENCIA
+          (la trajo el autor corrigiendo la entry 58): una accion puede ser
+          legal ahora y morir en el gesto siguiente.
+    Pedido del autor EN LA NOTA DE Z3, un check que PASO — SEPTIMA vez en el
+    arco. CORRIGE LA DECISION DE DISENO DE LA ENTRY 58, y hay que decir por
+    que: aquella declaro que el toggle seguia funcionando porque "bloquear el
+    commit seria inventar un rechazo que el mod no impone". ES FALSO, y el
+    autor tenia el dato: el mod SI lo impone, en diferido — sh_attach.lua:
+    143-144 apaga la linterna del engine EN CUANTO se cicla el dispositivo.
+    Encenderla bajo ese arma no es una accion valida que estuvieramos
+    estorbando: es una que MUERE EN EL SIGUIENTE CLICK. El razonamiento viejo
+    miraba el INSTANTE; el del autor mira la SECUENCIA.
+    FORMA: una fuente que se declara blocked rechaza el commit en las dos
+    direcciones y por las dos rutas. UNA regla (BlockedChip) con DOS
+    consumidores: Commit rechaza, y ClickCommit lee la misma respuesta para
+    decidir que UN RECHAZO NO CIERRA EL MENU — cerrar es como el wheel acusa
+    recibo de un commit, y no hubo ninguno. Mas el DESTELLO: un pulso rojo de
+    250 ms sobre la celda, pintado AL FINAL (sobre el tramado y las barras).
+    NO es el bloque 07 del mock (dos parpadeos + fade + cue), que sigue
+    diferido porque arrastra el dibujador raiz. Los dos canales dicen cosas
+    distintas: el tramado es "esto no esta disponible", el destello es "y
+    acabo de rechazar lo que apretaste".
+    EL DESTELLO SE RESUELVE EN EL PINTOR Y NO SE GUARDA EN EL CHIP: la lista
+    se re-arma al cambiar de arma (§17.8, V8), asi que colgarlo de la tabla
+    del chip lo evaporaria a mitad de ventana — mismo motivo por el que el
+    transito del NVG vive en un upvalue del archivo de luces.
+    FRONTERA DECLARADA: al SOLTAR la tecla sobre una tapada el rechazo ocurre
+    igual pero el wheel cierra, asi que el destello no llega a verse. El
+    tramado ya aviso; el destello es para el gesto que puede quedarse mirando.
+    Harness 700 (eran 698), 2 nuevos y 1 reversion en negativo. El segundo
+    check es el que hace distinguir al primero: destapada, el MISMO gesto
+    sobre el MISMO chip SI comitea.

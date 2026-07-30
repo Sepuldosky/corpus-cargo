@@ -1014,13 +1014,29 @@ es el tercero que más fácil se olvida que lo es.
 
 ### 17.2 Geometría y render
 
-- Dibujo por **HUDPaint sin VGUI**: cursor libre con `gui.EnableScreenClicker` (que además
-  se traga los clicks — nada dispara mientras se apunta el wheel); teclado y movimiento
-  quedan con el juego.
+- Dibujo por **HUDPaint sin VGUI**: cursor libre con `gui.EnableScreenClicker`, que **se
+  traga los clicks como input de JUEGO** —nada dispara mientras se apunta el wheel, y ésa
+  es exactamente la razón de encenderlo—. Lo que **no** hace es ocultar el **estado** del
+  botón: desde #48 el wheel lo lee para ofrecer el click como segunda forma de commit
+  (§17.4), y eso se **midió en juego antes de escribirlo** (planilla W). Teclado y
+  movimiento quedan con el juego.
 - **Una sola función de layout** (`CARGO.Wheel.BuildLayout`) resuelve centro, radios y
   cajas de chips; sectores, hub, chips y el pick beben todos de ahí (el bug del mock v1
   fue exactamente dos sistemas de escala desincronizados). Escala **uniforme** sobre
   `ScrH`: mock viewBox 1200×800, referencia @1080 → hub 120 px, borde exterior 305 px.
+- **Los números de referencia @1080 viven en UNA tabla** (`REF`: hub 120, anillo 305,
+  margen 46, celda 56, gap entre celdas 8, gap entre grupos 24, celda ancha 150), que
+  consumen tanto `BuildLayout` como las funciones puras. Una segunda copia de esos
+  números **es el bug del mock v1 otra vez**, y por eso la cuenta del extremo de un grupo
+  —`CARGO.Wheel.GroupOuterExtent(push, cellLong)`, en unidades @1080— **lee de ahí** en
+  vez de repetir la aritmética.
+- **La celda es POR GRUPO, no una constante** (#48). El resolvedor de cajas (`GroupCells`)
+  toma `(w, h)` en vez de cerrar sobre un único `chip`, y **qué celda le toca a cada grupo
+  es una regla pura y cubierta**: `CARGO.Wheel.GroupCellSize(anchor, w, h)` **clampea `w`
+  a `h` cuando el eje es horizontal**. Escrita como clamp, la degradación de la celda
+  ancha (§17.8) **no es un caso especial en ninguna parte: ES el clamp**, y las dos
+  anatomías coexisten en el mismo build. Quick y tools piden la cuadrada **en el call
+  site**, así que la excepción jamás los alcanza.
 - **6 sectores anulares de 50° con gaps de 10°**, triangulados como quads convexos
   (~5° por paso) vía `surface.DrawPoly` (un sector anular no es convexo; DrawPoly abanica
   desde su primer vértice). **Nada de texturas horneadas** — todo color lee el theme, así
@@ -1057,6 +1073,55 @@ es el tercero que más fácil se olvida que lo es.
   Dentro del anillo el pick es por **sector más cercano** al ángulo del cursor — los gaps
   de 10° perdonan. El cursor arranca centrado en la deadzone, como el mock. Chips primero:
   un cursor sobre un chip **nunca** activa un sector.
+- **El CLICK es una segunda forma de comitear, y es ADITIVA** (roadmap #48, decisión del
+  autor 2026-07-29; convar `cargo_wheel_click`, cliente y archivada, default **1** — a
+  diferencia de la celda ancha, ésta **suma** un gesto y no cambia ninguno). **CRG-31 no
+  se deroga y hay que leerlo así**: soltar la tecla sobre algo sigue comiteando
+  exactamente como siempre, que es el gesto ya en el músculo; el click se suma para el
+  pausado. Va por la **MISMA ruta** —`CARGO.Wheel.Close(true)` → `Commit`, mismo pick
+  re-corrido, mismo `pcall` de CRG-25—: **cero lógica de commit nueva**.
+  **Polleo con detección de flanco en el mismo `Think` de la tecla**, no un hook de mouse
+  nuevo, y eso significa que **no estrena una sola API del engine**: `input.IsButtonDown`
+  es la función que ese hook ya llamaba por frame, sólo que preguntando por `MOUSE_LEFT`
+  en vez de un enum `KEY_` — el mismo espacio de `BUTTON_CODE`. Lo único que era
+  asunción se **midió en juego antes de escribir una línea** (planilla W, W1): el screen
+  clicker se traga el click como input de juego pero **no** impide leer el estado del
+  botón por debajo — la misma maquinaria que usa el menú contextual del propio GMod.
+  **Un solo commit por apertura, por construcción**: el click cierra el wheel y
+  `Close` sale temprano con `state` nil, así que soltar la tecla después no dispara un
+  segundo commit. No hace falta bandera; hace falta **probarlo en negativo**, y el
+  harness lo prueba. **El flanco del botón se observa SIEMPRE**, abierto o cerrado: si
+  sólo se siguiera con el wheel abierto, abrirlo con el botón de disparo ya apretado
+  leería como pulsación nueva y comitearía en el acto. **El botón derecho no se toca**:
+  una acción alternativa (ciclar el modo de un dispositivo hacia atrás, que ARC9 soporta)
+  es bloque propio.
+- **El modo que NO cierra** (roadmap #49; convar `cargo_wheel_click_sticky`, cliente y
+  archivada, **default 0** — el default del #48 no cambia para nadie). Un click sobre un
+  **chip de luz** ejecuta el toggle **en el lugar** y deja el wheel abierto, así que N
+  clicks son N ciclos sin reabrir. **Sólo las luces**, y el motivo es el vocabulario que
+  §17.6/§17.8 ya fijaron: los sectores *equipan*, los quick *usan*, las luces *togglean*,
+  y **togglear es el único verbo repetible** — equipar dos veces es enfundar (#22) y usar
+  dos veces gasta dos ítems. Sobre sector, quick o tool el click sigue comiteando y
+  cerrando. **Al soltar la tecla: si hubo un click sostenido en esa apertura, sólo
+  cierra**; si no hubo ninguno, comitea igual que siempre — o sea **CRG-31 queda literal
+  en el camino default** y la excepción sólo existe tras un gesto que el jugador pidió.
+  Sin esa regla, terminar de ciclar dispararía un toggle de más. La política vive en
+  `CloseOnRelease` y **no dentro de `Close`**, que sigue siendo un "comitea o no, vos
+  decidís" tonto porque el camino del click necesita la respuesta contraria; la consumen
+  el poll de `Think` y el concommand `-cargo_wheel`, que así no se desincronizan.
+- **El botón DERECHO cicla en reversa** (roadmap #50; pedido del autor en la nota de un check
+  que PASÓ). Se pollea en el **mismo `Think` y por el mismo camino** que el izquierdo
+  —`ClickCommit(back)`—, porque el gesto es idéntico salvo el sentido: un solo código, no una
+  copia que derive. Hereda gratis el modo del #49 y la convar `cargo_wheel_click`.
+  **Sólo actúa donde hay reversa**: el registro de fuentes gana **`toggleBack(ply, wep)`
+  opcional**, y su ausencia es la respuesta honesta y no una carencia — **una linterna no
+  tiene reversa**, y tampoco la tiene nada más del wheel: *desequipar no es "equipar hacia
+  atrás"* y un quick slot no tiene undo (CRG-32). Sobre cualquier otra cosa el derecho **no
+  hace nada y tampoco cierra**. La pata ARC9 es `ToggleStat(addr, -1)` + `PostModify()`,
+  **verificada contra `dev/other/`** (CRG-24, `sh_attach.lua:718-735`): `val = val or 1` y el
+  wrap está escrito en **las dos direcciones** (`> #ToggleStats → 1`, `< 1 → #ToggleStats`),
+  o sea que ARC9 **anticipó** el paso negativo; `ToggleStat` **no** llama a `PostModify`, y un
+  dispositivo de un solo modo envuelve sobre sí mismo — no-op honesto, jamás un error.
 
 ### 17.5 Hub central = superficie de información universal
 
@@ -1145,10 +1210,10 @@ deadzone (que muestra lo que hay en mano y ofrece la salida). **CRG-32 — Ning�
 ### 17.8 Tercer grupo de chips: las LUCES (roadmap #46 — entry 52)
 
 *(Mockup congelado: `mockups/cargo_wheel_lights_mock_v1_1.html`, bloques 01-05, con sus
-dos capturas hermanas. Los bloques 06/07/08 están **aprobados y DIFERIDOS** — ver el
-roadmap. Archivos: el registro y el render en `client/corpus_cargo_wheel.lua`; las tres
-fuentes en `client/corpus_cargo_lights.lua`; el único net en
-`server/corpus_cargo_lights.lua`.)*
+dos capturas hermanas. El bloque **06 está implementado** (celda ancha, roadmap #48 — ver
+más abajo); los bloques 07/08 siguen **aprobados y DIFERIDOS** — ver el roadmap. Archivos:
+el registro y el render en `client/corpus_cargo_wheel.lua`; las tres fuentes en
+`client/corpus_cargo_lights.lua`; el único net en `server/corpus_cargo_lights.lua`.)*
 
 Los sectores del anillo son *equipar*; los chips quick son *usar*; las luces son un
 **tercer verbo, *togglear*** — §17.6 ya declara que mezclar verbos en el mismo anillo es
@@ -1191,14 +1256,47 @@ están en el arma en mano.
   canal que usa amber, así que nunca se confunde con ON (acento) ni con OFF (`textDim`),
   y es **CRG-64** hecho pintura. **Hover** = relleno y borde suben un escalón, y jamás
   toca el canal de color del estado (el tránsito además le gana al hover en el borde).
-  **El modo NO va como texto en el chip**: se comprime a **barras de color de 3 px** en
-  el borde inferior, una por **emisor activo** — léxico del mock: luz visible = accent,
-  láser visible = green, iluminador IR = orange, láser IR = red; geometría 46/22/14 px
-  según 1/2/3 barras. El nombre completo del modo (`Light + Green Laser`) vive en el
-  hub. **Regla del pie** (mock, y mata la ambigüedad): al pie **sólo se dibuja lo que
-  está pasando** — el track del tránsito existe mientras el tránsito, las barras de modo
-  mientras haya emisores encendidos; nada de rieles vacíos. Sin ícono montado, el chip
-  cae a su inicial (título 20/700) — degradación honesta.
+  **En la celda CUADRADA el modo NO va como texto**: se comprime a **barras de color de
+  3 px** en el borde inferior, una por **emisor activo** — léxico del mock: luz visible =
+  accent, láser visible = green, iluminador IR = orange, láser IR = red; geometría
+  46/22/14 px según 1/2/3 barras. El nombre completo del modo (`Light + Green Laser`)
+  vive en el hub (y, desde #48, también en la celda ancha). **Regla del pie** (mock, y
+  mata la ambigüedad): al pie **sólo se dibuja lo que está pasando** — el track del
+  tránsito existe mientras el tránsito, las barras de modo mientras haya emisores
+  encendidos; nada de rieles vacíos. Sin ícono montado, el chip cae a su inicial (título
+  20/700) — degradación honesta.
+- **Variante de CELDA ANCHA** (roadmap #48, mock bloque 06; convar
+  `cargo_wheel_lights_wide`, cliente y archivada, default **0** — la forma de hoy no
+  cambia sola para nadie). 150×56 @1080 escaladas por `L.scale`, con **dos condiciones
+  duras que son del mock y no se negocian**: **(1) sólo con anclaje `left` o `right`** —
+  con `top`/`bottom` el grupo **degrada solo a 56×56 en el MISMO build**, sin aviso y sin
+  error, porque una fila de celdas de 150 no entra en el eje horizontal (lo hace el clamp
+  de `GroupCellSize`, §17.2, no una rama aparte); **(2) quick y tools siguen cuadrados
+  siempre** — la celda ancha es la excepción del **panel de luces**, no un modo nuevo del
+  menú. Lo que gana: el **modo se lee sin hoverear**. Pinta los **mismos tres canales**
+  (estado / tránsito / hover — es más ROOM, no un lenguaje nuevo) más el **nombre** y la
+  **línea secundaria**, que es exactamente la del hub —tránsito > nombre del modo >
+  ON/OFF— resuelta en **una sola sede** (`LightSecondary`) y no en dos copias que
+  derivarían. **El pie:** el track del tránsito se pinta igual en las dos anatomías; las
+  **barras de modo NO se pintan en la ancha**, porque el nombre del modo dice más de lo
+  que ellas codifican — **con una excepción declarada**: un dispositivo que expone
+  emisores como DATO pero **no declara `PrintName` de su modo** (ARC9 lo permite) sí las
+  conserva, porque ahí no hay nombre que las reemplace y el hub las omite por ese mismo
+  motivo; sin esa excepción, esos emisores quedarían invisibles en todas partes.
+- **El empuje NO lo cambia la celda ancha** (#48): el multiplicador es el fondo del
+  **OCUPANTE** —quick o tools, cuadrados por definición—, y lo ancho sólo extiende el
+  borde exterior del propio grupo. **La advertencia de desborde del mock está mal y se
+  corrige con la cuenta**, no con una opinión: el grupo crece hacia AFUERA desde la misma
+  línea de anclaje, así que el extremo queda en `305 + 46 + push·(56+24) + 150` = **501 /
+  581 / 661** @1080 para empuje 0 / 1 / 2. El layout **escala por altura**, de modo que a
+  1280×720 son **~334 / ~387 / ~441 px reales** contra los 640 de media pantalla:
+  **entra** — y quedó **medido en juego a 16:9** (planilla W, W4), no sólo calculado. El
+  **4:3 sigue sin medir** y es la frontera declarada. **push 2 es inalcanzable por convars**
+  (`ResolveAnchors` nunca deja a quick y tools en el mismo lado). Queda fijado en el
+  harness sobre `GroupOuterExtent` para que **nadie re-herede la advertencia sin
+  recalcularla** — que es exactamente el error que #46 pagó con el `UnequipDelay` copiado
+  de la prosa. **El mock no se edita**: es sede congelada; la corrección vive acá, en el
+  CHANGELOG y en el roadmap.
 - **Las tres patas, con su procedencia** (todo verificado contra `dev/other/`, CRG-24,
   anotado en el header de `client/corpus_cargo_lights.lua`):
   **(1) Torch** — el commit es el **único intent nuevo** (§17.1, la enmienda de CRG-30):
@@ -1211,8 +1309,20 @@ están en el arma en mano.
   unos frames de latencia del engine, que este mismo diseño ya declara que no es mentira.
   **Frontera medida y NO peleada** (§13): con un arma ARC9 con dispositivo **desplegada**
   el haz de la linterna del engine **no se dibuja** —vuelve al cambiar a un arma sin
-  dispositivo, con el estado de server en `true` todo el tiempo—; es el mod evitando dos
-  linternas a la vez, y el chip reporta la verdad que tiene, que es que está encendida. **(2) NVG de Neosun** — aparece si `GetNWInt("nvg", 0) ~= 0` (decisión
+  dispositivo, con el estado de server en `true` todo el tiempo—.
+  **CORRECCIÓN (#51): el MECANISMO que este doc afirmaba está mal.** Se decía "supresión de
+  render de ARC9", y el código no lo sostiene: grepeada la base entera, ARC9 toca la linterna
+  del engine en **un solo lugar** (`sh_attach.lua:143-144` — `PostModify` la **apaga** si el
+  arma tiene un att `ToggleOnF`) y **no hay ninguna ruta de supresión de render** para ella
+  (todos los `render.SuppressEngineLighting` son de VGUI/FLIR/presets, o sea previews). El
+  mecanismo real **no está identificado**; la hipótesis viva es el presupuesto de projected
+  textures del engine, que las luces del dispositivo consumen — y **queda anotada como
+  hipótesis**. La CONDUCTA sigue medida y es lo que se pinta. Era una **inferencia redactada
+  como medición**, el mismo error que el `UnequipDelay`.
+  Desde #51 el chip **deja de decir sólo ON**: se pinta **tapado** (tramado de quickslot) y el
+  hub dice quién se quedó con la luz. `on` **no** se falsea a `false` —sería la mentira de
+  CRG-32— porque *encendida pero invisible* es un **tercer** hecho: **estado y disponibilidad
+  son preguntas distintas**. **(2) NVG de Neosun** — aparece si `GetNWInt("nvg", 0) ~= 0` (decisión
   declarada: el chip pregunta por la **NW**, no por el ítem — la NW es lo que
   `arc_vm_nvg` va a accionar y desde #47 **es** la resolución de Cargo replicada;
   preguntar al snapshot re-implementaría `EquippedShortName` en el cliente, una segunda
