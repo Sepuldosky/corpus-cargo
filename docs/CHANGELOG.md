@@ -5252,3 +5252,123 @@ línea de server en las cinco tandas.
 
 Planilla (sección AA, la misma URL que P, Q, R, S, U, V, W, X, Y y Z):
 https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
+
+---
+
+## 60. Hands: el sonido que no existe y el ícono del mod anterior `[APLICADO 2026-07-30]`
+
+Reporte del autor (2026-07-30), dos síntomas con **una sola causa**: el port de la entry 9 se quedó
+a medias con los assets del reciclaje. El header del SWEP declara desde entonces *"assets removed on
+request of the original authors"*, y **eso era falso en dos lugares** — uno que suena y uno que se ve.
+
+**LAS DOS CAUSAS, MEDIDAS Y NO SUPUESTAS.**
+
+- **El sonido.** `c_arms_apex.mdl` dispara **cuatro eventos de animación POR NOMBRE DE SOUNDSCRIPT**,
+  horneados en el modelo: `Apex_Cloth`, `Apex_Cloth_Jump`, `Apex_Gear_Sprint` y `Apex_Gear_Jump`.
+  Salieron **del propio .mdl** (volcado de strings del binario), no de la prosa de nadie. El original
+  los declaraba en un archivo aparte, `lua/autorun/apexsfx.lua`, sobre `sound/player/gear/*` — y ese
+  set de foley de ropa/equipo es **el único** que el port no trajo: los 41 wavs de melee sí están en
+  `sound/weapons/`, el de movimiento no. El modelo, en cambio, vino entero y **sigue disparando los
+  eventos igual**. De ahí las dos líneas por cada sprint y cada salto en la consola del autor.
+- **El ícono.** Los **tres VTF** (`vgui/corpus_cargo_hands`, `_killicon` y `vgui/entities/…`) son
+  **byte-idénticos** a los del mod original — verificado por hash contra `dev/other/`. El port los
+  **renombró en vez de reemplazarlos**, así que el HUD mostraba las manos de Apex bajo nuestro nombre
+  de archivo.
+
+- PARCHE 1 — fix(ui): los cuatro nombres se registran con `sound.Add` contra **`common/null.wav`**,
+  el sample mudo del engine (**verificado presente** en `hl2_sound_misc_dir.vpk`, que GMod monta).
+  **Mudos y no re-vozados a propósito:** volver a sonarlos pide foley de ropa y equipo que este repo
+  no tiene y que el acuerdo de reciclaje sacó. El `.mdl` **no se recompila** —sigue la regla del
+  port— así que los eventos van a disparar siempre: el único lugar donde la queja puede morir es la
+  tabla de soundscripts, y es la que este parche llena.
+- PARCHE 2 — fix(ui): **un PNG para las tres superficies.**
+  `materials/corpus_cargo/hands_icon.png` (512², renderizado de `assets/cargo_logo_dark.svg`) sirve
+  la selección de arma, el killicon y la baldosa del spawnmenu. Los **seis** archivos VMT/VTF se
+  borran, con lo que la línea del header deja de ser una promesa y pasa a ser un hecho.
+
+**TRES APIS VERIFICADAS CONTRA LA FUENTE INSTALADA, NINGUNA DE MEMORIA** (CRG-24 y la lección de la
+entry 53: *el engine también es un tercero*):
+
+1. `killicon.Add` construye su material con `Material(name)`
+   (`lua/includes/modules/killicon.lua:33`), o sea que **acepta un PNG**. El color se **multiplica**
+   contra la textura, por eso pasa blanco y no el naranja de antes: el logo trae su propio color.
+2. La baldosa del spawnmenu sale de `SWEP.IconOverride`, y sin él de `entities/<clase>.png`
+   (`gamemodes/sandbox/…/contenttypes/weapons.lua:6`). **Nunca miró `vgui/entities/`**: ese tercer
+   VTF ya estaba muerto antes de este parche, y sin `IconOverride` la baldosa nunca fue la nuestra.
+3. `SWEP.WepSelectIcon` es un **texture ID** de `surface`, no un material: un PNG no entra ahí. Por
+   eso el ícono se pinta tomando `SWEP:DrawWeaponSelection`, que es exactamente lo que hace
+   `weapon_base` (`gamemodes/base/entities/weapons/weapon_base/cl_init.lua:34-58`: recuadro **2:1**
+   con inset fijo de 10 px, más `PrintWeaponInfo`). El logo es **cuadrado**, así que se ajusta al
+   lado corto y se centra — y el inset se escribe como **fracción**, no como los 10 px del base, que
+   es la clase de constante que se va a negativo cuando la caja no es la que uno tenía en la cabeza.
+
+**Y el ícono llega al HUD que el autor realmente usa sin un caso especial:** DGL4 no pinta el ícono
+por su cuenta, su componente `weaponicon` **llama a este mismo método** para toda clase de la que no
+tenga arte propia (`dev/other/DGL4 …/components/weaponicon.lua:99` y `:155`). Un solo override cubre
+el HUD default de GMod **y** el suyo.
+
+**Lo que el harness no prueba, y se dice:** `lua/weapons/` no lo carga el manifest, así que estos dos
+parches **no tienen cobertura offline** más allá de la sintaxis (verificada con el mismo LuaJIT 2.1
+que usa el harness). Los **700** checks siguen verdes porque este cambio no toca nada de lo que
+miden — el número no es evidencia acá. Lo que hay que ver en juego es exactamente lo reportado:
+correr y saltar con las manos puestas **sin una línea en consola**, y el ícono de Cargo en la
+selección de arma, en el kill feed y en la baldosa del spawnmenu.
+
+### 1.ª pasada en juego (2026-07-30) — dos de tres, y el tercero midió una caja que miente
+
+El autor confirmó **las dos mitades del reporte**: *«ya no hay gritos en el developer console»* y el
+ícono en el spawnmenu, bien. Lo que salió mal es el mismo ícono en el **selector de armas de DGL4**:
+*«se ve medio cortado»*, con la captura al lado.
+
+**Y no era el ícono: era haberle creído a la caja.** La cadena, leída entera y con números (CRG-24 —
+el mismo pecado que la entry 53, y acá el tercero no es el engine sino el HUD):
+
+- `selectionpanel:SetSize(144, 72)`, y `AnimatedPanel:PaintFrame` **scissorea a ese rect**
+  (`animatedpanel.lua:189`).
+- Adentro, el ícono vive en `selection_icon_pos = (72, 36)` con `selection_icon_size = 140`, y
+  `weaponicon:PerformLayout` arma la caja como `140 × (140 · 100/140)` = **140 × 100**, centrada
+  sobre ese punto → `_y = -14`.
+- O sea: **la caja que llega mide 100 de alto y sólo se ven los 72 del medio.** 14 px afuera arriba
+  y 14 abajo.
+
+El cuadrado de la 1.ª versión era `math.min(140, 100) · 0.8 = 80` centrado → **4 px comidos arriba y
+4 abajo**, que es exactamente el corte plano de la captura.
+
+- PARCHE 3 — fix(ui): el lado del cuadrado sale de **`(wide - 20) / 2`** —la altura que
+  `weapon_base` pinta él mismo— clampeada por `tall · 0.8` para el caso de una caja más alta que
+  ancha. En DGL4 da **60**: arranca en `y = 20` y termina en `y = 80` contra una ventana visible de
+  14 a 86, o sea **6 px de aire por lado** en vez de 4 comidos. Y no es un número elegido para DGL4:
+  es el número alrededor del cual está maquetado **todo ícono stock**, así que entra donde entra el
+  base.
+
+**LA LECCIÓN, Y ES LA QUE HAY QUE ANOTAR: `tall` no es la altura en la que se puede dibujar.** Un
+tercero puede pasarte una caja **más grande que su propio recorte**, y la única forma de saberlo era
+seguir el `SetScissorRect` hasta el panel que lo pone. Es la familia de CRG-28 (*`HUDPaint` no tiene
+clipping de panel*) vista desde el otro lado: acá el clipping **sí** existe y **la caja no lo
+declara**. `wide` en cambio era honesto —140 contra un panel de 144—, y por eso el remedio se apoya
+en él y no en el que mintió.
+
+**Frontera declarada:** `selection_size` y `selection_icon_size` son **ajustes del usuario** en DGL4.
+Con los defaults el margen es de 6 px por lado; si alguien achica el panel y agranda el ícono, vuelve
+a recortar — y ahí el recorte es de su layout, no nuestro. No se lee la config de DGL4 para
+compensar: sería atarse a un tercero por un caso hipotético (COR-5).
+
+### Cierre — 2.ª pasada: las tres superficies del ícono, confirmadas (2026-07-30)
+
+*«Si ahora se ve bien en DGL4, kill icon en el hud de HL2 está perfecto. No hay nada más que
+tocar.»* Con eso quedan medidas en juego **las tres superficies** —el selector de DGL4, el kill feed
+del HUD de HL2 y la baldosa del spawnmenu— más la consola limpia que ya había confirmado la 1.ª
+pasada. **Dos rondas y un solo defecto**, y el defecto no estaba en lo que el reporte pedía: estaba
+en una **suposición sobre la caja de un tercero**.
+
+**Sin planilla, y se dice por qué:** esto es un parche de dos síntomas reportados, verificables por
+observación directa y sin superficie nueva que auditar — una sección de planilla mide una tanda de
+diseño, no un ícono que se ve o no se ve. Harness **700**, intacto: este bloque no toca nada de lo
+que mide, y el número **no es evidencia de nada de lo que se probó acá**.
+
+**Lo que deja escrito para el próximo port:** *un asset renombrado no es un asset reemplazado.* El
+header de este SWEP declaraba «assets removed on request of the original authors» desde la entry 9 y
+los tres VTF seguían ahí, byte por byte, bajo nuestros nombres de archivo — la declaración sobrevivió
+cincuenta entries porque **nadie la contrastó contra un hash**. Lo mismo del lado del sonido: el port
+copió el modelo y dejó afuera el archivo que registraba sus eventos, y el síntoma tardó en aparecer
+porque **es ruido de consola y no un error**.

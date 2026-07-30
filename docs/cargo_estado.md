@@ -5,7 +5,31 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-30 (**entries 54-59 `[APLICADO]`, confirmadas en juego — el ARCO
+**Última actualización:** 2026-07-30 (**entry 60 `[APLICADO]`, confirmada en juego en dos rondas y
+commiteada** — reporte del autor: el SWEP **Hands** arrastraba dos restos del port, y los dos son el
+mismo descuido —el header declaraba *"assets removed"* desde la entry 9 y **no era cierto**—.
+Confirmado: consola limpia (*«ya no hay gritos»*) y el ícono bien en **las tres superficies**
+(selector de DGL4, kill feed de HL2, baldosa del spawnmenu). **El único defecto de las dos rondas no
+estaba en lo reportado sino en una suposición sobre la caja de un tercero:** DGL4 pasa una caja de
+**140×100** centrada sobre un panel de **144×72** y después scissorea al PANEL, así que 14 px arriba
+y 14 abajo **no llegan nunca a pantalla** — **`tall` no es la altura en la que se puede dibujar**. El
+lado del cuadrado sale ahora de `(wide - 20) / 2`, la altura que pinta el propio `weapon_base`, que
+es el número alrededor del cual está maquetado todo ícono stock. **Y la regla que deja: un asset
+renombrado no es un asset reemplazado** — los tres VTF eran byte-idénticos a los del mod original y
+la declaración sobrevivió cincuenta entries porque nadie la contrastó contra un hash. Sin planilla a
+propósito (no hay superficie nueva que auditar); harness **700**, intacto y sin cubrir esto —
+`lua/weapons/` no lo carga el manifest. (1) `c_arms_apex.mdl` dispara **cuatro eventos de
+sonido horneados** (`Apex_Cloth`, `Apex_Cloth_Jump`, `Apex_Gear_Sprint`, `Apex_Gear_Jump`) cuyo foley
+de ropa/equipo es **el único set que el port no trajo**, y como el modelo no se recompila la consola
+comía dos líneas por sprint y por salto: quedan **mudos contra `common/null.wav`**, el sample del
+engine. (2) Los **tres VTF eran byte-idénticos a los del mod original** (hash contra `dev/other/`):
+se borran, y **un solo PNG del logo de Cargo** (`materials/corpus_cargo/hands_icon.png`) sirve
+selección de arma, killicon y baldosa del spawnmenu. `WepSelectIcon` es un texture ID y no admite
+PNG, así que el ícono se pinta tomando `DrawWeaponSelection` — **el mismo método que llama el HUD
+DGL4**, así que un override cubre los dos HUDs sin caso especial. Tres APIs leídas de la instalación
+y ninguna de memoria (CRG-24). **El harness no carga `lua/weapons/`**: los 700 siguen verdes porque
+el cambio no toca lo que miden — acá el número no es evidencia.
+Antes, **entries 54-59 `[APLICADO]`, confirmadas en juego — el ARCO
 #48-#52 del wheel CERRADO ENTERO**, cinco secciones de planilla (W, X, Y, Z, AA) en **23 checks** y **ni una
 ronda perdida por un defecto de código**: la única que costó una vuelta fue la medición de W1, y por el
 **instrumento**. Harness **639 → 700** (**61 nuevos, 19 reversiones verificadas en negativo**). **Ni una
@@ -270,6 +294,11 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   actividad de ataque (`sh_anim.lua`: `ACT_MP_ATTACK_STAND_PRIMARYFIRE` →
   `index + 5`), no existe gesto de puño izquierdo en el set de anims de jugador —
   el `weapon_fists` de Valve tiene exactamente la misma limitación. Aceptado.
+  **Y ya no arrastra nada del mod anterior** (entry 60): los cuatro eventos de sonido horneados en
+  el `.mdl` van mudos contra `common/null.wav` —su foley es el único set que el port no trajo— y el
+  ícono es **uno propio** (`materials/corpus_cargo/hands_icon.png`, el logo de Cargo) para las tres
+  superficies: selección de arma vía `DrawWeaponSelection` (que es también el método que llama el
+  HUD DGL4), kill feed y baldosa del spawnmenu vía `SWEP.IconOverride`.
 - **Suministros HL2 + mochilas genéricas + `Items.SetModel`** (entry 34, confirmada
   en juego): el framework base trae Health Kit/Vial/Battery como ítems (valores y
   sonidos de pickup del ENGINE — no es medicina, Coagulant intacto) y dos mochilas
@@ -324,6 +353,12 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
+- **La entry 60 quedó confirmada el 2026-07-30 en dos rondas, sin planilla** (no hay superficie
+  nueva que auditar: son dos síntomas reportados y verificables por observación directa). Ronda 1:
+  consola limpia y spawnmenu OK, selector de DGL4 recortado. Ronda 2, tras el PARCHE 3: *«se ve bien
+  en DGL4, kill icon en el hud de HL2 está perfecto, no hay nada más que tocar»*. **Commiteada y
+  pusheada.** Sin cobertura de harness —`lua/weapons/` no lo carga el manifest—, así que lo único
+  verificado offline fue la sintaxis y la aritmética de la caja.
 - **Las entries 54-59 (roadmap #48 a #52) quedaron confirmadas los 2026-07-29 y 30 con las planillas
   W (10/10), X (4/4), Y (3/3), Z (3/3) y AA (3/3)** — **23 checks, cinco secciones, ninguna ronda perdida
   por un defecto de código**. Harness **700** (eran 639), **61 nuevos** y **19 reversiones verificadas en
