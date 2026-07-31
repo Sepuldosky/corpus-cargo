@@ -1344,6 +1344,49 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     ENGANCHE YA ESCRITO: Instances.AttsWeight existe, recurre y esta probada
     offline; WeightOf no la llama. El filtro por categoria se enchufa ahi y en
     ningun otro lado (CRG-66: una sola recursion).
-    ANTES QUE ESTE, el autor quiere el PESO DE LA MUNICION cargada: blob.clip1
-    es un numero pelado que WeightOf no mira, asi que hoy cargar un arma hace
-    DESAPARECER peso del ledger. Aterriza en §16, no en el puente de ARC9.
+    ANTES QUE ESTE, el autor quiere el PESO DE LA MUNICION cargada: es el #56,
+    abajo. Se ejecuta primero.
+
+56. EL PESO DE LA MUNICION CARGADA [Cargo weight/ammo] — ABIERTO, SIN DISENAR.
+    Pedido del autor 2026-07-31, al cerrar el #53. SE EJECUTA ANTES DEL #55.
+    Semilla: dev/PROMPT_cargo_56_peso_municion.txt (investigacion y diseno; el
+    codigo va despues del voto del autor sobre la cadencia).
+
+    EL SINTOMA, EN UNA LINEA: las mismas 30 balas pesan 0,36 kg en el cinturon
+    y 0 kg adentro del arma. Recargar es un descuento de peso. El caso extremo
+    esta en el catalogo propio y no necesita un pack de terceros: un cohete de
+    RPG pesa 3,0 kg, asi que cargar el RPG hace desaparecer TRES KILOS del
+    ledger. Con varias armas guardadas, cada una con su cargador lleno, el
+    jugador gana capacidad de carga gratis.
+
+    NO ES UN OLVIDO, ESTA DECLARADO: la nota de CRG-66 en ids.yaml lo dice
+    desde el 2026-07-30 ("CASO DECLARADO Y NO CUBIERTO"). Inventory.TotalWeight
+    suma grid, equipado y cinturon —los stacks del cinturon SI pesan— y no
+    mira blob.clip1, que es un entero pelado sin tipo de municion.
+
+    NO ES EL #55 Y NO SE MEZCLA: el #55 pesa el CARGADOR como pieza, este pesa
+    las BALAS que tiene adentro. Mezclarlos deja los dos sin poder medirse.
+
+    LO QUE BLOQUEA EL DISENO, y por eso la semilla es de investigacion: el def
+    de un arma capturada NO sabe su tipo de municion — lleva `ammo.caliber`,
+    que es etiqueta de display, y §16.2 declara como decision que el tipo real
+    sale de la ENTIDAD. Un arma guardada en el grid no tiene entidad. Hay que
+    resolver de donde sale el tipo HL2 de un arma sin entidad viva (candidato a
+    VERIFICAR, no a asumir: weapons.Get(class).Primary.Ammo, la misma ruta que
+    CRG-41 ya usa para la trivia) y aceptar que la respuesta puede ser "no para
+    todas", que entonces es frontera declarada y no fracaso.
+
+    LA TRAMPA CENTRAL ES DE DISENO Y ES DEL AUTOR: hoy el ledger solo se mueve
+    cuando se mueve el CINTURON, y el sistema es barato exactamente por eso —
+    el comentario del espejo lo dice literal, "firing does not touch the
+    reserve, it drains the magazine" (ammopool.lua:260-262), y cada Touch es
+    Save + Sync + Movement. Si las balas del cargador pesan, disparar empieza a
+    mover el ledger. Tres formas con costos distintos: el peso sigue cada bala
+    (honesto y caro), el peso se refresca en los momentos de hoy (barato, con
+    un error maximo de un cargador que hay que poder DECIR), o el cargador pesa
+    por su CAPACIDAD y no por su contenido (el mas barato, y descargar no
+    aliviana). Se le presentan las tres con el costo MEDIDO, no estimado.
+
+    ENGANCHE: CRG-66 manda UNA SOLA RECURSION — Instances.WeightOf. Ahi mismo
+    tiene su enganche reservado el #55 (AttsWeight, escrita y sin llamar), asi
+    que hay que verificar que los dos no colisionen ANTES de escribir.

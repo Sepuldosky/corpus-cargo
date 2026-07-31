@@ -614,12 +614,18 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
    confirm). Semilla del chat nuevo:
    [`../../dev/HANDOFF_cargo_trade_slice2.md`](../../dev/HANDOFF_cargo_trade_slice2.md).
    La entry 27 se confirma de paso en esa pasada (checklist en el artifact).
-2. **#54 — íconos que distingan dos armas de la misma clase** (abierto por la nota de AB9, un check
+2. **#56 — el peso de la munición cargada** (abierto el 2026-07-31, **va antes del #55**): las
+   mismas 30 balas pesan 0,36 kg en el cinturón y **0 kg adentro del arma**, y un RPG cargado
+   esconde **3 kg**. Semilla de investigación y diseño:
+   [`../../dev/PROMPT_cargo_56_peso_municion.txt`](../../dev/PROMPT_cargo_56_peso_municion.txt).
+   Lo que bloquea el diseño no es el peso sino **de dónde sale el tipo HL2 de un arma sin entidad
+   viva**, y la decisión de **cadencia** que es del autor: hoy el ledger sólo se mueve cuando se
+   mueve el cinturón, y el espejo es barato exactamente por eso.
+3. **#54 — íconos que distingan dos armas de la misma clase** (abierto por la nota de AB9, un check
    que PASÓ): el ícono se autogenera del world model, así que dos AS VAL con builds distintas se ven
-   idénticas en el grid. **Después, el peso de la munición cargada** (arriba, en *Remanentes*) y
-   recién ahí el **#55** (qué attachments pesan), cuya pregunta difícil ya está anotada: **cómo
-   autodetectar la clasificación** sobre un pack de terceros sin catalogar a mano cada att — que es
-   justo el trabajo que CRG-41 existe para evitar.
+   idénticas en el grid. Y recién ahí el **#55** (qué attachments pesan), cuya pregunta difícil ya
+   está anotada: **cómo autodetectar la clasificación** sobre un pack de terceros sin catalogar a
+   mano cada att — que es justo el trabajo que CRG-41 existe para evitar.
 4. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 5. **#41 — explosivos ARC9 como stack throwable** (bloque propio, pedido del
    autor): hoy las granadas de EFT/CS:GO/MW2019 se equipan en Primary. El
