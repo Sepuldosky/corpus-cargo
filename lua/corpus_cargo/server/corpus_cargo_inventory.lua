@@ -365,6 +365,31 @@ function CARGO.Inventory.GiveEntry(ply, entry, skipCap)
     return true
 end
 
+-- ONE world-spawn path for everything that leaves (or never enters) the
+-- record: the real SWEP when it is a weapon and the world gate allows it
+-- — roadmap #16/#17, an ARC9 gun draws its assembled mirror on the ground
+-- and no prop stand-in matches it — and the corpus_cargo_item entity
+-- otherwise, which renders its own blob on Spawn. DropEntry and GiveOrDrop
+-- share it so a second route cannot drift from this one.
+local function SpawnDropped(pos, dropped)
+    local def = CARGO.Items.Get(dropped.id)
+    if dropped.uid ~= nil and istable(def)
+        and isstring(def.weapon_class) and def.weapon_class ~= ""
+        and istable(CARGO.Capture)
+        and isfunction(CARGO.Capture.WorldGunsEnabled)
+        and CARGO.Capture.WorldGunsEnabled()
+        and CARGO.Capture.SpawnWorldWeapon(def.weapon_class, pos, dropped.uid) ~= nil then
+        return true
+    end
+
+    local ent = ents.Create("corpus_cargo_item")
+    if not IsValid(ent) then return false end
+    ent.CargoEntry = dropped
+    ent:SetPos(pos)
+    ent:Spawn()
+    return true
+end
+
 -- ------------------------------------------------------------------
 -- Public contract: give / take / count (what Coagulant & Craving consume)
 -- ------------------------------------------------------------------
@@ -389,6 +414,60 @@ function CARGO.Inventory.GiveItem(ply, id, countOrSeed)
     rec.items[#rec.items + 1] = { id = id, uid = uid }
     CARGO.Inventory.Touch(ply)
     return true, uid
+end
+
+-- CRG-65 — "no entra" nunca significa "se destruye" (author call 2026-07-30,
+-- roadmap #53). A caller that HANDS Cargo an object it already took out of
+-- somewhere else has no way to put it back: if GiveItem refuses (weight, an
+-- unknown def) and the caller ignores the return, the object is gone. That is
+-- CRG-9's failure mode arriving through the other door — not a flow that
+-- destroys an item with occupied sub-slots, but a flow that destroys the item
+-- it was handed. Two live sites had it: the ARC9 detach bridge and the ammo
+-- pool mirror, and BOTH carried a comment claiming nothing was lost.
+--
+-- The line the author drew: REFUSING an action and saying so is fine (walk+use
+-- while overweight still answers "You can't carry that" and the gun stays on
+-- the floor — nothing was taken from anywhere). CONSUMING the object and
+-- saying so is the bug. Only the second shape goes through here.
+--
+-- Returns ok, droppedToFloor(, uid). ok is false only when the def is unknown,
+-- which is the one case where there is nothing to spawn either.
+function CARGO.Inventory.GiveOrDrop(ply, id, countOrSeed)
+    local def = CARGO.Items.Get(id)
+    if def == nil then return false, false end
+
+    local ok, extra = CARGO.Inventory.GiveItem(ply, id, countOrSeed)
+    if ok then return true, false, extra end
+
+    local dropped
+    if def.class == "stackable" then
+        local count = isnumber(countOrSeed) and math.max(math.floor(countOrSeed), 1) or 1
+        dropped = { id = id, count = count }
+    else
+        dropped = { id = id,
+            uid = CARGO.Instances.Create(id, istable(countOrSeed) and countOrSeed or nil) }
+    end
+
+    if not SpawnDropped(ply:EyePos() + ply:GetAimVector() * 32, dropped) then
+        return false, false
+    end
+    return true, true, dropped.uid
+end
+
+-- Same floor, no player in the frame: a world drop re-applying its tree can
+-- find an att that no longer fits, and there is nobody to hand it to. It lands
+-- next to the gun instead of evaporating (CRG-65 without an owner).
+function CARGO.Inventory.DropAt(pos, id, count)
+    local def = CARGO.Items.Get(id)
+    if def == nil or pos == nil then return false end
+
+    local dropped
+    if def.class == "stackable" then
+        dropped = { id = id, count = math.max(math.floor(count or 1), 1) }
+    else
+        dropped = { id = id, uid = CARGO.Instances.Create(id) }
+    end
+    return SpawnDropped(pos, dropped)
 end
 
 function CARGO.Inventory.TakeItem(ply, id, count)
@@ -646,6 +725,175 @@ function CARGO.Inventory.RestoreClip(ply, class, blob)
     timer.Simple(0, apply)
 end
 
+-- ------------------------------------------------------------------
+-- blob.atts — the attachment tree, harvested and re-applied AT THE GATE
+-- (roadmap #53, B3/B4). Same shape as the magazine, for the same reason: the
+-- live SWEP entity is the only place ARC9 keeps what is mounted
+-- (slottbl.Installed, sh_attach.lua:19) and it gives nothing back when it dies
+-- (OnRemove/OnDrop, sh_init.lua:215-234).
+--
+-- The trap, and it is the same one Artagdoll paid for: this is harvested IN
+-- THE GATE, never in a timer. Fifty milliseconds later the entity is gone and
+-- there is nothing left to ask.
+-- ------------------------------------------------------------------
+
+-- the blob carries no uid of its own (Instances.Create), so the harvest works
+-- on the blob TABLE and the two entry points differ only in how they got it
+local function HarvestInto(blob, wep)
+    if not istable(blob) or not IsValid(wep) then return end
+    if CARGO.ARC9 == nil or not CARGO.ARC9.Available() then return end
+
+    local ok, tree = pcall(CARGO.ARC9.HarvestTree, wep)
+    if not ok then
+        -- a pcall that swallows is worse than no pcall (lección del #46)
+        Corpus.Log("cargo", "atts: la cosecha falló sobre "
+            .. tostring(wep:GetClass()) .. " — " .. tostring(tree))
+        return
+    end
+    -- mutating the live blob IS the update (CRG-57)
+    blob.atts = tree
+end
+
+function CARGO.Inventory.StoreAtts(uid, wep)
+    if not isstring(uid) then return end
+    HarvestInto(CARGO.Instances.Get(uid), wep)
+end
+
+-- Which equipped instance IS this weapon entity? A give from GiveEquipWeapon
+-- leaves no uid on the entity (only world drops carry CargoInstanceUid), so
+-- the link is the class, the same way StripEquipWeapon resolves it.
+function CARGO.Inventory.EquippedUidForClass(ply, class)
+    if not IsValid(ply) or not isstring(class) or class == "" then return nil end
+    local rec = CARGO.Inventory.GetRecord(ply)
+    for _, val in pairs(rec.equip or {}) do
+        if isstring(val) then
+            local blob = CARGO.Instances.Get(val)
+            local def = blob and CARGO.Items.Get(blob.id) or nil
+            if def ~= nil and def.weapon_class == class then return val, blob end
+        end
+    end
+    return nil
+end
+
+-- THE BLOB HAS TO FOLLOW THE GUN WHILE IT IS IN YOUR HANDS, not only at the
+-- gates (planilla AB, check AB8 en FALLA).
+--
+-- The gates are where the tree is RESCUED — the entity is about to die there.
+-- But mounting a scope from ARC9's own C menu crosses no gate at all, so until
+-- this existed the blob stayed at whatever it said when the weapon was last
+-- stored. Persistence was right and everything DERIVED from the blob was
+-- stale: CRG-66 says the instance weighs what it carries, and the weight only
+-- caught up after putting the gun away. Same for the price.
+--
+-- Deliberately ONE TICK LATE, which is the opposite of the gate rule and for
+-- the opposite reason: the inventory hooks fire from inside ReceiveWeapon's
+-- ownership diff (sh_net.lua:90-122), which runs BEFORE BuildSubAttachments
+-- installs the new tree (:125). Harvesting on the spot would record the tree
+-- the player just replaced. Here the entity is not going anywhere — nothing
+-- expires in a tick — so waiting is safe; at a gate it never is.
+function CARGO.Inventory.SyncAttsSoon(ply)
+    if not IsValid(ply) then return end
+    if CARGO.ARC9 == nil or not CARGO.ARC9.Available() then return end
+    if ply.CargoAttSyncQueued then return end -- one per tick, not one per att
+    ply.CargoAttSyncQueued = true
+
+    timer.Simple(0, function()
+        if not IsValid(ply) then return end
+        ply.CargoAttSyncQueued = nil
+
+        local wep = ply:GetActiveWeapon() -- the C menu works on the held gun
+        if not IsValid(wep) or not istable(wep.Attachments) then return end
+        local uid, blob = CARGO.Inventory.EquippedUidForClass(ply, wep:GetClass())
+        if blob == nil then return end
+
+        local before = blob.atts
+        HarvestInto(blob, wep)
+        -- only pay for a sync + movement refresh when something moved
+        if util.TableToJSON(before or {}) ~= util.TableToJSON(blob.atts or {}) then
+            CARGO.Inventory.Touch(ply)
+        end
+    end)
+end
+
+-- Everything the live entity knows that the blob does not. The gates call
+-- THIS, so a gate added later gets the attachment tree for free instead of
+-- having to remember a second call.
+--
+-- StoreClip keeps its own name and behaviour on purpose: it is cited by an
+-- IMMUTABLE audit act (corpus/docs/auditorias/2026-07-19) and by §10 of the
+-- architecture, and renaming it would leave those citations describing
+-- something that no longer exists.
+function CARGO.Inventory.StoreFromEntity(uid, wep)
+    CARGO.Inventory.StoreClip(uid, wep)
+    CARGO.Inventory.StoreAtts(uid, wep)
+end
+
+-- Re-apply the tree onto a freshly born SWEP, BY THE MOD'S OWN SERVER ROUTE.
+--
+-- The sequence is ARC9's, read off the server branch of ReceiveWeapon
+-- (sh_net.lua:141-149) and not invented — with two deliberate differences:
+--   * FillIntegralSlots is NOT called (author call, 2026-07-30). It CONSUMES
+--     from the store, and the store is us, so every equip and every respawn
+--     would quietly eat items off the grid to top up integral slots. It is
+--     also the root of roadmap #42, which stays its own entry.
+--   * DoInvalidateCache IS called. It is easy to miss and it clears
+--     StatCache/HookCache/AttPosCache (sh_0_stats.lua:49-57); without it the
+--     gun keeps serving processed stats from before the tree changed.
+--
+-- CRG-23 holds: the write goes through the mod's API. And the ownership diff
+-- never runs — it lives INSIDE ReceiveWeapon's own `if SERVER` block
+-- (sh_net.lua:83-123), so calling BuildSubAttachments directly steps around
+-- it. That is what makes re-applying free: these atts already belong to this
+-- instance, they are not being bought a second time.
+--
+-- Afterwards the blob is RE-HARVESTED from the entity so it converges on what
+-- the gun actually carries: whatever PruneAttachments rejected already went
+-- back through our ARC9_PlayerGiveAtt hook (to the grid, or to the floor —
+-- CRG-65), and an att the pack deleted stops haunting the blob.
+function CARGO.Inventory.ApplyAtts(wep, blob, ply, fallbackPos)
+    if not IsValid(wep) or not istable(blob) then return end
+    if CARGO.ARC9 == nil or not CARGO.ARC9.Available() then return end
+    if not istable(blob.atts) then return end
+
+    local tree, orphans, unknown = CARGO.ARC9.ResolveTree(blob.atts, wep)
+    if tree == nil then return end
+
+    local ok, err = pcall(function()
+        wep:BuildSubAttachments(tree)
+        wep:DoInvalidateCache()
+        wep:PruneAttachments()
+        wep:SendWeapon()
+        wep:PostModify()
+    end)
+    if not ok then
+        Corpus.Log("cargo", "atts: la re-aplicación falló sobre "
+            .. tostring(wep:GetClass()) .. " — " .. tostring(err))
+        return -- the blob is NOT rewritten: a failed apply must not erase it
+    end
+
+    -- an att the pack no longer declares cannot come back as an item (our def
+    -- ids derive from ARC9.Attachments), so it is dropped — but it is SAID
+    for att, n in pairs(unknown) do
+        Corpus.Log("cargo", "atts: '" .. tostring(att) .. "' x" .. n
+            .. " ya no existe en ARC9.Attachments — descartado de "
+            .. tostring(wep:GetClass()))
+    end
+
+    -- an att that still exists but found no slot goes back as an item
+    for att, n in pairs(orphans) do
+        local itemId = CARGO.ARC9.ItemId(att)
+        if CARGO.Items.Get(itemId) ~= nil then
+            if IsValid(ply) then
+                CARGO.Inventory.GiveOrDrop(ply, itemId, n)
+            else
+                CARGO.Inventory.DropAt(fallbackPos or wep:GetPos(), itemId, n)
+            end
+        end
+    end
+
+    HarvestInto(blob, wep)
+end
+
 -- world entities (a drop straight out of the grid) take the same treatment
 function CARGO.Inventory.ApplyClipToEntity(wep, uid)
     if not IsValid(wep) or not isstring(uid) then return end
@@ -671,16 +919,32 @@ local function GiveEquipWeapon(ply, def, blob, noAmmo)
         ply.CargoEquipGive = true
         ply:Give(def.weapon_class, noAmmo == true)
         ply.CargoEquipGive = nil
+
+        -- ORDER IS LOAD-BEARING (roadmap #53, B4): the tree goes on BEFORE the
+        -- magazine. A mag attachment changes ClipSize, and ARC9's PostModify
+        -- answers a ClipSize change with Unload + SetRequestReload
+        -- (sh_attach.lua:147-159) — applied after RestoreClip, it would empty
+        -- the magazine we just restored into the pool. This is an argument
+        -- about the SEQUENCE and not the instant, so it is measured in game
+        -- with an att that moves ClipSize, never with a scope.
+        -- and the client's own preset restore is taken over FIRST: it fires
+        -- 0.075 s after the entity's first Think and would charge the grid for
+        -- what it mounts (roadmap #53, B4). Unconditional — a bare gun is
+        -- precisely the one it would dress up.
+        CARGO.ARC9.TakeOverPresets(ply:GetWeapon(def.weapon_class))
+        CARGO.Inventory.ApplyAtts(ply:GetWeapon(def.weapon_class), blob, ply)
+
         -- the stored magazine beats the SWEP's DefaultClip (#18)
         CARGO.Inventory.RestoreClip(ply, def.weapon_class, blob)
     end
 end
 
--- uid: remember the loaded magazine before the SWEP entity dies (#18)
+-- uid: remember the loaded magazine AND the attachment tree before the SWEP
+-- entity dies (#18 / roadmap #53 B3 — StoreFromEntity is both)
 local function StripEquipWeapon(ply, def, uid)
     if isstring(def.weapon_class) and def.weapon_class ~= "" then
         if uid ~= nil then
-            CARGO.Inventory.StoreClip(uid, ply:GetWeapon(def.weapon_class))
+            CARGO.Inventory.StoreFromEntity(uid, ply:GetWeapon(def.weapon_class))
         end
         ply:StripWeapon(def.weapon_class)
     end
@@ -847,30 +1111,11 @@ function CARGO.Inventory.DropEntry(ply, ref, count)
         dropped = { id = entry.id, count = count, condition = entry.condition }
     end
 
-    -- weapons drop as the REAL gun (roadmap #16/#17): the SWEP entity
-    -- renders itself (an ARC9 gun draws its assembled mirror on the ground
-    -- — no prop stand-in matches it) and carries the instance uid, so
-    -- taking it back (walk+use) restores this same blob. The world gate in
-    -- capture.lua keeps it from being hoovered by touch.
-    local spawned
-    local def = CARGO.Items.Get(dropped.id)
-    if dropped.uid ~= nil and istable(def)
-        and isstring(def.weapon_class) and def.weapon_class ~= ""
-        and istable(CARGO.Capture)
-        and isfunction(CARGO.Capture.WorldGunsEnabled)
-        and CARGO.Capture.WorldGunsEnabled() then
-        spawned = CARGO.Capture.SpawnWorldWeapon(def.weapon_class,
-            ply:EyePos() + ply:GetAimVector() * 32, dropped.uid)
-    end
-
-    if spawned == nil then
-        local ent = ents.Create("corpus_cargo_item")
-        if IsValid(ent) then
-            ent.CargoEntry = dropped
-            ent:SetPos(ply:EyePos() + ply:GetAimVector() * 32)
-            ent:Spawn()
-        end
-    end
+    -- weapons drop as the REAL gun and everything else as the item entity —
+    -- the shared SpawnDropped above, which taking it back (walk+use) reads to
+    -- restore this same blob. The world gate in capture.lua keeps it from
+    -- being hoovered by touch.
+    SpawnDropped(ply:EyePos() + ply:GetAimVector() * 32, dropped)
     CARGO.Inventory.Touch(ply)
     return true
 end
@@ -940,8 +1185,10 @@ function CARGO.Inventory.DropEquipped(ply, slotId)
         end
 
         -- carried (or eaten by a respawn race): no entity goes to the world
-        -- by itself — make one, with the magazine stored first (#18)
-        CARGO.Inventory.StoreClip(uid, wep)
+        -- by itself — make one, with the magazine and the attachment tree
+        -- stored first (#18 / roadmap #53 B3). SpawnWorldWeapon below builds a
+        -- NEW entity, so whatever is not harvested here dies with this one.
+        CARGO.Inventory.StoreFromEntity(uid, wep)
         rec.equip[slotId] = nil
         if IsValid(wep) then ply:StripWeapon(class) end
         local spawned

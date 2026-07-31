@@ -210,6 +210,12 @@ hook.Run("Corpus_Cargo_SubSlotChanged", ply, hostUid, subId)
 
 **CRG-9 —** Regla dura, aplica en todo flujo que destruye o reemplaza un ítem con sub-slots ocupados (desarme, reemplazo de armadura, muerte con drop): **los sub-slots se eyectan al inventario o al mundo antes de que el contenedor se destruya.** Un generador de escudo o una placa nunca se pierden como efecto colateral de perder el chaleco que los contenía.
 
+**CRG-65 — "No entra" nunca significa "se destruye".** La otra puerta por la que llega el mismo modo de falla que CRG-9 prohíbe, y por eso vive al lado. Cuando un flujo le **entrega** a Cargo un objeto que ya sacó de otra parte —un attachment que ARC9 acaba de desmontar del arma, unas balas que el espejo del pool acaba de restar de la reserva— y `GiveItem` lo rechaza, **el objeto cae al mundo como ítem**; jamás se lo da por entregado y se lo pierde. La ruta única es `Inventory.GiveOrDrop`, que devuelve además **si cayó al piso**, para que el call site pueda decirlo.
+
+La línea, que es lo que hace la norma aplicable (decisión del autor, 2026-07-30, roadmap #53): **rechazar** una acción y avisar es correcto —levantar un arma del suelo sobrecargado sigue contestando *"You can't carry that"* y el arma se queda donde estaba, porque de ahí no se sacó nada—; **consumir** el objeto y avisar es el defecto. Solo la segunda forma pasa por acá. El aviso al jugador no es el remedio: un objeto que ya no existe no deja de no existir porque se haya impreso una línea.
+
+> Los dos sitios que la acuñan la violaban **con un comentario encima afirmando lo contrario** — el puente ARC9 (`ARC9_PlayerGiveAtt` ignoraba el retorno de `GiveItem` y devolvía `true`) y el espejo del pool de munición (`SetAmmo(pool - left)` incondicional, bajo la línea *"The rounds are NOT destroyed"*). De ahí el corolario de verificación: el check que distingue no es "el grid no creció" —eso pasa igual si el objeto se evaporó— sino **el ledger**: el objeto tiene que verse EXISTIENDO en el suelo.
+
 ---
 
 ## 5. Peso y movimiento
@@ -219,6 +225,16 @@ hook.Run("Corpus_Cargo_SubSlotChanged", ply, hostUid, subId)
 **Coagulant soft-dep**: dueño del recurso de stamina. Si está presente, se suma *encima* de la penalización base: drenaje de stamina por sobrepeso, efectos de fatiga, interacción con vitales. Cargo nunca depende de la stamina de Coagulant para su propia consecuencia — evita degradación deshonesta si Coagulant no está montado.
 
 Capacidad total = base del jugador + bonus de mochila equipada (Back). El footer de peso muestra el desglose (`base + mochila = total`) y colorea según proximidad al límite.
+
+**CRG-66 — Lo que está acoplado a un ítem PESA, y pesa recursivamente.** El peso de una instancia es el de su def **más el de todo lo que lleva montado**, a cualquier profundidad. Sede del cálculo: `Instances.WeightOf`, **una sola recursión** — un tipo nuevo de cosa acoplable se suma ahí, no en una rama propia. Si el módulo que define lo acoplado no está montado, su def no existe y aporta 0: degradación honesta (cita **COR-5**), nunca un peso inventado.
+
+**Alcance VIGENTE hoy: el contenido de los sub-slots** (una placa en el chaleco, unas gafas en el casco), que es lo que pesa desde el Block 1.
+
+> **Enmienda 2026-07-31 (planilla AB, ronda 2) — el árbol de attachments NO pesa todavía, y la norma lo dice en vez de disimularlo.** La primera pasada del #53 lo sumó con el nominal plano de 0,3 kg por att, y **el número no sobrevivió el contacto con una build EFT real**: el MCX 5.56 del autor pesa **2,9 kg** y lleva **doce** attachments — las piezas pesarían más que el arma. No es un problema de calibración sino de modelo: en una build EFT la mayoría de los slots llevan **estructura** (receiver, cañón, guardamanos, tapa, miras de hierro), que *es* el arma y no carga colgada de ella.
+>
+> Se **difiere** en vez de bajarle el número, porque el arreglo es decidir **qué categorías** pesan —STALKER GAMMA cobra ópticas, silenciadores, lanzagranadas, dispositivos tácticos, foregrips y cargadores ampliados, y **nunca** la estructura— y eso es pasada propia: **roadmap #55**. `Instances.AttsWeight` queda escrita, probada offline y sin llamar desde `WeightOf`: la decisión fue *todavía no*, no *estaba mal*, y es exactamente donde el filtro por categoría se enchufa.
+>
+> **Caso declarado y tampoco cubierto:** la munición cargada en el arma. `blob.clip1` es un número pelado que `WeightOf` no mira, así que hoy cargar un arma **hace desaparecer peso del ledger**. Es lo siguiente que el autor quiere pesar, y aterriza en §16 (el cinturón **es** el pool), no acá.
 
 > **CRG-12 — Enmienda 2026-07-13 — compat con mods de movimiento (entry 16, roadmap #34).** Un mod
 > que re-estampa walk/run **cada tick** desde sus propias convars ("better movement v2":
@@ -372,7 +388,37 @@ Desacople: desde la inspección del arma (el tooltip §9 gana una fila de attach
 
 > **Verificado contra el código vivo (2026-07-10):** los nombres exactos de la API de attach/detach y de los hooks de eventos se leyeron de la base de ARC9 + el pack EFT de Darsu (`dev/other/`) y quedaron anotados en el header de `lua/corpus_cargo/shared/corpus_cargo_arc9.lua`; el puente shippeó (§14). El contrato #8 del `CLAUDE.md` congela la regla que lo motivó: este proyecto ya había aprendido (extractor EFT: `Penetration` vs nombres crudos, `armorDamage` ×0.01) que los nombres de ARC9 no se asumen de memoria — se leen del código vivo, siempre contra `dev/other/`.
 
-**La API de ARC9 se usa también para ACCIONAR, no solo para attach/detach** (roadmap #46, entry 52 — re-verificada contra `dev/other/Arc9 Base` el 2026-07-28, anotada en el header de `client/corpus_cargo_lights.lua`): el toggle de modo de un dispositivo (luz/láser/IR) va por `SWEP:ToggleStat(addr)` + `SWEP:PostModify()`, **client-side** — es literalmente lo que hace el radial propio de ARC9 al clickear (`cl_move.lua:153-163`) — y replica solo (`PostModify` en CLIENT llama `SendWeapon`, sh_attach.lua:132). Es el **mismo contrato de CRG-23**: la escritura va por la API del mod, del lado cliente, y el server se entera por el canal del propio mod. Cero lógica de server nueva. El estado del modo pertenece al slot del arma (`slottbl.ToggleNum`) y Cargo no lo persiste (§17.8).
+**La API de ARC9 se usa también para ACCIONAR, no solo para attach/detach** (roadmap #46, entry 52 — re-verificada contra `dev/other/Arc9 Base` el 2026-07-28, anotada en el header de `client/corpus_cargo_lights.lua`): el toggle de modo de un dispositivo (luz/láser/IR) va por `SWEP:ToggleStat(addr)` + `SWEP:PostModify()`, **client-side** — es literalmente lo que hace el radial propio de ARC9 al clickear (`cl_move.lua:153-163`) — y replica solo (`PostModify` en CLIENT llama `SendWeapon`, sh_attach.lua:132). Es el **mismo contrato de CRG-23**: la escritura va por la API del mod, del lado cliente, y el server se entera por el canal del propio mod. Cero lógica de server nueva. El estado del modo pertenece al slot del arma (`slottbl.ToggleNum`) y **desde el roadmap #53 viaja con la instancia** en `blob.atts` (§10.5) — nunca colgado del jugador (§17.8).
+
+### 10.5 `blob.atts` — la configuración pertenece a la INSTANCIA del arma
+
+**El problema, medido y no supuesto** (roadmap #53, 2026-07-30): ARC9 guarda lo que un arma lleva montado en **un solo lugar**, la tabla Lua de la entidad SWEP (`slottbl.Installed`, `sh_attach.lua:19`), y no devuelve nada cuando esa entidad muere (`OnDrop`/`OnRemove`, `sh_init.lua:215-234`). Como casi toda transición de Cargo destruye la entidad —`Unequip`, drop sin el arma en la mano, take-back del suelo, respawn/relog—, todo lo montado se perdía. Lo que *parecía* persistencia era el autoguardado del **cliente** de ARC9, **por clase de arma**, que al re-aplicarse **se cobraba otro ítem del grid**.
+
+**La forma.** `blob.atts` es un árbol anidado de datos planos —solo strings y enteros— con una entrada por slot ocupado:
+
+| Campo | Qué es |
+|---|---|
+| `cat` | La categoría del slot, **normalizada**: ARC9 la declara como string *o* como tabla de strings (las dos formas conviven en un mismo handguard), así que se ordena y se junta |
+| `nth` | Ordinal **entre hermanos de esa misma categoría**, y solo si hay más de uno. Existe porque los hay: el handguard del AS VAL mod4 declara **dos** slots que aceptan `eft_valmod4_side` |
+| `att` | El `shortname` del attachment — la clave estable (**CRG-63**) |
+| `mode` | El `ToggleNum` del slot, omitido cuando es 1 |
+| `sub` | Los hijos, misma forma |
+
+**Ni una posición se persiste, y el motivo es más fuerte que CRG-63 en su forma habitual.** El *address* de ARC9 no es solo un ordinal que un parche del pack puede correr: es el offset de un **aplanado recursivo del build actual** (`BuildSubAttachments` resetea los `SubAttachments` y los rearma solo para lo que está `Installed`), así que **se mueve dentro de la misma partida** mientras el jugador arma el arma. Medido: en el AS VAL del autor el PEQ-2 estaba en el address 11 **únicamente porque** el riel del 10 estaba puesto.
+
+**Ni `PrintName`:** `ARC9:GetPhrase` ya lo localizó, así que cambia con el idioma.
+
+**Nunca una tabla de slot de ARC9.** Llevan `Material()`, `Vector`, `Angle` y referencias cíclicas — es literalmente lo que rompe `gm_save` (§13). El serializador es **nuestro** y jamás copia un slot: lee tres campos y recursa. El propio de ARC9 (`WriteAttachmentTree`) además es `cl_presets.lua`, o sea **client-only**.
+
+**Se cosecha en la PUERTA, no en un timer** (`Inventory.StoreFromEntity`, que es el cargador y el árbol juntos — a los 50 ms la entidad ya no existe). **Se re-aplica por la ruta del propio mod y del lado server** (`Inventory.ApplyAtts`), copiando la secuencia de `ReceiveWeapon` (`sh_net.lua:141-149`): `BuildSubAttachments` → `DoInvalidateCache` → `PruneAttachments` → `SendWeapon` → `PostModify`. **CRG-23 intacto.** Tres cosas que no son obvias:
+
+- **`FillIntegralSlots` NO se llama** (decisión del autor). Consume del almacén, y el almacén somos nosotros: cada equip y cada respawn se comería ítems del grid. Es también la raíz del roadmap **#42**, que sigue siendo entrada propia.
+- **El diff de propiedad nunca corre.** Vive *dentro* del `if SERVER` de `ReceiveWeapon` (`sh_net.lua:83-123`), así que llamar `BuildSubAttachments` directo lo saltea. Eso es lo que hace que re-aplicar sea **gratis**: estos atts ya son de esta instancia, no se están comprando de nuevo.
+- **El árbol va ANTES del cargador.** Un cargador-attachment cambia el `ClipSize`, y el `PostModify` de server contesta un cambio de `ClipSize` con `Unload` + `SetRequestReload` (`sh_attach.lua:147-159`): aplicado después de `RestoreClip`, vaciaría el cargador que se acaba de restaurar. Es un argumento sobre la **secuencia**, no sobre el instante.
+
+**Nada se pierde por el camino.** Un `shortname` que el pack borró **no puede** volver como ítem (nuestros ids de def derivan de `ARC9.Attachments`), así que se descarta **con log**; uno que existe pero no encuentra slot **vuelve al inventario** — y sus **hijos se juzgan uno por uno**, porque un padre borrado no es motivo para tirar la mira que colgaba de él (cita **CRG-9**). Si el grid no tiene lugar, al piso (cita **CRG-65**). Después de aplicar, el blob se **re-cosecha** de la entidad, así que converge sobre lo que el arma realmente lleva.
+
+**Pesa y se cobra.** El árbol entra en `Instances.WeightOf` por la **misma recursión** que ya pesaba los sub-slots desde el Block 1 —una placa montada, unas gafas en el casco— y en `Trade.PriceOfEntry` sumando el `value` de cada att. El att **no paga la condición del arma**: no tiene condición propia (§10.1), así que una mira de $900 en un rifle hecho pedazos sigue valiendo $900. El **spread** sí lo alcanza, porque es el margen del trader y no desgaste.
 
 ### 10.4 Compatibilidad y armas no-ARC9
 
@@ -1343,8 +1389,14 @@ están en el arma en mano.
   activo son **datos**. Si un att no expone emisores en ningún modo, **el string del
   modo NO se parsea**: ese chip va sin barras y el modo queda sólo en el hub. **El
   estado de un dispositivo pertenece al slot del arma** (`slottbl.ToggleNum`, de ARC9) —
-  Cargo no persiste nada de esto; guardarlo en el jugador es el defecto de TLS que no se
-  porta.
+  guardarlo en el JUGADOR es el defecto de TLS que no se porta.
+  > **Enmienda 2026-07-30 (roadmap #53, decisión del autor).** Esta línea decía que *Cargo
+  > no persiste nada de esto*. Desde el #53 **sí lo persiste, y sin contradecir lo de
+  > arriba**: el modo viaja en el campo `mode` de un nodo de `blob.atts` (§10.5), o sea
+  > **colgado de la instancia del arma**, que es exactamente donde la frase original dice
+  > que pertenece. Lo que sigue prohibido —y es lo que la línea siempre quiso decir— es
+  > guardarlo en el jugador. Sin esto, un dispositivo en IR volvía en `Off` cada vez que el
+  > arma cambiaba de manos, y el pedido del autor era que *toda* la configuración viaje.
 - **El hub sirve también a estos chips** (§17.5, CRG-32): dos líneas + hint — principal
   = qué cosa es; secundaria = ON/OFF o el nombre del modo tal cual lo da el mod (o
   `OFF → ON` en tránsito, que no afirma ninguno de los dos — CRG-64); hint = `Release

@@ -580,6 +580,217 @@ if SERVER then
             and (tostring(entry.id) .. (entry.uid and (" uid=" .. entry.uid) or "")) or "nil"))
     end, nil, "DEV: prints the Cargo fields the entity you are looking at carries (world drop, crate, trader). Point it at a crate and at a dropped gun in the same save to compare")
 
+    -- ------------------------------------------------------------------
+    -- AB1 (roadmap #53) — is wep.Attachments per ENTITY or shared by CLASS?
+    --
+    -- The precondition the whole block hangs on. ARC9 never copies that table
+    -- when a weapon initializes (only DefaultAttachments = table.Copy(...),
+    -- sh_init.lua:43) and writes the mounted state THROUGH it: Attach sets
+    -- slottbl.Installed (sh_attach.lua:19) on a slot reached via
+    -- AttachmentAddresses, which BuildAttachmentAddresses fills FROM
+    -- self.Attachments (sh_subatts.lua:8-19). So if the engine hands every SWEP
+    -- entity the same table, two guns of one class share their configuration
+    -- and "the config belongs to THIS instance" is unreachable as asked.
+    -- Names verified against dev/other/Arc9 Base, 2026-07-30 (CRG-24) — and the
+    -- engine is a third party too, which is why this is measured, not read.
+    --
+    -- WHY IT IS NOT "two weapons in the inventory": a player holds ONE SWEP per
+    -- class, which the capture already paid for in game (capture.lua:906-912).
+    -- The second one is a grid ITEM, and an item has no Attachments to compare.
+    -- The two entities must coexist in the MAP: one in your hands, one on the
+    -- floor (drop it, or spawn it from the spawnmenu).
+    --
+    -- TWO readings, on purpose. Table IDENTITY explains the mechanism; the
+    -- INSTALLED set is the verdict, because identity can come back false while
+    -- the state is still shared through a deeper reference. Mount a light on
+    -- ONE of them: if the other shows it too, they share.
+    --
+    -- An ABSENCE is reported as an absence — one entity found is NOT evidence
+    -- that they do not share, and neither is two bare guns agreeing. Round 3 of
+    -- planilla R already paid for reading a silent absence as a result.
+    -- ------------------------------------------------------------------
+    local function InstalledSig(wep)
+        local parts = {}
+        for addr, slot in pairs(wep.AttachmentAddresses or {}) do
+            if istable(slot) and slot.Installed then
+                parts[#parts + 1] = tostring(addr) .. "=" .. tostring(slot.Installed)
+            end
+        end
+        table.sort(parts) -- addresses are ints today; sort the strings anyway
+        return table.concat(parts, ","), #parts
+    end
+
+    concommand.Add("cargo_dev_attshare", function(ply, _, args)
+        if not IsValid(ply) then ply = player.GetAll()[1] end
+        if not IsValid(ply) then return end
+
+        local class = isstring(args and args[1]) and args[1] or nil
+        if class == nil then
+            local held = ply:GetActiveWeapon()
+            class = IsValid(held) and held:GetClass() or nil
+        end
+        if class == nil then
+            Corpus.Log("cargo", "attshare: sin clase — pasala como argumento o empuñá el arma")
+            return
+        end
+
+        local found = {}
+        for _, ent in ipairs(ents.FindByClass(class)) do
+            if IsValid(ent) and istable(ent.Attachments) then found[#found + 1] = ent end
+        end
+
+        Corpus.Log("cargo", "attshare: clase " .. class .. " — " .. #found
+            .. " entidad(es) viva(s) con tabla Attachments")
+
+        for i, wep in ipairs(found) do
+            local owner = wep:GetOwner()
+            local where = IsValid(owner)
+                and (owner:IsPlayer() and owner:Nick() or owner:GetClass())
+                or "suelo/mundo"
+            Corpus.Log("cargo", "  [" .. i .. "] #" .. wep:EntIndex() .. " en " .. where)
+            Corpus.Log("cargo", "      Attachments         = " .. tostring(wep.Attachments))
+            Corpus.Log("cargo", "      DefaultAttachments  = " .. tostring(wep.DefaultAttachments))
+            Corpus.Log("cargo", "      AttachmentAddresses = " .. tostring(wep.AttachmentAddresses))
+
+            local lines = {}
+            for addr, slot in pairs(wep.AttachmentAddresses or {}) do
+                if istable(slot) and slot.Installed then
+                    lines[#lines + 1] = "      slot " .. tostring(addr)
+                        .. " Installed=" .. tostring(slot.Installed)
+                        .. " ToggleNum=" .. tostring(slot.ToggleNum)
+                end
+            end
+            table.sort(lines)
+            if #lines == 0 then
+                Corpus.Log("cargo", "      (sin nada montado)")
+            else
+                for _, line in ipairs(lines) do Corpus.Log("cargo", line) end
+            end
+        end
+
+        if #found < 2 then
+            Corpus.Log("cargo", "attshare: VEREDICTO N/A — hacen falta DOS entidades de la misma "
+                .. "clase vivas a la vez, y hay " .. #found .. ". Esto NO dice que no compartan: "
+                .. "dice que no se midió. Dropeá una segunda (o spawneala del menú Q) y repetí. "
+                .. "Con 0, el arma en la mano no es ARC9 o la clase está mal escrita")
+            return
+        end
+
+        local sigA, nA = InstalledSig(found[1])
+        local sameTable, sameSig, anyMounted = true, true, nA > 0
+        for i = 2, #found do
+            local sigB, nB = InstalledSig(found[i])
+            if not rawequal(found[1].Attachments, found[i].Attachments) then sameTable = false end
+            if sigB ~= sigA then sameSig = false end
+            if nB > 0 then anyMounted = true end
+        end
+
+        Corpus.Log("cargo", "attshare: tabla Attachments compartida por referencia = "
+            .. tostring(sameTable) .. " (mecanismo, no veredicto)")
+
+        if not sameSig then
+            Corpus.Log("cargo", "attshare: VEREDICTO — POR ENTIDAD. Dos entidades de la misma "
+                .. "clase tienen distinto Installed en este instante, así que el estado montado "
+                .. "NO se comparte y el invariante (a) del #53 es alcanzable")
+        elseif not anyMounted then
+            Corpus.Log("cargo", "attshare: VEREDICTO NO CONCLUYENTE — las " .. #found
+                .. " están peladas, y coincidir en nada no distingue nada. Montá una linterna en "
+                .. "UNA SOLA y volvé a correr el comando")
+        else
+            Corpus.Log("cargo", "attshare: VEREDICTO — SOSPECHA DE COMPARTIDA POR CLASE. Las "
+                .. #found .. " coinciden CON algo montado. Si lo montaste en UNA sola, comparten "
+                .. "y el #53 va por el plan B. Si montaste lo mismo en las dos, no distingue: "
+                .. "dejá una pelada y repetí")
+        end
+    end, nil, "DEV (roadmap #53 / AB1): compares wep.Attachments across every live entity of one ARC9 class. Arg: [class], default the weapon in your hands. Needs TWO entities of that class alive at once - hold one and drop another, then mount a light on ONE")
+
+    -- ------------------------------------------------------------------
+    -- THE ATTACHMENT LEDGER (author report 2026-07-31, note of check AB9)
+    --
+    -- Reported: with one UZI Pro in hand, ARC9's C menu offered the extended
+    -- magazine that belongs to ANOTHER UZI stored in the backpack. If that is
+    -- real it is duplication — mount it on the second gun and the part exists
+    -- twice. Four candidate causes, and they need different fixes, so this
+    -- prints the number that tells them apart instead of guessing:
+    --
+    --   1. arc9_free_atts back at 1 — its own PlayerGetAtts short-circuits to
+    --      999 BEFORE our hook ever runs (sh_attinv.lua). Not our bug at all,
+    --      and every att in the game reads as available.
+    --   2. the att is not bridged (Free / InvAtt / no PrintName): our hook
+    --      ABSTAINS and ARC9's own store answers. Also not duplication.
+    --   3. it is a FACTORY part — the UZI Pro declares eft_uzi_mag_32pro in
+    --      its own SWEP.Attachments, so nobody ever paid a grid item for it
+    --      and seeing one is not a copy of the other gun's.
+    --   4. genuinely counted twice: mounted inside a blob AND sitting in the
+    --      grid. That is the only one that is ours, and the only one where
+    --      grid > 0 and mounted > 0 at the same time.
+    --
+    -- `montado` walks every instance the player owns — grid entries, equipped
+    -- slots, and recursively through blob.atts — which is the ledger #53 is
+    -- supposed to keep: an att is in exactly ONE place.
+    -- ------------------------------------------------------------------
+    local function CountMounted(atts, out)
+        for _, node in ipairs(atts or {}) do
+            if istable(node) and isstring(node.att) then
+                out[node.att] = (out[node.att] or 0) + 1
+                CountMounted(node.sub, out)
+            end
+        end
+    end
+
+    concommand.Add("cargo_dev_attstock", function(ply, _, args)
+        if not IsValid(ply) then ply = player.GetAll()[1] end
+        if not IsValid(ply) then return end
+        if ARC9 == nil then
+            Corpus.Log("cargo", "attstock: ARC9 no montado")
+            return
+        end
+
+        local free = GetConVar("arc9_free_atts")
+        local freeN = free and free:GetInt() or -1
+        Corpus.Log("cargo", "attstock: arc9_free_atts=" .. tostring(freeN)
+            .. (freeN ~= 0 and "  <<< EN 1 EL MOD CONTESTA 999 ANTES QUE NUESTRO HOOK" or "")
+            .. "  cargo_arc9_bridge=" .. tostring(GetConVar("cargo_arc9_bridge"):GetInt()))
+
+        -- lo montado, sobre TODAS las instancias del jugador
+        local mounted = {}
+        local rec = CARGO.Inventory.GetRecord(ply)
+        local function scan(uid)
+            local blob = isstring(uid) and CARGO.Instances.Get(uid) or nil
+            if istable(blob) then CountMounted(blob.atts, mounted) end
+        end
+        for _, entry in ipairs(rec.items or {}) do scan(entry.uid) end
+        for _, val in pairs(rec.equip or {}) do scan(val) end
+
+        local filter = isstring(args and args[1]) and args[1]:lower() or nil
+        local lines, dobles = {}, 0
+        for id, def in pairs(CARGO.Items._defs) do
+            local short = def.arc9_att
+            if isstring(short) and (filter == nil or short:lower():find(filter, 1, true)) then
+                local grid = CARGO.Inventory.CountItem(ply, id)
+                local mon  = mounted[short] or 0
+                if grid > 0 or mon > 0 then
+                    local ok, hookN = pcall(hook.Run, "ARC9_PlayerGetAtts", ply, short, nil)
+                    local flag = (grid > 0 and mon > 0) and "   <<< uno puesto Y uno suelto" or ""
+                    if flag ~= "" then dobles = dobles + 1 end
+                    lines[#lines + 1] = "  " .. short .. "  grid=" .. grid
+                        .. "  montado=" .. mon
+                        .. "  hook=" .. tostring(ok and hookN or "err") .. flag
+                end
+            end
+        end
+        table.sort(lines)
+        for _, l in ipairs(lines) do Corpus.Log("cargo", l) end
+        Corpus.Log("cargo", "attstock: " .. #lines .. " att(s) con presencia, "
+            .. dobles .. " con copia puesta Y suelta")
+        Corpus.Log("cargo", "attstock: OJO — esa columna NO prueba duplicación. Un att "
+            .. "stackeable no tiene identidad, así que una FOTO no distingue 'el mismo "
+            .. "contado dos veces' de 'tenés uno puesto y otro de repuesto', que es legítimo")
+        Corpus.Log("cargo", "attstock: lo que SÍ distingue es la RESTA: corré esto, montá "
+            .. "uno desde el menú C, y corré de nuevo. Si `grid` no bajó en 1, ahí hay "
+            .. "duplicación de verdad")
+    end, nil, "DEV (roadmap #53): attachment ledger. Per att: how many sit in the grid, how many are mounted across ALL your instances, and what our PlayerGetAtts hook answers. An att in BOTH places at once is the duplication. Arg: [name filter]")
+
 end
 
 -- ------------------------------------------------------------------

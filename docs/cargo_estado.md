@@ -5,30 +5,61 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-30 (**entry 60 `[APLICADO]`, confirmada en juego en dos rondas y
-commiteada** — reporte del autor: el SWEP **Hands** arrastraba dos restos del port, y los dos son el
-mismo descuido —el header declaraba *"assets removed"* desde la entry 9 y **no era cierto**—.
-Confirmado: consola limpia (*«ya no hay gritos»*) y el ícono bien en **las tres superficies**
-(selector de DGL4, kill feed de HL2, baldosa del spawnmenu). **El único defecto de las dos rondas no
-estaba en lo reportado sino en una suposición sobre la caja de un tercero:** DGL4 pasa una caja de
-**140×100** centrada sobre un panel de **144×72** y después scissorea al PANEL, así que 14 px arriba
-y 14 abajo **no llegan nunca a pantalla** — **`tall` no es la altura en la que se puede dibujar**. El
-lado del cuadrado sale ahora de `(wide - 20) / 2`, la altura que pinta el propio `weapon_base`, que
-es el número alrededor del cual está maquetado todo ícono stock. **Y la regla que deja: un asset
-renombrado no es un asset reemplazado** — los tres VTF eran byte-idénticos a los del mod original y
-la declaración sobrevivió cincuenta entries porque nadie la contrastó contra un hash. Sin planilla a
-propósito (no hay superficie nueva que auditar); harness **700**, intacto y sin cubrir esto —
-`lua/weapons/` no lo carga el manifest. (1) `c_arms_apex.mdl` dispara **cuatro eventos de
-sonido horneados** (`Apex_Cloth`, `Apex_Cloth_Jump`, `Apex_Gear_Sprint`, `Apex_Gear_Jump`) cuyo foley
-de ropa/equipo es **el único set que el port no trajo**, y como el modelo no se recompila la consola
-comía dos líneas por sprint y por salto: quedan **mudos contra `common/null.wav`**, el sample del
-engine. (2) Los **tres VTF eran byte-idénticos a los del mod original** (hash contra `dev/other/`):
-se borran, y **un solo PNG del logo de Cargo** (`materials/corpus_cargo/hands_icon.png`) sirve
-selección de arma, killicon y baldosa del spawnmenu. `WepSelectIcon` es un texture ID y no admite
-PNG, así que el ícono se pinta tomando `DrawWeaponSelection` — **el mismo método que llama el HUD
-DGL4**, así que un override cubre los dos HUDs sin caso especial. Tres APIs leídas de la instalación
-y ninguna de memoria (CRG-24). **El harness no carga `lua/weapons/`**: los 700 siguen verdes porque
-el cambio no toca lo que miden — acá el número no es evidencia.
+**Última actualización:** 2026-07-31 (**entries 61-64 `[APLICADO]` — roadmap #53 CERRADO**,
+confirmado en juego con la planilla **AB en tres rondas**. **La configuración ARC9 de un arma
+pertenece a su instancia y viaja con ella:** sobrevive dropear y levantar, guardar y re-equipar, el
+respawn y el cambio de modo de un dispositivo; el cargador vuelve con las balas que tenía;
+desacoplar sin lugar en la mochila deja la pieza **en el piso** (**CRG-65**) en vez de destruirla; y
+el precio cuenta los attachments. Harness **700 → 771** (71 nuevos, **15 reversiones verificadas en
+negativo**); checker limpio. **Commiteado, sin push.**
+**Lo primero de la tanda no fue código sino una MEDICIÓN** (AB1): `wep.Attachments` es **por
+entidad** —dos AS VAL mod4 vivas con `Installed` distinto en el mismo slot—, así que el invariante
+que el autor pidió era alcanzable y el plan B quedó **descartado medido**. La clave de un nodo de
+`blob.atts` es **(categoría, ordinal entre hermanos)** y jamás la posición: el *address* de ARC9 es
+el offset de un aplanado recursivo del build actual y **se mueve dentro de la misma partida** —su
+PEQ-2 estaba en el 11 únicamente porque el riel del 10 estaba puesto—, que es CRG-63 en su forma más
+fuerte.
+**Las dos decisiones del autor que cambiaron el diseño, y las dos por un caso real:** (1) *"si el
+objeto no puede entrar al inventario, debe caer al piso"* → **CRG-65**, y el mismo modo de falla
+apareció en un **segundo** sitio que no era ARC9 (el espejo del pool de munición, con un comentario
+que decía literal *"The rounds are NOT destroyed"* desde el día que se escribió); (2) el **peso de
+los atts se DIFIERE al #55**, porque su MCX de 2,9 kg lleva **doce** attachments y con 0,3 kg planos
+las piezas pesarían más que el arma — **cuando un número no sobrevive el contacto con un caso real,
+el defecto suele estar en el modelo y no en el número**. `AttsWeight` queda escrita y **sin llamar**:
+la decisión fue «todavía no», no «estaba mal», y **CRG-66 quedó enmendada en su sede** diciendo el
+alcance vigente en vez de disimularlo.
+**LAS TRES REGLAS DE MÉTODO, pagadas las tres en una sesión:** (1) **un check que CRASHEA no es un
+check en rojo** — dos reversiones volvieron con 0 y 1 rojo y la lectura obvia («no distingue») era
+falsa: la corrida moría indexando un nil y se llevaba puestos los de abajo, así que **contar
+`[FAIL]` no alcanza, hay que mirar si la corrida TERMINÓ**; (2) **un check que llama a la función no
+prueba que la RUTA la llame** — tres checks invocaban `SyncAttsSoon` directo y sacar las llamadas de
+los hooks dejó la corrida **entera en verde** (hubo que exponer `_WireHooks`); (3) **un instrumento
+no debe afirmar lo que no puede medir** — `cargo_dev_attstock` gritaba "duplicación" sobre una
+**foto**, y una foto no distingue una copia de un repuesto: costó una ronda entera de diagnóstico
+equivocado. Y la cuarta, que ya va **ocho** veces en este módulo: de la nota de **AB9, en PASA**,
+salieron el roadmap **#54** y el propio **AB13**.
+**LA FRONTERA QUE QUEDA DECLARADA, no disimulada:** la **entry 64** (`SyncAttsSoon`) cierra **sin
+pasada en juego**. AB8 la medía por el peso y el peso se difirió; AB14 la iba a medir en vivo y quedó
+**SIN CORRER**, porque AB13 se respondió **botando** los repuestos y no montándolos. La ruta "montar
+desde el menú C" **no se ejerció con números en ninguna de las tres rondas** —AB10 no la cubre, pasa
+igual con duplicación puesta— y lo que sostiene la entrada son sus 6 checks de harness con el hook
+realmente cableado. Decisión del autor: cerrar con la frontera escrita en vez de retener la entrada.
+**Y AB13 cerró por la vía NEGATIVA y no por la resta**: botados los repuestos, `grid=0` **y**
+`hook=0` en las siete líneas y el menú dejó de ofrecerlos — el puente contesta lo que el grid tiene y
+**no hay un tercer inventario**, que es la forma que tendría la duplicación.)
+
+Antes, **entry 60 `[APLICADO]`, confirmada en juego en dos rondas y commiteada**: el SWEP **Hands**
+arrastraba dos restos del port —el header declaraba *"assets removed"* desde la entry 9 y **no era
+cierto**—. Los cuatro eventos de sonido horneados en `c_arms_apex.mdl` van **mudos contra
+`common/null.wav`** (su foley es el único set que el port no trajo y el modelo no se recompila), y
+los tres VTF eran **byte-idénticos** a los del mod original: se borran, y **un solo PNG del logo de
+Cargo** sirve las tres superficies vía `DrawWeaponSelection` —el mismo método que llama el HUD
+DGL4— más `SWEP.IconOverride`. **El único defecto no estaba en lo reportado sino en una suposición
+sobre la caja de un tercero:** DGL4 pasa **140×100** sobre un panel de **144×72** y después
+scissorea al PANEL, así que **`tall` no es la altura en la que se puede dibujar**. Las dos reglas:
+**un asset renombrado no es un asset reemplazado** (la declaración sobrevivió cincuenta entries
+porque nadie la contrastó contra un hash) y el harness **no carga `lua/weapons/`**, así que ahí el
+número verde no era evidencia.
 Antes, **entries 54-59 `[APLICADO]`, confirmadas en juego — el ARCO
 #48-#52 del wheel CERRADO ENTERO**, cinco secciones de planilla (W, X, Y, Z, AA) en **23 checks** y **ni una
 ronda perdida por un defecto de código**: la única que costó una vuelta fue la medición de W1, y por el
@@ -343,7 +374,25 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   Reglas puras y exportadas (`CARGO.UI.ResolveSlotDrop` / `FreeSubSlotFor` /
   `MountedEntries`); el grid genérico gana `onCellDrop` **con fall-through** al
   canvas, sin el cual el loot dejaría de transferir al soltar sobre una celda.
-- **Harness offline: 700 checks verdes en ambos realms** (con gate final: un
+- **La configuración ARC9 viaja con el arma** (entries 61-64, roadmap #53,
+  confirmado en juego): `blob.atts` es un árbol plano y nuestro —nodos de
+  `cat`/`nth`/`att`/`mode`/`sub`, sólo strings y enteros, para que ninguna
+  tabla de ARC9 se cuele y rompa `gm_save`—, cosechado **en las seis puertas**
+  donde la entidad muere (`Inventory.StoreFromEntity`) y re-aplicado por la
+  ruta del propio mod. La clave de un nodo es **(categoría, ordinal entre
+  hermanos)** y **jamás** la posición: el *address* de ARC9 es el offset de un
+  aplanado recursivo del build actual y **se mueve dentro de la misma
+  partida** (CRG-63 llevado a su forma más fuerte). El árbol se aplica
+  **antes** que el cargador, porque un cambio de `ClipSize` dispara `Unload` +
+  `SetRequestReload`. **CRG-65**: lo que no entra al inventario **cae al
+  piso**, nunca se destruye — ruta única `Inventory.GiveOrDrop`. **CRG-66**: lo
+  acoplado pesa, por la misma recursión que ya pesaba los sub-slots, aunque su
+  **alcance vigente son los sub-slots** y el árbol está **diferido al #55**. El
+  precio cuenta los atts y el att **cobra pleno** (no tiene condición propia).
+  `Inventory.SyncAttsSoon` mantiene el blob al día mientras el arma está en la
+  mano, **un tick tarde a propósito**: los hooks disparan *dentro* del diff de
+  `ReceiveWeapon`, antes de que el árbol nuevo esté instalado.
+- **Harness offline: 771 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN, y **el total lo imprime el propio script** — no se
   grepea de stdout, donde el banner de realm corría carreras con los `print` de Lua);
   `cargo_selftest` 83 client / 76 server.
@@ -353,6 +402,19 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
+- **Las entries 61-64 (roadmap #53) quedaron confirmadas el 2026-07-31 con la planilla AB en tres
+  rondas** — 12 checks en PASA (AB1-AB7, AB9-AB13), **AB8 retirado por decisión** (el peso de los
+  atts se difiere al #55: el modelo estaba mal, no el número) y **AB14 SIN CORRER**. Harness **771**
+  (eran 700), **15 reversiones verificadas en negativo**; checker limpio, espejo regenerado.
+  **Commiteado, sin push.**
+  **La única deuda de verificación, y está declarada en la entry 64:** la ruta *"montar un att desde
+  el menú C"* **no se ejerció con números en ninguna de las tres rondas**. AB13 respondió su pregunta
+  por la **negativa** —botados los repuestos, `grid=0` y `hook=0` en las siete líneas y el menú dejó
+  de ofrecerlos, o sea que el puente contesta lo que el grid tiene y no hay un tercer inventario—,
+  pero esa misma acción destruyó la precondición de la resta, y con ella AB14. `SyncAttsSoon` se
+  sostiene hoy en sus 6 checks de harness con el hook **realmente cableado** (por eso hizo falta
+  exponer `_WireHooks`). Si un día el sync se rompe, **ésa es la entrada que nadie miró en juego**.
+  Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
 - **La entry 60 quedó confirmada el 2026-07-30 en dos rondas, sin planilla** (no hay superficie
   nueva que auditar: son dos síntomas reportados y verificables por observación directa). Ronda 1:
   consola limpia y spawnmenu OK, selector de DGL4 recortado. Ronda 2, tras el PARCHE 3: *«se ve bien
@@ -529,7 +591,15 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   huérfanas de def** y se destruyen al dropearlas (§13, medido en U5 y
   **aceptado**): el kill-switch es para un servidor que **nunca** montó el
   catálogo, no para apagarlo a mitad de partida.
-- Peso nominal de attachments; comandos dev sin gate admin; sin `addon.json`.
+- **El peso de los attachments está DIFERIDO al roadmap #55**, no pendiente de
+  calibrar: `Instances.AttsWeight` está escrita, recurre y se prueba offline,
+  pero `WeightOf` **no la llama**. El modelo que falta es *qué* attachment es
+  carga y cuál **es** el arma — en una build EFT la mayoría de los slots llevan
+  estructura. CRG-66 lo dice en la norma en vez de disimularlo. Y **antes** del
+  #55 va el peso de la **munición cargada**: `blob.clip1` es un número pelado
+  que `WeightOf` no mira, así que hoy cargar un arma **hace desaparecer peso
+  del ledger** (aterriza en §16, el cinturón **es** el pool).
+- Comandos dev sin gate admin; sin `addon.json`.
 
 ## Próximo paso
 
@@ -544,6 +614,12 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
    confirm). Semilla del chat nuevo:
    [`../../dev/HANDOFF_cargo_trade_slice2.md`](../../dev/HANDOFF_cargo_trade_slice2.md).
    La entry 27 se confirma de paso en esa pasada (checklist en el artifact).
+2. **#54 — íconos que distingan dos armas de la misma clase** (abierto por la nota de AB9, un check
+   que PASÓ): el ícono se autogenera del world model, así que dos AS VAL con builds distintas se ven
+   idénticas en el grid. **Después, el peso de la munición cargada** (arriba, en *Remanentes*) y
+   recién ahí el **#55** (qué attachments pesan), cuya pregunta difícil ya está anotada: **cómo
+   autodetectar la clasificación** sobre un pack de terceros sin catalogar a mano cada att — que es
+   justo el trabajo que CRG-41 existe para evitar.
 4. Remitir el fix de brazos oscuros a Twilight (acción del autor).
 5. **#41 — explosivos ARC9 como stack throwable** (bloque propio, pedido del
    autor): hoy las granadas de EFT/CS:GO/MW2019 se equipan en Primary. El

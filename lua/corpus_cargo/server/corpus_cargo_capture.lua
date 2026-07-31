@@ -638,7 +638,7 @@ end
 -- Spawn a weapon as a world entity: the drop of a weapon item, or a
 -- deliberate take that did not fit going back to the ground. `uid` tags the
 -- entity with the Cargo instance it embodies — the capture restores that
--- exact blob (attachments/condition) instead of minting a fresh item
+-- exact blob (blob.atts/condition/clip1) instead of minting a fresh item
 -- (roadmap #17: a dropped gun keeps being ITS item).
 function CARGO.Capture.SpawnWorldWeapon(class, pos, uid)
     if not isstring(class) or class == "" then return nil end
@@ -650,8 +650,9 @@ function CARGO.Capture.SpawnWorldWeapon(class, pos, uid)
     -- THE BLOB TRAVELS WITH THE ENTITY (CRG-60). A gun on the ground is a world
     -- drop like any other: a savegame gives the flat fields back but not the
     -- instance, and a uid on its own is a ghost — the take would mint a
-    -- factory-fresh item and the condition, the attachments and the stored
-    -- magazine would be gone.
+    -- factory-fresh item and the condition, the attachment tree (blob.atts,
+    -- roadmap #53) and the stored magazine would be gone. Until #53 this
+    -- comment named a field that did not exist — it does now.
     if wep.CargoInstanceUid ~= nil then
         wep.CargoInstances = CARGO.Instances.RenderEntry({ uid = wep.CargoInstanceUid })
     end
@@ -668,6 +669,16 @@ function CARGO.Capture.SpawnWorldWeapon(class, pos, uid)
     -- and a WALK+USE take still rides its KeyPressed(IN_USE) branch.
     if wep.IsVJBaseWeapon and isnumber(wep.InitTime) then
         wep.InitTime = CurTime() - 1
+    end
+    -- ...and its attachment tree (roadmap #53, B4). SAME ORDER AS THE EQUIP
+    -- ROUTE and for the same reason: a mag attachment changes ClipSize, and
+    -- ARC9's PostModify answers that with Unload + SetRequestReload
+    -- (sh_attach.lua:147-159) — after ApplyClipToEntity it would empty the
+    -- magazine that just travelled. No owner here, so an att that finds no
+    -- slot lands next to the gun instead of evaporating (CRG-65).
+    CARGO.ARC9.TakeOverPresets(wep) -- before the client's 0.075 s window (B4)
+    if isstring(uid) then
+        CARGO.Inventory.ApplyAtts(wep, CARGO.Instances.Get(uid), nil, pos)
     end
     -- a gun dropped straight out of the grid carries its stored magazine (#18);
     -- a fresh SWEP would otherwise spawn with its DefaultClip
@@ -916,7 +927,9 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
             local id = EnsureDef(class, ent)
             local ok, newUid = CARGO.Inventory.GiveItem(ply, id)
             if ok then
-                if isstring(newUid) then CARGO.Inventory.StoreClip(newUid, ent) end
+                -- ent:Remove() two lines down: the tree is harvested here or
+                -- it dies with the entity (roadmap #53 B3)
+                if isstring(newUid) then CARGO.Inventory.StoreFromEntity(newUid, ent) end
                 CARGO.Inventory.NotifyPickup(ply, id, 1)
                 ent:Remove()
             else
@@ -1086,7 +1099,10 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
             -- makes sense in the session that produced it is not continuity, so
             -- the blob is the authority and the restored entity is not.
             if not revivedFromSave then
-                CARGO.Inventory.StoreClip(dropUid, wep)
+                -- the take-back destroys this entity (wep:Remove below), so the
+                -- attachment tree is harvested HERE or not at all (roadmap #53
+                -- B3). Same reason the magazine is: the blob is the authority.
+                CARGO.Inventory.StoreFromEntity(dropUid, wep)
             end
         else
             action = CARGO.Capture.Decide(
@@ -1185,7 +1201,10 @@ hook.Add("PlayerDroppedWeapon", "corpus_cargo_drop_reconcile", function(ply, wep
     -- the take-back (WeaponEquip reads CargoInstanceUid) treat it as THIS
     -- instance. The loaded magazine goes into the blob NOW (#18): the entity
     -- keeps its own Clip1 while it lies there, but the take-back destroys it.
-    CARGO.Inventory.StoreClip(uid, wep)
+    -- The attachment tree rides along for the same reason (roadmap #53 B3):
+    -- this is the ONE transition that keeps the entity alive with its atts, so
+    -- it is the one place the blob would silently fall behind the gun.
+    CARGO.Inventory.StoreFromEntity(uid, wep)
     rec.equip[slotId] = nil
     wep.CargoInstanceUid = uid
     wep.CargoInstances = CARGO.Instances.RenderEntry({ uid = uid }) -- CRG-60, as above

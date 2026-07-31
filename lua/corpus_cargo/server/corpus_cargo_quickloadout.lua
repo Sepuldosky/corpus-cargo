@@ -117,7 +117,9 @@ hook.Add("PlayerLoadout", "corpus_cargo_ql_compat", function(ply)
             local def = blob and CARGO.Items.Get(blob.id) or nil
             local class = def and def.weapon_class or nil
             if isstring(class) and class ~= "" and ply:HasWeapon(class) then
-                CARGO.Inventory.StoreClip(val, ply:GetWeapon(class))
+                -- the mod's strip is about to kill these entities, so the
+                -- attachment tree banks with the magazine (roadmap #53 B3)
+                CARGO.Inventory.StoreFromEntity(val, ply:GetWeapon(class))
             end
         end
     end

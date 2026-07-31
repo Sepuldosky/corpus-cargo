@@ -1141,3 +1141,207 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Harness 700 (eran 698), 2 nuevos y 1 reversion en negativo. El segundo
     check es el que hace distinguir al primero: destapada, el MISMO gesto
     sobre el MISMO chip SI comitea.
+
+53. LA CONFIGURACION ARC9 NO SOBREVIVE A NADA [Cargo arc9/inventory, bug] —
+    CERRADO 2026-07-31, entries 61-64 [APLICADO], planilla AB en tres rondas
+    (12 en PASA; AB8 retirado por decision, AB14 sin correr). Harness 700 ->
+    771, 15 reversiones verificadas en negativo.
+    LO QUE DECIDIO EL BLOQUE FUE UNA MEDICION Y NO UNA LECTURA: AB1 midio que
+    wep.Attachments es POR ENTIDAD (dos AS VAL mod4 vivas con Installed
+    distinto en el mismo slot), asi que el invariante pedido era alcanzable y
+    el plan B quedo descartado MEDIDO. Su receta nacio corregida: un jugador
+    sostiene UN SWEP por clase, asi que las dos armas no pueden estar las dos
+    en el inventario — tienen que ser dos entidades vivas, una en la mano y
+    otra en el suelo.
+    DOS DECISIONES DEL AUTOR CAMBIARON EL DISENO, Y LAS DOS POR UN CASO REAL:
+    (1) "si el objeto no puede entrar al inventario, debe caer al piso" ->
+    CRG-65, y el mismo modo de falla aparecio en un SEGUNDO sitio que no era
+    ARC9 (el espejo del pool de municion, con un comentario que decia literal
+    "The rounds are NOT destroyed" desde el dia que se escribio). (2) El peso
+    de los atts se DIFIERE al #55: su MCX de 2,9 kg lleva DOCE attachments, y
+    con 0,3 kg planos las piezas pesarian mas que el arma — cuando un numero no
+    sobrevive el contacto con un caso real, el defecto suele estar en el modelo
+    y no en el numero.
+    LA FRONTERA QUE QUEDA DECLARADA: la ruta "montar un att desde el menu C" no
+    se ejercio CON NUMEROS en ninguna de las tres rondas. AB13 respondio su
+    pregunta por la NEGATIVA (botados los repuestos, grid=0 y hook=0 en las
+    siete lineas y el menu dejo de ofrecerlos: el puente contesta lo que el
+    grid tiene y no hay un tercer inventario), pero esa misma accion destruyo
+    la precondicion de la resta y con ella AB14. La entry 64 se sostiene en sus
+    6 checks de harness con el hook realmente cableado. Ver CHANGELOG 64.
+    -- el pedido original, para referencia --
+    Pedido del autor 2026-07-30, con el sintoma
+    y la sospecha ya separados: "suelo perder las linternas como attachments de
+    mis armas ARC9", y la pregunta partida en dos — sobreviven a la
+    persistencia cuando ya estan en el arma? sobreviven a pasar del equipo al
+    inventario?
+    LA RESPUESTA A LAS DOS ES NO, Y LA PRIMERA ES AL REVES DE LA INTUICION.
+    DIAGNOSTICO POR LECTURA DE CODIGO, NO POR MEDICION — se dice asi a
+    proposito: es la regla que dejo el arco #48-#52 (una inferencia no se
+    escribe como una medicion) aplicada al doc que abre el bloque. El
+    instrumento para medirlo es la planilla AB del handoff.
+
+    DONDE VIVE EL ESTADO MONTADO: en un solo lugar, la tabla Lua de la entidad
+    SWEP (slottbl.Installed, sh_attach.lua:19). Nada en el jugador, nada en
+    disco del lado server. Y el blob de instancia de Cargo NO TIENE CAMPO DE
+    ATTACHMENTS (instances.lua:45-59 — id, condition, zones, subslots,
+    ammo_group; mas clip1, que se cosecha a mano en StoreClip). El cargador
+    tiene ruta de guardado; el arbol de atts no tiene ninguna. De paso: dos
+    comentarios nuestros afirman lo contrario (capture.lua:641 y :653, "el blob
+    restaura la condicion, los attachments y el cargador") y la fila del
+    savegame de §13 los repite. Hay que corregirlos en la misma tanda.
+
+    LAS CINCO PUERTAS SON UNA SOLA COSA: la entidad SWEP se destruye con atts
+    adentro, y ARC9 no devuelve nada en OnRemove/OnDrop (sh_init.lua:215-234).
+      (1) equipo -> inventario: Unequip -> StripEquipWeapon -> StripWeapon.
+      (2) drop SIN el arma en la mano: StripWeapon + SpawnWorldWeapon, que crea
+          una entidad NUEVA y solo re-aplica el cargador.
+      (3) WALK+USE de un arma del suelo: la captura hace wep:Remove()
+          (capture.lua:1136) para convertirla en item del grid.
+      (4) respawn / reconexion / cambio de mapa: RegiveEquipped da la clase de
+          nuevo, entidad nueva y desnuda.
+      (5) muerte con cargo_lose_on_death — esa si es intencional.
+    La unica transicion que SI los conserva es el drop con el arma EN LA MANO:
+    ply:DropWeapon deja la MISMA entidad en el suelo, con su arbol y
+    dibujandose. Hasta que la levantas, y ahi cae en la puerta 3.
+
+    POR QUE PARECE QUE SOBREVIVEN, Y POR QUE TE COME REPUESTOS: ARC9 tiene un
+    autoguardado propio, DEL CLIENTE y POR CLASE de arma (arc9_autosave, default
+    1) que re-aplica el preset 0,075 s despues del primer Think de cada entidad
+    nueva (sh_think.lua:208-223). Eso manda el arbol al server, que lo valida
+    contra el almacen — que somos nosotros — en ValidateInventoryForNewTree
+    (sh_subatts.lua:242-263). Dos desenlaces, y ninguno es continuidad:
+      - CON otra linterna en la mochila: la validacion pasa y el diff de
+        sh_net.lua:90-122 llama PlayerTakeAtt, o sea que nuestro hook la
+        DESCUENTA del grid. El arma "volvio con la linterna" y desaparecio un
+        item del bolso. Cada ciclo se come uno.
+      - SIN repuesto: la validacion falla (la instalada se destruyo y el
+        contador de Cargo es 0), el server re-manda su arbol vacio y el arma
+        vuelve pelada.
+    Lo que hoy parece persistencia es un preset POR CLASE pagado con items del
+    inventario. Dos armas iguales comparten esa configuracion.
+
+    SEGUNDA FUGA, INDEPENDIENTE Y MAS BARATA DE ARREGLAR: desacoplar con la
+    mochila llena DESTRUYE el attachment. El hook ARC9_PlayerGiveAtt
+    (arc9.lua:117-124) llama GiveItem, IGNORA su valor de retorno y devuelve
+    true igual — y GiveItem rechaza por peso (inventory.lua:380, "too heavy").
+    ARC9 da el att por entregado y nadie lo tiene. Es la forma exacta de error
+    que CRG-9 existe para prohibir, en los slots de un tercero.
+
+    LO QUE EL AUTOR DECIDIO (2026-07-30, textual): "lo que quiero es conservar
+    la configuracion de ARC9 en el equipamiento del arma y que el cambio de
+    attachments vuelva al inventario, es decir, si quito la linterna, esta debe
+    volver al inventario como un item mas. Si boto un arma ARC9 con mira
+    telescopica, toda esa configuracion va con el drop."
+    Son TRES invariantes, y el segundo ya existe a medias:
+      (a) un att instalado PERTENECE A LA INSTANCIA DEL ARMA, no al jugador:
+          viaja con ella al grid, al suelo, al contenedor y al savegame.
+      (b) sacarlo devuelve un item al inventario — ESTO YA FUNCIONA por el diff
+          de ReceiveWeapon; lo que falta es que no se pierda cuando el grid no
+          tiene lugar (la segunda fuga).
+      (c) nada se destruye como efecto colateral: CRG-9 aplicado a los slots de
+          un tercero.
+
+    FORMA PROPUESTA (nada escrito todavia; se discute al abrir el bloque):
+      - blob.atts: nuestro propio arbol PLANO — solo strings y enteros
+        (shortname del att, ToggleNum, y la categoria del slot). JAMAS las
+        tablas de slot de ARC9: llevan Material() y referencias ciclicas
+        adentro, que es exactamente lo que rompe gm_save (§13) y lo que el
+        guard offline rechaza.
+      - se cosecha COMO clip1: en la puerta, antes de que la entidad muera, no
+        despues. StoreClip es el precedente exacto y el molde a copiar.
+      - se re-aplica por la ruta del propio mod y del lado server:
+        BuildSubAttachments + PruneAttachments + SendWeapon + PostModify, que es
+        literalmente el bloque server de ReceiveWeapon (sh_net.lua:141-149), y
+        todo eso es realm SHARED (el autoinclude de shared.lua:1530-1557 corre
+        los sh_ en los dos). Cero API nueva: CRG-23 en pie, la escritura va por
+        la API del mod.
+      - el autoguardado del cliente hay que APAGARLO para nuestras armas o
+        pelea con el blob: SetNoPresets(true) es NetworkVar del propio ARC9
+        (shared.lua:1632) y es lo que el mod usa para las armas de sus NPC
+        (sv_npc.lua:226). Con eso el blob queda como fuente unica.
+      - ORDEN CONTRA EL CARGADOR: el PostModify de server, si el ClipSize
+        cambio —y un cargador extendido lo cambia—, hace Unload +
+        SetRequestReload (sh_attach.lua:147-159). El arbol va ANTES de
+        RestoreClip o la restauracion se vacia al pool. Es un argumento sobre la
+        SECUENCIA: se mide, no se supone.
+      - el indice de slot de ARC9 es un ORDINAL DE UN TERCERO (CRG-63): un pack
+        que inserte un slot corre los indices y el arbol guardado montaria la
+        mira en otra parte. Se persiste el shortname (clave estable, como el
+        ShortName de #47) y la categoria del slot, se VALIDA antes de escribir,
+        y si no calza el att vuelve al inventario en vez de perderse.
+
+    LA PRECONDICION QUE DECIDIA EL BLOQUE — MEDIDA EL 2026-07-30, check AB1:
+    wep.Attachments es POR ENTIDAD. Dos AS VAL mod4 vivas a la vez con
+    Installed DISTINTO en el mismo slot (una con eft_tactical_peq2 en el 11 y
+    la otra sin el) y las tres tablas en direcciones distintas. El invariante
+    (a) es alcanzable y el plan B quedo descartado con medicion. El instrumento
+    es cargo_dev_attshare, y nacio corrigiendo la receta: un jugador sostiene
+    UN SWEP por clase, asi que las dos armas no pueden estar las dos en el
+    inventario — tienen que ser dos ENTIDADES vivas, una en la mano y otra en
+    el suelo. Texto original de la pregunta: si wep.Attachments
+    es por ENTIDAD o compartida por CLASE. ARC9 nunca copia esa tabla al
+    inicializar (solo DefaultAttachments, sh_init.lua:43) y escribe Installed
+    ATRAVES de ella, asi que si el engine no entrega una copia profunda por
+    entidad, dos armas de la misma clase comparten configuracion y el
+    invariante (a) es INALCANZABLE tal como esta pedido. Se mide con dos armas
+    iguales y una linea de consola, y va PRIMERO en la planilla: el resto del
+    bloque depende de la respuesta.
+
+    DECISIONES ABIERTAS PARA EL AUTOR: que pasa con los atts montados cuando el
+    arma se VENDE (hoy el precio no los cuenta) y cuando se destruye con
+    cargo_lose_on_death; y si un att montado PESA (hoy el peso del arma no
+    incluye lo instalado, y el nominal de attachment es 0,3 kg).
+
+    ENLAZA: el #42 (lanzagranadas capturado sin su att de municion) es la misma
+    raiz por el otro lado — FillIntegralSlots solo llena si el jugador POSEE el
+    att, y con Cargo como almacen no lo posee. Y la frontera ya declarada de
+    §13 (un arma ARC9 en el suelo rompe gm_save por sus IMaterial) es la razon
+    de que blob.atts tenga que ser plano y nuestro.
+    Semilla: dev/HANDOFF_cargo_arc9_attachments.md.
+
+54. EL ICONO NO DISTINGUE DOS ARMAS DE LA MISMA CLASE [Cargo icons, UX] —
+    ABIERTO, SIN DISENAR. Pedido del autor 2026-07-31, salido de la NOTA del
+    check AB9 de la planilla, que estaba en PASA: "el icono autogenerado se
+    genera para las dos armas, incluso una que tenga mira y la otra no".
+    Con el #53 cerrado dos instancias de la MISMA clase ya no son
+    intercambiables —una lleva mira telescopica y la otra no, y desde ahora eso
+    pesa distinto y vale distinto—, pero en el grid se ven identicas: el
+    pipeline de iconos rinde por DEF (clase), no por instancia.
+    FORMA QUE PROPUSO EL AUTOR, textual: "en la autogeneracion puede existir el
+    modelo base del arma (El arma sin attachments) y las armas que sean
+    diferentes en attachments se vuelvan a autogenerar en una nueva imagen".
+    O sea: el render por def sigue siendo el default barato, y una instancia
+    cuyo arbol difiera del build de fabrica acuna su propio render.
+    LO QUE HAY QUE DECIDIR ANTES DE ESCRIBIR: donde vive ese render (el cache
+    de PNG es POR CLIENTE y no persiste namespaced — Cargo_ItemImages §4.3), y
+    cual es la clave — el arbol entero es demasiado fino (cambiar de modo de un
+    dispositivo no deberia acunar un icono nuevo) y la clase es demasiado
+    grueso. Enlaza con la deuda ya declarada de la fuente ARC9 a 256^2.
+    Semilla: la nota de AB9 en la planilla.
+
+55. QUE ATTACHMENTS PESAN [Cargo weight, diseno] — ABIERTO, SIN DISENAR.
+    Decision del autor 2026-07-31, revirtiendo la del 30 tras ver los numeros
+    en juego (planilla AB, check AB8, en FALLA las dos rondas).
+    EL NUMERO QUE LO MATO: el MCX 5.56 del autor pesa 2,9 kg y lleva DOCE
+    attachments de EFT. Con el nominal plano de 0,3 kg eso da 3,6 kg solo de
+    piezas — las partes pesarian mas que el arma. No es un problema de
+    calibracion sino de MODELO: en una build EFT la mayoria de los slots
+    llevan ESTRUCTURA (receiver, cañon, guardamanos, tapa, miras de hierro),
+    que ES el arma y no carga colgada de ella.
+    LA FORMA QUE PROPUSO EL AUTOR: cobrar solo las categorias que STALKER
+    Anomaly/GAMMA cobra — opticas y miras, silenciadores, lanzagranadas
+    acoplables, dispositivos tacticos (laser, linterna, foregrip) y cargadores
+    ampliados o de tambor. Nunca la estructura.
+    LO QUE HAY QUE RESOLVER: como se AUTODETECTA esa clasificacion sobre un
+    pack de terceros sin catalogar a mano cada att (que es exactamente el
+    trabajo que CRG-41 existe para evitar). Candidatos a mirar en dev/other/:
+    la Category del slot que lo acepta, ATT.SortOrder, y los campos de stat
+    que el propio att declara. Y un peso por att declarado por el pack seria
+    mejor que cualquier nominal — hay que ver si alguno lo expone.
+    ENGANCHE YA ESCRITO: Instances.AttsWeight existe, recurre y esta probada
+    offline; WeightOf no la llama. El filtro por categoria se enchufa ahi y en
+    ningun otro lado (CRG-66: una sola recursion).
+    ANTES QUE ESTE, el autor quiere el PESO DE LA MUNICION cargada: blob.clip1
+    es un numero pelado que WeightOf no mira, asi que hoy cargar un arma hace
+    DESAPARECER peso del ledger. Aterriza en §16, no en el puente de ARC9.

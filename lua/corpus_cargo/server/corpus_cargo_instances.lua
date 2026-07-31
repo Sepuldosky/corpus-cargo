@@ -230,6 +230,21 @@ end
 
 -- Weight of an instance = its def + everything mounted in its sub-slots
 -- (plates and accessories weigh; nested unique entries recurse).
+-- the attachment tree of §10 weighs like everything else that is mounted; it
+-- nests, so it recurses (roadmap #53)
+function CARGO.Instances.AttsWeight(atts)
+    if not istable(atts) then return 0 end
+    local total = 0
+    for _, node in ipairs(atts) do
+        if istable(node) and isstring(node.att) then
+            local def = CARGO.Items.Get(CARGO.ARC9.ItemId(node.att))
+            total = total + (istable(def) and def.weight or 0)
+            total = total + CARGO.Instances.AttsWeight(node.sub)
+        end
+    end
+    return total
+end
+
 function CARGO.Instances.WeightOf(uidOrBlob)
     local blob = isstring(uidOrBlob) and CARGO.Instances.Get(uidOrBlob) or uidOrBlob
     if not istable(blob) then return 0 end
@@ -249,5 +264,26 @@ function CARGO.Instances.WeightOf(uidOrBlob)
             end
         end
     end
+
+    -- blob.atts DELIBERATELY DOES NOT WEIGH — author call 2026-07-31, planilla
+    -- AB round 2, reversing the 2026-07-30 one after seeing the numbers.
+    --
+    -- The flat 0.3 kg nominal per attachment does not survive contact with a
+    -- real EFT build: his MCX 5.56 weighs 2.9 kg and carries TWELVE
+    -- attachments, so the parts would outweigh the gun 3.6 to 2.9. That is not
+    -- a tuning problem, it is the wrong model — in an EFT build most slots hold
+    -- structural pieces (receiver, barrel, handguard, dust cover, sights) that
+    -- are the gun, not cargo hanging off it.
+    --
+    -- Deferred rather than patched with a smaller number: the fix is to decide
+    -- WHICH categories carry weight (STALKER GAMMA charges optics, silencers,
+    -- launchers, tactical devices, foregrips and extended magazines — never the
+    -- structure) and that needs its own pass. Roadmap #55. The recursion below
+    -- stays exactly where a category filter will plug in.
+    --
+    -- AttsWeight is kept and exercised offline on purpose: the decision was
+    -- "not yet", not "wrong", and deleting it would make the next pass rewrite
+    -- what already works.
+
     return total
 end

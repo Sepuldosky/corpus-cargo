@@ -5372,3 +5372,246 @@ los tres VTF seguían ahí, byte por byte, bajo nuestros nombres de archivo — 
 cincuenta entries porque **nadie la contrastó contra un hash**. Lo mismo del lado del sonido: el port
 copió el modelo y dejó afuera el archivo que registraba sus eventos, y el síntoma tardó en aparecer
 porque **es ruido de consola y no un error**.
+
+---
+
+## 61. CRG-65: "no entra" nunca significa "se destruye" (roadmap #53, B2) `[APLICADO 2026-07-31]`
+
+La **segunda fuga** del #53, que es independiente del resto del bloque y **cierra sola**: desacoplar
+un attachment con la mochila llena lo destruía. El hook `ARC9_PlayerGiveAtt` llamaba a `GiveItem`,
+**ignoraba su valor de retorno** y devolvía `true` igual — y `GiveItem` rechaza por peso. ARC9 daba
+el att por entregado, Cargo no lo tenía, y nadie lo tenía.
+
+**La tanda encontró un SEGUNDO sitio con la misma forma, y no está en ARC9.** El espejo del pool de
+munición (`corpus_cargo_ammopool.lua`) baja la reserva con un `SetAmmo(pool - left)` **incondicional**
+y después intenta darle las balas al grid: con el grid lleno, las balas salían de la reserva y no
+llegaban a ninguna parte. Los **dos** sitios llevaban encima un comentario afirmando que nada se
+perdía — el del pool lo decía literal (*"The rounds are NOT destroyed"*) desde el día que se escribió.
+
+**Decisión del autor (2026-07-30):** *"si no por peso u otra acción, el objeto no puede entrar al
+inventario, este objeto debe caer al piso"*. Y la línea que hace la norma aplicable, que salió de
+mirar los diez call sites de `GiveItem`: **rechazar** una acción y avisar está bien —levantar un arma
+del suelo sobrecargado sigue contestando *"You can't carry that"* y el arma se queda donde estaba,
+porque de ahí no se sacó nada—; **consumir** el objeto y avisar es el defecto. Solo la segunda forma
+se toca. El aviso no es el remedio: un objeto que ya no existe no deja de no existir porque se haya
+impreso una línea.
+
+- PARCHE 1 — feat(inventory): **`Inventory.GiveOrDrop(ply, id, countOrSeed)`**, ruta única, devuelve
+  `ok, cayóAlPiso(, uid)`. Y `SpawnDropped`, **extraída de `DropEntry`** en vez de escrita de nuevo:
+  el SWEP real cuando es un arma y el gate de mundo lo permite (roadmap #16/#17), el
+  `corpus_cargo_item` en todo lo demás, que renderiza su propio blob al spawnear. `DropEntry` pasa a
+  usarla, así que **no hay una segunda ruta de spawn que pueda derivar de ésta**.
+- PARCHE 2 — fix(arc9): el hook lee el retorno. Si cayó al piso lo **dice** (`Notice`), y sigue
+  devolviendo `true` — que es correcto en los dos casos, porque el objeto existe: acá o a tus pies.
+  Si la def ni siquiera es nuestra, ahora **no** se suprime el almacén interno de ARC9.
+- PARCHE 3 — fix(ammo): el sobrante del espejo va por la misma ruta, y **el comentario que mentía se
+  reescribe** en vez de borrarse — dice qué hacía mal y desde cuándo.
+- PARCHE 4 — feat(dev): **`cargo_dev_attshare`**, el instrumento de **AB1** (ver entrada siguiente).
+- PARCHE 5 — docs: **CRG-65 acuñada**, sede `Cargo_Architecture.md` §4, al lado de CRG-9 — es el
+  mismo modo de falla por la otra puerta. Entrada en `ids.yaml` en el mismo parche (FLU-36), más la
+  sección **AB** en `familias_excluidas`, registrada **antes** de usarse (FLU-30).
+
+**Harness 700 → 714** (14 nuevos), **dos reversiones verificadas en negativo** — y la segunda dejó el
+corolario de verificación de la norma. Revertido el sitio del pool, se pone en rojo **un solo** check:
+el del **ledger** (*"LAS TRES ESTÁN EN EL SUELO"*). Los otros dos —"la reserva baja igual", "el grid
+sigue lleno"— **pasan con el bug puesto**. O sea: *el check que distingue no es que el grid no crezca
+—eso pasa igual si el objeto se evaporó— sino ver el objeto EXISTIENDO en el suelo.* Sin ese check el
+bloque entero habría salido verde midiendo nada.
+
+**Lo que el harness NO puede probar, y por eso hay planilla:** el sitio del puente ARC9 no se puede
+ejercer offline —sus hooks se cablean dentro del `OnReady` y ahí `ARC9` es `nil`—, así que lo cubierto
+offline son el primitivo y el sitio del pool. Que la linterna caiga a tus pies al desacoplarla con la
+mochila llena se mide en juego.
+
+---
+
+## 62. AB1: el instrumento de la precondición del #53 `[APLICADO 2026-07-31]`
+
+**Lo primero de la tanda no es código de producción, es una medición** — y su receta estaba mal.
+
+`wep.Attachments` decide la forma del bloque entero: ARC9 nunca copia esa tabla al inicializar (solo
+`DefaultAttachments = table.Copy(...)`, `sh_init.lua:43`) y escribe el estado montado **a través** de
+ella (`slottbl.Installed`, `sh_attach.lua:19`, alcanzado por `AttachmentAddresses`, que
+`BuildAttachmentAddresses` llena **desde `self.Attachments`**, `sh_subatts.lua:8-19`). Si el engine
+entrega la misma tabla a cada entidad, dos armas de una clase comparten configuración y *"la config
+pertenece a ESTA instancia"* es inalcanzable tal como se pidió. **El engine también es un tercero:**
+no se lee, se mide.
+
+**La corrección:** la receta original decía *"con dos armas de la misma clase en el inventario"*, y eso
+no se puede correr — **un jugador sostiene UN SWEP por clase**, cosa que la captura ya pagó en juego
+(`capture.lua:906-912`, *"You can't take that right now"*). La segunda M4 en el inventario es un
+**ítem del grid**, y un ítem no tiene `Attachments` que comparar. Las dos entidades tienen que
+coexistir en el **mapa**: una en la mano y otra en el suelo.
+
+- PARCHE 1 — feat(dev): `cargo_dev_attshare [clase]`. Barre las entidades **vivas** de esa clase
+  (default: el arma en la mano), imprime por cada una la identidad de `Attachments`,
+  `DefaultAttachments` y `AttachmentAddresses`, más el `Installed`/`ToggleNum` de cada slot ocupado.
+  **Dos lecturas a propósito:** la identidad de tabla explica el *mecanismo*, pero el veredicto es el
+  **set instalado** —la identidad puede dar `false` y el estado compartirse igual por una referencia
+  más adentro—. Y **la ausencia se reporta como ausencia**: una sola entidad, o dos peladas
+  coincidiendo en nada, sale **NO CONCLUYENTE**, nunca como resultado.
+
+Sin cobertura de harness: es un concommand dev y el harness no los carga. Lo único verificado offline
+es la sintaxis.
+
+
+---
+
+## 63. `blob.atts`: la configuración ARC9 pertenece a la instancia del arma (roadmap #53, B1/B3/B4) `[APLICADO 2026-07-31]`
+
+El cuerpo del #53. **AB1 lo desbloqueó primero, y con un resultado, no con una suposición:**
+`wep.Attachments` es **por entidad** — dos AS VAL mod4 vivas a la vez, con `Installed` distinto en el
+mismo slot y las tres tablas en direcciones distintas. El invariante que el autor pidió —*la
+configuración pertenece a ESTA instancia*— es alcanzable, y el plan B queda descartado **medido**.
+
+**B1 — el árbol, plano y nuestro.** `blob.atts`, nodos de `cat`/`nth`/`att`/`mode`/`sub`, solo strings
+y enteros. La clave es **(categoría, ordinal entre hermanos de esa categoría)** y jamás la posición,
+y el motivo resultó **más fuerte que CRG-63 en su forma habitual**: el *address* de ARC9 no es solo un
+ordinal que un parche del pack puede correr, es el offset de un **aplanado recursivo del build
+actual**, así que **se mueve dentro de la misma partida**. Medido en el arma del autor: su PEQ-2
+estaba en el address 11 **únicamente porque** el riel del 10 estaba puesto. `nth` existe porque el
+handguard del mod4 declara **dos** slots que aceptan `eft_valmod4_side` — el shortname solo no es
+clave. Y `PrintName` no es candidato: `ARC9:GetPhrase` ya lo localizó.
+
+**B3 — cosechar en la puerta.** `Inventory.StoreFromEntity` (cargador **y** árbol) reemplaza al
+`StoreClip` en las seis puertas donde la entidad muere. `StoreClip` **no se renombra**: lo cita un
+acta de auditoría **inmutable** y §10 de la arquitectura, y renombrarlo dejaría esas citas
+describiendo algo que ya no existe. Las puertas resultaron **seis y no cinco** — el handoff no listaba
+la toma del suelo de una clase duplicada (`capture.lua`) ni el banqueo de Quick Loadouts.
+
+**B4 — re-aplicar por la ruta del propio mod.** `Inventory.ApplyAtts`, con la secuencia de
+`ReceiveWeapon` server (`sh_net.lua:141-149`). **Tres cosas que no son obvias y las tres se
+verificaron leyendo la fuente:** `FillIntegralSlots` **no** se llama (consume del grid en cada equip —
+decisión del autor, y raíz del #42); **`DoInvalidateCache` sí** se llama, y el handoff lo omitía —
+sin él el arma sirve stats de antes del cambio; y **el diff de propiedad nunca corre**, porque vive
+*dentro* del `if SERVER` de `ReceiveWeapon`, que es lo que hace que re-aplicar sea **gratis**.
+
+**El orden contra el cargador dejó de ser hipotético.** El volcado del arma del autor tiene el
+cargador (`eft_val_mag_30s`) y el cartucho (`eft_ammo_9x39_sp5`) **como attachments**, así que el
+`Unload` + `SetRequestReload` que dispara un cambio de `ClipSize` es alcanzable con su arma real. El
+árbol va **antes** de `RestoreClip` en las dos rutas (equip y drop).
+
+**Decisiones 1 y 4 del autor, implementadas.** Lo acoplado **pesa** (**CRG-66 acuñada**) por la
+**misma recursión** que ya pesaba los sub-slots desde el Block 1 — no es un mecanismo nuevo, el att
+era invisible por una sola razón: no estaba en el blob. Y el precio **cuenta los atts**, cobrando
+**pleno**: un att no tiene condición propia (§10.1), así que una mira de $900 en un rifle destrozado
+sigue valiendo $900; el spread sí lo alcanza, porque es margen y no desgaste.
+
+**Nada se pierde por el camino.** Un shortname que el pack borró no puede volver como ítem y se
+descarta **con log**; uno que existe pero no encuentra slot **vuelve al inventario**, y sus **hijos se
+juzgan uno por uno** — un padre borrado no es motivo para tirar la mira que colgaba de él (CRG-9).
+Sin lugar en el grid, al piso (CRG-65). Después de aplicar, el blob se **re-cosecha** de la entidad.
+
+**Harness 714 → 761** (47 nuevos), **once reversiones verificadas en negativo**.
+
+**LA LECCIÓN DE MÉTODO DE LA TANDA, y se pagó dos veces en la misma sesión: un check que CRASHEA no
+es un check en rojo.** Dos reversiones —la de la densidad del array y la de la puerta de `Unequip`—
+volvieron con **0 y 1 rojo**, y las dos veces la lectura ingenua («el check no distingue») era falsa:
+la corrida **moría indexando un nil** y se llevaba puestos todos los checks de abajo. La forma es
+siempre la misma: **un check que lee A TRAVÉS de lo que el check anterior acaba de probar que existe**
+explota justamente en el escenario que la reversión fabrica. Con navegación nil-safe pasaron a **3 y
+8 rojos**. Corolario para el instrumento, no para el código: contar `[FAIL]` no alcanza — hay que
+mirar también si la corrida **terminó**.
+
+**Lo que el harness prueba** (761): el round-trip completo del árbol, el negativo que protege
+`gm_save` por **partida doble** (lista blanca de claves *y* tipo plano con guarda de profundidad,
+porque el `Vector` del harness es una tabla plana y ahí no probaría nada), CRG-63 con un slot
+insertado por el pack, los dos rieles hermanos, la rama perdida juzgada por nodo, la densidad, el
+orden árbol→cargador, la presencia de `DoInvalidateCache`, la **ausencia** de `FillIntegralSlots`, el
+ledger a dos vueltas por la puerta, el peso recursivo, el precio pleno y la negativa de COR-5.
+**Lo que no puede probar:** que la linterna siga puesta al recoger el arma del suelo, que el cargador
+extendido no vacíe el cargador restaurado, y que 17 atts quepan en el tope de 64 KiB del export LAN.
+Eso es la **planilla AB**.
+
+**B5 — docs.** §10.5 nueva (la forma, las tres trampas de secuencia y las dos rutas de pérdida);
+**§17.8 enmendada** — decía que Cargo *no* persiste el modo del dispositivo y ahora sí lo persiste,
+**sin contradecir su propio espíritu**: el modo viaja colgado de la **instancia**, que es donde esa
+misma frase decía que pertenece, y lo que sigue prohibido es guardarlo en el **jugador**; §5 con
+CRG-66; y los dos comentarios de `capture.lua` que **nombraban un campo que no existía** — ahora
+existe.
+
+### Confirmado en juego (planilla AB, tres rondas, 2026-07-30 y 31)
+
+Diez checks en PASA en la ronda 1 (AB1-AB7, AB9-AB12) y **AB13 cerrado en la ronda 3**: la
+configuración viaja, el cargador vuelve con las balas que tenía, el respawn devuelve el arma
+vestida, el precio cuenta los atts, y el export con 17 atts pesa 9 KB contra un tope de 64 KiB.
+
+**AB13 cerró por la vía NEGATIVA y no por la resta que la planilla pedía, y eso se dice acá porque
+la evidencia no es la misma.** El reporte que lo abrió —el menú C ofreciendo el cargador de otra
+UZI guardada— resultó ser **repuestos del propio jugador**: botados los repuestos, el volcado dio
+`grid=0` **y** `hook=0` en las siete líneas y el menú dejó de ofrecerlos. Eso prueba que el puente
+contesta exactamente lo que el grid tiene y que **no hay un tercer inventario en el medio**, que es
+la forma que tendría la duplicación. `ARC9_PlayerTakeAtt` queda descartado como causa de lo
+reportado. Lo que **no** prueba —y por eso es una vía distinta— es que montar **descuente** uno del
+grid: la resta nunca llegó a correrse, porque botar los repuestos es a la vez lo que produjo la
+respuesta y lo que destruyó su precondición. Ver la frontera en la entrada siguiente.
+
+
+---
+
+## 64. El blob sigue al arma mientras está en tus manos (planilla AB, check AB8) `[APLICADO 2026-07-31]`
+
+**El único rojo de la sección AB**, y es un defecto de diseño mío, no una medición mal hecha.
+
+Las puertas son donde el árbol se **rescata** — la entidad está por morir ahí. Pero montar una mira
+desde el menú C de ARC9 **no cruza ninguna puerta**, así que `blob.atts` se quedaba en lo que dijera
+la última vez que el arma se guardó. La persistencia estaba bien y **todo lo derivado del blob
+estaba viejo**: CRG-66 dice que la instancia pesa lo que lleva, y el peso solo se ponía al día
+después de guardar el arma. El precio, igual.
+
+Descartadas dos hipótesis más cómodas antes de tocar nada: los 17 atts del AS VAL **sí** tienen def
+(ninguno es `Free`, todos declaran `PrintName`), o sea ~5 kg, nada que la precisión del footer pueda
+esconder.
+
+- PARCHE 1 — feat(inventory): **`Inventory.SyncAttsSoon(ply)`**, más `EquippedUidForClass` (una
+  entidad dada por `GiveEquipWeapon` no lleva uid encima; el vínculo es la clase, igual que en
+  `StripEquipWeapon`). Corre **un tick tarde y a propósito**, que es lo contrario de la regla de la
+  puerta y por el motivo contrario: los hooks de inventario disparan **dentro** del diff de
+  `ReceiveWeapon`, **antes** de que `BuildSubAttachments` instale el árbol nuevo, así que cosechar
+  en el acto grabaría el árbol que el jugador acaba de reemplazar. Acá la entidad no se va a ningún
+  lado — nada caduca en un tick; en una puerta nunca es así. Un sync por tick, no uno por att, y si
+  el árbol no cambió no hay `Touch` ni refresco de movimiento.
+- PARCHE 2 — fix(arc9): los hooks `ARC9_PlayerGiveAtt`/`TakeAtt` lo llaman.
+
+**Harness 764 → 770** (6 nuevos), **dos reversiones**.
+
+**Y LA LECCIÓN, que es la TERCERA vez en la tanda que la reversión audita al instrumento y no al
+código.** Los tres primeros checks de AB8 llamaban a `SyncAttsSoon` **directo**: probaban que la
+función anda y **no** que el hook la llame. Sacar las dos llamadas de los hooks dejó la corrida
+entera **en verde**. Fue necesario exponer `CARGO.ARC9._WireHooks` (interno, mismo precedente que
+`Corpus._SelfTest`) para poder disparar el hook de verdad — `WireHooks` corre dentro del `OnReady`
+y ahí `ARC9` es `nil` offline, así que sin eso un test **sólo puede llamar a la función**. Con el
+cableado ejercido, la misma reversión da 2 rojos.
+
+Es exactamente la forma que el arco #48-#52 nombró —*un check puede nacer sin distinguir*— y las
+tres veces de esta tanda tuvieron la misma raíz: **el check no ejercía la ruta que el usuario
+recorre**, sino una función que esa ruta llama.
+
+### FRONTERA DECLARADA: esta entrada cierra sin pasada en juego, y no es un descuido
+
+**Los dos checks que la iban a medir se cayeron por motivos distintos, y ninguno fue un defecto.**
+
+**AB8 (rondas 1 y 2) — retirado por decisión, no arreglado.** Medía el peso, que era la consecuencia
+visible del sync. Falló las dos veces y la segunda **el autor diagnosticó la causa mejor que el
+check**: su MCX 5.56 pesa 2,9 kg y lleva **doce** attachments, así que con el nominal plano de 0,3 kg
+las piezas pesarían más que el arma. No es calibración sino **modelo** — en una build EFT la mayoría
+de los slots llevan estructura (receiver, cañón, guardamanos, tapa, miras de hierro), y la estructura
+**es** el arma. El peso de los atts se difiere al **roadmap #55**; `Instances.AttsWeight` queda
+escrita, recurriendo, probada offline y **sin llamar**. Y la regla que dejó, del autor: **cuando un
+número no sobrevive el contacto con un caso real, el defecto suele estar en el modelo y no en el
+número** — bajarle el nominal habría escondido que la mitad de un build EFT no es carga.
+
+**AB14 (ronda 3) — SIN CORRER**, que es un estado legítimo y no un fallo. Se escribió para recuperar
+lo que el diferimiento de AB8 dejó huérfano: que `montado` **suba** en la misma corrida, con el arma
+todavía en la mano y sin cruzar ninguna puerta. Su precondición era montar algo, y la ronda 3 no
+montó nada — la respuesta de AB13 salió de **botar** los repuestos, no de montarlos. El volcado que
+volvió es una foto con `montado=1` fijo: no dice nada sobre el movimiento, que es lo único que este
+check mide.
+
+**O sea: la ruta "montar desde el menú C" no se ejerció con números en ninguna de las tres rondas**,
+y `AB10` no la cubre —"tres ciclos no consumen repuestos" pasa igual con duplicación puesta—. Lo que
+sostiene esta entrada hoy son sus **6 checks de harness con el hook realmente cableado** (por eso
+hizo falta exponer `_WireHooks`) más sus dos reversiones. Decisión del autor, 2026-07-31: cerrar con
+la frontera escrita en vez de retener la entrada. **Se declara acá en vez de disimularse** — si algún
+día el sync se rompe, esta es la entrada que nadie miró en juego.
+

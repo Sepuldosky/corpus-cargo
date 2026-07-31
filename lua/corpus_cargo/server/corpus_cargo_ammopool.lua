@@ -225,19 +225,28 @@ function CARGO.AmmoPool.Reconcile(ply)
             local left = AbsorbType(rec, hl2, pool - belt)
 
             if left > 0 then
-                -- Belt is full. The rounds are NOT destroyed — they go to the
-                -- grid, which is what the grid is for. Either way they are no
-                -- longer reserve, so the pool MUST drop to the belt sum: left
-                -- at the old count, the next poll would see pool > belt again
-                -- and mint the same rounds forever (dup at 4 Hz — latent in
-                -- Bloque B, reachable once #26 made "unload with a full belt"
-                -- an ordinary move).
+                -- Belt is full, so they go to the grid — which is what the grid
+                -- is for. Either way they are no longer reserve, so the pool
+                -- MUST drop to the belt sum: left at the old count, the next
+                -- poll would see pool > belt again and mint the same rounds
+                -- forever (dup at 4 Hz — latent in Bloque B, reachable once #26
+                -- made "unload with a full belt" an ordinary move).
+                --
+                -- And that unconditional SetAmmo is what made this the second
+                -- site of CRG-65 (roadmap #53): with the grid full too, the
+                -- give failed, the pool dropped anyway and the rounds ENDED —
+                -- while the line above claimed they were not destroyed. It said
+                -- so from the day it was written. Now they fall to the floor.
                 local itemId = CARGO.Ammo.ItemForType(hl2)
-                local ok = itemId and CARGO.Inventory.GiveItem(ply, itemId, left) or false
+                local ok, toFloor = false, false
+                if itemId then
+                    ok, toFloor = CARGO.Inventory.GiveOrDrop(ply, itemId, left)
+                end
                 ply:SetAmmo(pool - left, hl2)
-                if not ok then
-                    -- nowhere left to carry them: the pool cannot hold rounds
-                    -- the player has no room for, or the belt count would lie
+                if toFloor then
+                    CARGO.Inventory.Notice(ply, "No room — the rounds dropped at your feet.")
+                elseif not ok then
+                    -- no item def for this ammo type: nothing to spawn either
                     CARGO.Inventory.Notice(ply, "You cannot carry any more ammunition.")
                 end
             end

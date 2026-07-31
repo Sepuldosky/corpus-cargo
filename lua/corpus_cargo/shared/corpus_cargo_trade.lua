@@ -54,11 +54,44 @@ function CARGO.Trade.ConditionOfEntry(entry)
     return nil
 end
 
+-- What is bolted onto a weapon is worth what it is worth (roadmap #53, author
+-- call 2026-07-30): selling a rifle with an expensive scope has to pay for the
+-- scope. The att does NOT pay the gun's condition — attachments have no
+-- condition of their own in ARC9 and none in Cargo (§10.1), so a $100 scope on
+-- a wreck is still a $100 scope. The spread DOES apply: it is the trader's
+-- margin, not wear.
+--
+-- Pure, and shared on purpose: the server is the authority (CRG-18) and the
+-- client paints with the SAME function, so a mounted att can never make the
+-- two disagree.
+function CARGO.Trade.AttsValue(atts)
+    if not istable(atts) then return 0 end
+    local total = 0
+    for _, node in ipairs(atts) do
+        if istable(node) and isstring(node.att) then
+            local def = CARGO.Items.Get(CARGO.ARC9.ItemId(node.att))
+            -- an att with no value is not "free": ausencia = no está a la
+            -- venta (CRG-18), so it simply adds nothing
+            if istable(def) and isnumber(def.value) then total = total + def.value end
+            total = total + CARGO.Trade.AttsValue(node.sub)
+        end
+    end
+    return total
+end
+
 -- unit price of a snapshot/record entry under a given multiplier
 function CARGO.Trade.PriceOfEntry(entry, mult)
     if not istable(entry) then return nil end
-    return CARGO.Trade.UnitPrice(CARGO.Items.Get(entry.id),
+    local base = CARGO.Trade.UnitPrice(CARGO.Items.Get(entry.id),
         CARGO.Trade.ConditionOfEntry(entry), mult)
+    if base == nil then return nil end -- not for sale: the atts do not make it so
+
+    local atts = istable(entry.blob) and entry.blob.atts or nil
+    if not istable(atts) then return base end
+
+    local m = isnumber(mult) and mult or 1
+    local extra = CARGO.Trade.AttsValue(atts) * m
+    return base + math.floor(extra + 0.5)
 end
 
 -- Stable key of a ref/entry, so client and server agree on what "the same
