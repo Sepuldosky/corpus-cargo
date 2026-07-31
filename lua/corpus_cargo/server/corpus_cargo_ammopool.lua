@@ -201,6 +201,40 @@ end
 -- The mirror
 -- ------------------------------------------------------------------
 
+-- THE MAGAZINE IN YOUR HANDS FOLLOWS THE GUN, at the cadence the author chose
+-- (roadmap #56, 2026-07-31, with the four costs measured). The loaded rounds
+-- weigh (CRG-67), and `blob.clip1` was only refreshed at the gates — so firing
+-- left the ledger claiming a full magazine until the gun was put away.
+--
+-- This rides THE POLL THAT ALREADY RUNS. No new timer, no weapon-base hook, no
+-- per-shot anything: at most four refreshes a second while the player is
+-- actually shooting, and none at all when they are not, because a clip that
+-- did not move sets no `dirty`. Measured before choosing: recomputing the
+-- weight costs 1.5 us, but the Touch it would trigger costs 0.158 ms of disk
+-- and ~1.7 KB on the wire, so what had to be rationed was the Touch and not
+-- the arithmetic.
+--
+-- It is the SAME shape as SyncAttsSoon (entry 64) and the opposite timing, for
+-- the opposite reason: there the entity was about to be replaced and we had to
+-- wait a tick; here the entity is standing still and we only have to look.
+local function SyncHeldClip(ply)
+    local wep = ply:GetActiveWeapon()
+    if not IsValid(wep) then return false end
+
+    local uid, blob = CARGO.Inventory.EquippedUidForClass(ply, wep:GetClass())
+    if blob == nil then return false end -- an admin/console give owns no blob
+
+    local ok, clip = pcall(wep.Clip1, wep)
+    if not ok or not isnumber(clip) or clip < 0 then return false end
+    if blob.clip1 == clip then return false end
+
+    -- mutating the live blob IS the update (CRG-57)
+    blob.clip1 = clip
+    return true
+end
+
+CARGO.AmmoPool.SyncHeldClip = SyncHeldClip
+
 function CARGO.AmmoPool.Reconcile(ply)
     if not cvPool:GetBool() then return end
     if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
@@ -208,7 +242,12 @@ function CARGO.AmmoPool.Reconcile(ply)
 
     local rec = CARGO.Inventory.GetRecord(ply)
     local totals = BeltTotals(rec)
-    local dirty = false
+
+    -- FIRST, and it is load-bearing on a reload: the belt is about to pay for
+    -- the rounds the magazine just took. Reading the clip in the same pass is
+    -- what makes the two halves land in ONE Touch, so the ledger is continuous
+    -- across a reload instead of dipping by a magazine and recovering later.
+    local dirty = SyncHeldClip(ply)
 
     for _, hl2 in ipairs(CARGO.Ammo.TYPES) do
         local pool = ply:GetAmmoCount(hl2)
@@ -257,9 +296,18 @@ function CARGO.AmmoPool.Reconcile(ply)
     if dirty then CARGO.Inventory.Touch(ply) end
 end
 
--- 4 Hz. The pool only MOVES on reload / unload / grenade throw, so `dirty` is
--- rare and the Touch (save + sync) it triggers is rarer still — firing does not
+-- 4 Hz. The pool only MOVES on reload / unload / grenade throw, so `dirty` was
+-- rare and the Touch (save + sync) it triggers rarer still — firing does not
 -- touch the reserve, it drains the magazine.
+--
+-- AMENDED 2026-07-31 (roadmap #56): the magazine now WEIGHS, so draining it is
+-- a ledger movement too and `dirty` also rises when the held clip changed. The
+-- ceiling that buys is explicit and it is why this cadence was the one chosen:
+-- at most FOUR Touch per second, and only while the trigger is actually being
+-- pulled — a full-auto rifle at ten rounds a second still pays four, not ten,
+-- and a player who is not shooting pays none. Measured cost of the difference:
+-- 26 KB/s to disk and 0.63 ms/s of disk time per firing player, against the
+-- 64 KB/s and 1.58 ms/s that one Touch per bullet would have cost.
 timer.Create("corpus_cargo_ammopool", 0.25, 0, function()
     if not cvPool:GetBool() then return end
     for _, ply in ipairs(player.GetAll()) do
@@ -378,14 +426,30 @@ function CARGO.AmmoPool.UnloadWeapon(ply)
 
     PlayUnloadAnim(ply, wep)
 
+    -- BEFORE the reconcile, and the order is load-bearing since the loaded
+    -- rounds started weighing (roadmap #56, CRG-67). Reconcile does a Touch of
+    -- its own, and that Touch computes the weight: with the blob still holding
+    -- the pre-unload count, the same rounds would be counted twice — once on
+    -- the belt they just landed on and once in a magazine that is already
+    -- empty. And it would not be a blink: nothing Touches again after this
+    -- line, so the inflated number would be the one written to disk and the
+    -- one the client is shown, until something else moved the record.
+    --
+    -- Safe to hoist: wep:Clip1() is already 0 here — SWEP:Unload zeroed it
+    -- (sh_reload.lua:199-205), and so did the manual branch above.
+    --
+    -- MEASURED, and it changes what this line can claim: under the chosen
+    -- cadence it is REDUNDANT. SyncHeldClip runs at the head of Reconcile and
+    -- reads the same zero, so reverting this hoist alone turns NOTHING red
+    -- (reversión R5, 0 fails) — only dropping both guards does (R8). It stays
+    -- because it is the one that survives a cadence change: if the poll ever
+    -- stops re-reading the clip, this is what keeps the unload honest.
+    local uid = EquippedUidOf(ply, wep:GetClass())
+    if uid ~= nil then CARGO.Inventory.StoreClip(uid, wep) end
+
     -- no waiting on the 4 Hz poll: the rounds land on the belt (grid when
     -- the belt is full) in the same breath
     CARGO.AmmoPool.Reconcile(ply)
-
-    -- the emptied magazine persists in the blob (#18): re-equipping from the
-    -- grid must not hand the rounds back
-    local uid = EquippedUidOf(ply, wep:GetClass())
-    if uid ~= nil then CARGO.Inventory.StoreClip(uid, wep) end
 end
 
 net.Receive(NET_UNLOAD, function(_, ply)

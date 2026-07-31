@@ -234,7 +234,7 @@ Capacidad total = base del jugador + bonus de mochila equipada (Back). El footer
 >
 > Se **difiere** en vez de bajarle el número, porque el arreglo es decidir **qué categorías** pesan —STALKER GAMMA cobra ópticas, silenciadores, lanzagranadas, dispositivos tácticos, foregrips y cargadores ampliados, y **nunca** la estructura— y eso es pasada propia: **roadmap #55**. `Instances.AttsWeight` queda escrita, probada offline y sin llamar desde `WeightOf`: la decisión fue *todavía no*, no *estaba mal*, y es exactamente donde el filtro por categoría se enchufa.
 >
-> **Caso declarado y tampoco cubierto:** la munición cargada en el arma. `blob.clip1` es un número pelado que `WeightOf` no mira, así que hoy cargar un arma **hace desaparecer peso del ledger**. Es lo siguiente que el autor quiere pesar, y aterriza en §16 (el cinturón **es** el pool), no acá.
+> **Caso CERRADO el 2026-07-31 (roadmap #56, entry 65) — la munición cargada en el arma.** Era el «caso declarado y no cubierto» de esta nota: `blob.clip1` es un número pelado que `WeightOf` no miraba, así que cargar un arma hacía **desaparecer peso del ledger** (tres kilos en el caso del RPG). Ya pesa, por la misma recursión y como un término aparte del árbol de atts — **CRG-67**, cuya sede es §16.10 porque el problema no era el peso sino la munición: de dónde sale el tipo cuando no hay entidad viva, y a qué ritmo se refresca el número.
 
 > **CRG-12 — Enmienda 2026-07-13 — compat con mods de movimiento (entry 16, roadmap #34).** Un mod
 > que re-estampa walk/run **cada tick** desde sus propias convars ("better movement v2":
@@ -994,6 +994,109 @@ lanzable al espejo de §16.3. Todo en `server/corpus_cargo_ammopool.lua`.)*
   `cargo_ammo_world_pickup 0` restaura el pickup crudo del engine. La captura tampoco
   acuña ya `wpn_weapon_frag`: la entidad del give muere y el espejo contabiliza (con el
   stack equipado, la clase es suya — el take-back del entry 13 intacto).
+
+### 16.10 El peso de la munición cargada (roadmap #56 — entry 65)
+
+*(Cierra el «CASO DECLARADO Y NO CUBIERTO» que la nota de CRG-66 llevaba escrito desde el
+2026-07-30. Aterriza acá y no en §5 porque el problema no era el peso sino **la munición**:
+de dónde sale el tipo, y a qué ritmo se refresca el número.)*
+
+**CRG-67 — Una bala pesa lo mismo viva donde viva, y se cuenta UNA sola vez.** Colgada del
+cinturón, guardada en el grid o cargada en el arma: el costo de carga es el mismo, y ninguna
+ruta puede contarla en dos lados a la vez. Es CRG-14 llevado al peso — el cinturón *es* el
+pool, y el cargador es el tercer bolsillo que faltaba.
+
+El síntoma que lo abrió: las mismas 30 balas pesaban **0,36 kg en el cinturón y 0 kg adentro
+del arma**, así que recargar era un descuento de peso. El caso extremo está en el catálogo
+propio: un cohete de RPG pesa 3,0 kg, y cargar el lanzacohetes hacía desaparecer **tres kilos**
+del ledger.
+
+#### El tipo de un arma que no tiene entidad viva
+
+§16.2 declara que **el tipo real de un arma sale de su ENTIDAD, nunca del def**, y eso sigue
+vigente. Lo que faltaba era la respuesta para el caso que esa regla no cubre: un arma guardada
+en el grid es un blob y un `id`, y no hay entidad a la que preguntarle. `CARGO.Ammo.TypeOfClass`
+la contesta como **default de clase**, y donde hay entidad la entidad sigue ganando.
+
+La resolución trepa `.Base` a mano con `weapons.GetStored` —no `weapons.Get`, que deep-copea el
+SWEP entero para leer un string—, en este orden:
+
+1. **`SWEP.Ammo`**, que es como lo declara ARC9. **No** `Primary.Ammo`, que era el candidato
+   obvio y **está vacío en la clase**: `SWEP.Primary.Ammo = SWEP.Ammo` se evalúa al cargar la
+   base, con `SWEP.Ammo` todavía `""` (`Arc9 Base/…/shared.lua:334-335`), y sólo `Initialize` lo
+   corrige **por instancia**. El wheel ya lo había pagado en `AmmoTypeOf`.
+2. **`SWEP.Primary.Ammo`** para SWEPs no-ARC9 (VJ, ZBase), donde sí es el valor real.
+3. **Tabla de escape para las armas del engine**, que no son SWEPs (`GetStored` devuelve `nil`).
+   Es el mismo patrón que `Capture.WeaponSlotKinds` y `Capture.WeaponTrivia` ya necesitaron por
+   la misma razón — y ahí cae el caso estrella del bloque, el RPG.
+
+**El censo que lo respalda** (`dev/other/`, 2026-07-31, 243 SWEPs con la herencia resuelta):
+**215** clases caen en un tipo que Cargo maneja, **10** en uno que no, 6 en un placeholder
+`"none"`, y **las 12 que no resuelven nada son exactamente plantillas base y melee/tools** — o
+sea, lo que no tiene cargador. El censo cubre ~2/3 del arsenal real del autor: los packs de EFT
+SMG/escopetas/LMG, CS:GO y `arc9_wtt` no están en `dev/other/`.
+
+#### Se calcula, no se guarda
+
+El peso es **derivado** y se calcula en `Instances.WeightOf` (CRG-66: una sola recursión).
+Guardarlo crearía el segundo número que CRG-56/57 existen para evitar, y no compraría nada:
+`TotalWeight` sobre un record de media partida mide **1,5 µs**. Lo único memoizado es el mapa
+`clase → tipo`, y es seguro porque su entrada —las tablas de SWEP registradas— no puede cambiar
+dentro de un boot: no es el memo que esconde estado vivo.
+
+El peso por bala sale del **def del ítem de munición**, nunca de una segunda tabla: la bala del
+cinturón y la del cargador tienen que ser la misma bala o CRG-67 es indemostrable.
+
+#### La cadencia, y por qué ésta
+
+Hasta acá el ledger sólo se movía cuando se movía el **cinturón**, y el sistema era barato por
+eso. Con el cargador pesando, disparar pasa a mover el ledger. **Decisión del autor 2026-07-31,
+con los cuatro costos medidos y no estimados:** el refresco **viaja en el poll de 4 Hz que ya
+corría** (`AmmoPool.SyncHeldClip`, al tope de `Reconcile`). Sin timer nuevo, sin hook de base de
+arma, sin mensaje de red nuevo.
+
+| | costo medido |
+|---|---|
+| recalcular el peso | **1,5 µs** — gratis |
+| un `Touch` (Save + Sync + Movement) | **0,158 ms** de disco + **6.537 B** a disco + **~1,1-1,7 KB** al cable |
+| un Touch por bala, a 10 disparos/s | 64 KB/s a disco · 1,58 ms/s · ~11-17 KB/s de red **por jugador** |
+| **el poll de 4 Hz (lo elegido)** | **≤4 Touch/s mientras dispara, CERO cuando no** — 26 KB/s · 0,63 ms/s |
+
+Lo que la medición cambió: **lo caro de un `Touch` no es la matemática del peso sino el Save y
+el Sync**, así que lo que había que racionar era el Touch y no la aritmética.
+
+**El re-leído va PRIMERO dentro de `Reconcile`, y eso carga peso:** en una recarga el cinturón
+está por pagar exactamente lo que el cargador acaba de tomar, y leer el clip en la misma pasada
+es lo que hace que las dos mitades caigan en **un solo Touch**. Sin eso, el ledger bajaría un
+cargador entero y lo recuperaría después — que es el defecto original con otro disfraz.
+
+**Error máximo declarado:** 250 ms de disparo (≈5 balas de fusil, ~0,06 kg), y **siempre de
+más, nunca de menos** — nunca se gana capacidad gratis, que era el reclamo.
+
+#### Fronteras declaradas
+
+- **Un tipo que Cargo no maneja pesa 0.** Son 10 clases medidas: 7 marksman/snipers de ARC9MW
+  que comen `SniperPenetratedRound`, el cuchillo arrojadizo de MW y el ssg08 de VJ. Ninguna
+  tiene ítem de munición detrás, así que no hay peso que reclamar (COR-5). El mismo hueco ya
+  existía antes de este bloque: **el cinturón tampoco las alimenta**.
+- **Un attachment puede cambiar el tipo, y el default de clase no lo ve.** §16.6 mide que
+  ningún ammo-att de **EFT** setea `ATT.Ammo`, y es cierto — pero **ARC9MW tiene cuatro que sí**
+  (`mw19_ammo_types.lua`: dos a `xbowbolt`, que Cargo maneja a 0,15 kg, y dos a un tipo propio).
+  El árbol está en `blob.atts` desde el #53, así que es resoluble; queda **fuera del v1** porque
+  su sede natural es el #55.
+- **El tooltip sigue mostrando `def.weight`**, o sea el peso pelado del def. Un RPG cargado suma
+  9 kg al total y muestra 6 en su ficha. No es nuevo —un chaleco con dos placas ya se comportaba
+  así— pero este bloque lo vuelve más visible. Queda anotado, sin decidir.
+- **Con `cargo_ammo_pool 0`** el poll no corre y el cargador sólo se refresca en las puertas de
+  siempre. Es consistente: con el pool apagado, el modelo entero de §16 está apagado.
+
+#### Enganche, y por qué no colisiona con el #55
+
+Los dos enganches viven en `Instances.WeightOf` y son **términos distintos**: el #55 pesa el
+cargador **como pieza** (`blob.atts`, `AttsWeight`, todavía sin llamar), éste pesa **las balas
+adentro** (`blob.clip1`, `ClipWeight`). El único solape es de calibración y queda dicho por
+adelantado: cuando el #55 aterrice, el peso que le dé a un cargador ampliado tiene que ser el
+del **cargador vacío**, o las balas se cuentan dos veces.
 
 ---
 

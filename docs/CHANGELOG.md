@@ -5615,3 +5615,127 @@ hizo falta exponer `_WireHooks`) más sus dos reversiones. Decisión del autor, 
 la frontera escrita en vez de retener la entrada. **Se declara acá en vez de disimularse** — si algún
 día el sync se rompe, esta es la entrada que nadie miró en juego.
 
+---
+
+## 65. El peso de la munición cargada (roadmap #56) `[PENDIENTE]`
+
+**Las mismas 30 balas pesaban 0,36 kg en el cinturón y 0 kg adentro del arma**, así que
+recargar era un descuento de peso. El caso extremo estaba en el catálogo propio y no hacía
+falta un pack de terceros para verlo: un cohete de RPG pesa 3,0 kg, y cargar el lanzacohetes
+hacía **desaparecer tres kilos** del ledger. No era un olvido — estaba declarado por escrito
+desde el 2026-07-30 en la nota de CRG-66 («CASO DECLARADO Y NO CUBIERTO»). Esta entrada lo
+cierra. Sede del diseño: **§16.10**, y la norma nueva es **CRG-67**.
+
+### La tanda empezó SIN escribir código, y fue lo que la salvó
+
+Las cuatro preguntas de la semilla tenían respuestas incompatibles entre sí y **la del candidato
+obvio resultó falsa**. Escribir primero habría costado el parche entero:
+
+**`Primary.Ammo` NO sirve para resolver el tipo de un arma ARC9.** Está **vacío en la clase**:
+`SWEP.Primary.Ammo = SWEP.Ammo` se evalúa al cargar la base, con `SWEP.Ammo` todavía `""`
+(`Arc9 Base/…/shared.lua:334-335`), y sólo `Initialize` lo corrige **por instancia**. El wheel ya
+lo había pagado en `AmmoTypeOf` y estaba anotado; la semilla proponía justo ese camino.
+
+La respuesta que sí funciona es `SWEP.Ammo` trepando `.Base` con `weapons.GetStored` —no
+`weapons.Get`, que deep-copea el SWEP entero para leer un string— más una tabla de escape para
+las armas del **engine**, que no son SWEPs. **Censo sobre `dev/other/`, 243 SWEPs con la herencia
+resuelta: 215 caen en un tipo que Cargo maneja, 10 en uno que no, y las 12 que no resuelven nada
+son exactamente plantillas base y melee/tools** — o sea, lo que no tiene cargador. La respuesta
+es limpia porque lo que no resuelve es lo que no tenía nada que resolver.
+
+### La medición que decidió la cadencia, y lo que cambió
+
+El comentario del espejo era el eje del problema: *«firing does not touch the reserve, it drains
+the magazine»*. Con el cargador pesando, disparar empieza a mover el ledger, y cada `Touch` es
+Save + Sync + Movement. **Se midió antes de preguntar, en vez de estimar:**
+
+| | medido |
+|---|---|
+| recalcular el peso (`TotalWeight`, record de media partida) | **1,5 µs** |
+| snapshot del `Sync` | 10.246 B crudos, **1,1-1,7 KB** comprimidos |
+| lo que escribe `SaveRecord` | **6.537 B**, **0,158 ms** de disco real (200 corridas) |
+| un Touch por bala a 10 disparos/s | 64 KB/s a disco · 1,58 ms/s · ~11-17 KB/s de red |
+
+**Lo caro de un `Touch` no es la matemática del peso sino el Save y el Sync** — 1,5 µs contra
+0,158 ms —, así que lo que había que racionar era el Touch y no la aritmética. Eso convirtió las
+tres opciones de la semilla en cuatro, y la medición **descalificó una de las tres**: la (iii)
+(«el cargador pesa por su capacidad») no era la más barata sobre el arsenal del autor, porque
+**las armas EFT no declaran `SWEP.ClipSize`** —cero líneas en los tres packs de `dev/other/`—: la
+capacidad vive en el cargador montado (`ATT.ClipSize`, 134 attachments la setean), o sea que
+pesar por capacidad necesitaba caminar el árbol de atts, que es la maquinaria del #55 que este
+bloque existía para no tocar.
+
+**Decisión del autor: el poll de 4 Hz que ya corría.** `AmmoPool.SyncHeldClip` al tope de
+`Reconcile`. Sin timer nuevo, sin hook de base de arma, sin mensaje de red nuevo: **techo de
+cuatro Touch por segundo mientras se dispara, y cero cuando no**. Error máximo declarado: 250 ms
+de disparo, y **siempre de más, nunca de menos** — nunca se gana capacidad gratis, que era el
+reclamo.
+
+**El re-leído va PRIMERO dentro de `Reconcile` y eso carga peso:** en una recarga el cinturón
+está por pagar exactamente lo que el cargador acaba de tomar, y leer el clip en la misma pasada
+es lo que hace que las dos mitades caigan en **un solo Touch**. Sin eso el ledger bajaría un
+cargador entero y lo recuperaría después, que es el defecto original con otro disfraz.
+
+### Lo que encontró recorrer las rutas de doble conteo
+
+`AmmoPool.UnloadWeapon` llamaba a `Reconcile` —que hace un `Touch` adentro, y ese Touch calcula
+el peso— **y recién después** a `StoreClip`. Con el cargador pesando, las mismas balas quedaban
+contadas en el cinturón donde acababan de aterrizar **y** en un cargador que ya estaba vacío. Y
+no era un parpadeo: **nada vuelve a Touchear después de esa línea**, así que el número inflado
+era el que se escribía a disco y el que veía el cliente. El `StoreClip` se adelanta.
+
+Las otras seis rutas se recorrieron una por una y ninguna cuenta doble: `StripEquipWeapon`, el
+drop al mundo, el reconciliador de `WeaponDrop`, el banqueo de Quick Loadouts, el
+`StripAmmo`+`Push` del spawn y el import LAN.
+
+### La regla de método de la tanda, y la trajo una reversión
+
+**Adelantar el `StoreClip` no pone NADA en rojo.** Medido: la reversión R5 dio **cero** rojos,
+porque `SyncHeldClip` encabeza `Reconcile` y lee el mismo cero antes. La propiedad —*una bala se
+cuenta una sola vez en el Touch que va a disco*— está sostenida por **dos guardas independientes**,
+y hacen falta las dos caídas (R8 = R4+R5) para ponerla en rojo.
+
+De ahí sale la regla: **un check que sobrevive una reversión no está roto, pero no puede reclamar
+que prueba el mecanismo — prueba el resultado.** El check quedó reescrito diciendo eso, y el
+`StoreClip` adelantado se queda con su motivo dicho: es redundante bajo *esta* cadencia y es el
+único que sobrevive si la cadencia cambia.
+
+De paso, **el propio driver de reversiones falló dos veces y las dos son la misma lección del
+#53**: buscaba el gate final en `stdout` cuando el gate escribe por `stderr`, así que reportó
+«murió antes de terminar» sobre siete corridas que habían terminado bien; y después truncó los
+archivos fuente al abrir en `"w"` antes de leerlos. **Contar `[FAIL]` no alcanza, y mirar si la
+corrida terminó tampoco alcanza si el detector que lo mira está mal.**
+
+### Fronteras declaradas, no disimuladas
+
+- **§16.6 es verdad para EFT y NO se generaliza:** ningún ammo-att de EFT setea `ATT.Ammo`, pero
+  **ARC9MW tiene cuatro que sí** (`mw19_ammo_types.lua` — dos a `xbowbolt`, que Cargo maneja a
+  0,15 kg/unidad, y dos a un tipo propio). El default de clase no los ve. El árbol está en
+  `blob.atts` desde el #53, así que es resoluble; queda fuera del v1 porque su sede es el #55.
+- **10 clases medidas comen un tipo que Cargo no maneja** y su cargador pesa 0: 7 marksman de
+  ARC9MW en `SniperPenetratedRound`, el cuchillo arrojadizo de MW y el ssg08 de VJ. El hueco ya
+  existía: **el cinturón tampoco las alimenta**.
+- **El censo cubre ~2/3 del arsenal real** — EFT SMG/escopetas/LMG, CS:GO y `arc9_wtt` no están
+  en `dev/other/`.
+- **El tooltip sigue mostrando `def.weight`**, o sea el peso pelado: un RPG cargado suma 9 kg al
+  total y muestra 6 en su ficha. No es nuevo (un chaleco con placas ya se comportaba así), pero
+  este bloque lo vuelve más visible. Anotado sin decidir.
+- **Los ocho valores de la tabla del engine son lo único escrito sin poder derivarlo del árbol.**
+  `weapons.GetStored` devuelve `nil` para las armas de HL2, así que el harness prueba que la
+  tabla **se consulta**, no que sus valores sean los correctos — y el caso estrella del bloque,
+  el RPG, cae justo ahí. **CRG-24 vale también para el engine** (lección del #46): se miden uno
+  por uno en juego. Es lo que mide la planilla **AC**.
+
+### Archivos
+
+- `shared/corpus_cargo_ammo.lua`: `Ammo.TypeOfClass` (memo por clase, seguro porque su entrada no
+  cambia dentro de un boot), `Ammo.WeightPerRound`, `Ammo.EngineWeaponTypes`,
+  `Ammo.ForgetClassTypes`.
+- `server/corpus_cargo_instances.lua`: `Instances.ClipWeight`, sumada dentro de `WeightOf`.
+- `server/corpus_cargo_ammopool.lua`: `AmmoPool.SyncHeldClip` al tope de `Reconcile`, el
+  `StoreClip` del unload adelantado, y el comentario de cadencia enmendado con su techo.
+- **Harness 771 → 798** (27 nuevos), con **8 reversiones verificadas en negativo** (una de ellas
+  con resultado CERO, que es la que dejó la regla de método). El stub `weapons.GetStored` dejó de
+  devolver `nil` fijo: ahora sirve tablas **sin heredar**, que es lo que devuelve en GMod, para
+  que la trepada por `.Base` quede realmente ejercida.
+- Sin convars nuevas, sin mensajes de red nuevos, sin timers nuevos.

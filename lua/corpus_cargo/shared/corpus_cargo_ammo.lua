@@ -192,6 +192,105 @@ function CARGO.Ammo.Managed(hl2)
     return CARGO.Ammo.ItemForType(hl2) ~= nil
 end
 
+-- ------------------------------------------------------------------
+-- CLASS -> engine ammo type (roadmap #56). §16.2 says a weapon's REAL type
+-- comes from its ENTITY and never from the def, and that stays true: this is
+-- the answer for a weapon that HAS no entity — one stored in the grid, which
+-- is a blob and a def id and nothing else. So it is not a second truth, it is
+-- the CLASS DEFAULT, and the entity still wins wherever there is one.
+--
+-- Measured over dev/other/ (2026-07-31, 243 SWEP files, inheritance resolved):
+-- 215 classes land on a type Cargo manages, 10 on a type it does not (7 ARC9MW
+-- marksman rifles on "SniperPenetratedRound", the MW throwing knife, VJ's
+-- ssg08), 6 on a "none"/-1 placeholder, and the 12 that resolve to NOTHING are
+-- exactly base templates and melee/tools — things with no magazine.
+--
+-- WHY NOT Primary.Ammo FIRST, which is the obvious candidate: on ARC9 it is
+-- EMPTY at class level. `SWEP.Primary.Ammo = SWEP.Ammo` runs when the base
+-- file loads, with SWEP.Ammo still "" (Arc9 Base shared.lua:334-335), and only
+-- Initialize fixes it PER INSTANCE. The wheel already pays for this in
+-- AmmoTypeOf; same finding, other realm.
+--
+-- WHY GetStored AND NOT weapons.Get: weapons.Get deep-copies the whole SWEP,
+-- attachment tables included, to read one string — we climb `.Base` ourselves,
+-- the same call this module's icon pipeline already makes for the same reason.
+-- ------------------------------------------------------------------
+
+-- Engine weapons are not SWEPs at all: weapons.Get/GetStored return nil for
+-- them (capture.lua pays for this twice already, in WeaponSlotKinds and
+-- WeaponTrivia). So they need the same escape hatch, and this one carries the
+-- headline case of the whole block: an RPG rocket weighs 3 kg.
+--
+-- CRG-24 applies to the ENGINE too (the lesson of #46): these are NOT written
+-- from memory, they are the pairs HL2's own item_ammo_* entities feed, and
+-- each one is measured in game before the block closes (planilla AC).
+CARGO.Ammo.EngineWeaponTypes = {
+    weapon_pistol    = "Pistol",
+    weapon_357       = "357",
+    weapon_smg1      = "SMG1",
+    weapon_ar2       = "AR2",
+    weapon_shotgun   = "Buckshot",
+    weapon_crossbow  = "XBowBolt",
+    weapon_rpg       = "RPG_Round",
+    weapon_annabelle = "357",
+    weapon_frag      = "Grenade",
+    weapon_slam      = "slam",
+}
+
+-- class -> type | false. Memo is safe because its INPUT cannot change within a
+-- boot: the registered SWEP tables are fixed once the packs mount. It is not
+-- the convar-memo trap (a memo that hides live state); nothing here is live.
+local typeForClass = {}
+
+local function SwepAmmoField(class, depth)
+    local s = weapons.GetStored(class)
+    if not istable(s) then return nil end
+    if isstring(s.Ammo) and s.Ammo ~= "" then return s.Ammo end
+    -- non-ARC9 SWEPs (VJ, ZBase, plain scripted weapons) declare it here, and
+    -- for them it is the real value
+    if istable(s.Primary) and isstring(s.Primary.Ammo) and s.Primary.Ammo ~= ""
+        and s.Primary.Ammo ~= "none" then
+        return s.Primary.Ammo
+    end
+    local base = s.Base
+    if isstring(base) and base ~= class and (depth or 0) < 10 then
+        return SwepAmmoField(base, (depth or 0) + 1)
+    end
+    return nil
+end
+
+-- The engine ammo type a weapon CLASS feeds on, or nil when it has none or
+-- Cargo does not manage it. Deliberately returns nil (never a guess) for the
+-- unmanaged types: a round with no item behind it has no weight to claim.
+function CARGO.Ammo.TypeOfClass(class)
+    if not isstring(class) or class == "" then return nil end
+
+    local memo = typeForClass[class]
+    if memo ~= nil then return memo or nil end
+
+    local hl2 = CARGO.Ammo.EngineWeaponTypes[class] or SwepAmmoField(class)
+    -- a type with no Cargo item behind it resolves to nothing: not ours, not
+    -- weighed, not invented (COR-5 in its weight-shaped form)
+    if hl2 ~= nil and CARGO.Ammo.ItemForType(hl2) == nil then hl2 = nil end
+
+    typeForClass[class] = hl2 or false
+    return hl2
+end
+
+-- Exposed so a re-registration (a pack mounting late) cannot leave a stale
+-- "this class has no ammo" behind. Nothing calls it in the normal path.
+function CARGO.Ammo.ForgetClassTypes()
+    typeForClass = {}
+end
+
+-- Weight of ONE round of an engine ammo type, straight off the item def that
+-- carries it — there is no second table of per-round weights, and there must
+-- not be: the belt stack and the magazine weigh the same round.
+function CARGO.Ammo.WeightPerRound(hl2)
+    local def = CARGO.Items.Get(CARGO.Ammo.ItemForType(hl2))
+    return istable(def) and def.weight or 0
+end
+
 -- Engine ammo type -> the DISPLAY caliber label of the item that carries it
 -- (roadmap #33: the wheel hub and the captured-weapon defs read it). It is
 -- deliberately the label the belt groups on — an EFT rifle eating "smg1"

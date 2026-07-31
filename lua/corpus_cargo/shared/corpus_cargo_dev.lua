@@ -581,6 +581,99 @@ if SERVER then
     end, nil, "DEV: prints the Cargo fields the entity you are looking at carries (world drop, crate, trader). Point it at a crate and at a dropped gun in the same save to compare")
 
     -- ------------------------------------------------------------------
+    -- roadmap #56 — el ledger de la munición cargada, y el CONTRASTE que la
+    -- planilla AC necesita.
+    --
+    -- Lo que el harness NO puede probar de este bloque es lo único que se
+    -- escribió sin poder derivarlo del árbol: los valores de
+    -- Ammo.EngineWeaponTypes. `weapons.GetStored` devuelve nil para las armas
+    -- de HL2, así que offline sólo se prueba que la tabla SE CONSULTA — no que
+    -- acierte. Y ahí cae el caso estrella del bloque, el RPG y sus 3 kg.
+    --
+    -- POR ESO ESTE COMANDO NO SE APOYA EN LO QUE AUDITA: al lado de nuestra
+    -- respuesta imprime la del ENGINE (`GetPrimaryAmmoType` -> `GetAmmoName`),
+    -- que es una fuente independiente, y las compara. Un comando que llamara a
+    -- `Ammo.TypeOfClass` dos veces no mediría nada.
+    --
+    -- La columna del engine sólo existe para las armas que están EN LA MANO o
+    -- en el mundo: un arma guardada en el grid no tiene entidad, que es
+    -- justamente el caso que la tabla resuelve. La ausencia se imprime como
+    -- ausencia (`sin entidad`), nunca como coincidencia.
+    -- ------------------------------------------------------------------
+    concommand.Add("cargo_dev_ammoweight", function(ply)
+        if not IsValid(ply) then ply = player.GetAll()[1] end
+        if not IsValid(ply) then return end
+        if not SERVER then return end
+
+        local rec = CARGO.Inventory.GetRecord(ply)
+
+        -- el tipo según el ENGINE, para el arma viva de esa clase si la hay
+        local function EngineType(class)
+            local wep = ply:GetWeapon(class)
+            if not IsValid(wep) then return nil end
+            local ok, t = pcall(wep.GetPrimaryAmmoType, wep)
+            if not ok or not isnumber(t) or t < 0 then return nil end
+            local name = game.GetAmmoName(t)
+            return isstring(name) and name or nil
+        end
+
+        local function Linea(donde, uid)
+            local blob = CARGO.Instances.Get(uid)
+            if not istable(blob) then return end
+            local def = CARGO.Items.Get(blob.id)
+            local class = istable(def) and def.weapon_class or nil
+            if not isstring(class) or class == "" then return end
+
+            local nuestro = CARGO.Ammo.TypeOfClass(class)
+            local suyo = EngineType(class)
+            local veredicto
+            if suyo == nil then
+                veredicto = "sin entidad (no comparable)"
+            elseif nuestro == nil then
+                veredicto = "DISCREPA: el engine dice " .. suyo .. " y nosotros nada"
+            elseif nuestro:lower() == suyo:lower() then
+                veredicto = "coincide"
+            else
+                veredicto = "DISCREPA: engine=" .. suyo
+            end
+
+            Corpus.Log("cargo", string.format(
+                "  %-9s %-26s tipo=%-14s clip1=%-4s balas=%6.3f kg  def=%5.2f  total=%6.2f  [%s]",
+                donde, class, tostring(nuestro or "-"), tostring(blob.clip1 or "-"),
+                CARGO.Instances.ClipWeight(blob),
+                (istable(def) and def.weight or 0),
+                CARGO.Instances.WeightOf(blob), veredicto))
+        end
+
+        Corpus.Log("cargo", "ammoweight: peso de la municion cargada (roadmap #56)")
+        Corpus.Log("cargo", "  la columna [ ] contrasta NUESTRA resolucion contra la del ENGINE;")
+        Corpus.Log("cargo", "  'sin entidad' no es coincidencia, es que no hay con que comparar")
+
+        for slot, val in pairs(rec.equip or {}) do
+            if isstring(val) then Linea("equip:" .. slot, val) end
+        end
+        for _, entry in ipairs(rec.items or {}) do
+            if entry.uid then Linea("grid", entry.uid) end
+        end
+
+        local balas = 0
+        for _, hl2 in ipairs(CARGO.Ammo.TYPES) do
+            local n = ply:GetAmmoCount(hl2)
+            if n > 0 then
+                balas = balas + n * CARGO.Ammo.WeightPerRound(hl2)
+                Corpus.Log("cargo", string.format("  reserva   %-26s x%-5d %6.3f kg",
+                    hl2, n, n * CARGO.Ammo.WeightPerRound(hl2)))
+            end
+        end
+
+        local cap = CARGO.Inventory.Capacity(ply)
+        Corpus.Log("cargo", string.format(
+            "  TOTAL %.2f kg de %.2f  ·  reserva del pool %.3f kg  ·  arma en mano: %s",
+            CARGO.Inventory.TotalWeight(ply), cap, balas,
+            IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon():GetClass() or "ninguna"))
+    end, nil, "DEV: per-weapon breakdown of loaded-magazine weight (roadmap #56), with OUR class->ammo-type answer contrasted against the ENGINE's own")
+
+    -- ------------------------------------------------------------------
     -- AB1 (roadmap #53) — is wep.Attachments per ENTITY or shared by CLASS?
     --
     -- The precondition the whole block hangs on. ARC9 never copies that table

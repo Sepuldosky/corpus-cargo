@@ -5,7 +5,38 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-31 (**entries 61-64 `[APLICADO]` — roadmap #53 CERRADO**,
+**Última actualización:** 2026-07-31 (**entry 65 `[PENDIENTE]` — roadmap #56, el peso de la
+munición cargada**, esperando la planilla **AC**. **Las mismas 30 balas pesaban 0,36 kg en el
+cinturón y 0 kg adentro del arma**, o sea que recargar era un descuento — tres kilos enteros con
+el RPG. Ya pesan: **CRG-67 acuñada** (*una bala pesa lo mismo viva donde viva y ninguna ruta la
+cuenta dos veces*), sede §16.10. Harness **771 → 798**, checker limpio. **Sin commitear.**
+**La tanda no abrió código hasta contestar cuatro preguntas, y la del candidato obvio salió
+FALSA:** `Primary.Ammo` **está vacío en la clase** de un arma ARC9 —`SWEP.Primary.Ammo = SWEP.Ammo`
+se evalúa al cargar la base, con `SWEP.Ammo` todavía `""`— y sólo `Initialize` lo corrige por
+instancia. Lo que sí resuelve es `SWEP.Ammo` trepando `.Base` con `GetStored`, más una tabla de
+escape para las armas del engine, que no son SWEPs. **Censo de 243 SWEPs: 215 caen en un tipo
+manejado y las 12 que no resuelven nada son exactamente plantillas base y melee** — lo que no
+tiene cargador.
+**LA MEDICIÓN CAMBIÓ LA PREGUNTA:** recalcular el peso cuesta **1,5 µs** y el `Touch` que
+dispararía cuesta **0,158 ms de disco + ~1,7 KB de red**, así que lo caro nunca fue la aritmética
+sino el Save y el Sync. Con eso el autor eligió **el poll de 4 Hz que ya corría**: techo de cuatro
+Touch por segundo mientras dispara y **cero cuando no**, contra los diez por segundo (64 KB/s a
+disco) de un Touch por bala. La medición además **descalificó una de las tres opciones**: pesar el
+cargador *por capacidad* no era lo más barato, porque **las armas EFT no declaran `SWEP.ClipSize`**
+—cero líneas en los tres packs— y la capacidad vive en el cargador montado.
+**LA REGLA DE MÉTODO, y la trajo una reversión que dio CERO:** adelantar el `StoreClip` del unload
+—un defecto real de doble conteo que iba a disco— **no pone nada en rojo**, porque el re-leído del
+poll ya tapa el mismo hueco. Hacen falta las dos guardas caídas para verlo. O sea: **un check que
+sobrevive una reversión no está roto, pero no puede reclamar que prueba el MECANISMO — prueba el
+RESULTADO.** Y el propio driver de reversiones falló dos veces por lo mismo del #53: buscaba el
+gate en `stdout` cuando sale por `stderr`, y después truncó los fuentes al abrirlos en `"w"` antes
+de leerlos.
+**Frontera que queda declarada:** §16.6 dice que ningún ammo-att de EFT cambia el pool y es cierto,
+pero **ARC9MW tiene cuatro que sí** (`ATT.Ammo`), y los ocho valores de la tabla del engine son lo
+único escrito sin poder derivarlo del árbol — el harness prueba que la tabla se consulta, no que
+acierte, y el caso estrella (el RPG) cae justo ahí. Eso es lo que mide la AC.)
+
+Antes, **entries 61-64 `[APLICADO]` — roadmap #53 CERRADO**,
 confirmado en juego con la planilla **AB en tres rondas**. **La configuración ARC9 de un arma
 pertenece a su instancia y viaja con ella:** sobrevive dropear y levantar, guardar y re-equipar, el
 respawn y el cambio de modo de un dispositivo; el cargador vuelve con las balas que tenía;
@@ -392,7 +423,17 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   `Inventory.SyncAttsSoon` mantiene el blob al día mientras el arma está en la
   mano, **un tick tarde a propósito**: los hooks disparan *dentro* del diff de
   `ReceiveWeapon`, antes de que el árbol nuevo esté instalado.
-- **Harness offline: 771 checks verdes en ambos realms** (con gate final: un
+- **La munición cargada PESA** (entry 65, roadmap #56, **sin confirmar en juego**):
+  `blob.clip1` × el peso por bala del ítem de munición, sumado en `Instances.WeightOf`
+  —la única recursión de CRG-66— como término **aparte** del árbol de atts que el #55
+  todavía tiene diferido. El tipo HL2 de un arma **sin entidad viva** sale de su clase
+  (`Ammo.TypeOfClass`: `SWEP.Ammo` trepando `.Base` con `GetStored`, después
+  `Primary.Ammo`, después la tabla de escape de las armas del engine), y §16.2 queda
+  intacta: donde hay entidad, la entidad manda. **CRG-67**: una bala pesa lo mismo
+  viva donde viva y ninguna ruta la cuenta dos veces. El refresco viaja en el **poll
+  de 4 Hz que ya corría** (`AmmoPool.SyncHeldClip`) — decisión del autor con los cuatro
+  costos medidos. Sin convars, sin net, sin timers nuevos.
+- **Harness offline: 798 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN, y **el total lo imprime el propio script** — no se
   grepea de stdout, donde el banner de realm corría carreras con los `print` de Lua);
   `cargo_selftest` 83 client / 76 server.
@@ -402,6 +443,20 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
+- **La entry 65 (roadmap #56) está `[PENDIENTE]`, esperando la planilla AC.** Lo que el harness
+  prueba (27 checks nuevos, **8 reversiones verificadas en negativo**): que el tipo se resuelve
+  sin entidad viva por sus cinco formas, que el RPG descargado pesa 6 kg y cargado 9, **la
+  IGUALDAD de conservación** —30 balas pesan lo mismo en el cinturón que en el cargador, que es
+  el reclamo textual del autor— con su desigualdad de apoyo, la degradación honesta en cuatro
+  formas, y la cadencia **con su AUSENCIA**: dos pasadas del poll sin mover el cargador cuestan
+  cero Touch, que es lo único que separa esta cadencia de un Touch por bala.
+  **Lo que NO puede probar, y por eso existe la AC:** (1) que los **ocho valores de la tabla del
+  engine** sean los que el engine usa — `weapons.GetStored` da `nil` para las armas de HL2, así
+  que offline sólo se prueba que la tabla se consulta, y **el caso estrella del bloque, el RPG,
+  cae justo ahí**; (2) el arsenal real, del que `dev/other/` cubre ~2/3; (3) **cómo se siente**
+  el peso moviéndose mientras se dispara — y si se siente mal, la primera sospecha va al modelo
+  y no al número.
+  Planilla: https://claude.ai/code/artifact/5734e521-db27-400d-9693-0fc1e12a85a9
 - **Las entries 61-64 (roadmap #53) quedaron confirmadas el 2026-07-31 con la planilla AB en tres
   rondas** — 12 checks en PASA (AB1-AB7, AB9-AB13), **AB8 retirado por decisión** (el peso de los
   atts se difiere al #55: el modelo estaba mal, no el número) y **AB14 SIN CORRER**. Harness **771**

@@ -1344,13 +1344,35 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     ENGANCHE YA ESCRITO: Instances.AttsWeight existe, recurre y esta probada
     offline; WeightOf no la llama. El filtro por categoria se enchufa ahi y en
     ningun otro lado (CRG-66: una sola recursion).
+    RESTRICCION QUE DEJO EL #56, y hay que respetarla o se cuenta dos veces: las
+    BALAS adentro del cargador ya pesan (CRG-67, Instances.ClipWeight). Asi que
+    el peso que este bloque le de a un cargador ampliado o de tambor tiene que
+    ser el del cargador VACIO. Los dos son terminos distintos de la misma suma,
+    no el mismo termino.
+    Y UN DATO MEDIDO QUE ESTE BLOQUE VA A NECESITAR: 134 attachments de los packs
+    instalados declaran ATT.ClipSize, o sea que en EFT la capacidad del arma ES
+    una propiedad del cargador montado y no de la clase (las EFT no declaran
+    SWEP.ClipSize: cero lineas en los tres packs de dev/other/).
     ANTES QUE ESTE, el autor quiere el PESO DE LA MUNICION cargada: es el #56,
     abajo. Se ejecuta primero.
 
-56. EL PESO DE LA MUNICION CARGADA [Cargo weight/ammo] — ABIERTO, SIN DISENAR.
-    Pedido del autor 2026-07-31, al cerrar el #53. SE EJECUTA ANTES DEL #55.
-    Semilla: dev/PROMPT_cargo_56_peso_municion.txt (investigacion y diseno; el
-    codigo va despues del voto del autor sobre la cadencia).
+56. EL PESO DE LA MUNICION CARGADA [Cargo weight/ammo] — ESCRITO (entry 65),
+    ESPERANDO LA PLANILLA AC. Pedido del autor 2026-07-31, al cerrar el #53.
+    SE EJECUTO ANTES DEL #55, como el autor pidio.
+    Semilla: dev/PROMPT_cargo_56_peso_municion.txt. Sede del diseno:
+    Cargo_Architecture.md §16.10 + CRG-67 en ids.yaml. Detalle: CHANGELOG 65.
+
+    LO QUE QUEDO DECIDIDO Y MEDIDO, para no releer la semilla:
+    · El tipo HL2 de un arma SIN entidad viva sale de su CLASE (Ammo.TypeOfClass).
+      El candidato de la semilla —Primary.Ammo— resulto FALSO para ARC9: esta
+      vacio en la clase y solo Initialize lo corrige por instancia.
+    · Cadencia: el poll de 4 Hz QUE YA CORRIA (voto del autor con los cuatro
+      costos medidos). Recalcular el peso cuesta 1,5 us; el Touch que dispara
+      cuesta 0,158 ms de disco y ~1,7 KB de red — lo caro nunca fue la
+      aritmetica. Techo: 4 Touch/s disparando, 0 cuando no.
+    · La opcion "pesar por CAPACIDAD" quedo descalificada con medicion: las EFT
+      no declaran SWEP.ClipSize (0 lineas en los tres packs) — la capacidad vive
+      en el cargador montado, o sea que necesitaba el arbol de atts del #55.
 
     EL SINTOMA, EN UNA LINEA: las mismas 30 balas pesan 0,36 kg en el cinturon
     y 0 kg adentro del arma. Recargar es un descuento de peso. El caso extremo
@@ -1390,3 +1412,47 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     ENGANCHE: CRG-66 manda UNA SOLA RECURSION — Instances.WeightOf. Ahi mismo
     tiene su enganche reservado el #55 (AttsWeight, escrita y sin llamar), asi
     que hay que verificar que los dos no colisionen ANTES de escribir.
+
+
+57. LAS ARMAS QUE COMEN UN TIPO DE MUNICION QUE CARGO NO MANEJA [Cargo ammo] —
+    ABIERTO, SIN DISENAR. Salido de una MEDICION del #56, no de un reporte:
+    el censo de tipos sobre dev/other/ (243 SWEPs, herencia resuelta).
+
+    DIEZ CLASES resuelven a un tipo de engine que Cargo no tiene registrado como
+    item: SIETE marksman/snipers de ARC9MW en "SniperPenetratedRound" (kar98k,
+    m14, spr208, ax50, hdr, rytec, svd), el cuchillo arrojadizo de MW en
+    "arc9_cod2019_knife", y el ssg08 de VJ en "SniperRound".
+
+    LA CONSECUENCIA NO ES DEL #56 SINO ANTERIOR A EL, y es mas grande que el
+    peso: si el tipo no esta en CARGO.Ammo.TYPES, el espejo de §16.3 no lo
+    mira — o sea que EL CINTURON NO ALIMENTA A ESAS ARMAS. El #56 solo lo hizo
+    visible (su cargador pesa 0) y lo dejo declarado como frontera.
+
+    LO QUE HAY QUE DECIDIR: si esos tipos se registran como items de cinturon
+    propios (peso, max_stack, valor, modelo — el trabajo que la tabla AMMO de
+    shared/corpus_cargo_ammo.lua ya hace para los nueve de HL2), o si se
+    REMAPEAN a un tipo existente (un .308 de ARC9MW comiendo del stack de 357,
+    por ejemplo), que es mas barato y miente sobre la balistica. Es decision del
+    autor y es de sensacion de juego, no tecnica.
+
+    ENLAZA: el campo def.ammo.att reservado en el schema (§16.6) y el binding de
+    ammo-atts de EFT, que es el mismo frente por el otro lado.
+    Y UNA FRONTERA MEDIDA QUE VA CON ESTE BLOQUE: ARC9MW tiene CUATRO
+    attachments que setean ATT.Ammo y por lo tanto CAMBIAN el tipo del arma
+    (mw19_ammo_types.lua — dos a "xbowbolt", que Cargo si maneja, y dos a
+    "arc9_cod2019_nade_rock", que no). §16.6 midio que ningun ammo-att de EFT lo
+    hace y es cierto; lo que no se puede es generalizarlo a los otros packs.
+
+58. EL TOOLTIP MUESTRA EL PESO PELADO DEL DEF [Cargo ui] — ABIERTO, CHICO.
+    Anotado al cerrar el #56. corpus_cargo_tooltip.lua pinta def.weight, o sea
+    el peso de la def sin nada de lo que la instancia lleve encima: un RPG
+    cargado suma 9 kg al total y muestra 6 en su ficha.
+    NO ES NUEVO — un chaleco con dos placas ya se comportaba asi desde el
+    Block 1, porque WeightOf recurre y el tooltip no —, pero el #56 lo vuelve
+    mas visible porque ahora cambia SOLO, sin que el jugador monte nada.
+    LO QUE HAY QUE DECIDIR: si la ficha muestra el peso EFECTIVO de la instancia
+    (def + sub-slots + balas, y manana + atts) o el de la def con el extra al
+    lado. Es una decision de UI y del autor. El calculo ya existe y es uno solo:
+    Instances.WeightOf — pero es SERVER, asi que el numero tiene que viajar en
+    el snapshot o el cliente tendria que recalcularlo, que es exactamente la
+    clase de segunda verdad que CRG-56/57 evitan.

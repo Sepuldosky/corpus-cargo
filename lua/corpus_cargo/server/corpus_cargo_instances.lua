@@ -245,12 +245,37 @@ function CARGO.Instances.AttsWeight(atts)
     return total
 end
 
+-- The rounds LOADED in the magazine weigh, and they weigh the same as they did
+-- on the belt (roadmap #56, CRG-67). Before this, the same 30 rounds weighed
+-- 0.36 kg hanging off the belt and 0 kg inside the gun, so reloading was a
+-- discount — and with an RPG it was a three-kilo one.
+--
+-- `blob.clip1` is a bare integer with no ammo type in it (that is what #18
+-- persists), so the type comes from the weapon CLASS via Ammo.TypeOfClass:
+-- §16.2's rule that the real type comes from the ENTITY still holds, and this
+-- is the answer for the case that rule does not cover — a gun in the grid has
+-- no entity to ask. A class Cargo cannot resolve, or one that eats a type
+-- Cargo does not manage, weighs its rounds at 0: honest degradation, never an
+-- invented number (cites COR-5).
+function CARGO.Instances.ClipWeight(blob)
+    if not istable(blob) then return 0 end
+    if not isnumber(blob.clip1) or blob.clip1 <= 0 then return 0 end
+
+    local def = CARGO.Items.Get(blob.id)
+    if not istable(def) or not isstring(def.weapon_class) then return 0 end
+
+    local hl2 = CARGO.Ammo.TypeOfClass(def.weapon_class)
+    if hl2 == nil then return 0 end
+
+    return blob.clip1 * CARGO.Ammo.WeightPerRound(hl2)
+end
+
 function CARGO.Instances.WeightOf(uidOrBlob)
     local blob = isstring(uidOrBlob) and CARGO.Instances.Get(uidOrBlob) or uidOrBlob
     if not istable(blob) then return 0 end
 
     local def = CARGO.Items.Get(blob.id)
-    local total = istable(def) and def.weight or 0
+    local total = (istable(def) and def.weight or 0) + CARGO.Instances.ClipWeight(blob)
 
     if istable(blob.subslots) then
         for _, entries in pairs(blob.subslots) do
@@ -284,6 +309,11 @@ function CARGO.Instances.WeightOf(uidOrBlob)
     -- AttsWeight is kept and exercised offline on purpose: the decision was
     -- "not yet", not "wrong", and deleting it would make the next pass rewrite
     -- what already works.
+    --
+    -- The LOADED ROUNDS are a different question and they are already in the
+    -- sum above (ClipWeight, roadmap #56): #55 weighs the magazine as a PIECE,
+    -- this weighs the bullets inside it. When #55 lands, the weight it gives an
+    -- extended mag has to be the EMPTY mag, or the rounds get counted twice.
 
     return total
 end
