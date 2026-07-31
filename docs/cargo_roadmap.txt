@@ -1298,7 +1298,9 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     att, y con Cargo como almacen no lo posee. Y la frontera ya declarada de
     §13 (un arma ARC9 en el suelo rompe gm_save por sus IMaterial) es la razon
     de que blob.atts tenga que ser plano y nuestro.
-    Semilla: dev/HANDOFF_cargo_arc9_attachments.md.
+    Sede de lo ya decidido, ahora que el #53 cerro: Cargo_Architecture.md §5
+    (CRG-66 y su enmienda) + §10.5 (la forma del arbol), CHANGELOG 63 y 64. El
+    handoff de dev/ ya cumplio y no se cita — dev/ no esta versionado.
 
 54. EL ICONO NO DISTINGUE DOS ARMAS DE LA MISMA CLASE [Cargo icons, UX] —
     ABIERTO, SIN DISENAR. Pedido del autor 2026-07-31, salido de la NOTA del
