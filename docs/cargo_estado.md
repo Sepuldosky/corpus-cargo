@@ -463,6 +463,29 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
+- **BLOQUEANTE ABIERTO tras la ronda 2 de la AC (1 PASA · 2 FALLA): el ESPEJO DE MUNICIÓN NO
+  ESTÁ CORRIENDO en la instalación del autor**, y los dos rojos son ese único hecho. La captura
+  de pantalla lo prueba contra CRG-15: 3 cohetes y 2 virotes en el pool que **no están en ningún
+  slot del cinturón ni en el grid**, con dos slots libres — y los cuatro tipos que sí coinciden
+  son exactamente los que no tuvieron actividad. Un espejo con un bug no se ve así; **un espejo
+  detenido sí.** Con eso, *«el belt dejó de funcionar»*, *«la munición del pickup no va a ningún
+  lado»* y *«no puedo hacer unload»* dejan de ser tres defectos.
+  **Los dos interruptores fallan DISTINTO y esa diferencia es el diagnóstico:** con
+  `cargo_ammo_pool 0` el unload sale **mudo** (y la convar es `FCVAR_ARCHIVE`, o sea que
+  sobrevive al reinicio); con el gate de spawn cerrado, **avisa**. Ninguno de los dos lo puede
+  tocar el parche del éter — cambiar el segundo argumento de `ply:Give` no escribe una convar ni
+  el gate—, y se dice en vez de descartar la sospecha en silencio.
+  **La tanda entregó instrumento, no parche:** `AmmoPool.IsReady` expone el gate (hasta ahora
+  *«apagado»* y *«corre y falla»* eran indistinguibles desde el juego) y `cargo_dev_ammoweight`
+  imprime los dos interruptores más el invariante **ya comparado**. **Falta correrlo.**
+  **Segunda puerta del éter, confirmada y NO parcheada todavía:** tomar un arma de HL2 **del
+  mundo** regala reserva — el parche de la ronda 1 cerró la ruta del *equip*, no la de la
+  **captura**. El clawback que existe es **sólo de VJ Base** (lee `PickUpAmmoAmount`); para un
+  arma del engine no hay tabla que leer y hay que hacerlo **por delta** en
+  `PlayerCanPickupWeapon`, que es el único "antes" legible. No se escribe con el espejo detenido.
+- **AC9 CERRÓ la deuda de verificación de la entry 64**, abierta desde el #53: montar un att
+  desde el menú C **descuenta uno del grid** (`pmag_30` de `grid=5 montado=0` a `grid=4
+  montado=1`, con el STANAG desalojado en `grid=1`). El puente no duplica, medido en juego.
 - **La entry 65 (roadmap #56) sigue `[PENDIENTE]` tras la ronda 1 de la planilla AC (8/9).** El
   único rojo, **AC2, no era del código**: refutó la premisa de la tanda (el RPG no tiene cargador)
   y se resolvió corrigiendo las cinco sedes que la repetían. Los dos parches de la ronda salieron

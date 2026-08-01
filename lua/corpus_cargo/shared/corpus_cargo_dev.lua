@@ -656,14 +656,44 @@ if SERVER then
             if entry.uid then Linea("grid", entry.uid) end
         end
 
-        local balas = 0
+        -- EL ESPEJO (CRG-15), y por qué se imprime acá: la planilla AC ronda 2
+        -- devolvió tres síntomas —el cinturón no baja, la munición del pickup
+        -- no llega a ningún lado, y el unload se niega— que son UN solo hecho
+        -- si el espejo no está corriendo. `Reconcile` y `UnloadWeapon`
+        -- comparten exactamente un gate, y sin esta línea no había manera de
+        -- distinguir "está apagado" de "corre y falla".
+        --
+        -- El invariante se imprime COMPARADO, no cada mitad por su lado: un
+        -- volcado que muestra el pool y te deja sumar el cinturón a ojo no
+        -- mide el invariante, lo insinúa.
+        local ready = CARGO.AmmoPool.IsReady(ply)
+        local totals = CARGO.AmmoPool.BeltTotals(CARGO.Inventory.GetRecord(ply))
+        Corpus.Log("cargo", "  ESPEJO: cargo_ammo_pool=" .. GetConVar("cargo_ammo_pool"):GetInt()
+            .. "  ready=" .. tostring(ready)
+            .. (ready and "" or "   <<< APAGADO: ni el cinturon sigue al pool ni se puede descargar"))
+
+        local balas, desync = 0, 0
         for _, hl2 in ipairs(CARGO.Ammo.TYPES) do
             local n = ply:GetAmmoCount(hl2)
-            if n > 0 then
+            local belt = totals[hl2] or 0
+            if n > 0 or belt > 0 then
                 balas = balas + n * CARGO.Ammo.WeightPerRound(hl2)
-                Corpus.Log("cargo", string.format("  reserva   %-26s x%-5d %6.3f kg",
-                    hl2, n, n * CARGO.Ammo.WeightPerRound(hl2)))
+                local veredicto = "espejo OK"
+                if n > belt then
+                    veredicto = "DESINCRONIZADO: sobran " .. (n - belt) .. " en el pool (deberia ABSORBER al cinturon)"
+                    desync = desync + 1
+                elseif n < belt then
+                    veredicto = "DESINCRONIZADO: faltan " .. (belt - n) .. " en el pool (deberia DRENAR el cinturon)"
+                    desync = desync + 1
+                end
+                Corpus.Log("cargo", string.format("  reserva   %-20s pool=%-5d cinturon=%-5d %6.3f kg  [%s]",
+                    hl2, n, belt, n * CARGO.Ammo.WeightPerRound(hl2), veredicto))
             end
+        end
+        if desync > 0 then
+            Corpus.Log("cargo", "  ESPEJO: " .. desync .. " tipo(s) DESINCRONIZADOS — CRG-15 roto."
+                .. " Si ready=true, el espejo corre y NO esta arreglando: eso es un defecto de logica."
+                .. " Si ready=false, el espejo nunca corrio: eso es el gate del spawn")
         end
 
         local cap = CARGO.Inventory.Capacity(ply)

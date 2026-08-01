@@ -235,6 +235,17 @@ end
 
 CARGO.AmmoPool.SyncHeldClip = SyncHeldClip
 
+-- Is the mirror ALLOWED to run for this player? Exposed because it is the
+-- single gate that `Reconcile` and `UnloadWeapon` share, so when the belt
+-- stops following the pool AND the unload refuses, one flag explains both —
+-- and hasta ahora no había forma de leerlo desde afuera, así que las dos
+-- hipótesis ("el espejo está apagado" y "el espejo corre y falla") eran
+-- indistinguibles desde el juego. Un instrumento que no puede separar dos
+-- hipótesis cuesta una ronda entera (lección de la sección AB).
+function CARGO.AmmoPool.IsReady(ply)
+    return ready[ply] == true
+end
+
 function CARGO.AmmoPool.Reconcile(ply)
     if not cvPool:GetBool() then return end
     if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end

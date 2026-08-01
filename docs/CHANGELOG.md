@@ -5816,3 +5816,86 @@ su reversión, porque son tres caminos distintos al mismo número.
 
 Harness **798 → 805** (7 nuevos: 4 del éter con su contraprueba, 3 del arma sin cargador), con
 **4 reversiones nuevas verificadas en negativo** — 12 en total para el bloque.
+
+### Planilla AC, ronda 2 (2026-08-01) — 1 PASA · 2 FALLA, y los dos rojos son UN solo hecho
+
+**AC9 CIERRA la deuda de la entry 64**, que llevaba abierta desde el #53 y era la única ruta
+del bloque que nadie había ejercido con números: montar un att desde el menú C **descuenta uno
+del grid**. La resta, en el MCX 5.56 cambiando el STANAG 30 por un PMAG:
+`eft_mag_ar15_pmag_30` pasa de `grid=5 montado=0` a `grid=4 montado=1`, y el STANAG desalojado
+aparece con `grid=1`. **El puente no duplica**, y ahora está medido en juego y no sólo en el
+harness.
+
+**Los dos rojos, en cambio, no son dos defectos: son el mismo espejo detenido.**
+
+#### El diagnóstico, hecho sobre la foto y no sobre una impresión
+
+La captura de pantalla que acompaña el reporte prueba lo que ningún volcado decía: el pool tiene
+**3 cohetes de RPG y 2 virotes** que **no están en ningún slot del cinturón ni en el grid**, con
+dos slots de cinturón **libres**. Contrastado tipo por tipo contra CRG-15
+(`pool == suma de los stacks del cinturón`):
+
+| tipo | pool | cinturón | |
+|---|---|---|---|
+| Pistol / SMG1 / AR2 / Grenade | 120 / 120 / 60 / 3 | 120 / 120 / 60 / 3 | coinciden |
+| **Buckshot** | **27** | **40** | debería DRENAR |
+| **XBowBolt** | **2** | **0** | debería ABSORBER |
+| **RPG_Round** | **3** | **0** | debería ABSORBER |
+
+**Los cuatro que coinciden son exactamente los que no tuvieron actividad** — coinciden porque el
+`Push` del spawn los igualó y nada los movió desde entonces. Los tres desincronizados son los que
+sí se movieron. Eso no es un espejo con un bug: es **un espejo que no está corriendo**.
+
+Y con eso los tres síntomas del autor colapsan en uno: *«el belt dejó de funcionar, no hay baja de
+balas»* (no drena), *«te da una reserva que no va ni al inventario ni al belt»* (no absorbe) y *«no
+puedo hacer unload»* (`UnloadWeapon` comparte los mismos interruptores). **No hay que buscar tres
+causas.**
+
+#### Los dos interruptores, y fallan distinto — que es el diagnóstico
+
+`Reconcile` y `UnloadWeapon` comparten exactamente dos condiciones de salida, y **la diferencia
+entre ellas es observable sin ningún comando**:
+
+- **`cargo_ammo_pool 0`** → `UnloadWeapon` sale en su primera línea, **sin decir nada**. Es
+  `FCVAR_ARCHIVE`, o sea que si alguna vez quedó en 0 **sobrevive al reinicio**.
+- **el gate de spawn (`ready[ply]`)** → `UnloadWeapon` **avisa** *«You can't do that right now»*.
+
+Que el autor reporte *«no puedo hacer unload»* **sin mencionar un aviso** apunta al primero, pero
+eso es una inferencia y no se escribe como una medición: `cargo_dev_ammoweight` ahora imprime los
+dos, más el invariante **comparado** en vez de dejar sumar el cinturón a ojo.
+
+**Ninguno de los dos interruptores lo puede tocar el parche 1 de la ronda 1**: cambiar el segundo
+argumento de `ply:Give` no escribe una convar ni el gate del spawn. Queda dicho porque la sospecha
+por secuencia era legítima —en la ronda 1 el unload funcionaba— y descartarla en silencio sería
+exactamente lo que este proyecto no hace.
+
+#### Lo que el parche 1 SÍ hizo, y está medido
+
+Su mitad se confirmó: *«al traerlo del inventario a equipamiento, no me da reserva de ammo, lo
+mismo el RPG»*. **La ruta que se parcheó quedó cerrada.**
+
+Y el mismo check destapó **la segunda puerta del éter, que es otra**: *«al tomar por primera vez
+como ítem de HL2 tanto el RPG como el Crossbow, te da una reserva»*, confirmado con el
+experimento limpio — cohetes en 0, botar el RPG, tomarlo, **tres cohetes regalados**. Esa puerta
+es la **captura**, no el equip: el engine entrega el arma y su reserva *antes* de que
+`WeaponEquip` mint el ítem y strippee el arma, así que la munición queda en el pool.
+
+**Ya existe un clawback para exactamente esto y es de VJ Base solamente**
+(`capture.lua`, `WeaponEquip`): lee `PickUpAmmoAmount` del SWEP y descuenta el regalo exacto un
+tick después. Para un arma del **engine** no hay tabla que leer —`weapons.Get` devuelve `nil`—,
+así que el clawback por lectura no sirve y hay que hacerlo **por delta**: el propio comentario del
+world gate dice que *toda* adquisición pasa por `PlayerCanPickupWeapon` **antes** del `Equip`, o
+sea que ahí está el único "antes" legible. **No se escribe todavía**: el espejo está detenido, y
+un tercer parche sobre un subsistema que ahora mismo no se puede verificar en juego es una apuesta.
+
+#### Qué se hizo en esta tanda
+
+Instrumento, no parche. `AmmoPool.IsReady` expone el gate —hasta ahora *«el espejo está apagado»*
+y *«el espejo corre y falla»* eran **indistinguibles desde el juego**, que es la lección de la
+sección AB en su forma más cara— y `cargo_dev_ammoweight` imprime los dos interruptores y el
+invariante ya comparado, con el veredicto por tipo.
+
+**Cuatro checks nuevos de harness para el modo de falla que nadie había fichado** (809 desde 805),
+con su AUSENCIA: con el gate cerrado el espejo **no** corrige un desincronizado, y con el gate
+abierto el **mismo** desincronizado se corrige. Sin esa segunda mitad, el primero pasaría también
+con un espejo que no hace nada.
