@@ -5915,7 +5915,7 @@ de los throwables **pasaba por un `nil` ajeno**: el stub de `GetAmmoName` no con
 tipo del frag, así que la granada quedaba sin fotografiar por una razón que no era la excepción que
 el check decía medir. Reescritos, las cuatro reversiones ponen en rojo **un check cada una**.
 
-#### PARCHE 4 — el regalo se apaga en la FUENTE, no sólo se descuenta
+#### PARCHE 4 — INTENTO de apagar el regalo en la fuente, y NO alcanzó
 
 Con el parche 3 puesto el autor confirmó lo funcional —*«ya no recolecta rockets»*, y
 `cargo_dev_ammoweight` lo respalda— y reportó lo que quedaba: **el HUD de DGL4 seguía anunciando
@@ -5938,6 +5938,22 @@ fracaso no rompe nada porque el clawback por delta sigue garantizando lo funcion
 está, **se pierde la cosmética y nunca el invariante** — y eso es lo que la planilla mide, porque
 el engine es un tercero y esto no se verifica offline. Los throwables siguen exceptuados por el
 mismo motivo que en el parche 3.
+
+> **MEDIDO EN JUEGO Y NO ALCANZÓ (ronda 4, 2026-08-01).** *«Todavía no desaparece el history de 3
+> cohetes de DGL4; en `cargo_dev_ammoweight` no se muestran que existan 3 cohetes.»* O sea: **el
+> invariante está cerrado y la cosmética no**. Escribir `m_iPrimaryAmmoCount` no impide el evento —
+> o el campo no es ése, o `SetSaveValue` no lo alcanza, o el regalo no vive en el datamap.
+>
+> El parche **se queda**: es inerte donde no aplica (va en `pcall`) y el clawback por delta, que es
+> lo que sostiene el invariante, no depende de él. Lo que **no** se queda es la afirmación: este
+> bloque decía que el regalo se apagaba en la fuente y **eso no está probado**, así que el título
+> pasa a *intento*. Una afirmación no sobrevive a la medición que la contradice.
+>
+> **Y no se prueba un segundo nombre de campo a ojo**, que sería la tercera vuelta sobre una
+> suposición: `cargo_dev_worldwep` ahora imprime los campos de `ammo`/`clip` de la **save table**
+> del arma que estés mirando, más si esa entidad pasó por el world gate. Con eso la próxima pasada
+> o encuentra el campo real, o prueba que el regalo no vive en el datamap — y entonces la frontera
+> queda declarada **con su medición** en vez de por cansancio.
 
 **Y otra vez la reversión auditó el instrumento antes que al código.** Sacarle el `pcall` al parche
 **no ponía nada en rojo: mataba la corrida** —cero `[FAIL]` y la pasada sin terminar, que es

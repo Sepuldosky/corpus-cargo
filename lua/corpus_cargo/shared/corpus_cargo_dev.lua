@@ -571,6 +571,38 @@ if SERVER then
         Corpus.Log("cargo", "  instancia viva    = "
             .. tostring(uid ~= nil and CARGO.Instances.Get(uid) ~= nil))
 
+        -- LA TABLA DE SAVE DEL ARMA (planilla AC ronda 4). El apagado del
+        -- regalo en la fuente NO funcionó —el historial de DGL4 sigue
+        -- anunciando los 3 cohetes aunque el pool quede en 0—, y antes de
+        -- probar un segundo nombre de campo hay que MEDIR si el campo existe
+        -- y qué vale. Adivinar de nuevo sería la tercera vuelta sobre una
+        -- suposición, que es justo lo que CRG-24 prohíbe: el engine es un
+        -- tercero y su datamap no se lee de memoria.
+        --
+        -- Se imprimen sólo los campos con "ammo"/"clip" en el nombre: la tabla
+        -- entera son cientos de líneas y la consola de GMod las trunca.
+        if ent:IsWeapon() then
+            local okS, save = pcall(ent.GetSaveTable, ent)
+            if not okS or not istable(save) then
+                Corpus.Log("cargo", "  save table: NO LEGIBLE en esta entidad — "
+                    .. "si no hay datamap, el regalo no se puede apagar por ahí y la frontera es esa")
+            else
+                local vistos = 0
+                for k, v in pairs(save) do
+                    local nombre = tostring(k):lower()
+                    if nombre:find("ammo", 1, true) or nombre:find("clip", 1, true) then
+                        Corpus.Log("cargo", "  save." .. tostring(k) .. " = " .. tostring(v))
+                        vistos = vistos + 1
+                    end
+                end
+                Corpus.Log("cargo", "  save table: " .. vistos
+                    .. " campo(s) de ammo/clip sobre " .. table.Count(save) .. " totales"
+                    .. (vistos == 0 and "  <<< ninguno: el regalo no vive en el datamap" or ""))
+            end
+            Corpus.Log("cargo", "  CargoGiftCut      = " .. tostring(ent.CargoGiftCut)
+                .. "   (si es nil, esta arma nunca pasó por el world gate)")
+        end
+
         local cont = istable(ent.CargoContainer) and ent.CargoContainer or nil
         Corpus.Log("cargo", "  CargoContainer    = " .. (cont
             and (#(cont.items or {}) .. " entrada(s), "
