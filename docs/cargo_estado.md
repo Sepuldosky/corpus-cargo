@@ -489,6 +489,15 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   hay es un **antes**, porque toda adquisición pasa por `PlayerCanPickupWeapon` antes del `Equip`.
   Se fotografía ahí y se restaura un tick después, **sólo si el pool subió**. Los throwables quedan
   afuera a propósito: para un frag el regalo del engine **es** el mecanismo (§16.9).
+  **Parche 4 — el regalo se apaga en la FUENTE:** con lo funcional ya cerrado (*«ya no recolecta
+  rockets»*), el HUD de DGL4 **seguía anunciando la captura de 3 cohetes** — el mismo síntoma que
+  dejaban las armas de VJ, y la línea que lo resolvió allá está en este mismo archivo: *«the event
+  itself must never fire»*. Verificado contra la fuente del mod (CRG-24): DGL4 alimenta su
+  historial desde `HUDAmmoPickedUp`. **Taparlo desde un hook hermano sería una carrera** —el orden
+  entre hooks distintos no es de inserción, lección de la saga VJ—, así que se apaga
+  `m_iPrimaryAmmoCount` en la entidad antes del `Equip`, **en `pcall` y sin asumir que el campo
+  exista**: si no está se pierde la cosmética y nunca el invariante. **Falta confirmarlo en juego**,
+  que es lo único que puede decir si el evento dejó de emitirse.
 - **AC9 CERRÓ la deuda de verificación de la entry 64**, abierta desde el #53: montar un att
   desde el menú C **descuenta uno del grid** (`pmag_30` de `grid=5 montado=0` a `grid=4
   montado=1`, con el STANAG desalojado en `grid=1`). El puente no duplica, medido en juego.

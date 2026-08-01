@@ -5915,6 +5915,37 @@ de los throwables **pasaba por un `nil` ajeno**: el stub de `GetAmmoName` no con
 tipo del frag, así que la granada quedaba sin fotografiar por una razón que no era la excepción que
 el check decía medir. Reescritos, las cuatro reversiones ponen en rojo **un check cada una**.
 
+#### PARCHE 4 — el regalo se apaga en la FUENTE, no sólo se descuenta
+
+Con el parche 3 puesto el autor confirmó lo funcional —*«ya no recolecta rockets»*, y
+`cargo_dev_ammoweight` lo respalda— y reportó lo que quedaba: **el HUD de DGL4 seguía anunciando
+la captura de 3 cohetes**. Textual: *«es lo mismo que pasaba con las armas de VJ que regalaban
+munición»*, y tiene razón — es el mismo síntoma, y la línea que lo resolvió allá estaba veinte
+líneas más arriba en este mismo archivo: **«the event itself must never fire»**. El clawback deja
+el pool correcto, pero llega tarde para el evento.
+
+**Verificado contra la fuente del mod y no supuesto (CRG-24, 2026-08-01):** DGL4 alimenta su
+historial desde `HUDAmmoPickedUp` (`holohud2/elements/resourcehistory.lua:281`).
+
+**Y eso descarta el camino fácil.** Devolver `true` desde un `HUDAmmoPickedUp` propio sólo gana si
+corre **antes** que el suyo, y **el orden de `hook.Call` entre hooks distintos no es de
+inserción** — la saga VJ ya pagó esa lección (entries 37-40). Una carrera no es un arreglo.
+
+Así que se apaga en la entidad, antes del `Equip`, en el mismo choke point donde se toma la foto:
+`m_iPrimaryAmmoCount` es el campo del datamap que un arma del engine entrega al equiparse, y es el
+mismo que el `bNoAmmo` de `ply:Give` pone en cero. **No se asume que exista:** va en `pcall`, y su
+fracaso no rompe nada porque el clawback por delta sigue garantizando lo funcional. Si el campo no
+está, **se pierde la cosmética y nunca el invariante** — y eso es lo que la planilla mide, porque
+el engine es un tercero y esto no se verifica offline. Los throwables siguen exceptuados por el
+mismo motivo que en el parche 3.
+
+**Y otra vez la reversión auditó el instrumento antes que al código.** Sacarle el `pcall` al parche
+**no ponía nada en rojo: mataba la corrida** —cero `[FAIL]` y la pasada sin terminar, que es
+exactamente la regla 1 del #53—, porque **ninguna** de las armas de mentira del bloque tenía el
+campo del datamap y la primera reventaba. El stub ahora modela la realidad —las armas del engine
+**sí** lo tienen— y deja **una sola** sin él, que es la que prueba la degradación. Con eso las tres
+reversiones enrojecen **un check cada una** y la corrida llega al final.
+
 #### Qué se hizo en esta tanda
 
 Instrumento, no parche. `AmmoPool.IsReady` expone el gate —hasta ahora *«el espejo está apagado»*

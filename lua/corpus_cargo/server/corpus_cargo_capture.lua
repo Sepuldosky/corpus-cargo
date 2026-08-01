@@ -777,6 +777,33 @@ hook.Add("PlayerCanPickupWeapon", "corpus_cargo_world_gate", function(ply, wep)
             -- la última foto antes del Equip es la que vale
             wep.CargoAmmoBefore = { name, ply:GetAmmoCount(name) }
         end
+
+        -- Y EL REGALO SE APAGA EN LA FUENTE, no sólo se descuenta después
+        -- (planilla AC ronda 3): el clawback deja el pool correcto pero el
+        -- EVENTO ya se disparó, así que el HUD de DGL4 sigue anunciando "+3
+        -- cohetes" que el jugador nunca tuvo. Es el mismo síntoma exacto que
+        -- las armas de VJ dejaban en su historial, y la línea que lo resolvió
+        -- allá está veinte líneas más arriba: "the event itself must never
+        -- fire". Verificado contra la fuente del mod (CRG-24, 2026-08-01):
+        -- holohud2/elements/resourcehistory.lua:281 escucha HUDAmmoPickedUp.
+        --
+        -- POR QUÉ NO SE TAPA DESDE UN HOOK HERMANO: devolver true en un
+        -- HUDAmmoPickedUp propio sólo gana si corre ANTES que el suyo, y el
+        -- orden de hook.Call entre hooks DISTINTOS no es de inserción — la
+        -- saga VJ ya pagó esa lección (entries 37-40). Una carrera no es un
+        -- arreglo.
+        --
+        -- `m_iPrimaryAmmoCount` es el campo del datamap que un arma del engine
+        -- entrega al equiparse, y es el mismo que el `bNoAmmo` de ply:Give
+        -- pone en cero. NO se asume que exista: va en pcall y su fracaso no
+        -- rompe nada, porque el clawback por delta de abajo sigue garantizando
+        -- lo FUNCIONAL. Si el campo no está, se pierde la cosmética y no el
+        -- invariante — y eso es lo que la planilla mide, porque el engine es
+        -- un tercero y esto no se puede verificar offline.
+        if wep.CargoGiftCut == nil then
+            wep.CargoGiftCut = true
+            pcall(wep.SetSaveValue, wep, "m_iPrimaryAmmoCount", 0)
+        end
     end
 
     if not cvWorldGuns:GetBool() then
