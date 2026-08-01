@@ -234,7 +234,7 @@ Capacidad total = base del jugador + bonus de mochila equipada (Back). El footer
 >
 > Se **difiere** en vez de bajarle el número, porque el arreglo es decidir **qué categorías** pesan —STALKER GAMMA cobra ópticas, silenciadores, lanzagranadas, dispositivos tácticos, foregrips y cargadores ampliados, y **nunca** la estructura— y eso es pasada propia: **roadmap #55**. `Instances.AttsWeight` queda escrita, probada offline y sin llamar desde `WeightOf`: la decisión fue *todavía no*, no *estaba mal*, y es exactamente donde el filtro por categoría se enchufa.
 >
-> **Caso CERRADO el 2026-07-31 (roadmap #56, entry 65) — la munición cargada en el arma.** Era el «caso declarado y no cubierto» de esta nota: `blob.clip1` es un número pelado que `WeightOf` no miraba, así que cargar un arma hacía **desaparecer peso del ledger** (tres kilos en el caso del RPG). Ya pesa, por la misma recursión y como un término aparte del árbol de atts — **CRG-67**, cuya sede es §16.10 porque el problema no era el peso sino la munición: de dónde sale el tipo cuando no hay entidad viva, y a qué ritmo se refresca el número.
+> **Caso CERRADO el 2026-07-31 (roadmap #56, entry 65) — la munición cargada en el arma.** Era el «caso declarado y no cubierto» de esta nota: `blob.clip1` es un número pelado que `WeightOf` no miraba, así que cargar un arma hacía **desaparecer peso del ledger** (1,588 kg repartidos en cinco armas del loadout real del autor, medidos por la planilla AC; el «tres kilos del RPG» que esta nota citaba antes era **falso** — ese arma no tiene cargador, ver la corrección en §16.10). Ya pesa, por la misma recursión y como un término aparte del árbol de atts — **CRG-67**, cuya sede es §16.10 porque el problema no era el peso sino la munición: de dónde sale el tipo cuando no hay entidad viva, y a qué ritmo se refresca el número.
 
 > **CRG-12 — Enmienda 2026-07-13 — compat con mods de movimiento (entry 16, roadmap #34).** Un mod
 > que re-estampa walk/run **cada tick** desde sus propias convars ("better movement v2":
@@ -1007,9 +1007,28 @@ ruta puede contarla en dos lados a la vez. Es CRG-14 llevado al peso — el cint
 pool, y el cargador es el tercer bolsillo que faltaba.
 
 El síntoma que lo abrió: las mismas 30 balas pesaban **0,36 kg en el cinturón y 0 kg adentro
-del arma**, así que recargar era un descuento de peso. El caso extremo está en el catálogo
-propio: un cohete de RPG pesa 3,0 kg, y cargar el lanzacohetes hacía desaparecer **tres kilos**
-del ledger.
+del arma**, así que recargar era un descuento de peso.
+
+> **CORRECCIÓN 2026-08-01 (planilla AC, check AC2 en FALLA) — el ejemplo estrella era falso, y
+> queda dicho en vez de reemplazado en silencio.** La semilla, este doc, el roadmap y el CHANGELOG
+> abrían con *«un cohete de RPG pesa 3,0 kg, así que cargar el lanzacohetes hace desaparecer tres
+> kilos»*. **No es cierto: el RPG de HL2 no tiene cargador.** Dispara de la reserva directo y su
+> `Clip1()` contesta **-1** — medido en juego: `clip1=-` en las cuatro corridas del autor, con el
+> arma cargada y disparando. Los cohetes siempre estuvieron en el pool, el pool sigue al cinturón
+> y el cinturón siempre pesó: **ahí nunca desapareció nada**. El número salió de multiplicar dos
+> campos del catálogo (`weight 3.0`, `max_stack 2`) sin abrir el arma — **una inferencia escrita
+> como si fuera una medición**, que es justo lo que §7.1 del flujo prohíbe, cometido en la premisa
+> de la propia tanda.
+>
+> **El síntoma real, medido sobre el loadout del autor** (dump del check AC3): cinco armas con el
+> cargador puesto escondían **1,588 kg** — AS VAL 31×0,02 = 0,620 · KS-23 4×0,05 = 0,200 · PL-15
+> 13×0,012 = 0,156 · UZI 20×0,012 = 0,240 · MCX 31×0,012 = 0,372. Menos espectacular que tres
+> kilos, y es el que existe.
+>
+> **Corolario de forma, y tiene código:** un arma sin cargador contesta `-1`, y un `-1` guardado
+> daría peso **negativo** — un arma que alivianaría al jugador. Los dos caminos al campo
+> (`StoreClip` y `SyncHeldClip`) lo rechazan, y `ClipWeight` lo rechaza otra vez; las tres guardas
+> están medidas por separado, cada una con su reversión.
 
 #### El tipo de un arma que no tiene entidad viva
 

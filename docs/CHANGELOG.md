@@ -5620,9 +5620,9 @@ día el sync se rompe, esta es la entrada que nadie miró en juego.
 ## 65. El peso de la munición cargada (roadmap #56) `[PENDIENTE]`
 
 **Las mismas 30 balas pesaban 0,36 kg en el cinturón y 0 kg adentro del arma**, así que
-recargar era un descuento de peso. El caso extremo estaba en el catálogo propio y no hacía
-falta un pack de terceros para verlo: un cohete de RPG pesa 3,0 kg, y cargar el lanzacohetes
-hacía **desaparecer tres kilos** del ledger. No era un olvido — estaba declarado por escrito
+recargar era un descuento de peso. Medido sobre el loadout real del autor (planilla AC, dump de
+AC3): cinco armas con el cargador puesto escondían **1,588 kg** — AS VAL 0,620 · KS-23 0,200 ·
+PL-15 0,156 · UZI 0,240 · MCX 0,372. No era un olvido — estaba declarado por escrito
 desde el 2026-07-30 en la nota de CRG-66 («CASO DECLARADO Y NO CUBIERTO»). Esta entrada lo
 cierra. Sede del diseño: **§16.10**, y la norma nueva es **CRG-67**.
 
@@ -5739,3 +5739,80 @@ corrida terminó tampoco alcanza si el detector que lo mira está mal.**
   devolver `nil` fijo: ahora sirve tablas **sin heredar**, que es lo que devuelve en GMod, para
   que la trepada por `.Base` quede realmente ejercida.
 - Sin convars nuevas, sin mensajes de red nuevos, sin timers nuevos.
+
+### Planilla AC, ronda 1 (2026-08-01) — 8 PASA · 1 FALLA, y el rojo no fue el hallazgo
+
+**El bloque quedó confirmado en lo suyo:** AC3 y AC4 midieron el ciclo entero sobre el arsenal
+real —el AS VAL bajó de `clip1=31 · 0,620 kg` a `clip1=0 · 0,000` gastando el cargador, y el
+total bajó exactamente 0,62—, AC5 midió el unload con el total **idéntico a los dos lados**
+(69,71 → 69,71), AC6 vio la frontera comportarse como frontera, y AC8 volvió limpia.
+
+**AC7, que era el único check de sensación, es el que valida la decisión de cadencia:** *«usé una
+M249 SAW EFT y se sintió muy satisfactorio; mientras disparaba y miraba el inventario podía ver
+el peso bajar, no de golpe, bastante suave la curva. Está perfecto en ese sentido.»* Los cuatro
+refrescos por segundo se leen como una curva y no como escalones.
+
+#### PARCHE 1 — el éter, y salió de la NOTA de un check que PASÓ
+
+AC1 pasó con las tres armas en `[coincide]`, y al costado: *«BUG ENCONTRADO, armas del HL2 al
+capturar o pasar al equipo te regalan munición, RPG da 3 cohetes y crossbow da 4»*. Está en su
+propio volcado: la reserva de `RPG_Round` pasa de **x6 a x9** entre el dump con el RPG en el grid
+y el dump con el RPG equipado, y la de `XBowBolt` de x8 a x11.
+
+**Tres cohetes son NUEVE KILOS de capacidad de carga regalados por equipada** — un agujero más
+grande que el que este bloque vino a cerrar, y **anterior a él**. Es el éter que §16.4 declara
+como clase de defecto con las palabras del propio autor (*«la munición no puede aparecer del
+éter»*) y que CRG-17 prohíbe por escrito: *la reserva se reconstruye del cinturón y de nada más*.
+
+La causa es de alcance, no de lógica, y **el argumento correcto ya estaba escrito en el mismo
+comentario que lo dejaba pasar**: `GiveEquipWeapon` documentaba que *«pool-fed SWEPs like
+weapon_frag put that free clip straight into the ammo POOL, and the §16 mirror would launder it
+onto the belt — ether»*… y aplicaba el `noAmmo` **sólo al slot throwable**. Toda arma del engine
+es pool-fed igual. Ahora la entrega es incondicional (`ply:Give(class, true)`) y el parámetro
+desaparece: no había un caso que quisiera el regalo.
+
+**Por qué cinco packs de armas nunca lo mostraron:** sólo mordía a las armas del ENGINE. Un arma
+ARC9 declara `SWEP.Ammo` y deja `Primary.Ammo` vacío en la clase, así que el engine no tenía qué
+regalar, y el regalo propio de ARC9 ya estaba neutralizado en la fuente por el takeover de
+`arc9_mult_defaultammo`. El arsenal del autor es ARC9 casi entero.
+
+**Y el harness no podía verlo, que es la mitad más incómoda:** su `FakePlayer.Give` **ignoraba el
+segundo argumento**, así que pasaba en verde con el éter puesto y sin él. El stub ahora modela el
+regalo del engine (`ENGINE_GIVE_AMMO`, vacío por default: se declara el mecanismo, no se catalogan
+los números de HL2), y el check nuevo va con su **contraprueba explícita** — que el stub SÍ regala
+cuando nadie se lo impide, porque sin esa mitad el check no distinguiría nada. Misma clase de
+agujero que el `lua/weapons/` sin cargar de la entry 60.
+
+#### PARCHE 2 — el ejemplo estrella del bloque era FALSO (AC2, el único rojo)
+
+AC2 falló, y no por el código: *«RPG no tiene cargador, mientras tenga munición en el belt sale
+como si estuviera cargado»*. **El RPG de HL2 no tiene cargador**: dispara de la reserva directo y
+su `Clip1()` contesta `-1` — `clip1=-` en las cuatro corridas del autor, con el arma cargada.
+
+O sea que **la premisa con la que se abrió el bloque nunca fue cierta**. «Un cohete pesa 3,0 kg,
+así que cargar el RPG hace desaparecer tres kilos» salió de multiplicar `weight` × `max_stack` del
+catálogo **sin abrir el arma**: una inferencia escrita como si fuera una medición, que es lo que
+§7.1 del flujo prohíbe, cometida en la premisa de la tanda y copiada a cinco sedes. Los cohetes
+siempre estuvieron en el pool, el pool sigue al cinturón y el cinturón siempre pesó.
+
+Se corrige **diciéndolo** en las cinco sedes en vez de reemplazarlo callado, y el síntoma real
+pasa a ser el que está medido sobre el loadout del autor: **1,588 kg escondidos en cinco armas**.
+
+**Tiene código, además de prosa:** un `-1` guardado daría peso **negativo** — un arma que
+alivianaría al jugador. Los dos caminos al campo (`StoreClip`, `SyncHeldClip`) lo rechazan y
+`ClipWeight` lo rechaza otra vez; las **tres guardas quedan medidas por separado**, cada una con
+su reversión, porque son tres caminos distintos al mismo número.
+
+#### Lo que la ronda dejó anotado y no se ejecuta acá
+
+- **El tooltip** (nota de AC3, textual): *«el tooltip debería reflejar el peso que tiene el arma
+  por efectos de la munición en el cargador»*. Es el **roadmap #58**, que esta misma tanda había
+  abierto — ahora con pedido explícito del autor en vez de anotación nuestra.
+- **Los tipos de munición que Cargo no maneja** (nota de AC6): *«hay que dar a Cargo los ítems de
+  sniper y airboatgun/winchester ammo, hay varias armas de distintas bases que se alimentan con
+  esas balas. Amerita buscar un modelo para esas balas»*. Es el **roadmap #57**, y la nota le
+  fija la forma —**registrarlos como ítems**, no remapearlos— y le agrega dos tipos que el censo
+  de `dev/other/` no había visto, `AirboatGun` y `Winchester`.
+
+Harness **798 → 805** (7 nuevos: 4 del éter con su contraprueba, 3 del arma sin cargador), con
+**4 reversiones nuevas verificadas en negativo** — 12 en total para el bloque.

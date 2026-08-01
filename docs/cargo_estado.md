@@ -5,11 +5,31 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-07-31 (**entry 65 `[PENDIENTE]` — roadmap #56, el peso de la
-munición cargada**, esperando la planilla **AC**. **Las mismas 30 balas pesaban 0,36 kg en el
-cinturón y 0 kg adentro del arma**, o sea que recargar era un descuento — tres kilos enteros con
-el RPG. Ya pesan: **CRG-67 acuñada** (*una bala pesa lo mismo viva donde viva y ninguna ruta la
-cuenta dos veces*), sede §16.10. Harness **771 → 798**, checker limpio. **Sin commitear.**
+**Última actualización:** 2026-08-01 (**entry 65 — roadmap #56, el peso de la munición cargada**,
+**planilla AC ronda 1: 8 PASA · 1 FALLA**, sigue `[PENDIENTE]` a la espera de la ronda 2. **Las
+mismas 30 balas pesaban 0,36 kg en el cinturón y 0 kg adentro del arma**, o sea que recargar era
+un descuento: medido sobre el loadout real, **1,588 kg escondidos en cinco armas**. Ya pesan —
+**CRG-67 acuñada** (*una bala pesa lo mismo viva donde viva y ninguna ruta la cuenta dos veces*),
+sede §16.10. Harness **771 → 805**, **12 reversiones verificadas en negativo**; checker limpio.
+**EL HALLAZGO DE LA RONDA NO FUE EL ROJO SINO LA NOTA DE UN CHECK QUE PASÓ, y es el ÉTER:**
+equipar un arma **del engine** regalaba reserva — el volcado del autor la muestra pasando de 6
+cohetes a 9 al equipar el RPG, o sea **nueve kilos de capacidad gratis por equipada**. Es más
+grande que el agujero que este bloque vino a cerrar y es **anterior** a él; lo prohíbe CRG-17 por
+escrito, y **el argumento correcto ya estaba escrito en el mismo comentario que lo dejaba pasar**
+(`GiveEquipWeapon` documentaba el éter de los pool-fed y aplicaba el `noAmmo` sólo al throwable).
+Sólo mordía a las armas del ENGINE —un ARC9 deja `Primary.Ammo` vacío en la clase—, por eso cinco
+packs nunca lo mostraron. **Y el harness no podía verlo: su `Give` ignoraba el segundo argumento**,
+así que pasaba en verde con el bug puesto y sin él; el stub ahora modela el regalo y el check va
+con su contraprueba.
+**Y EL ÚNICO ROJO REFUTÓ LA PREMISA DE LA TANDA, no su código:** *el RPG de HL2 no tiene
+cargador* — dispara de la reserva y su `Clip1()` es **-1**, medido con `clip1=-` en las cuatro
+corridas. O sea que *«cargar el RPG hace desaparecer tres kilos»*, que abría la semilla y cinco
+sedes, **era una inferencia escrita como si fuera una medición** (multiplicar `weight` ×
+`max_stack` sin abrir el arma). Se corrige **diciéndolo**, no reemplazándolo callado. Tiene
+código además de prosa: un `-1` guardado daría peso **negativo**, y las tres guardas que lo
+impiden quedaron medidas por separado.
+**La cadencia quedó validada por el único check de sensación**, AC7: *«usé una M249 SAW EFT y se
+sintió muy satisfactorio, podía ver el peso bajar, no de golpe, bastante suave la curva»*.
 **La tanda no abrió código hasta contestar cuatro preguntas, y la del candidato obvio salió
 FALSA:** `Primary.Ammo` **está vacío en la clase** de un arma ARC9 —`SWEP.Primary.Ammo = SWEP.Ammo`
 se evalúa al cargar la base, con `SWEP.Ammo` todavía `""`— y sólo `Initialize` lo corrige por
@@ -443,7 +463,16 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **La entry 65 (roadmap #56) está `[PENDIENTE]`, esperando la planilla AC.** Lo que el harness
+- **La entry 65 (roadmap #56) sigue `[PENDIENTE]` tras la ronda 1 de la planilla AC (8/9).** El
+  único rojo, **AC2, no era del código**: refutó la premisa de la tanda (el RPG no tiene cargador)
+  y se resolvió corrigiendo las cinco sedes que la repetían. Los dos parches de la ronda salieron
+  de **la nota de un check que PASÓ** (AC1, el éter) y del rojo (AC2, el ejemplo falso).
+  **Falta la ronda 2:** re-correr AC2 con su premisa corregida —sobre un arma que sí tenga
+  cargador— y **AC1 con el éter tapado**, que es el check que ahora tiene que volver mostrando la
+  reserva quieta al equipar un arma de HL2. **AC9 quedó marcado PASA sobre una sola foto** y su
+  criterio pedía la resta (correr, montar desde el menú C, correr de nuevo): sin el segundo
+  volcado, la evidencia pegada no lo sostiene — es la misma trampa de AB13/AB14.
+- **Detalle de la ronda 1, para referencia.** Lo que el harness
   prueba (27 checks nuevos, **8 reversiones verificadas en negativo**): que el tipo se resuelve
   sin entidad viva por sus cinco formas, que el RPG descargado pesa 6 kg y cargado 9, **la
   IGUALDAD de conservación** —30 balas pesan lo mismo en el cinturón que en el cargador, que es

@@ -908,16 +908,32 @@ end
 -- Equip / unequip
 -- ------------------------------------------------------------------
 
--- noAmmo: stack-slot (throwable) gives suppress the engine's default clip.
--- Pool-fed SWEPs like weapon_frag put that free clip straight into the ammo
--- POOL, and the §16 mirror would launder it onto the belt — ether. The stack
--- itself is the reserve; the AmmoPool.Push after the equip loads it.
-local function GiveEquipWeapon(ply, def, blob, noAmmo)
+-- NEVER with the engine's free ammo, and that is CRG-17 taken literally: the
+-- reserve is rebuilt from the belt AND FROM NOTHING ELSE.
+--
+-- This argument was already written here, and it was only applied to the
+-- throwable slot: "pool-fed SWEPs like weapon_frag put that free clip straight
+-- into the ammo POOL, and the §16 mirror would launder it onto the belt —
+-- ether". Every HL2 engine weapon is pool-fed in exactly the same way, so the
+-- reasoning covered them from the start and the flag did not.
+--
+-- MEASURED IN GAME (planilla AC, ronda 1, 2026-08-01), on the author's own
+-- dump: equipping weapon_rpg took the reserve from 6 rockets to 9, and the
+-- crossbow from 8 bolts to 11. THREE ROCKETS IS NINE KILOS of free carry
+-- capacity per equip — a bigger hole than the one this block was opened to
+-- close, and it stayed invisible until the magazine started weighing.
+--
+-- It only ever bit the ENGINE weapons: an ARC9 gun declares SWEP.Ammo and
+-- leaves Primary.Ammo empty at class level (Arc9 Base shared.lua:334-335), so
+-- the engine had nothing to hand out, and ARC9's own gift was already
+-- neutralised at the source by the arc9_mult_defaultammo takeover (§16.4).
+-- That is why five packs' worth of weapons never showed it.
+local function GiveEquipWeapon(ply, def, blob)
     if isstring(def.weapon_class) and def.weapon_class ~= "" then
         -- flag lets the capture hook (corpus_cargo_capture.lua) tell OUR
         -- equip-give apart from engine/loadout gives it must intercept
         ply.CargoEquipGive = true
-        ply:Give(def.weapon_class, noAmmo == true)
+        ply:Give(def.weapon_class, true)
         ply.CargoEquipGive = nil
 
         -- ORDER IS LOAD-BEARING (roadmap #53, B4): the tree goes on BEFORE the
@@ -1017,8 +1033,8 @@ function CARGO.Inventory.Equip(ply, ref, slotId)
         table.remove(rec.items, idx2)
         rec.equip[slotId] = { id = e2.id, count = e2.count or 1, condition = e2.condition }
 
-        -- noAmmo: the stack IS the reserve; the Push loads the pool from it
-        GiveEquipWeapon(ply, def, nil, true)
+        -- the stack IS the reserve; the Push loads the pool from it
+        GiveEquipWeapon(ply, def, nil)
         -- no blob: a stack slot holds an entry table, never an instance
         hook.Run("Corpus_Cargo_EquipChanged", ply, slotId, def.id, nil)
         CARGO.Inventory.Touch(ply)
@@ -1623,13 +1639,13 @@ function CARGO.Inventory.RegiveEquipped(ply)
     if not IsValid(ply) then return end
     local rec = CARGO.Inventory.GetRecord(ply)
     for _, val in pairs(rec.equip) do
-        -- stack slot (table): no blob, no default clip — its ammo is the
-        -- stack, the ammopool Push reloads the pool from it
+        -- stack slot (table): no blob — its ammo is the stack, and the
+        -- ammopool Push reloads the pool from it
         local blob = istable(val) and val or CARGO.Instances.Get(val)
         local def = blob and CARGO.Items.Get(blob.id) or nil
         if def ~= nil and not (isstring(def.weapon_class)
             and def.weapon_class ~= "" and ply:HasWeapon(def.weapon_class)) then
-            GiveEquipWeapon(ply, def, istable(val) and nil or blob, istable(val))
+            GiveEquipWeapon(ply, def, istable(val) and nil or blob)
         end
     end
 

@@ -1375,11 +1375,15 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
       en el cargador montado, o sea que necesitaba el arbol de atts del #55.
 
     EL SINTOMA, EN UNA LINEA: las mismas 30 balas pesan 0,36 kg en el cinturon
-    y 0 kg adentro del arma. Recargar es un descuento de peso. El caso extremo
-    esta en el catalogo propio y no necesita un pack de terceros: un cohete de
-    RPG pesa 3,0 kg, asi que cargar el RPG hace desaparecer TRES KILOS del
-    ledger. Con varias armas guardadas, cada una con su cargador lleno, el
-    jugador gana capacidad de carga gratis.
+    y 0 kg adentro del arma. Recargar es un descuento de peso. Con varias armas
+    guardadas, cada una con su cargador lleno, el jugador gana capacidad de
+    carga gratis: medido sobre el loadout real del autor (planilla AC, dump de
+    AC3), cinco armas escondian 1,588 kg.
+    OJO — EL EJEMPLO DEL RPG QUE ESTA ENTRADA CITABA ERA FALSO, y se deja dicho
+    en vez de borrado: "un cohete pesa 3,0 kg asi que cargar el RPG hace
+    desaparecer tres kilos" salio de multiplicar dos campos del catalogo sin
+    abrir el arma. El RPG de HL2 NO TIENE CARGADOR (Clip1 = -1, dispara de la
+    reserva), asi que ahi nunca desaparecio nada. Lo refuto el check AC2.
 
     NO ES UN OLVIDO, ESTA DECLARADO: la nota de CRG-66 en ids.yaml lo dice
     desde el 2026-07-30 ("CASO DECLARADO Y NO CUBIERTO"). Inventory.TotalWeight
@@ -1428,12 +1432,22 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     mira — o sea que EL CINTURON NO ALIMENTA A ESAS ARMAS. El #56 solo lo hizo
     visible (su cargador pesa 0) y lo dejo declarado como frontera.
 
-    LO QUE HAY QUE DECIDIR: si esos tipos se registran como items de cinturon
-    propios (peso, max_stack, valor, modelo — el trabajo que la tabla AMMO de
-    shared/corpus_cargo_ammo.lua ya hace para los nueve de HL2), o si se
-    REMAPEAN a un tipo existente (un .308 de ARC9MW comiendo del stack de 357,
-    por ejemplo), que es mas barato y miente sobre la balistica. Es decision del
-    autor y es de sensacion de juego, no tecnica.
+    DECIDIDO POR EL AUTOR (planilla AC, nota del check AC6, 2026-08-01): se
+    REGISTRAN COMO ITEMS PROPIOS, no se remapean. Textual: "hay que dar a Cargo
+    los items de sniper y airboatgun/winchester ammo, hay varias armas de
+    distintas bases que se alimentan con esas balas. Amerita buscar un modelo
+    para esas balas". O sea el mismo trabajo que la tabla AMMO de
+    shared/corpus_cargo_ammo.lua ya hace para los nueve de HL2: peso, max_stack,
+    valor, calibre de display y modelo.
+    Y LA NOTA SUMA DOS TIPOS QUE EL CENSO DE dev/other/ NO HABIA VISTO:
+    AirboatGun y Winchester. El censo miro los SWEP de los packs instalados; el
+    autor tiene armas de OTRAS bases que comen de esos pools. Antes de escribir,
+    volver a censar sobre el arsenal vivo con cargo_dev_dump_weapons y no sobre
+    dev/other/, que cubre unos dos tercios.
+    LO QUE QUEDA ABIERTO: el MODELO de cada tipo nuevo. Los nueve de HL2 usan
+    el .mdl de su propio item_ammo_* y por eso una caja en el suelo y su item se
+    ven igual; para un tipo que no tiene entidad de mundo en HL2 no hay ese
+    default gratis.
 
     ENLAZA: el campo def.ammo.att reservado en el schema (§16.6) y el binding de
     ammo-atts de EFT, que es el mismo frente por el otro lado.
@@ -1450,6 +1464,9 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     NO ES NUEVO — un chaleco con dos placas ya se comportaba asi desde el
     Block 1, porque WeightOf recurre y el tooltip no —, pero el #56 lo vuelve
     mas visible porque ahora cambia SOLO, sin que el jugador monte nada.
+    PEDIDO EXPLICITO DEL AUTOR (planilla AC, nota del check AC3, 2026-08-01):
+    "el tooltip deberia reflejar el peso que tiene el arma por efectos de la
+    municion en el cargador". Deja de ser anotacion nuestra y pasa a ser pedido.
     LO QUE HAY QUE DECIDIR: si la ficha muestra el peso EFECTIVO de la instancia
     (def + sub-slots + balas, y manana + atts) o el de la def con el extra al
     lado. Es una decision de UI y del autor. El calculo ya existe y es uno solo:
