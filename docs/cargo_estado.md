@@ -478,11 +478,17 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   **La tanda entregó instrumento, no parche:** `AmmoPool.IsReady` expone el gate (hasta ahora
   *«apagado»* y *«corre y falla»* eran indistinguibles desde el juego) y `cargo_dev_ammoweight`
   imprime los dos interruptores más el invariante **ya comparado**. **Falta correrlo.**
-  **Segunda puerta del éter, confirmada y NO parcheada todavía:** tomar un arma de HL2 **del
-  mundo** regala reserva — el parche de la ronda 1 cerró la ruta del *equip*, no la de la
-  **captura**. El clawback que existe es **sólo de VJ Base** (lee `PickUpAmmoAmount`); para un
-  arma del engine no hay tabla que leer y hay que hacerlo **por delta** en
-  `PlayerCanPickupWeapon`, que es el único "antes" legible. No se escribe con el espejo detenido.
+  **EL ESPEJO VOLVIÓ** (reporte del autor: *«se arregló el belt con la munición»*), así que el
+  bloqueante está levantado y el instrumento queda igual — es el que va a decir cuál de los dos
+  interruptores era, si vuelve a pasar.
+  **Segunda puerta del éter, PARCHEADA (parche 3):** tomar un arma de HL2 **del mundo** regalaba
+  reserva, y el síntoma sobrevivió al espejo restaurado, o sea que era independiente. El parche de
+  la ronda 1 había cerrado la ruta del *equip*; ésta es la de la **captura**. Se resuelve **por
+  DELTA y no por lectura**: el clawback que ya existía es **sólo de VJ Base** (lee
+  `PickUpAmmoAmount`), y un arma del engine no es un SWEP, así que no hay tabla que leer — lo que
+  hay es un **antes**, porque toda adquisición pasa por `PlayerCanPickupWeapon` antes del `Equip`.
+  Se fotografía ahí y se restaura un tick después, **sólo si el pool subió**. Los throwables quedan
+  afuera a propósito: para un frag el regalo del engine **es** el mecanismo (§16.9).
 - **AC9 CERRÓ la deuda de verificación de la entry 64**, abierta desde el #53: montar un att
   desde el menú C **descuenta uno del grid** (`pmag_30` de `grid=5 montado=0` a `grid=4
   montado=1`, con el STANAG desalojado en `grid=1`). El puente no duplica, medido en juego.

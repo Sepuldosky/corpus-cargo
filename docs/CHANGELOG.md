@@ -5888,6 +5888,33 @@ world gate dice que *toda* adquisición pasa por `PlayerCanPickupWeapon` **antes
 sea que ahí está el único "antes" legible. **No se escribe todavía**: el espejo está detenido, y
 un tercer parche sobre un subsistema que ahora mismo no se puede verificar en juego es una apuesta.
 
+#### PARCHE 3 — el éter por la puerta de la CAPTURA (reportado dos veces)
+
+Con el espejo de vuelta en marcha (*«se arregló el belt con la munición»*) el síntoma sobrevivió
+y se pudo aislar: **tomar el RPG del suelo sigue regalando cohetes**. Es la puerta que el parche 1
+no cubría — aquél cerró `ply:Give` (el equip desde el inventario, confirmado en juego); ésta es el
+arma que viene **del mundo**, donde el engine la entrega con su reserva por default *antes* de que
+`WeaponEquip` acuñe el ítem y la strippee.
+
+**Se resuelve por DELTA y no por lectura, y ésa es la diferencia con el clawback que ya existía.**
+El de VJ Base lee `PickUpAmmoAmount` del SWEP y descuenta el número exacto; un arma del **engine**
+no es un SWEP —`weapons.Get` devuelve `nil`— así que no hay tabla que leer. Lo que sí hay es un
+**antes**: el propio comentario del world gate declara que *toda* adquisición (touch, WALK+USE y
+`ply:Give`) pasa por `PlayerCanPickupWeapon` **antes** del `Equip`. Se fotografía ahí y se restaura
+un tick después, sólo si el pool **subió**. Funciona con cualquier base, incluida una que no
+conozcamos — es "detección, nunca asunción" aplicado al regalo.
+
+**Los throwables quedan afuera a propósito y no es un descuido:** para un frag el regalo del engine
+**es** el mecanismo (§16.9 — es lo que mueve el `×N` del stack equipado cuando el engine concede una
+granada). Clawbackearlo rompería la recogida de granadas del mundo.
+
+**Y las reversiones auditaron los checks antes que al código:** de las cuatro, **dos volvieron con
+CERO rojos** y las dos eran culpa de los checks, no del parche. El del piso medía *«sin regalo el
+pool no cambia»* —con el antes y el después iguales, que un clawback sin guarda pasa igual—, y el
+de los throwables **pasaba por un `nil` ajeno**: el stub de `GetAmmoName` no contestaba para el
+tipo del frag, así que la granada quedaba sin fotografiar por una razón que no era la excepción que
+el check decía medir. Reescritos, las cuatro reversiones ponen en rojo **un check cada una**.
+
 #### Qué se hizo en esta tanda
 
 Instrumento, no parche. `AmmoPool.IsReady` expone el gate —hasta ahora *«el espejo está apagado»*

@@ -748,6 +748,37 @@ hook.Add("PlayerCanPickupWeapon", "corpus_cargo_world_gate", function(ply, wep)
         prim.PickUpAmmoAmount = 0
         wep.Primary = prim
     end
+    -- EL ÉTER POR LA OTRA PUERTA — la CAPTURA (planilla AC ronda 2, medido en
+    -- juego: con los cohetes en 0, botar el RPG y volver a tomarlo devolvía
+    -- TRES cohetes). El parche del equip cerró `ply:Give`; esto es lo que pasa
+    -- cuando el arma viene DEL MUNDO: el engine la entrega con su reserva por
+    -- default antes de que WeaponEquip acuñe el ítem y la strippee, así que la
+    -- munición queda en el pool sin stack que la explique.
+    --
+    -- POR DELTA Y NO POR LECTURA, y ésa es la diferencia con el clawback de VJ
+    -- que ya vive abajo: aquel lee `PickUpAmmoAmount` del SWEP y descuenta el
+    -- número exacto, pero un arma del ENGINE no es un SWEP —`weapons.Get`
+    -- devuelve nil— así que no hay tabla que leer. Lo que sí hay es un ANTES:
+    -- este hook corre para toda adquisición (touch, WALK+USE y `ply:Give`) y
+    -- corre ANTES del Equip, como dice el comentario de arriba. Se fotografía
+    -- acá y se restaura del otro lado. Es "detección, nunca asunción" aplicado
+    -- al regalo: funciona con cualquier base, incluida una que no conocemos.
+    --
+    -- LOS THROWABLES QUEDAN AFUERA A PROPÓSITO, y no es un descuido: para un
+    -- frag el regalo del engine ES el mecanismo (§16.9 — es lo que mueve el ×N
+    -- del stack equipado cuando el engine concede una granada). Clawbackearlo
+    -- rompería la recogida de granadas del mundo.
+    if cvCapture:GetBool() and IsValid(ply) and ply:IsPlayer()
+        and not ply.CargoEquipGive and ThrowableFace(wep:GetClass()) == nil then
+        local okT, t = pcall(wep.GetPrimaryAmmoType, wep)
+        local name = (okT and isnumber(t) and t >= 0) and game.GetAmmoName(t) or nil
+        if isstring(name) and name ~= "" then
+            -- se pisa en cada llamada a propósito: el touch dispara repetido y
+            -- la última foto antes del Equip es la que vale
+            wep.CargoAmmoBefore = { name, ply:GetAmmoCount(name) }
+        end
+    end
+
     if not cvWorldGuns:GetBool() then
         -- gate off: stock VJ behavior, from inside the single hook
         if vjPickup ~= nil then return vjPickup(ply, wep) end
@@ -998,6 +1029,30 @@ hook.Add("WeaponEquip", "corpus_cargo_capture", function(wep, ply)
             timer.Simple(0, function()
                 if IsValid(owner) and owner:IsPlayer() then
                     owner:RemoveAmmo(grant, ammoType)
+                end
+            end)
+        end
+    end
+
+    -- La otra mitad del clawback por DELTA (ver la foto en el world gate): el
+    -- engine acaba de regalar la reserva por default del arma. Se devuelve el
+    -- pool al valor que tenía ANTES de la adquisición, y sólo si SUBIÓ —
+    -- bajarlo por debajo sería robarle munición al jugador, que es el defecto
+    -- simétrico y peor.
+    --
+    -- Un tick tarde, por el mismo motivo que el clawback de VJ: es a prueba de
+    -- en qué orden lleguen Equip y WeaponEquip. Si un tick del espejo se cuela
+    -- en el medio, la baja del pool se lee como consumo y el cinturón se
+    -- re-drena — consistente igual, por las dos ramas.
+    do
+        local antes = istable(wep.CargoAmmoBefore) and wep.CargoAmmoBefore or nil
+        wep.CargoAmmoBefore = nil
+        if antes ~= nil and IsValid(ply) and ply:IsPlayer() and not ply.CargoEquipGive then
+            local tipo, previo, owner = antes[1], antes[2], ply
+            timer.Simple(0, function()
+                if not IsValid(owner) or not owner:IsPlayer() then return end
+                if owner:GetAmmoCount(tipo) > previo then
+                    owner:SetAmmo(previo, tipo)
                 end
             end)
         end
