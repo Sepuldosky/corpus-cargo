@@ -545,7 +545,7 @@ if SERVER then
     -- treats their Lua tables the same is exactly the open question.
     -- No admin gate, like the rest of the dev kit (CRG-45).
     -- ------------------------------------------------------------------
-    concommand.Add("cargo_dev_worldwep", function(ply)
+    concommand.Add("cargo_dev_worldwep", function(ply, _, args)
         if not IsValid(ply) then ply = player.GetAll()[1] end
         if not IsValid(ply) then return end
 
@@ -587,17 +587,32 @@ if SERVER then
                 Corpus.Log("cargo", "  save table: NO LEGIBLE en esta entidad — "
                     .. "si no hay datamap, el regalo no se puede apagar por ahí y la frontera es esa")
             else
-                local vistos = 0
+                -- Por NOMBRE y también por VALOR. Filtrar sólo por "ammo"/"clip"
+                -- asume que el campo se llama como uno espera, y ésa es la
+                -- suposición que ya falló una vez en este mismo frente. El
+                -- regalo que el HUD anuncia es un número conocido —los 3
+                -- cohetes—, así que cualquier campo que valga exactamente eso
+                -- es candidato, se llame como se llame.
+                local esperado = tonumber(args and args[1]) or 3
+                local vistos, porValor = 0, 0
                 for k, v in pairs(save) do
                     local nombre = tostring(k):lower()
-                    if nombre:find("ammo", 1, true) or nombre:find("clip", 1, true) then
-                        Corpus.Log("cargo", "  save." .. tostring(k) .. " = " .. tostring(v))
-                        vistos = vistos + 1
+                    local porNombre = nombre:find("ammo", 1, true) or nombre:find("clip", 1, true)
+                    local coincide = tonumber(v) == esperado
+                    if porNombre or coincide then
+                        Corpus.Log("cargo", "  save." .. tostring(k) .. " = " .. tostring(v)
+                            .. (coincide and not porNombre and "   <<< vale " .. esperado
+                                .. ", candidato por VALOR" or ""))
+                        if porNombre then vistos = vistos + 1 end
+                        if coincide then porValor = porValor + 1 end
                     end
                 end
-                Corpus.Log("cargo", "  save table: " .. vistos
-                    .. " campo(s) de ammo/clip sobre " .. table.Count(save) .. " totales"
-                    .. (vistos == 0 and "  <<< ninguno: el regalo no vive en el datamap" or ""))
+                Corpus.Log("cargo", "  save table: " .. vistos .. " campo(s) de ammo/clip y "
+                    .. porValor .. " que valen " .. esperado
+                    .. ", sobre " .. table.Count(save) .. " totales"
+                    .. ((vistos == 0 and porValor == 0)
+                        and "  <<< ninguno: el regalo NO vive en el datamap" or ""))
+                Corpus.Log("cargo", "  (el valor buscado se cambia: cargo_dev_worldwep <n>)")
             end
             Corpus.Log("cargo", "  CargoGiftCut      = " .. tostring(ent.CargoGiftCut)
                 .. "   (si es nil, esta arma nunca pasó por el world gate)")
