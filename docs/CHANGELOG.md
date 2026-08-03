@@ -5617,7 +5617,7 @@ día el sync se rompe, esta es la entrada que nadie miró en juego.
 
 ---
 
-## 65. El peso de la munición cargada (roadmap #56) `[PENDIENTE]`
+## 65. El peso de la munición cargada (roadmap #56) `[APLICADO 2026-08-01]`
 
 **Las mismas 30 balas pesaban 0,36 kg en el cinturón y 0 kg adentro del arma**, así que
 recargar era un descuento de peso. Medido sobre el loadout real del autor (planilla AC, dump de
@@ -5973,3 +5973,28 @@ invariante ya comparado, con el veredicto por tipo.
 con su AUSENCIA: con el gate cerrado el espejo **no** corrige un desincronizado, y con el gate
 abierto el **mismo** desincronizado se corrige. Sin esa segunda mitad, el primero pasaría también
 con un espejo que no hace nada.
+
+### Cierre — cuatro rondas, y el bloque cierra por lo que MIDIÓ y no por lo que se propuso
+
+**Decisión del autor, 2026-08-01:** *«sí, por ahora será costo cosmético, se arregló el resto pero
+se muestran los cohetes en el HUD»*. La frontera queda **declarada en §13 con su medición**, que es
+la diferencia entre cerrar y abandonar: se sabe qué miente (el aviso), qué no (el ledger), por qué
+no se tapó (una carrera no es un arreglo) y qué costaría taparlo (no dejar que el engine equipe el
+arma, arriesgando la superficie de compat que el header de `capture.lua` protege).
+
+**Lo que el bloque entrega, todo medido en juego:** las balas del cargador pesan y se cuentan una
+sola vez; el tipo de munición se resuelve sin entidad viva; la cadencia es la del poll que ya
+corría y **se siente como una curva y no como escalones** (AC7); y **dos puertas del éter que no
+eran de este bloque quedaron cerradas de paso** — equipar un arma del engine y tomarla del suelo,
+las dos regalaban reserva, la segunda desde el Bloque B.
+
+**Y el bloque cierra con más reglas de método que de código.** Ninguno de los cuatro parches salió
+de donde el bloque miraba: el primero de una **nota en un check que pasó**, el segundo de un **rojo
+que refutó la premisa** en vez del código, el tercero de un reporte que sobrevivió al bloqueante, y
+el cuarto de **medir en vez de adivinar un segundo nombre de campo**. Tres veces la reversión
+auditó **el instrumento antes que al código** — dos checks que no distinguían y un `pcall` cuya
+ausencia mataba la corrida en vez de enrojecerla —, y una afirmación de este mismo CHANGELOG hubo
+que **corregirla porque la medición la volvió falsa**.
+
+Harness **771 → 817** (46 nuevos), **19 reversiones verificadas en negativo**. Checker limpio,
+espejo regenerado.

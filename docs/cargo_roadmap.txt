@@ -1356,8 +1356,16 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     ANTES QUE ESTE, el autor quiere el PESO DE LA MUNICION cargada: es el #56,
     abajo. Se ejecuta primero.
 
-56. EL PESO DE LA MUNICION CARGADA [Cargo weight/ammo] — ESCRITO (entry 65),
-    ESPERANDO LA PLANILLA AC. Pedido del autor 2026-07-31, al cerrar el #53.
+56. EL PESO DE LA MUNICION CARGADA [Cargo weight/ammo] — CERRADO 2026-08-01,
+    entry 65 [APLICADO], planilla AC en cuatro rondas.
+    CIERRA CON UNA FRONTERA COSMETICA DECLARADA en §13 y decidida por el autor:
+    el HUD anuncia la municion que el arma del engine regala aunque el jugador
+    nunca la reciba. El invariante esta cerrado (el pool queda en 0, medido);
+    lo que miente es el aviso, y taparlo costaria no dejar que el engine equipe
+    el arma — la superficie de compat que el header de capture.lua protege.
+    DE PASO CERRO DOS PUERTAS DEL ETER que no eran de este bloque: equipar un
+    arma del engine y tomarla del suelo, las dos regalaban reserva, la segunda
+    desde el Bloque B. Pedido del autor 2026-07-31, al cerrar el #53.
     SE EJECUTO ANTES DEL #55, como el autor pidio.
     Semilla: dev/PROMPT_cargo_56_peso_municion.txt. Sede del diseno:
     Cargo_Architecture.md §16.10 + CRG-67 en ids.yaml. Detalle: CHANGELOG 65.

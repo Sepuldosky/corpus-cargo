@@ -5,8 +5,9 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-01 (**entry 65 — roadmap #56, el peso de la munición cargada**,
-**planilla AC ronda 1: 8 PASA · 1 FALLA**, sigue `[PENDIENTE]` a la espera de la ronda 2. **Las
+**Última actualización:** 2026-08-01 (**entry 65 `[APLICADO]` — roadmap #56 CERRADO**, el peso de
+la munición cargada, confirmado en juego con la **planilla AC en cuatro rondas** y una **frontera
+cosmética declarada en §13** por decisión del autor. **Las
 mismas 30 balas pesaban 0,36 kg en el cinturón y 0 kg adentro del arma**, o sea que recargar era
 un descuento: medido sobre el loadout real, **1,588 kg escondidos en cinco armas**. Ya pesan —
 **CRG-67 acuñada** (*una bala pesa lo mismo viva donde viva y ninguna ruta la cuenta dos veces*),
@@ -463,8 +464,9 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **BLOQUEANTE ABIERTO tras la ronda 2 de la AC (1 PASA · 2 FALLA): el ESPEJO DE MUNICIÓN NO
-  ESTÁ CORRIENDO en la instalación del autor**, y los dos rojos son ese único hecho. La captura
+- **Detalle de las rondas 2-4, para referencia. El bloqueante de la ronda 2 quedó RESUELTO** (el
+  espejo volvió por su cuenta y el instrumento que lo lee quedó escrito para la próxima vez).
+  Entonces: **el ESPEJO DE MUNICIÓN NO ESTABA CORRIENDO**, y los dos rojos son ese único hecho. La captura
   de pantalla lo prueba contra CRG-15: 3 cohetes y 2 virotes en el pool que **no están en ningún
   slot del cinturón ni en el grid**, con dos slots libres — y los cuatro tipos que sí coinciden
   son exactamente los que no tuvieron actividad. Un espejo con un bug no se ve así; **un espejo
