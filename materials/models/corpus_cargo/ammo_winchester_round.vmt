@@ -1,0 +1,9 @@
+"VertexLitGeneric"
+{
+	"$basetexture" "models/corpus_cargo/ammo_winchester_round"
+	"$bumpmap" "models/corpus_cargo/ammo_winchester_round_normal"
+	"$phong" "1"
+	"$phongexponent" "20"
+	"$phongboost" "3"
+	"$phongfresnelranges" "[0.5 1 4]"
+}

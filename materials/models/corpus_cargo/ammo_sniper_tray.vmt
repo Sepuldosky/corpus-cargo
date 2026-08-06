@@ -1,0 +1,5 @@
+"VertexLitGeneric"
+{
+	"$basetexture" "models/corpus_cargo/ammo_sniper_tray"
+	"$bumpmap" "models/corpus_cargo/ammo_sniper_tray_normal"
+}

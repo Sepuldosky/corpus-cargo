@@ -23,6 +23,7 @@ Antes de tocar código o diseño, lee en este orden (los tres primeros son **doc
 5. **Arquitectura del módulo** → [`docs/Cargo_Architecture.md`](docs/Cargo_Architecture.md) (Block 1: inventario). Doc particular autocontenido.
 6. **Arquitectura del banco de trabajo** → [`docs/Workbench_Arquitectura.md`](docs/Workbench_Arquitectura.md). Subsistema propio (craft/reparación/desarme), **bloque futuro — NO implementado**.
 7. **Convenciones de commit** → [`docs/cargo_convenciones_commits.txt`](docs/cargo_convenciones_commits.txt). Alcances específicos de **este** repo.
+8. **Créditos de assets de terceros** → [`docs/CREDITOS.md`](docs/CREDITOS.md). El repo shipea dos modelos de munición **CC BY 4.0** (`models/corpus_cargo/`), y la atribución es **obligación de la licencia**. Todavía no los usa ninguna def: el roadmap **#57** deja los ítems detrás de un censo del arsenal vivo con `cargo_dev_dump_weapons`.
 
 Los mockups congelados de la UI viven en [`docs/mockups/`](docs/mockups/) — dicen QUÉ va dónde, no cómo maquetarlo (son CSS; VGUI no tiene flexbox: todo es Dock/SetPos/Paint manual).
 
