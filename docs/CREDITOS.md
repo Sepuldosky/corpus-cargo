@@ -24,14 +24,28 @@ Los dos son del mismo autor, así que **una sola entrada los cubre**.
 | `ammo_sniper` | caja de cartón abierta, *ELITE HUNTER · 7mm MAG · 20 cartridges*, con 13 cartuchos | [Sniper Ammo Box (Game-ready)](https://sketchfab.com/3d-models/sniper-ammo-box-game-ready-5338de8c47ea4f68aa40dd51602a2b53) | 6.000 | 19 cm |
 | `ammo_winchester` | caja de cartón abierta, *PANTHERA · .44 MAG*, con ~15 cartuchos | [Magnum Ammo Box (game-ready)](https://sketchfab.com/3d-models/magnum-ammo-box-game-ready-c85ea88531e84bf7b72b89b9e5cc79db) | 7.960 | 13 cm |
 
-> **El nombre del archivo es el del POOL de engine, no el del calibre.** El arte de
-> `ammo_winchester` dice **.44 Magnum**; se llama así porque es el pool que Cargo ata. El mapeo
-> vive acá y en el header de su `.qc` — en ningún otro lado.
+> **CORRECCIÓN (2026-08-06, roadmap #57): el nombre del archivo NO es el de un pool del engine.**
+> Esta página decía que sí, y el censo del arsenal vivo lo refutó: **`Winchester` no existe como
+> tipo de munición** —no aparece en `garrysmod/bin/win64/server.dll`, donde `AirboatGun`,
+> `SniperRound` y `SniperPenetratedRound` sí están—. Es el `PrintName` que **TFA Base** le pone al
+> pool `AirboatGun` (`tfa_ammo_winchester`, *"Winchester Ammo"*, 50 balas). El mapeo real es:
+>
+> | `.mdl` | Pool del engine que ata | Ítem de Cargo |
+> |---|---|---|
+> | `ammo_sniper` | `SniperPenetratedRound` (10 armas ARC9) **y** `SniperRound` (3 de VJ) | `cargo_ammo_sniperpenetratedround` · `cargo_ammo_sniperround` |
+> | `ammo_winchester` | `AirboatGun` | `cargo_ammo_airboatgun`, mostrado como *Winchester Rounds* |
+>
+> Y el desajuste de calibre queda **a la vista y por decisión**: el arte dice **.44 Magnum** y el
+> ítem se etiqueta **`.308`**, que es el texto de la caja de TFA que reparte estas balas. El modelo
+> es **suplente** hasta que exista una caja de .308 (pedido del autor, 2026-08-06).
+>
+> **Ése es el único pendiente del #57**, y es de arte: cuando aparezca la caja de .308 se agrega
+> acá con su crédito y se cablea con `Items.SetModel("cargo_ammo_airboatgun", …)` — **sin tocar la
+> tabla `AMMO`**, que para eso existe ese punto de extensión (entry 34).
 
-**Todavía no los usa ninguna def.** El roadmap **#57** (los tipos de munición que Cargo no maneja)
-deja la escritura de los ítems detrás de un censo del arsenal vivo con `cargo_dev_dump_weapons`;
-lo que ese punto dejaba abierto y ya está cerrado es **el modelo**. Confirmados en juego el
-2026-08-05.
+**Los usan tres defs desde el roadmap #57** (`shared/corpus_cargo_ammo.lua`), y los dos ítems de
+francotirador **comparten `ammo_sniper.mdl`**: son dos pools distintos del engine y lo que los
+separa en la celda es el nombre. Modelos confirmados en juego el 2026-08-05.
 
 ## Cómo se reproducen
 

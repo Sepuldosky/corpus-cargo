@@ -5,7 +5,48 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-01 (**entry 65 `[APLICADO]` — roadmap #56 CERRADO**, el peso de
+**Última actualización:** 2026-08-07 (**entry 66 `[APLICADO]` — roadmap #57 CERRADO y confirmado
+en juego**: los tres pools de munición que el cinturón **no miraba**. No era un problema de peso —
+un tipo fuera de `CARGO.Ammo.TYPES` es un tipo que el espejo de §16.3 **no recorre**, o sea que
+**esas armas no se alimentaban del cinturón**; el #56 sólo lo hizo visible y lo dejó como frontera.
+Tres defs nuevos y el espejo, el peso, el precio, el badge, el unload y el veto de mundo lo heredan
+**sin una línea propia**.
+**EL CENSO SE REHIZO SOBRE EL ARSENAL VIVO —380 `.gma` suscritos, índice parseado— Y CORRIGIÓ DOS
+PREMISAS DEL PROPIO ROADMAP:** (1) **«Winchester» no es un tipo de munición del engine** —no está
+en `server.dll`, donde `AirboatGun`/`SniperRound`/`SniperPenetratedRound` sí—: es el `PrintName`
+de **TFA Base** para el pool `AirboatGun`, así que *«airboatgun/winchester»* nunca fueron dos pools
+sino **uno con dos nombres**, y registrarlos como dos habría acuñado un ítem fantasma; (2) los
+francotiradores de ARC9 comen **`SniperPenetratedRound`** y son **diez** clases, no siete (las 7 de
+ARC9MW + `awp`/`scout`/`ssg08` de `arc9_go`, que `dev/other/` no tenía), mientras que `SniperRound`
+es **otro** pool con tres comedores, todos VJ. Por eso van **los dos** registrados y ninguno
+remapeado: dos pools del engine son dos reservas.
+**Y un tercer dato que sólo aparece midiendo:** ARC9MW escribe el tipo con **dos grafías** según el
+archivo (`SniperPenetratedRound` / `sniperPenetratedRound`). La resolución ya era case-insensitive;
+si no lo fuera, **la mitad de las diez seguiría sin cinturón** y se leería como *«a veces anda»*.
+**LA VERIFICACIÓN EN NEGATIVO DESTAPÓ UN DEFECTO DEL INSTRUMENTO, Y ERA LA REGLA DEL #53 COMETIDA
+AL ESCRIBIR LOS CHECKS QUE LA CITAN:** las seis reversiones enrojecen, pero **cinco lo hacían
+crasheando** —los checks indexaban el def pelado, así que quitar una entrada mataba la corrida en
+vez de enrojecerla y se llevaba puestos los de abajo—. Corregido con guarda: hoy dan rojo limpio y
+la corrida llega al final. **La sexta no se puede reclamar y se dice:** R5 (volver `ItemForType`
+case-sensitive) enrojece pero crashea **antes** de llegar al check de las dos grafías, así que ese
+check lo sostiene la medición que documenta y no una reversión propia.
+**Dos checks viejos se corrigieron, no se borraron:** `#56(a)` y `#56(e)` usaban
+`SniperPenetratedRound` como ejemplo de *«tipo que Cargo NO maneja»* y esta tanda vuelve esa
+premisa falsa; pasan al pool propio del cuchillo arrojadizo de ARC9MW, que **sigue** sin ítem, y el
+francotirador queda como su **contracara**. Harness **817 → 828**.
+**Dos fronteras dichas:** **ninguna arma del arsenal vivo come `AirboatGun`** —su única fuente es
+la caja de TFA, por eso entra a `WORLD_AMMO`— y los pools por-lanzable de cada pack ARC9 quedan
+afuera: son pregunta de throwables (§16.9).
+**LA PASADA EN JUEGO CERRÓ, Y CERRÓ POR EL CAMINO QUE SE ESCRIBIÓ:** *«no se rompió nada y están
+los modelos; tomar `tfa_ammo` da la munición correspondiente»*, **con la caja entregando un ÍTEM AL
+GRID**. Eso último se preguntó antes de escribirlo y no es cosmético: *«la caja da munición»* es
+cierto en los **dos** mundos —el ítem al grid (lo nuestro) y el pool crudo que el espejo absorbe al
+cinturón (la deuda de `arc9_ammo`, §16.5)—, y **un «funciona» que no distingue qué mecanismo corrió
+no cierra un bloque**. Es CRG-16 literal. **Único pendiente, y es de arte:** la caja de **.308** —
+el modelo actual dice *.44 Magnum* y es **suplente declarado**; re-vestirlo cuesta un
+`Items.SetModel` y ninguna línea de la tabla `AMMO`.)
+
+Antes, 2026-08-01 (**entry 65 `[APLICADO]` — roadmap #56 CERRADO**, el peso de
 la munición cargada, confirmado en juego con la **planilla AC en cuatro rondas** y una **frontera
 cosmética declarada en §13** por decisión del autor. **Las
 mismas 30 balas pesaban 0,36 kg en el cinturón y 0 kg adentro del arma**, o sea que recargar era
@@ -454,10 +495,23 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   viva donde viva y ninguna ruta la cuenta dos veces. El refresco viaja en el **poll
   de 4 Hz que ya corría** (`AmmoPool.SyncHeldClip`) — decisión del autor con los cuatro
   costos medidos. Sin convars, sin net, sin timers nuevos.
-- **Harness offline: 798 checks verdes en ambos realms** (con gate final: un
+- **Los tres pools que el cinturón no miraba** (entry 66, roadmap #57,
+  **confirmado en juego**): `SniperPenetratedRound` (*Sniper Rounds (AP)*, las **10**
+  clases de francotirador ARC9 del arsenal vivo), `SniperRound` (*Sniper Rounds
+  (Ball)*, **3** armas VJ) y `AirboatGun` (*Winchester Rounds* — **`Winchester` no
+  es un tipo del engine**, es el `PrintName` de TFA para ese pool). Tres entradas
+  en la tabla `AMMO` y el espejo, el peso, el precio, el badge, el unload y el veto
+  de mundo lo heredan sin una línea propia. Los dos de francotirador **comparten
+  `ammo_sniper.mdl`** y los separa el **nombre**. Las dos cajas de TFA
+  (`tfa_ammo_winchester` 50, `tfa_ammo_sniper_rounds` 30) entran a `WORLD_AMMO`
+  porque la de Winchester es la **única fuente** de `AirboatGun` en el arsenal —
+  y se midió que la caja entrega **ítem al grid** (CRG-16) y no reserva cruda.
+  **Pendiente de arte:** el `.mdl` de Winchester dice *.44 Magnum* y el ítem se
+  etiqueta `.308` — suplente declarado hasta que haya una caja de .308.
+- **Harness offline: 828 checks verdes en ambos realms** (con gate final: un
   FAIL tardío ya no imprime ALL GREEN, y **el total lo imprime el propio script** — no se
   grepea de stdout, donde el banner de realm corría carreras con los `print` de Lua);
-  `cargo_selftest` 83 client / 76 server.
+  `cargo_selftest` 83 client / 76 server (+2 en el bloque de munición).
 - **Mapa de archivos completo** → [`../CLAUDE.md`](../CLAUDE.md). Remote
   `origin` **al día** (push 2026-07-13, pedido del autor; incluye `LICENSE`
   MIT y el rename `corpus_stalker` en el kit dev).

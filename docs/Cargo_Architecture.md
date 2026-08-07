@@ -784,15 +784,33 @@ literalmente `ply:GetAmmoCount(self:GetProcessedValue("Ammo"))`
 (`Arc9 Base/lua/weapons/arc9_base/sh_reload.lua:578-586`). Por eso el modelo funciona **nativo**,
 sin pelearse con ARC9 ni forkearlo.
 
-Los **11 tipos** de munición del engine que Cargo maneja quedan registrados como ítems en
+Los **14 tipos** de munición del engine que Cargo maneja quedan registrados como ítems en
 [`shared/corpus_cargo_ammo.lua`](../lua/corpus_cargo/shared/corpus_cargo_ammo.lua), cada uno con
-modelo, peso por unidad, descripción y **`max_stack`**: **9 como munición de cinturón**
-(`cargo_ammo_<tipo>`, categoría `ammo`) y **2 con cara lanzable** (`cargo_throw_frag` /
+modelo, peso por unidad, descripción y **`max_stack`**: **9 como munición de cinturón de HL2**
+(`cargo_ammo_<tipo>`, categoría `ammo`), **2 con cara lanzable** (`cargo_throw_frag` /
 `cargo_throw_slam`, categoría `throwables` — ver la enmienda de §4 y §16.9; los ids
 `cargo_ammo_grenade`/`cargo_ammo_slam` quedaron **muertos** y remapean vía
-`CARGO.Ammo.LegacyThrowIds`). El tope es lo que convierte a los seis slots del cinturón en una
-**decisión** (cuánta munición y de qué calibre te colgás) en vez de decoración. Los `.mdl` se
-verificaron parseando los VPK reales, no de memoria.
+`CARGO.Ammo.LegacyThrowIds`) y **3 del roadmap #57** (abajo). El tope es lo que convierte a los
+seis slots del cinturón en una **decisión** (cuánta munición y de qué calibre te colgás) en vez de
+decoración. Los `.mdl` de HL2 se verificaron parseando los VPK reales, no de memoria.
+
+> **Los 3 del roadmap #57 (2026-08-06) — y por qué la lista no era una preferencia sino un
+> agujero.** Un tipo que **no está** en `CARGO.Ammo.TYPES` es un tipo que el espejo de §16.3 **no
+> recorre**: el cinturón sencillamente **no alimentaba** a las armas que lo comen. El #56 sólo lo
+> volvió visible (su cargador pesaba 0) y lo dejó como frontera declarada.
+>
+> | Pool del engine | Ítem | Quién lo come, medido sobre el arsenal VIVO |
+> |---|---|---|
+> | `SniperPenetratedRound` | *Sniper Rounds (AP)* | **10** clases: 7 de ARC9MW + `awp`/`scout`/`ssg08` de `arc9_go` |
+> | `SniperRound` | *Sniper Rounds (Ball)* | **3**, todas VJ: `weapon_vj_ssg08`, `m40a1` y `csniper` de HL Resurgence |
+> | `AirboatGun` | *Winchester Rounds* | **ninguna** — su única fuente es la caja de TFA |
+>
+> **`Winchester` no es un tipo del engine** (no está en `server.dll`): es el `PrintName` de TFA
+> Base para `AirboatGun`. Por eso el ítem se **llama** Winchester —que es lo que el jugador lee— y
+> su **clave** es el pool, que es lo que manda esta sección. Los dos de francotirador **comparten
+> `.mdl`** y los separa el nombre; son **dos pools**, así que son **dos reservas** y no se remapean
+> uno en el otro. Sus modelos son propios del addon (no hay `item_ammo_*` de HL2 del que heredarlos)
+> — [`CREDITOS.md`](CREDITOS.md).
 
 ### 16.3 El espejo (`server/corpus_cargo_ammopool.lua`)
 

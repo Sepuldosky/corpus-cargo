@@ -1252,7 +1252,13 @@ function CARGO._SelfTest()
     -- The mirror itself needs a live player, so it is verified by the offline
     -- harness and in game — here we only pin the map that the mirror reads.
     if CARGO.Ammo ~= nil then
-        check("ammo: los 11 tipos de HL2 registrados", #CARGO.Ammo.TYPES == 11)
+        -- 14 = 9 de cinturón HL2 + 2 con cara lanzable + los 3 del roadmap #57
+        check("ammo: los 14 tipos de engine registrados", #CARGO.Ammo.TYPES == 14)
+        check("ammo: los tres pools del #57 resuelven a su ítem",
+            CARGO.Ammo.ItemForType("SniperPenetratedRound") == "cargo_ammo_sniperpenetratedround"
+            and CARGO.Ammo.ItemForType("SniperRound") == "cargo_ammo_sniperround"
+            -- el ítem se llama Winchester y el pool debajo es AirboatGun
+            and CARGO.Ammo.ItemForType("AirboatGun") == "cargo_ammo_airboatgun")
 
         local pistolId = CARGO.Ammo.ItemForType("Pistol")
         check("ammo: el tipo resuelve a su ítem", pistolId == "cargo_ammo_pistol")

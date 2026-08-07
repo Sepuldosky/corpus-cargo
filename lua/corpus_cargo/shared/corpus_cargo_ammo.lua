@@ -16,11 +16,16 @@
 -- "different" calibers therefore share one HL2 type. So `hl2` is the truth and
 -- `caliber` is a DISPLAY label (it is what the A/B belt badge groups on).
 --
--- Every .mdl below was verified to exist by parsing the real VPKs
+-- Every HL2 .mdl below was verified to exist by parsing the real VPKs
 -- (sourceengine/hl2_misc_dir.vpk, garrysmod/garrysmod_dir.vpk) — the same rule
 -- this project applies to ARC9 names: paths are never trusted from memory.
 -- They are also the models HL2's own item_ammo_* entities use, so a box on the
 -- floor and its inventory item look like the same object.
+--
+-- The THREE types of roadmap #57 are the exception, and it is the reason that
+-- point stayed open: HL2 has no item_ammo_* entity for them, so there is no
+-- model to inherit. They ship with the addon (models/corpus_cargo/, CC BY 4.0
+-- — docs/CREDITOS.md) and are the only ones here that are not Valve's.
 
 local CARGO = Corpus.GetModule("cargo")
 
@@ -81,6 +86,61 @@ local AMMO = {
       model = "models/items/combine_rifle_ammo01.mdl",
       weight = 0.5, max_stack = 3, value = 600,
       trivia = "Contained singularity. Carrying it is the second worst idea; firing it is the first." },
+
+    -- ------------------------------------------------------------------
+    -- ROADMAP #57 — the pools the live arsenal eats and Cargo did not manage.
+    --
+    -- WHAT WAS BROKEN, and it is older and bigger than the weight of a loaded
+    -- magazine that made it visible: a type outside this table is a type the
+    -- §16.3 mirror never looks at, so THE BELT DID NOT FEED THOSE WEAPONS at
+    -- all. #56 only made it show up (their magazine weighed 0) and left it
+    -- declared as a frontier. Author call (planilla AC, check AC6): they are
+    -- REGISTERED AS ITEMS, not remapped onto a type that already has one.
+    --
+    -- Measured over the LIVE arsenal, not over dev/other/ which the roadmap
+    -- warned covers ~2/3: the 380 subscribed .gma of 2026-08-06, index parsed
+    -- and every .lua inside read. That census corrected two premises, so both
+    -- corrections are written here and not just in the docs:
+    --
+    --   * "Winchester" IS NOT AN ENGINE AMMO TYPE. It does not exist in
+    --     garrysmod/bin/win64/server.dll (AirboatGun, SniperRound and
+    --     SniperPenetratedRound all do). It is TFA Base's PrintName for the
+    --     AirboatGun pool: tfa_small_entities.lua registers tfa_ammo_winchester
+    --     as "Winchester Ammo" with AmmoType = "AirboatGun", 50 rounds. So the
+    --     ITEM is named Winchester (that is what the player already reads in
+    --     game) and the POOL underneath it is AirboatGun. The id is derived
+    --     from the pool, so it is `cargo_ammo_airboatgun` — that mismatch is
+    --     deliberate, not a leftover.
+    --   * THE ARC9 SNIPERS EAT SniperPenetratedRound, NOT SniperRound. Ten
+    --     classes in the live arsenal: seven ARC9MW (kar98k, m14, spr208,
+    --     ax50, hdr, rytec, svd) plus arc9_go's awp, scout and ssg08 — which
+    --     dev/other/ could not see. SniperRound is a DIFFERENT pool with three
+    --     eaters, all VJ (weapon_vj_ssg08 and Half-Life Resurgence's m40a1 and
+    --     csniper), which is why both are registered and neither is remapped
+    --     into the other: they are two engine pools and the mirror is per pool.
+    --
+    -- The two share ammo_sniper.mdl, so the NAME is what tells them apart in
+    -- the cell (the lesson of the 61 NVG variants). AP/Ball is the engine's own
+    -- distinction — the "penetrated" round is the one that goes through walls.
+    { hl2 = "SniperPenetratedRound", caliber = "7mm MAG", name = "Sniper Rounds (AP)",
+      model = "models/corpus_cargo/ammo_sniper.mdl",
+      weight = 0.035, max_stack = 20, value = 55,
+      trivia = "Armour-piercing rifle ammunition. It stops at the second wall, not the first." },
+
+    { hl2 = "SniperRound",  caliber = "7.62x51", name = "Sniper Rounds (Ball)",
+      model = "models/corpus_cargo/ammo_sniper.mdl",
+      weight = 0.03, max_stack = 20, value = 45,
+      trivia = "Plain jacketed rifle ammunition. Everything a marksman needs and nothing he'd brag about." },
+
+    -- The caliber label is TFA's own (.308, the text printed on its box) and
+    -- NOT the .44 Magnum the shipped model's art shows. Author call 2026-08-06,
+    -- knowing the mismatch: the label follows the mod that hands these rounds
+    -- out, and the model is a stand-in until a .308 box exists. Re-vesting it
+    -- costs one call to Items.SetModel and no change here.
+    { hl2 = "AirboatGun",   caliber = ".308",  name = "Winchester Rounds",
+      model = "models/corpus_cargo/ammo_winchester.mdl",
+      weight = 0.025, max_stack = 50, value = 28,
+      trivia = "Hunting rifle ammunition. Older than everything shooting it, and still cheaper by the box." },
 }
 
 -- THROWABLE-faced types (roadmap #32, in-game report 2026-07-13): the HL2
@@ -204,6 +264,11 @@ end
 -- marksman rifles on "SniperPenetratedRound", the MW throwing knife, VJ's
 -- ssg08), 6 on a "none"/-1 placeholder, and the 12 that resolve to NOTHING are
 -- exactly base templates and melee/tools — things with no magazine.
+-- Roadmap #57 CLOSED the sniper half of those 10 by registering the pools (see
+-- the AMMO table): re-measured over the LIVE arsenal it was 13 classes, not 10,
+-- and today the only ones still resolving to nothing are the per-nade custom
+-- pools each ARC9 pack mints for its own throwables (arc9_cod2019_knife et al).
+-- Those are a THROWABLE question (§16.9), not a belt one, and stay out.
 --
 -- WHY NOT Primary.Ammo FIRST, which is the obvious candidate: on ARC9 it is
 -- EMPTY at class level. `SWEP.Primary.Ammo = SWEP.Ammo` runs when the base

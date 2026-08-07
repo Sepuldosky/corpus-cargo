@@ -5998,3 +5998,111 @@ que **corregirla porque la medición la volvió falsa**.
 
 Harness **771 → 817** (46 nuevos), **19 reversiones verificadas en negativo**. Checker limpio,
 espejo regenerado.
+
+---
+
+## 66. Los tres pools que el cinturón no miraba (roadmap #57) `[APLICADO 2026-08-07]`
+
+Pedido del autor, 2026-08-06: *«ya están los modelos para la munición de winchester y sniper
+rounds, es hora que los agreguemos a cargo (…) porque antes algunas armas de ARC9 no tenían cómo
+meter munición al belt sin un item que capturara esa info»*. Es el **roadmap #57**, y su modelo
+—lo único que ese punto dejaba abierto— se cerró el 2026-08-05.
+
+**Qué estaba roto, y no era el peso.** Un tipo que no está en `CARGO.Ammo.TYPES` es un tipo que el
+espejo de §16.3 **no recorre**: esas armas **no se alimentaban del cinturón**, punto. El #56 sólo
+lo hizo visible (su cargador pesaba 0) y lo dejó declarado como frontera. Tres entradas nuevas en
+la tabla `AMMO` de `shared/corpus_cargo_ammo.lua` y el espejo, el peso, el precio, el badge del
+cinturón, el unload y el veto de mundo los heredan **sin una línea propia**: es el mismo trabajo
+que la tabla ya hacía para los nueve de HL2.
+
+### El censo se rehízo sobre el arsenal VIVO, y corrigió dos premisas del propio roadmap
+
+El punto avisaba que `dev/other/` cubre ~2/3 y pedía re-censar. Se re-censó **sobre los 380 `.gma`
+suscritos** (índice de cada uno parseado y sus `.lua` leídos — no un barrido de los 63 GB), más los
+binarios del engine. **Las dos correcciones son del punto, no del código:**
+
+1. **«Winchester» NO ES UN TIPO DE MUNICIÓN DEL ENGINE.** No aparece en
+   `garrysmod/bin/win64/server.dll` — `AirboatGun`, `SniperRound` y `SniperPenetratedRound` sí. Es
+   el `PrintName` que **TFA Base** le pone al pool `AirboatGun`: `tfa_small_entities.lua` registra
+   `tfa_ammo_winchester` como *"Winchester Ammo"* con `AmmoType = "AirboatGun"` y 50 balas. O sea
+   que *«airboatgun/winchester ammo»* nunca fueron **dos** pools: son **uno** visto por sus dos
+   nombres. Registrarlos como dos habría acuñado un ítem fantasma que ninguna arma alimenta.
+2. **Los francotiradores de ARC9 comen `SniperPenetratedRound`, no `SniperRound`** — y son **diez**
+   clases, no siete: las 7 de ARC9MW más el `awp`, el `scout` y el `ssg08` de `arc9_go`, que
+   `dev/other/` no tenía. `SniperRound` es **otro** pool con **tres** comedores, todos VJ
+   (`weapon_vj_ssg08` y el `m40a1` y el `csniper` de Half-Life Resurgence). Por eso van los **dos**
+   registrados y ninguno remapeado al otro: son dos pools del engine y el espejo es por pool.
+
+**Y un tercer dato que sólo aparece midiendo:** ARC9MW escribe el tipo con **dos grafías** según el
+archivo (`SniperPenetratedRound` en kar98k/spr208/ax50/hdr, `sniperPenetratedRound` en
+m14/rytec/svd). `ItemForType` ya era case-insensitive; si no lo fuera, **la mitad de las diez
+seguiría sin cinturón** y el defecto se leería como *"a veces anda"*.
+
+### Lo que se escribió
+
+- **Tres defs nuevos** (ids derivados del pool, como los nueve de HL2):
+  `cargo_ammo_sniperpenetratedround` → *Sniper Rounds (AP)*, `7mm MAG`, 0,035 kg, tope 20, $55;
+  `cargo_ammo_sniperround` → *Sniper Rounds (Ball)*, `7.62x51`, 0,03 kg, tope 20, $45;
+  `cargo_ammo_airboatgun` → *Winchester Rounds*, `.308`, 0,025 kg, tope 50, $28.
+- **Los dos francotiradores comparten `ammo_sniper.mdl`**, así que **el nombre es lo que los
+  separa** en la celda (la lección de las 61 variantes de NVG). AP/Ball es la distinción **del
+  propio engine**: el *penetrated* es el que atraviesa.
+- **El ítem se llama Winchester y su clave es `AirboatGun`.** El nombre es el que el jugador ya lee
+  en juego; la clave es el pool. Decisión del autor con el desajuste a la vista: el `caliber` es
+  **`.308`** (el texto que TFA imprime en su caja) y **no** el *.44 Magnum* que dice el arte del
+  modelo shipeado, que queda de suplente hasta que haya una caja de .308. Re-vestirlo cuesta un
+  `Items.SetModel` y ninguna línea de este archivo.
+- **Las dos cajas de TFA entran a `WORLD_AMMO`** (`tfa_ammo_winchester` 50, `tfa_ammo_sniper_rounds`
+  30, cuentas leídas del `.gma`, no de HL2). Sin esto el ítem de Winchester **no tiene de dónde
+  salir**: ninguna arma del arsenal come `AirboatGun` y esa caja es su única fuente. Lo que cierra
+  la fuga no es el veto de `PlayerCanPickupItem` —TFA reparte por su propio `ENT:Use`, que ese hook
+  nunca ve— sino el **`return false` del gate de WALK+USE**, que impide que el engine llegue a
+  `ENT:Use`: la técnica del roadmap #27, ya probada. Inerte sin TFA montado y bajo el kill-switch
+  `cargo_ammo_world_pickup` que ya existía.
+
+### Lo que la verificación en negativo destapó, y era del instrumento
+
+Las **seis reversiones enrojecen**, pero **cinco lo hacían crasheando**: los checks nuevos
+indexaban el def pelado, así que quitar una entrada mataba la corrida en vez de enrojecerla y se
+llevaba puestos todos los checks de abajo. Es **la regla del #53 —"un check que CRASHEA no es un
+check en rojo"— cometida de nuevo al escribir los checks que la citan**. Corregido con guarda: hoy
+las cinco dan rojo limpio y la corrida llega al final.
+
+**La sexta no se puede reclamar y se dice:** R5 (volver `ItemForType` case-sensitive) enrojece la
+corrida pero **crashea antes de llegar** al check de las dos grafías, así que ese check queda
+sostenido por la medición que documenta, no por una reversión propia.
+
+**Dos checks viejos había que corregirlos, no borrarlos:** `#56(a)` y `#56(e)` usaban
+`SniperPenetratedRound` como ejemplo de *"tipo que Cargo NO maneja"*, y esta tanda vuelve esa
+premisa falsa. Pasan a usar el pool propio que ARC9MW acuña para su cuchillo arrojadizo
+(`arc9_cod2019_knife`, vía `game.AddAmmoType`), que **sigue** sin ítem — y el francotirador queda
+como su **contracara**, midiendo que ahora sí pesa sus balas.
+
+**Qué queda afuera, dicho:** los pools propios que cada pack ARC9 acuña por lanzable
+(`arc9_cod2019_knife`, `arc9_cod2019_c4`, los `arc9_go_nade_*`) son una pregunta de **throwables**
+(§16.9) y no de cinturón. Y **ninguna arma del arsenal vivo come `AirboatGun`**: el ítem existe,
+pesa, se guarda y se comercia, pero hoy sólo se llena desde la caja de TFA.
+
+Harness **817 → 828** (11 nuevos), **5 reversiones verificadas en negativo** + 1 declarada sin
+poder reclamarse. `cargo_selftest` pasa de 11 a 14 tipos, con los tres ids fijados.
+
+### Pasada en juego (2026-08-07) — cierra, y cierra por el camino que se escribió
+
+Reporte del autor: *«testeado ingame, no se rompió nada y están los modelos. Tomar `tfa_ammo` da la
+munición correspondiente»*, y **la caja entrega un ÍTEM AL GRID**. Con eso el bloque cierra:
+
+- **Los tres pools se alimentan** y los modelos se ven — que era el pedido literal.
+- **`WORLD_AMMO` es lo que corrió, y no el espejo.** La distinción no es cosmética y por eso se
+  preguntó antes de escribirla: *«la caja da munición»* es cierto en los **dos** mundos posibles —el
+  ítem al grid (lo que escribimos) y el pool crudo que el espejo de 4 Hz absorbe al cinturón (la
+  deuda declarada de `arc9_ammo`, §16.5)—, y sólo uno de los dos prueba que la línea nueva hizo
+  algo. Es **CRG-16 literal**: el grid es el almacén, el cinturón es el pool, y el jugador decide
+  cuánto cuelga. **Un «funciona» que no distingue qué mecanismo corrió no cierra un bloque.**
+- **Nada se rompió**, que es la mitad que ninguna corrida offline podía dar: el harness prueba que
+  los tres tipos resuelven, no que agregarlos al recorrido del espejo deje quieto lo que ya andaba.
+
+**Lo único que queda abierto, y es de arte, no de código:** la caja de **.308**. El
+`ammo_winchester.mdl` que ships hoy dice *.44 Magnum* en su arte y el ítem se etiqueta `.308`
+(el texto de la caja de TFA, decisión del autor con el desajuste a la vista). Es **suplente
+declarado**: re-vestirlo cuesta un `Items.SetModel` y **ninguna línea** de
+`shared/corpus_cargo_ammo.lua`, porque para eso existe ese punto de extensión (entry 34).

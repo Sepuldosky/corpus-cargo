@@ -1427,8 +1427,45 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 
 
 57. LAS ARMAS QUE COMEN UN TIPO DE MUNICION QUE CARGO NO MANEJA [Cargo ammo] —
-    ABIERTO, SIN DISENAR. Salido de una MEDICION del #56, no de un reporte:
-    el censo de tipos sobre dev/other/ (243 SWEPs, herencia resuelta).
+    CERRADO (entry 66, confirmado en juego 2026-08-07). Salido de una MEDICION
+    del #56, no de un reporte: el censo de tipos sobre dev/other/ (243 SWEPs,
+    herencia resuelta).
+    QUEDA UNA SOLA COSA, Y ES DE ARTE: la caja de .308 para el item de
+    Winchester. El ammo_winchester.mdl actual dice ".44 Magnum" en su arte y el
+    item se etiqueta .308 (decision del autor con el desajuste a la vista); es
+    SUPLENTE DECLARADO y se re-viste con Items.SetModel, sin tocar la tabla
+    AMMO. No bloquea nada: los tres pools se alimentan hoy.
+
+    RE-CENSADO SOBRE EL ARSENAL VIVO como el propio punto pedia (380 .gma
+    suscritos, indice parseado y sus .lua leidos, + los binarios del engine), y
+    el censo CORRIGIO DOS PREMISAS DE ESTE MISMO PUNTO:
+      * "Winchester" NO ES UN TIPO DE MUNICION DEL ENGINE — no esta en
+        garrysmod/bin/win64/server.dll. Es el PrintName de TFA Base para el pool
+        AirboatGun (tfa_ammo_winchester, AmmoType = "AirboatGun", 50 balas). O
+        sea que "AirboatGun y Winchester" nunca fueron DOS tipos: son UNO visto
+        por sus dos nombres, y registrarlos como dos habria acunado un item
+        fantasma.
+      * Los francotiradores de ARC9 comen SniperPenetratedRound y son DIEZ
+        clases, no siete: las 7 de ARC9MW mas awp/scout/ssg08 de arc9_go, que
+        dev/other/ no tenia. SniperRound es OTRO pool, con tres comedores todos
+        de VJ (weapon_vj_ssg08 y el m40a1 y el csniper de Half-Life Resurgence).
+      * Bonus que solo aparece midiendo: ARC9MW escribe el tipo con DOS grafias
+        segun el archivo (SniperPenetratedRound / sniperPenetratedRound). La
+        resolucion ya era case-insensitive; si no lo fuera, la mitad de las diez
+        seguiria sin cinturon y se leeria como "a veces anda".
+
+    LA PASADA EN JUEGO (2026-08-07) CERRO POR EL CAMINO QUE SE ESCRIBIO: no se
+    rompio nada, los modelos se ven, y tomar la caja de TFA entrega un ITEM AL
+    GRID. Eso ultimo se PREGUNTO antes de escribirlo porque "la caja da
+    municion" es cierto en los DOS mundos posibles —el item al grid (lo nuestro)
+    y el pool crudo que el espejo de 4 Hz absorbe al cinturon (la deuda de
+    arc9_ammo, §16.5)— y solo uno prueba que la linea nueva hizo algo. Regla:
+    UN "FUNCIONA" QUE NO DISTINGUE QUE MECANISMO CORRIO NO CIERRA UN BLOQUE.
+    Y dos cosas dichas, no disimuladas: NINGUNA arma del arsenal come AirboatGun
+    —su unica fuente es la caja de TFA, por eso entra a WORLD_AMMO—, y los pools
+    propios que cada pack ARC9 acuna por lanzable (arc9_cod2019_knife,
+    arc9_cod2019_c4, los arc9_go_nade_*) quedan AFUERA: son pregunta de
+    throwables (§16.9), no de cinturon.
 
     DIEZ CLASES resuelven a un tipo de engine que Cargo no tiene registrado como
     item: SIETE marksman/snipers de ARC9MW en "SniperPenetratedRound" (kar98k,
@@ -1452,6 +1489,12 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     autor tiene armas de OTRAS bases que comen de esos pools. Antes de escribir,
     volver a censar sobre el arsenal vivo con cargo_dev_dump_weapons y no sobre
     dev/other/, que cubre unos dos tercios.
+    OJO CON ESA INSTRUCCION, medido al ejecutarla: cargo_dev_dump_weapons SIN
+    argumento vuelca SOLO ARC9 (el volcado de dev/weapon_dump.txt son 369 filas
+    y las 369 son arc9_*), asi que por definicion no puede mostrar los pools de
+    TFA ni de VJ — que es justo donde estaban AirboatGun y SniperRound. Hay que
+    correrlo con "all". El censo del 2026-08-06 no lo uso: fue sobre los .gma
+    suscritos, parseando el indice de cada uno y leyendo sus .lua.
     LO QUE QUEDA ABIERTO: el MODELO de cada tipo nuevo. Los nueve de HL2 usan
     el .mdl de su propio item_ammo_* y por eso una caja en el suelo y su item se
     ven igual; para un tipo que no tiene entidad de mundo en HL2 no hay ese

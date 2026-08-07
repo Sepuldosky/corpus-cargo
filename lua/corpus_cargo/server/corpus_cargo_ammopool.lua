@@ -501,6 +501,21 @@ local WORLD_AMMO = {
     item_rpg_round         = { "RPG_Round",     1 },
     item_ammo_smg1_grenade = { "SMG1_Grenade",  1 },
     item_ammo_ar2_altfire  = { "AR2AltFire",    1 },
+
+    -- TFA Base's own ammo entities (roadmap #57). NOT HL2 defaults: the counts
+    -- are the mod's (tfa/modules/tfa_small_entities.lua, read out of the .gma),
+    -- and they are the ONLY thing in the live arsenal that hands out AirboatGun
+    -- — no weapon eats it, so without this line the Winchester item has nothing
+    -- to come from but the mirror absorbing raw pool.
+    -- WHY THIS TABLE AND NOT THE VETO HOOK: TFA grants through its own ENT:Use
+    -- (`activator:GiveAmmo(self.AmmoCount, self.AmmoType)`), which
+    -- PlayerCanPickupItem never sees. What actually closes it is the WALK+USE
+    -- gate returning false, which keeps the engine from reaching ENT:Use at all
+    -- — the roadmap #27 technique, same as the registered third-party pickups.
+    -- Inert without TFA mounted (the class simply never exists) and it rides
+    -- the existing cargo_ammo_world_pickup kill-switch.
+    tfa_ammo_winchester    = { "AirboatGun",           50 },
+    tfa_ammo_sniper_rounds = { "SniperPenetratedRound", 30 },
 }
 
 -- Class of a world ammo box -> { id, count } of the grid item a deliberate
