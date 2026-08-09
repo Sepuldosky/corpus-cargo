@@ -446,6 +446,38 @@ Cargo.StatusPanel.RegisterBar(module, {
 
 **CRG-44 —** Si el módulo dueño de una barra no está montado, la barra simplemente no se registra — degradación honesta, mismo principio que gobierna todo soft-dep del ecosistema.
 
+### 11.1 Sobrellenado — la marca (enmienda 2026-08-08)
+
+Pedida por Craving, que con la enmienda de su §2.1 tiene stats que pasan de 100 y llegan a 150 (comer de más es posible y tiene riesgo de vómito). **El panel no puede seguir clampeando en silencio.**
+
+*El defecto que arregla, medido y no supuesto:* hoy `Build` hace `math.Clamp(tonumber(v) or 0, 0, 100)` al pollear, así que un valor de 138 **no desborda la barra — la deja llena y muda**. El jugador ve exactamente lo mismo con 100 que con 149, y con 149 la próxima mordida lo hace vomitar casi seguro. Es un modo de falla peor que un desborde: un desborde se ve.
+
+**CRG-68 — El panel dibuja MAGNITUD, jamás significado.** `softMax` y `hardMax` son **data del registrante**; Cargo no sabe qué es un vómito, ni que exista. Es CRG-1 aplicado a la única superficie donde la tentación es real, porque acá el dato ya viene con una consecuencia pegada.
+
+```lua
+Cargo.StatusPanel.RegisterBar(module, {
+    id       = "hunger",
+    label    = "Hunger",
+    getValue = function(ply) return ... end,  -- ahora 0..hardMax
+    color    = Color(214, 142, 58),
+
+    -- NUEVOS, ambos opcionales. Omitidos = comportamiento de hoy, sin cambios.
+    softMax  = 100,                 -- el "lleno": la barra se llena acá (default 100)
+    hardMax  = 150,                 -- el clamp real  (default = softMax)
+    overfillColor = Color(...),     -- default: T.Colors.warn
+})
+```
+
+Reglas de render, y las dos primeras son las que hacen que esto no rompa a nadie:
+
+1. **El relleno normal no cambia.** `frac = clamp(v, 0, softMax) / softMax`. Una barra sin `softMax` se pinta hoy exactamente igual que ayer, al pixel.
+2. **El clamp del poll pasa a `hardMax`**, que por default **es** `softMax` — o sea, sigue siendo 100 para las cuatro barras que existen.
+3. **El exceso se pinta como tramado sobre la barra ya llena**, no como una barra más larga: alargarla mentiría sobre qué es "lleno". Ancho del tramado = `(v - softMax) / (hardMax - softMax)` del ancho total.
+4. **El tramado se recorta con `render.SetScissorRect`** — **CRG-28**: `HUDPaint` no tiene clipping de panel y esto es exactamente el caso que la pagó (el hatching de los quickslots del wheel).
+5. **Además del tramado, la cifra**: `+38` junto al label. Ninguna señal se comunica **solo** por color ni solo por textura — hay daltonismo y hay barras de 9 px.
+
+*Degradación en las dos direcciones, que es lo que vuelve barata esta enmienda:* un registrante viejo no declara los campos y se pinta como siempre; un **Cargo** viejo recibe campos que no conoce, los ignora, y pinta como siempre. Ninguna de las dos mitades necesita saber la versión de la otra.
+
 ---
 
 ## 12. Persistencia

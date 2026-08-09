@@ -1524,3 +1524,27 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Instances.WeightOf — pero es SERVER, asi que el numero tiene que viajar en
     el snapshot o el cliente tendria que recalcularlo, que es exactamente la
     clase de segunda verdad que CRG-56/57 evitan.
+
+59. LA MARCA DE SOBRELLENADO EN EL STATUSPANEL [Cargo ui] — ABIERTO, CHICO.
+    Diseño CERRADO el 2026-08-08 en Cargo_Architecture.md §11.1 (CRG-68);
+    falta la bajada a codigo. Pedido POR CRAVING, cuya enmienda del mismo dia
+    le da stats que pasan de 100 y llegan a 150 (comer de mas es posible y
+    tiene riesgo de vomito, su §2.1).
+    EL DEFECTO ESTA MEDIDO, NO SUPUESTO: el poll de StatusPanel.Build clampea
+    a 0..100, asi que un valor de 138 NO desborda la barra — la deja LLENA Y
+    MUDA. El jugador ve lo mismo con 100 que con 149, y con 149 la proxima
+    mordida lo hace vomitar casi seguro. Es peor que un desborde: un desborde
+    se ve.
+    QUE ENTRA: dos campos opcionales en el spec de RegisterBar (softMax,
+    hardMax, + overfillColor) y el exceso pintado como TRAMADO sobre la barra
+    llena — nunca alargandola, que mentiria sobre que es "lleno" —, recortado
+    con render.SetScissorRect (CRG-28), y la cifra "+38" junto al label porque
+    ninguna señal va solo por color ni solo por textura.
+    LO QUE LO HACE BARATO: degrada en las DOS direcciones. Un registrante viejo
+    no declara los campos y pinta como siempre, al pixel; un Cargo viejo ignora
+    campos que no conoce. Ninguna mitad necesita saber la version de la otra, y
+    por eso esta entrada NO bloquea a Craving.
+    CRG-68 ES EL LIMITE: el panel dibuja MAGNITUD, jamas significado. softMax y
+    hardMax son data del registrante — Cargo no sabe que es un vomito, ni que
+    exista. Es CRG-1 en la unica superficie donde la tentacion es real, porque
+    aca el dato llega con una consecuencia pegada.
