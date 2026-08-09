@@ -1548,3 +1548,35 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     hardMax son data del registrante — Cargo no sabe que es un vomito, ni que
     exista. Es CRG-1 en la unica superficie donde la tentacion es real, porque
     aca el dato llega con una consecuencia pegada.
+60. CONTAR Y CONSUMIR CONTRA CONTENEDORES CERCANOS [Cargo containers] — PEDIDO
+    DE COAGULANT, SIN RATIFICAR POR CARGO. Abierto 2026-08-09.
+    QUIEN PIDE Y POR QUE: Coagulant vota su "area hospital" (COA-50, su §17). La
+    medicina de hospital no asume una mochila, asume una farmacia: el can() de
+    una accion tiene que poder mirar los contenedores dentro de un radio, no
+    solo el inventario del medico.
+    QUE PIDE, y es el espejo EXACTO de las tres que Coagulant ya usa para que no
+    haya que aprender un modelo nuevo:
+        CARGO.Containers.AreaHas(pos, radius, id)      -> bool
+        CARGO.Containers.AreaCount(pos, radius, id)    -> n
+        CARGO.Containers.AreaTake(pos, radius, id, n)  -> ok
+    LAS TRES, NO DOS, por una leccion que este repo ya pago: CountItem cuenta
+    solo stacks y los unique le son invisibles — es por que el torniquete daba
+    siempre 0 (fallo G4 de Coagulant, 2026-07-13) hasta que Cargo agrego
+    HasItem. Un AreaCount sin su AreaHas reproduce el defecto en el area, con el
+    mismo sintoma: la accion existe, el item esta, y el boton dice que no hay.
+    POR QUE NO LO RESUELVE COAGULANT SOLO: el contrato publico de Cargo expone
+    unicamente Containers.Attach; el contenido vive en _byId/Snapshot, que es
+    off-contract. Coagulant YA arrastra una deuda de esa clase — cuenta los
+    items de sus botones con CARGO.ClientState.items, con la nota escrita de que
+    se rompe EN SILENCIO si Cargo cambia su snapshot. Firmar la segunda por
+    comodidad convierte un accidente en metodo.
+    ESTADO: PEDIDO. Se escribe el mismo dia en los dos lados justamente porque
+    D-5 dejo la leccion de que pasa cuando una firma vive un mes en un solo lado
+    (ApplyExternalCondition, congelada por el consumidor y sin ratificar por el
+    dueno). Hasta que Cargo la ratifique, el area hospital de Coagulant NO baja
+    a codigo. Si Cargo la rechaza o la devuelve con otra forma, manda Cargo: la
+    superficie es suya.
+    LO QUE ESTA ENTRADA NO PIDE, para que no se lea de mas: nada de permisos.
+    Que OpenFor no compruebe dueno (cualquiera a 160 u abre cualquier
+    contenedor) es un hecho de Cargo que el area hospital ENSANCHA — de 160 u a
+    lo que mida la sala — pero no crea. Vive en el #12, no aca.
