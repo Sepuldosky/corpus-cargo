@@ -6106,3 +6106,57 @@ munición correspondiente»*, y **la caja entrega un ÍTEM AL GRID**. Con eso el
 (el texto de la caja de TFA, decisión del autor con el desajuste a la vista). Es **suplente
 declarado**: re-vestirlo cuesta un `Items.SetModel` y **ninguna línea** de
 `shared/corpus_cargo_ammo.lua`, porque para eso existe ese punto de extensión (entry 34).
+
+---
+
+## PARCHES DE sesión Instrumentos del realm CLIENTE — 2026-08-08
+
+Cola del diagnóstico cuya sede es el CHANGELOG de `corpus/` (sesión *La ready barrier no
+disparaba en el realm CLIENTE*) y cuyo veredicto vive en
+[`dev/VEREDICTO_ready_barrier_cliente.md`](../../dev/VEREDICTO_ready_barrier_cliente.md). El
+defecto era del framework; **lo que es de Cargo es que no había con qué verlo**.
+
+El mensaje que el autor reportó como *«dice que no reconoce módulos cargados»* es de este repo:
+`"No bars registered (absent modules)"`, `client/corpus_cargo_statuspanel.lua:66`. No estaba en
+el `console.log` **porque es VGUI, no `Corpus.Log`** — un string que se ve en pantalla y no está
+en el log es un string dibujado. **Y decía la verdad:** las 3 barras se registran dentro de
+`Corpus.OnReady`, y esa barrera no disparaba en el realm cliente. La degradación honesta del
+§11 funcionó exactamente como se diseñó; lo que faltaba era el instrumento para creerle.
+
+- PARCHE 1 — `shared/corpus_cargo_dev.lua`: **`cargo_selftest_cl`**, alias CLIENT-only, misma
+  razón que `corpus_selftest_cl` (2026-07-25, planilla T4): este archivo es shared, así que
+  `cargo_selftest` queda registrado en los dos realms y **en listen server gana el del SERVER**;
+  `lua_run_cl` está gateado por `sv_allowcslua` en 0. Sin nombre propio, el realm CLIENT de este
+  módulo era **inverificable en juego**. **[APLICADO 2026-08-08]**
+- PARCHE 2 — `shared/corpus_cargo_dev.lua`: **`cargo_dev_items_cl`**, el check directo del
+  defecto: lista las defs que el CLIENTE tiene, que son **las que el grid realmente renderiza**
+  (Cargo no sincroniza defs de módulo por red — **COR-12**), y por eso «qué defs existen» es una
+  pregunta **distinta por realm**. Cuando esto se escribió, la respuesta del cliente eran 4.413
+  defs menos que la del server, y nada en juego podía decirlo. **[APLICADO 2026-08-08]**
+- PARCHE 3 — `shared/corpus_cargo_dev.lua`: `IsBulk`, `FindDefs` y el cuerpo del listado salen
+  del bloque `if SERVER then` a scope de archivo, y los **dos** comandos llaman a la misma
+  `ListDefs`. **Una rutina, dos nombres** — dos copias del listado es cómo los realms terminan
+  divergiendo en lo que reportan. La cabecera del listado ahora **imprime el realm**: una
+  medición que no dice de dónde se tomó es cómo un check verde reporta dos veces el mismo lado.
+  **[APLICADO 2026-08-08]**
+
+Harness `harness_cargo.py`: **828 verdes**, sin cambio de conteo — los tres parches son
+instrumentos y superficie de consola, no lógica pura. La verificación de que sirven es en juego:
+`cargo_dev_items_cl` tiene que devolver el mismo catálogo no-bulk que `cargo_dev_items`.
+
+### Pasada en juego (2026-08-08) — los dos instrumentos CIERRAN, y el listado fue el que probó el fix
+
+`cargo_dev_items_cl` devolvió **51 ítems no-bulk en el realm CLIENT** (+4.467 bulk), con las 4
+defs de Coagulant en `[medical]` y las 15 de Craving en `[food]` — el catálogo del que el grid
+renderiza, que hasta el día anterior **no se podía preguntar en juego**. El autor confirma el
+inventario: *«se ve bien como antes, tengo todo lo que debería tener»*, y el StatusPanel pinta
+las 5 barras en vez del `"No bars registered (absent modules)"`.
+
+Los tres parches quedan **verificados en juego**. Nota de método: el instrumento que se agregó
+*porque faltaba para diagnosticar* terminó siendo el que **acreditó el arreglo** — un listado que
+dice su realm es lo que separa «el catálogo existe» de «el catálogo existe en el otro lado».
+
+**Queda una observación abierta, y no es de este arco.** En la pasada se ven **tres** quick slots
+(F1, F2, F3) con `x0` en rojo, donde antes del fix se veía uno solo — o sea que **no era un
+efecto de la def faltante**: con el catálogo completo el síntoma se hizo más visible, no menos.
+Un `count == 0` en una referencia de quick slot es su propio defecto y **no se investigó**.

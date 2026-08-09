@@ -180,6 +180,88 @@ CARGO.Items.Register({
 })
 
 -- ------------------------------------------------------------------
+-- Def listing — SHARED on purpose (2026-08-08)
+-- ------------------------------------------------------------------
+-- The listing used to live inside the SERVER block, so `cargo_dev_items`
+-- could only ever report the server catalogue. That is not a cosmetic gap:
+-- Cargo does NOT sync module defs over the wire (COR-12) — the client grid
+-- renders from ITS OWN defs — so "which defs exist" is a different question
+-- per realm, and the client's was unanswerable in game. On 2026-08-08 the
+-- client was missing 4.413 defs and no instrument could say so
+-- (dev/VEREDICTO_ready_barrier_cliente.md); the check that would have caught
+-- it, `cargo_dev_items`, wins the SERVER registration on a listen server and
+-- would have come back green off the one realm that was fine.
+--
+-- ONE routine, two names — same reason `corpus_selftest` has `_cl`. Two
+-- copies of the listing is how the realms drift apart in what they report.
+
+-- "bulk" = a DERIVED catalogue, not hand-written content: it floods an
+-- unfiltered listing without telling you anything. Captured weapons and
+-- ARC9 attachments were the first two; the 61 Neosun NVG variants
+-- (roadmap #47) are the third, and they are the same shape — one def per
+-- third-party variant, reachable with a filter like everything else.
+local function IsBulk(id, def)
+    return def.arc9_att ~= nil or id:sub(1, 4) == "wpn_"
+        or id:sub(1, 10) == "cargo_nvg_"
+end
+
+-- nil filter: every non-bulk def. With filter: case-insensitive plain
+-- substring over id AND display name, bulk included.
+local function FindDefs(filter)
+    local out = {}
+    for id, def in pairs(CARGO.Items._defs) do
+        if filter == nil then
+            if not IsBulk(id, def) then out[#out + 1] = { id = id, def = def } end
+        elseif id:lower():find(filter, 1, true)
+            or def.name:lower():find(filter, 1, true) then
+            out[#out + 1] = { id = id, def = def }
+        end
+    end
+    table.sort(out, function(a, b)
+        local ca = a.def.category or "misc"
+        local cb = b.def.category or "misc"
+        if ca == cb then return a.id < b.id end
+        return ca < cb
+    end)
+    return out
+end
+
+-- The realm is printed in the header, not left to be inferred from which
+-- command was typed: a listing that does not say where it was taken is how a
+-- green check ends up reporting the same realm twice.
+local function ListDefs(args)
+    local filter = isstring(args and args[1]) and args[1]:lower() or nil
+    local rows = FindDefs(filter)
+
+    MsgN(string.format("— %d ítems registrados en el realm %s%s —", #rows,
+        SERVER and "SERVER" or "CLIENT",
+        filter and (" (filtro '" .. filter .. "')") or ""))
+    local lastCat
+    for _, r in ipairs(rows) do
+        local cat = r.def.category or "misc"
+        if cat ~= lastCat then
+            MsgN("[" .. cat .. "]")
+            lastCat = cat
+        end
+        MsgN(string.format("  %-28s %s (%s)", r.id, r.def.name, r.def.class))
+    end
+
+    if filter == nil then
+        local bulk = 0
+        for id, def in pairs(CARGO.Items._defs) do
+            if IsBulk(id, def) then bulk = bulk + 1 end
+        end
+        if bulk > 0 then
+            MsgN("(+" .. bulk .. " armas capturadas/attachments ocultos — usá un filtro para verlos; armas: cargo_dev_dump_weapons)")
+        end
+    end
+    if SERVER then
+        MsgN("dar uno: cargo_dev_give_item <id|texto> [cantidad]")
+        MsgN("el catálogo del CLIENTE es otro (COR-12): cargo_dev_items_cl")
+    end
+end
+
+-- ------------------------------------------------------------------
 -- Dev commands (server) — TODO: gate behind the future Corpus admin
 -- permission primitive (own design session pending); until then these are
 -- open like Caliber's debug commands.
@@ -226,64 +308,9 @@ if SERVER then
     -- instrument for the weapon set anyway).
     -- ------------------------------------------------------------------
 
-    -- "bulk" = a DERIVED catalogue, not hand-written content: it floods an
-    -- unfiltered listing without telling you anything. Captured weapons and
-    -- ARC9 attachments were the first two; the 61 Neosun NVG variants
-    -- (roadmap #47) are the third, and they are the same shape — one def per
-    -- third-party variant, reachable with a filter like everything else.
-    local function IsBulk(id, def)
-        return def.arc9_att ~= nil or id:sub(1, 4) == "wpn_"
-            or id:sub(1, 10) == "cargo_nvg_"
-    end
-
-    -- nil filter: every non-bulk def. With filter: case-insensitive plain
-    -- substring over id AND display name, bulk included.
-    local function FindDefs(filter)
-        local out = {}
-        for id, def in pairs(CARGO.Items._defs) do
-            if filter == nil then
-                if not IsBulk(id, def) then out[#out + 1] = { id = id, def = def } end
-            elseif id:lower():find(filter, 1, true)
-                or def.name:lower():find(filter, 1, true) then
-                out[#out + 1] = { id = id, def = def }
-            end
-        end
-        table.sort(out, function(a, b)
-            local ca = a.def.category or "misc"
-            local cb = b.def.category or "misc"
-            if ca == cb then return a.id < b.id end
-            return ca < cb
-        end)
-        return out
-    end
-
     concommand.Add("cargo_dev_items", function(_, _, args)
-        local filter = isstring(args and args[1]) and args[1]:lower() or nil
-        local rows = FindDefs(filter)
-
-        MsgN(string.format("— %d ítems registrados%s —", #rows,
-            filter and (" (filtro '" .. filter .. "')") or ""))
-        local lastCat
-        for _, r in ipairs(rows) do
-            local cat = r.def.category or "misc"
-            if cat ~= lastCat then
-                MsgN("[" .. cat .. "]")
-                lastCat = cat
-            end
-            MsgN(string.format("  %-28s %s (%s)", r.id, r.def.name, r.def.class))
-        end
-
-        if filter == nil then
-            local bulk = 0
-            for id, def in pairs(CARGO.Items._defs) do
-                if IsBulk(id, def) then bulk = bulk + 1 end
-            end
-            if bulk > 0 then
-                MsgN("(+" .. bulk .. " armas capturadas/attachments ocultos — usá un filtro para verlos; armas: cargo_dev_dump_weapons)")
-            end
-        end
-        MsgN("dar uno: cargo_dev_give_item <id|texto> [cantidad]")
-    end, nil, "Lists registered item defs grouped by category (arg: id/name filter; captured weapons and attachments only show filtered)")
+        ListDefs(args)
+    end, nil, "Lists SERVER item defs grouped by category (arg: id/name filter; captured weapons and attachments only show filtered). The client catalogue is a different one: cargo_dev_items_cl")
 
     concommand.Add("cargo_dev_give_item", function(ply, _, args)
         if not IsValid(ply) then ply = player.GetAll()[1] end
@@ -986,6 +1013,13 @@ if CLIENT then
             getValue = function(ply) return ply:Armor() end,
         })
     end)
+
+    -- CLIENT-only name, same routine as cargo_dev_items (see its header). This
+    -- is the direct check for the 2026-08-08 defect: the client renders from
+    -- ITS defs, and until now nothing in game could list them.
+    concommand.Add("cargo_dev_items_cl", function(_, _, args)
+        ListDefs(args)
+    end, nil, "Lists CLIENT item defs — the catalogue the grid actually renders from (arg: id/name filter)")
 end
 
 -- ------------------------------------------------------------------
@@ -1317,3 +1351,15 @@ end
 concommand.Add("cargo_selftest", function()
     CARGO._SelfTest()
 end, nil, "Cargo primitives self-test (runs in the invoking realm)")
+
+-- CLIENT-only alias, same reason as corpus_selftest_cl: this file is shared, so
+-- `cargo_selftest` is registered in BOTH realms and on a listen server the
+-- SERVER one wins — typing it at the host console never reaches the client, and
+-- `lua_run_cl` is gated by sv_allowcslua (0). Without its own name the CLIENT
+-- realm of this module was unverifiable in game, which is how 4.413 missing
+-- client defs survived two full map loads with the log green (2026-08-08).
+if CLIENT then
+    concommand.Add("cargo_selftest_cl", function()
+        CARGO._SelfTest()
+    end, nil, "Cargo primitives self-test, CLIENT realm (listen server: cargo_selftest wins the server one)")
+end

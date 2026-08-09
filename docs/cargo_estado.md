@@ -5,8 +5,18 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-07 (**entry 66 `[APLICADO]` — roadmap #57 CERRADO y confirmado
-en juego**: los tres pools de munición que el cinturón **no miraba**. No era un problema de peso —
+**Última actualización:** 2026-08-08 (**nuevo: dos instrumentos para el realm CLIENTE** —
+`cargo_selftest_cl` y `cargo_dev_items_cl`, misma razón que `corpus_selftest_cl`: este módulo es
+shared y en listen server **gana el registro del server**, así que su realm cliente era
+inverificable en juego. Los estrenó un defecto del framework —la ready barrier no disparaba en
+cliente y el grid se quedaba **sin 4.413 defs**, incluidas las médicas y las de comida— cuyo único
+síntoma de este lado era el `"No bars registered (absent modules)"` del StatusPanel, que **decía la
+verdad**. Sede del diagnóstico: `corpus/docs/CHANGELOG.md` + `dev/VEREDICTO_ready_barrier_cliente.md`.
+**CERRADO en juego el mismo día**: `cargo_dev_items_cl` devuelve 51 defs no-bulk en CLIENT —las 4
+médicas y las 15 de comida incluidas— y el panel pinta las 5 barras. **Abierto y de otro arco:**
+tres quick slots (F1/F2/F3) muestran `x0` en rojo, y con el catálogo completo se ven MÁS que
+antes, o sea que no era la def faltante — sin investigar. Contexto previo: **entry 66 `[APLICADO]` — roadmap #57 CERRADO y
+confirmado en juego**: los tres pools de munición que el cinturón **no miraba**. No era un problema de peso —
 un tipo fuera de `CARGO.Ammo.TYPES` es un tipo que el espejo de §16.3 **no recorre**, o sea que
 **esas armas no se alimentaban del cinturón**; el #56 sólo lo hizo visible y lo dejó como frontera.
 Tres defs nuevos y el espejo, el peso, el precio, el badge, el unload y el veto de mundo lo heredan
