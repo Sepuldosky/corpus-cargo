@@ -1677,3 +1677,52 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
          negra la incluye sola, y esa es toda la decision.
     LO QUE ESTA ENTRADA NO PIDE: nada sobre precios. El multiplicador es el 61 y
     son independientes — se pueden hacer en cualquier orden o solo uno.
+
+63. ENUMERAR EL CATALOGO DESDE AFUERA DEL MODULO [Cargo items] — RATIFICADA Y
+    ESCRITA el 2026-08-18. Abierta y cerrada el mismo dia.
+    DE DONDE SALE: de sentarse a escribir el trader de comida de corpus-stalker
+    (su roadmap [1]) y descubrir que la regla ya votada por el autor —"vende
+    TODO lo que declare category = food", que es una REGLA y no una lista, para
+    que una comida registrada mañana por cualquier addon entre sola— NO SE PUEDE
+    ESCRIBIR. `Items.Get(id)` responde por UNA def y no existia forma publica de
+    recorrerlas. Medido con `rg --no-ignore` sobre el workspace entero: los
+    unicos tres recorridos son dev.lua, lan.lua e iconeditor.lua, y los tres
+    leen `CARGO.Items._defs` directo porque viven ADENTRO del modulo; ningun
+    consumidor de afuera la tocaba.
+    POR QUE ES DE CARGO Y NO DEL QUE PIDE: STK-1 le prohibe a corpus-stalker
+    agregar superficie a este modulo, y alcanzar `_defs` desde afuera no evita
+    el acoplamiento — lo muda a una tabla privada, que es peor porque se rompe
+    en silencio. Es el mismo argumento con el que este repo ya movio
+    Trade.StockOf / HasViewer / ClearViewers a accesores publicos cuando la
+    entidad de Sidorovich empezo a leer `trader.cont` y `trader.viewers`.
+    VOTO DEL AUTOR, textual, cuando se le presento el hallazgo: "si no hay API
+    mejor construirla correctamente". Eso ratifica la entrada; el trader queda
+    esperandola y su prompt, pendiente.
+    LO QUE SE ESCRIBIO, en shared/corpus_cargo_items.lua:
+        CARGO.Items.GetAll()            -> lista de defs, ordenada por id
+        CARGO.Items.ByCategory(id)      -> las de esa categoria, ordenada por id
+    Lista FRESCA (del caller, mutable), defs POR REFERENCIA — mismo invariante
+    que Items.Get, el modulo dueño las sigue escribiendo. No abre ninguna via
+    para mutar el registro: no hay desregistro publico y esto no lo inventa.
+    EL ORDEN ES LA MITAD DEL CONTRATO, y es lo unico que no era obvio. `_defs`
+    es un hash y el orden de `pairs` no se repite entre sesiones: un trader que
+    siembre stock recorriendo el registro arma un catalogo DISTINTO en cada
+    arranque sin que nadie lo haya sorteado, y un defecto que dependa del orden
+    no se reproduce dos veces — se lee como mala suerte, que es la peor forma
+    que puede tomar. Acuñada como CRG-69, sede Cargo_Architecture.md §3.
+    LO QUE NO HACE, para que no se lea de mas: no oculta el catalogo BULK
+    (attachments de ARC9, armas capturadas wpn_*, las 61 NVG). Esconderlas es
+    decision de DISPLAY y vive en el listado de dev.lua, que ya tiene su
+    IsBulk; un accesor que descartara entradas mentiria sobre que hay
+    registrado, y el que siembra stock decide por si mismo.
+    HALLAZGO DE INSTRUMENTO QUE SALIO DE ESCRIBIR ESTO, y es mas grande que la
+    entrada — ver CHANGELOG 67: harness_cargo.py invocaba el selftest con
+    `pcall` y miraba SOLO si habia corrido, tirando el valor de retorno, que es
+    justamente `fail == 0`. Con el selftest en ROJO el harness imprimia
+    ALL GREEN y salia 0: sus 86 checks de server y 93 de client no hacian
+    fallar nada. Los harness de Craving y Coagulant ya exigian el `== true`;
+    el de Cargo era el unico. Arreglado en el mismo parche.
+    NO CONFUNDIR CON EL 61 NI CON EL 62. El 61 (multiplicador de precio por
+    categoria) y el 62 (que un trader elija que compra) siguen PEDIDOS sin
+    ratificar y son independientes de esto: el 63 es leer el catalogo, no
+    preciarlo ni filtrarlo.

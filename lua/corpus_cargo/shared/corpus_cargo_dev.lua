@@ -1078,6 +1078,60 @@ function CARGO._SelfTest()
         CARGO.Items.MatchesFilter(plate, "category:plates")
             and not CARGO.Items.MatchesFilter(plate, "category:gear"))
 
+    -- ------------------------------------------------------------------
+    -- Enumeración del catálogo (CRG-69). El consumidor que la pidió siembra
+    -- stock con ella, así que lo que se mide es lo que a él le importa: que
+    -- el subconjunto sea el correcto, que el orden sea REPRODUCIBLE y que la
+    -- lista devuelta no sea la del registro.
+    -- ------------------------------------------------------------------
+    local todas = CARGO.Items.GetAll()
+    check("GetAll devuelve una lista no vacía", #todas > 0)
+
+    -- ORDEN: es la mitad del contrato y es lo único que se rompe SIN SÍNTOMA
+    -- (sin el sort, el catálogo sale en orden de hash y cambia entre
+    -- arranques; nada falla, y un defecto que dependa del orden se lee como
+    -- mala suerte). Se recorre la lista ENTERA, no una muestra.
+    local ordenada = true
+    for i = 2, #todas do
+        if not (todas[i - 1].id < todas[i].id) then ordenada = false break end
+    end
+    check("GetAll sale ordenada por id, de punta a punta", ordenada)
+
+    -- las defs van POR REFERENCIA (mismo invariante que Items.Get), y la
+    -- LISTA es fresca: mutarla no puede tocar el registro
+    check("GetAll devuelve la MISMA def que Get, no una copia",
+        CARGO.Items.GetAll()[1] == CARGO.Items.Get(CARGO.Items.GetAll()[1].id))
+    local n0 = #todas
+    todas[#todas + 1] = { id = "st_no_registrada" }
+    check("la lista de GetAll es del caller (mutarla no toca el registro)",
+        #CARGO.Items.GetAll() == n0)
+
+    -- ByCategory: subconjunto correcto, y CRUZADO contra GetAll — si el
+    -- predicado se equivocara, los dos accesores discreparían
+    local placas = CARGO.Items.ByCategory("plates")
+    local placasEsperadas = 0
+    for _, def in ipairs(CARGO.Items.GetAll()) do
+        if def.category == "plates" then placasEsperadas = placasEsperadas + 1 end
+    end
+    check("ByCategory coincide con filtrar GetAll a mano",
+        #placas == placasEsperadas and placasEsperadas > 0)
+    local todasPlacas = true
+    for _, def in ipairs(placas) do
+        if def.category ~= "plates" then todasPlacas = false break end
+    end
+    check("ByCategory no deja entrar una categoría ajena", todasPlacas)
+    check("ByCategory encuentra la placa dev y no la comida dev",
+        table.HasValue(placas, CARGO.Items.Get("cargo_dev_plate"))
+            and not table.HasValue(placas, CARGO.Items.Get("cargo_dev_food")))
+
+    -- una categoría que nadie registró tiene cero ítems, y eso es una
+    -- medición legítima: no es un error y no revienta
+    check("categoría inexistente devuelve lista vacía",
+        #CARGO.Items.ByCategory("no_existe_esta_categoria") == 0)
+    check("argumento inválido devuelve lista vacía, no explota",
+        #CARGO.Items.ByCategory(nil) == 0 and #CARGO.Items.ByCategory("") == 0
+            and #CARGO.Items.ByCategory(42) == 0)
+
     -- precio de comercio (Cargo_Trade §4): value x condición x spread
     local Tr = CARGO.Trade
     check("sin value no es comerciable",

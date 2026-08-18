@@ -6160,3 +6160,71 @@ dice su realm es lo que separa «el catálogo existe» de «el catálogo existe 
 (F1, F2, F3) con `x0` en rojo, donde antes del fix se veía uno solo — o sea que **no era un
 efecto de la def faltante**: con el catálogo completo el síntoma se hizo más visible, no menos.
 Un `count == 0` en una referencia de quick slot es su propio defecto y **no se investigó**.
+
+---
+
+## 67. Enumerar el catálogo desde afuera del módulo (roadmap #63) `[PENDIENTE]`
+
+Superficie nueva, chica, y **pedida por un consumidor que no podía escribir su regla sin ella**.
+
+**De dónde sale.** De sentarse a escribir el trader de comida de `corpus-stalker` y descubrir que
+la regla que el autor ya había votado —*«vende TODO lo que declare `category = "food"`»*, que es
+una **regla y no una lista**, para que una comida registrada mañana por cualquier addon entre
+sola— **no se puede escribir**. `Items.Get(id)` responde por *una* def; recorrerlas no tenía
+puerta pública. Censado con `rg --no-ignore` sobre el workspace entero: los únicos tres recorridos
+son `dev.lua`, `lan.lua` e `iconeditor.lua`, y los tres leen `CARGO.Items._defs` directo **porque
+viven adentro del módulo**. Ningún consumidor de afuera la tocaba.
+
+Voto del autor al presentarle el hallazgo, textual: *«si no hay API mejor construirla
+correctamente»*. El trader queda esperándola y su prompt, pendiente.
+
+- PARCHE 1 — `shared/corpus_cargo_items.lua`: **`Cargo.Items.GetAll()`** y
+  **`Cargo.Items.ByCategory(id)`**. Lista **fresca** (del caller, mutable), defs **por
+  referencia** — mismo invariante que `Items.Get`, el módulo dueño las sigue escribiendo. **No
+  abre ninguna vía para mutar el registro**: no hay desregistro público y esto no lo inventa.
+  Es el mismo movimiento con el que este repo ya sacó `Trade.StockOf`/`HasViewer`/`ClearViewers`
+  cuando la entidad de Sidorovich empezó a leer `trader.cont` y `trader.viewers`: alcanzar la
+  tabla privada desde afuera **no evita el acoplamiento, lo muda**. **[PENDIENTE]**
+- PARCHE 2 — el mismo archivo: **el orden**. Las dos salen ordenadas por id, y eso es **la mitad
+  del contrato**, no prolijidad. `_defs` es un hash y el orden de `pairs` no se repite entre
+  sesiones: un trader que siembre stock recorriéndolo arma un catálogo **distinto en cada
+  arranque sin que nadie lo haya sorteado**, y un defecto que dependa del orden **no se reproduce
+  dos veces** — se lee como mala suerte, que es la peor forma que puede tomar. Acuñado como
+  **CRG-69**, sede `Cargo_Architecture.md` §3. **[PENDIENTE]**
+
+Lo que **no** hace, para que no se lea de más: no oculta el catálogo **bulk** (attachments de
+ARC9, armas capturadas `wpn_*`, las 61 NVG). Esconderlas es decisión de **display** y vive en el
+listado de `dev.lua`, que ya tiene su `IsBulk`; un accesor que descartara entradas **mentiría
+sobre qué hay registrado**, y el que siembra stock decide por sí mismo.
+
+### El hallazgo de instrumento, que es más grande que el parche
+
+Verificando en negativo —mutando `GetAll` a propósito, borrándole el `table.sort`— salió esto:
+
+**`harness_cargo.py` invocaba el selftest con `pcall` y miraba SÓLO si había corrido**, tirando el
+valor de retorno. Y `CARGO._SelfTest()` **sí** devuelve `fail == 0`. O sea que con el selftest en
+**rojo** el harness imprimía `ALL GREEN` y salía **0**: sus **86 checks de server y 93 de client
+no hacían fallar nada** — escribían una línea en stdout y la pasada seguía verde. Es la familia
+más cara de control defectuoso: el que **da verde sin medir**, y encima acredita.
+
+- PARCHE 3 — `dev/harness_cargo.py`: el selftest se exige **PASADO**, no corrido, en los **dos**
+  realms (`check(okSelf and resSelf == true, ...)`). Con el mutante puesto, la pasada ahora sale
+  **exit 1**. Los harness de **Craving y Coagulant ya lo hacían bien** (`check(X._SelfTest() ==
+  true, ...)`) — el de Cargo era el único, así que es un desvío y no un patrón. **[PENDIENTE]**
+
+**Y la misma verificación en negativo destapó un defecto en un check que yo acababa de escribir.**
+El primer check de orden del harness comparaba **dos** elementos (`arte[1].id == "t_enum_aa"`).
+Con el `table.sort` borrado, **el selftest se puso rojo y ese check siguió verde**: con dos
+elementos, un `pairs` sin ordenar acierta la mitad de las veces, y encima su comentario afirmaba
+lo contrario. Lo que juzga es recorrer el catálogo **entero** — miles de ids ascendentes por azar
+del hash no pasa. Reescrito así, y verificado aislando el gate temprano para poder verlo ponerse
+rojo. *Un caso suelto no juzga un orden* (PLANTILLA_CHECKS §4), y esta vez el que se lo saltó fue
+el que escribía el check.
+
+Harness `harness_cargo.py`: **828 → 838 verdes** (7 checks de la superficie nueva + 1 de orden
+reescrito + 2 de los gates del selftest), selftest **86 OK server / 93 OK client**, exit 0. Los
+dos gates nuevos verificados en negativo: con `GetAll` mutado, exit 1.
+
+**Falta la pasada en juego.** Nada de esto es UI ni comportamiento —es superficie pura y
+verificable offline—, pero el entry no pasa a `[APLICADO]` hasta que corra `cargo_selftest` y
+`cargo_selftest_cl` en juego y los dos reporten 0 fallas.

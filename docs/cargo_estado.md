@@ -5,7 +5,18 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-08 (**nuevo: dos instrumentos para el realm CLIENTE** —
+**Última actualización:** 2026-08-18 (**nuevo: el catálogo se puede recorrer desde afuera** —
+`Items.GetAll()` / `Items.ByCategory(id)`, roadmap **#63**, CRG-69. Lo pidió el trader de comida de
+corpus-stalker: su regla votada —*«vende todo lo que declare `category = food`»*, regla y no lista—
+no se podía escribir, porque `Items.Get` responde por UNA def y los tres recorridos que existían
+leen `_defs` directo desde **adentro** del módulo. La mitad no obvia es el **orden**: salen
+ordenadas por id, porque un hash sin ordenar le arma a un trader un catálogo distinto cada arranque
+**sin que nadie lo haya sorteado**. **Y salió un defecto del instrumento, más grande que el
+parche:** el harness invocaba el selftest con `pcall` y miraba sólo si había **corrido**, tirando su
+retorno —que es `fail == 0`—, así que **179 checks (86 server + 93 client) no hacían fallar la
+pasada**; los de Craving y Coagulant ya lo hacían bien. Arreglado y verificado en negativo.
+Harness **838 verdes**, exit 0; **falta la pasada en juego** — corre `cargo_selftest` y
+`cargo_selftest_cl` y que los dos den 0 fallas. Contexto previo: **dos instrumentos para el realm CLIENTE** —
 `cargo_selftest_cl` y `cargo_dev_items_cl`, misma razón que `corpus_selftest_cl`: este módulo es
 shared y en listen server **gana el registro del server**, así que su realm cliente era
 inverificable en juego. Los estrenó un defecto del framework —la ready barrier no disparaba en

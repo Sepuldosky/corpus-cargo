@@ -257,6 +257,77 @@ function CARGO.Items.Get(id)
 end
 
 -- ------------------------------------------------------------------
+-- ENUMERATING THE CATALOGUE (CRG-69). `Items.Get` answers for ONE def by id
+-- and there was no public way to WALK them: the three loops that exist
+-- (dev.lua, lan.lua, iconeditor.lua) read `_defs` straight because they live
+-- INSIDE the module. A consumer from outside had no door — and the first one
+-- is already knocking: the food trader of corpus-stalker sells "everything
+-- that declares category = food" as a RULE, not as a list, precisely so a
+-- food registered by a future addon joins on its own. That rule cannot be
+-- written without walking the registry, and STK-1 forbids that addon from
+-- adding the accessor itself. So it is added here, where the registry lives.
+--
+-- STABLE ORDER, and it is HALF the contract, not decoration. `_defs` is a
+-- hash and `pairs` order is not reproducible across sessions. A trader that
+-- seeds its stock in that order builds a DIFFERENT catalogue every boot
+-- without anyone having rolled for it, and a bug that depends on the order
+-- never reproduces twice — the worst shape a defect can take, because it
+-- reads as a bad roll. Both accessors return their list sorted by id, so the
+-- only randomness a caller sees is the randomness the caller asked for.
+--
+-- THE LIST IS FRESH, THE DEFS ARE BY REFERENCE. The array belongs to the
+-- caller and may be mutated; the defs inside it are the same tables
+-- `Items.Get` hands out (the owner module keeps writing them — see the
+-- by-reference note on Register). Mutating the registry itself is NOT part
+-- of this surface: there is no public way to unregister, and this does not
+-- open one.
+--
+-- TWO THINGS A CALLER HAS TO KNOW, because neither is guessable:
+--   · THE TWO REALMS HOLD DIFFERENT CATALOGUES (COR-12). Autogen defs are
+--     minted server-side and only reach a client through the snapshot that
+--     needs them, so the same call answers with different sets on each side.
+--     Measured 2026-08-08: 4.413 defs server, 51 non-bulk client.
+--   · AN EMPTY RESULT IS AMBIGUOUS AND THIS API CANNOT DISAMBIGUATE IT. A
+--     category nobody registered and a category with zero items are the same
+--     answer, and so is a typo in the category name. It is not a defect to
+--     fix here — categories auto-register off the first def that names one,
+--     so the two states are genuinely identical in the registry. A caller who
+--     needs to tell them apart asks `GetCategories()`, which lists what was
+--     registered; and one who seeds stock off this should LOG the count, or
+--     "the pack is not mounted" and "my filter matches nothing" look alike.
+--
+-- NOT A HOT PATH: both walk the whole registry and sort. With the captured
+-- arsenal registered that is thousands of entries — fine at spawn or on a
+-- restock timer, wrong inside a Think.
+-- ------------------------------------------------------------------
+
+local function SortedDefs(acepta)
+    local out = {}
+    for _, def in pairs(CARGO.Items._defs) do
+        if acepta == nil or acepta(def) then out[#out + 1] = def end
+    end
+    table.sort(out, function(a, b) return a.id < b.id end)
+    return out
+end
+
+-- Every registered def of THIS realm, id-ordered. Includes the bulk catalogue
+-- (ARC9 attachments, captured `wpn_*` weapons, the NVG variants): hiding them
+-- is a DISPLAY decision and it stays in dev.lua, where the listing that wants
+-- it lives. An accessor that silently dropped entries would be lying about
+-- what is registered.
+function CARGO.Items.GetAll()
+    return SortedDefs(nil)
+end
+
+-- The defs of one category, id-ordered. The category set is OPEN (any addon
+-- may register one), so this takes the id as data and knows nothing about
+-- which categories exist.
+function CARGO.Items.ByCategory(category)
+    if not isstring(category) or category == "" then return {} end
+    return SortedDefs(function(def) return def.category == category end)
+end
+
+-- ------------------------------------------------------------------
 -- Def piggyback (Cargo_ItemImages §10) — ONE routine, every snapshot.
 --
 -- Autogen defs (captured engine weapons) are minted SERVER-side and the

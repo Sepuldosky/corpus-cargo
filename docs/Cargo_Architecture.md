@@ -92,6 +92,21 @@ Cargo.Items.Register({
 
 > **Sustitución de modelos (entry 34, decisión del autor 2026-07-23).** Un def **sin `model`** es el default honesto de un ítem setting-agnostic: dropea como la cajita de cartón (`models/props_junk/cardboard_box004a.mdl`, último eslabón de la cadena de resolución) y su ícono cae a la letra. `Cargo.Items.SetModel(id, model)` es el punto de extensión con el que un addon de **contenido** re-viste cualquier def sin poseerlo: el override se guarda y se aplica en el acto o cuando el def (re-)registre — orden-independiente entre addons (COR-5) y a prueba de re-registro (autogen/lua refresh) —, y gana sobre el `model` declarado. Un path no montado es inofensivo (`ModelUsable` gatea drop e íconos). Los defs siguen siendo del módulo dueño: solo cambia la piel.
 
+### Leer el catálogo desde afuera (CRG-69)
+
+**`Cargo.Items.GetAll()`** devuelve todas las defs registradas **de su realm**; **`Cargo.Items.ByCategory(id)`** devuelve las de una categoría. Las dos entregan una **lista fresca** —del caller, que puede mutarla— con las **defs por referencia**, igual que `Items.Get`: el módulo dueño sigue siendo el que las escribe. Mutar el registro **no** es parte de esta superficie.
+
+**Por qué existe, y por qué no es una comodidad.** `Items.Get(id)` responde por *una* def y no había forma pública de recorrerlas: los tres recorridos que ya existían (`dev`, `lan`, `iconeditor`) leen `_defs` directo porque viven **adentro** del módulo. El primer consumidor de afuera es el trader de comida de `corpus-stalker`, que vende *«todo lo que declare `category = "food"`»* como **regla y no como lista**, justamente para que una comida registrada mañana por cualquier addon entre sola. Esa regla no se escribe sin recorrer el registro, y **STK-1 le prohíbe a ese addon agregar el accesor**: por eso se agrega acá, donde el registro vive. Es el mismo movimiento que `Trade.StockOf`/`HasViewer`/`ClearViewers` — alcanzar `_defs` desde afuera sería mover el acoplamiento a una tabla privada, no evitarlo.
+
+**El orden es la mitad del contrato.** Las dos salen **ordenadas por id**. `_defs` es un hash y el orden de `pairs` no se repite entre sesiones: un trader que siembre su stock en ese orden arma un catálogo distinto cada arranque **sin que nadie lo haya sorteado**, y un defecto que dependa del orden no se reproduce dos veces — que es la peor forma que puede tomar, porque se lee como mala suerte. Con el orden fijo, lo único aleatorio que ve un caller es lo que el caller pidió.
+
+**Dos cosas que un consumidor tiene que saber, y ninguna se adivina:**
+
+- **Los dos realms tienen catálogos distintos (COR-12).** Las defs autogen se acuñan en server y llegan al cliente sólo en el snapshot que las necesita, así que la misma llamada contesta conjuntos distintos de cada lado. Medido el 2026-08-08: **4.413 defs en server contra 51 no-bulk en cliente**.
+- **Una lista vacía es ambigua y esta API no puede desambiguarla.** Una categoría que nadie registró, una con cero ítems y un typo en el nombre son la **misma** respuesta — y no es un defecto a arreglar acá: las categorías se auto-registran desde la primera def que las nombra, así que los tres estados son idénticos en el registro. Quien necesite distinguirlos pregunta `GetCategories()`; quien siembre stock con esto **tiene que loguear la cuenta**, o *«el pack no está montado»* y *«mi filtro no matchea nada»* se ven iguales.
+
+El catálogo **bulk** (attachments de ARC9, armas capturadas `wpn_*`, las variantes de NVG) **sí** sale en `GetAll`: esconderlo es una decisión de **display** y vive en el listado de `dev`. Un accesor que descartara entradas mentiría sobre qué hay registrado. Ninguna de las dos es para un `Think`: recorren el registro entero y ordenan.
+
 ### Lo que un def guarda de un tercero
 
 **CRG-63 — Un identificador POSICIONAL de un tercero (un ordinal de su tabla) no se persiste jamás: se persiste su clave estable y el ordinal se resuelve en el momento de usarlo.** Es CRG-42 en otra superficie —"`SWEP.Slot` no es la señal"— y la regla general es la misma: no guardar un dato que el tercero puede reordenar sin avisar.
