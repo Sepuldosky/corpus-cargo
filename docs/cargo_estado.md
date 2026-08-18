@@ -20,7 +20,10 @@ rechazos era **ciego** — borrando el gate `Ignore` la pasada seguía verde, po
 exigía «rechazado con algún motivo» y la clase caía **un gate más abajo** rechazándose igual. *Un
 check que no mira CUÁL guarda contestó no juzga ninguna: la firma la de al lado.* Reescrito por
 motivo exacto; los **8** gates verificados en negativo. Harness **852 verdes**, selftest **91
-server** / 93 client, exit 0; **falta la pasada en juego**, que comparte con el #63.
+server** / 93 client, exit 0. **PASADA EN JUEGO ✓ 2026-08-18**: `cargo_selftest` 91 OK y
+`cargo_selftest_cl` 93 OK, 0 fallas los dos — y los dos totales **clavados** con los que el
+harness offline había predicho, que es lo único que acredita a ese instrumento. Cerró en la
+misma corrida el **#63**; CHANGELOG **67 y 68 `[APLICADO]`**.
 Contexto previo: **el catálogo se puede recorrer desde afuera** —
 `Items.GetAll()` / `Items.ByCategory(id)`, roadmap **#63**, CRG-69. Lo pidió el trader de comida de
 corpus-stalker: su regla votada —*«vende todo lo que declare `category = food`»*, regla y no lista—
@@ -31,8 +34,7 @@ ordenadas por id, porque un hash sin ordenar le arma a un trader un catálogo di
 parche:** el harness invocaba el selftest con `pcall` y miraba sólo si había **corrido**, tirando su
 retorno —que es `fail == 0`—, así que **179 checks (86 server + 93 client) no hacían fallar la
 pasada**; los de Craving y Coagulant ya lo hacían bien. Arreglado y verificado en negativo.
-Harness **838 verdes**, exit 0; **falta la pasada en juego** — corre `cargo_selftest` y
-`cargo_selftest_cl` y que los dos den 0 fallas. Contexto previo: **dos instrumentos para el realm CLIENTE** —
+Harness **838 verdes** en su momento, exit 0; **pasada en juego ✓ 2026-08-18** (ver arriba). Contexto previo: **dos instrumentos para el realm CLIENTE** —
 `cargo_selftest_cl` y `cargo_dev_items_cl`, misma razón que `corpus_selftest_cl`: este módulo es
 shared y en listen server **gana el registro del server**, así que su realm cliente era
 inverificable en juego. Los estrenó un defecto del framework —la ready barrier no disparaba en

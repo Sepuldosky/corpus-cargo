@@ -6163,7 +6163,7 @@ Un `count == 0` en una referencia de quick slot es su propio defecto y **no se i
 
 ---
 
-## 67. Enumerar el catálogo desde afuera del módulo (roadmap #63) `[PENDIENTE]`
+## 67. Enumerar el catálogo desde afuera del módulo (roadmap #63) `[APLICADO 2026-08-18]`
 
 Superficie nueva, chica, y **pedida por un consumidor que no podía escribir su regla sin ella**.
 
@@ -6184,13 +6184,13 @@ correctamente»*. El trader queda esperándola y su prompt, pendiente.
   abre ninguna vía para mutar el registro**: no hay desregistro público y esto no lo inventa.
   Es el mismo movimiento con el que este repo ya sacó `Trade.StockOf`/`HasViewer`/`ClearViewers`
   cuando la entidad de Sidorovich empezó a leer `trader.cont` y `trader.viewers`: alcanzar la
-  tabla privada desde afuera **no evita el acoplamiento, lo muda**. **[PENDIENTE]**
+  tabla privada desde afuera **no evita el acoplamiento, lo muda**. **[APLICADO 2026-08-18]**
 - PARCHE 2 — el mismo archivo: **el orden**. Las dos salen ordenadas por id, y eso es **la mitad
   del contrato**, no prolijidad. `_defs` es un hash y el orden de `pairs` no se repite entre
   sesiones: un trader que siembre stock recorriéndolo arma un catálogo **distinto en cada
   arranque sin que nadie lo haya sorteado**, y un defecto que dependa del orden **no se reproduce
   dos veces** — se lee como mala suerte, que es la peor forma que puede tomar. Acuñado como
-  **CRG-69**, sede `Cargo_Architecture.md` §3. **[PENDIENTE]**
+  **CRG-69**, sede `Cargo_Architecture.md` §3. **[APLICADO 2026-08-18]**
 
 Lo que **no** hace, para que no se lea de más: no oculta el catálogo **bulk** (attachments de
 ARC9, armas capturadas `wpn_*`, las 61 NVG). Esconderlas es decisión de **display** y vive en el
@@ -6210,7 +6210,7 @@ más cara de control defectuoso: el que **da verde sin medir**, y encima acredit
 - PARCHE 3 — `dev/harness_cargo.py`: el selftest se exige **PASADO**, no corrido, en los **dos**
   realms (`check(okSelf and resSelf == true, ...)`). Con el mutante puesto, la pasada ahora sale
   **exit 1**. Los harness de **Craving y Coagulant ya lo hacían bien** (`check(X._SelfTest() ==
-  true, ...)`) — el de Cargo era el único, así que es un desvío y no un patrón. **[PENDIENTE]**
+  true, ...)`) — el de Cargo era el único, así que es un desvío y no un patrón. **[APLICADO 2026-08-18]**
 
 **Y la misma verificación en negativo destapó un defecto en un check que yo acababa de escribir.**
 El primer check de orden del harness comparaba **dos** elementos (`arte[1].id == "t_enum_aa"`).
@@ -6225,11 +6225,13 @@ Harness `harness_cargo.py`: **828 → 838 verdes** (7 checks de la superficie nu
 reescrito + 2 de los gates del selftest), selftest **86 OK server / 93 OK client**, exit 0. Los
 dos gates nuevos verificados en negativo: con `GetAll` mutado, exit 1.
 
-**Falta la pasada en juego.** Nada de esto es UI ni comportamiento —es superficie pura y
-verificable offline—, pero el entry no pasa a `[APLICADO]` hasta que corra `cargo_selftest` y
-`cargo_selftest_cl` en juego y los dos reporten 0 fallas.
+**PASADA EN JUEGO ✓ (2026-08-18).** `cargo_selftest` → **91 OK, 0 fallas** (realm server) y
+`cargo_selftest_cl` → **93 OK, 0 fallas** (realm client). Los dos números son **exactamente** los
+que había predicho el harness offline, que es la única forma que tiene ese instrumento de
+acreditarse: no alcanza con que sea verde, tiene que coincidir con el motor. Cubre también al
+entry 68, que corrió en la misma pasada.
 
-## 68. El ítem de una clase de arma (roadmap #64) `[PENDIENTE]`
+## 68. El ítem de una clase de arma (roadmap #64) `[APLICADO 2026-08-18]`
 
 **El mismo agujero que el 67, un día después y en otra superficie** — y esta vez el consumidor
 llegó con el anterior ya resuelto.
@@ -6266,13 +6268,13 @@ todo el árbol de Cargo. El agujero era de una familia, no del catálogo.
   class"` y `"NPC-only weapon"`. **Sólo armas scripteadas**: las del engine no son SWEPs
   (`GetStored` da `nil`), se rechazan, y no pierden nada — siguen capturándose por la vía del
   pickup, que tiene entidad viva y nunca necesitó esta puerta. Acuñado como **CRG-70**, sede
-  `Cargo_Architecture.md` §3. **[PENDIENTE]**
+  `Cargo_Architecture.md` §3. **[APLICADO 2026-08-18]**
 - PARCHE 2 — el mismo archivo: **lo que acuña, lo persiste**, y es la mitad que no era obvia.
   `autogen_defs` existe (CHANGELOG #6) para que un arma **capturada** sobreviva al cambio de mapa;
   un arma **comprada** necesita exactamente lo mismo, o el jugador se queda con un blob cuyo id no
   resuelve. Efecto lateral **declarado y no escondido**: el catálogo pasa a ser *«lo que los
   jugadores tuvieron en la mano Y lo que los traders sortearon»*. Nada se acuña dos veces.
-  **[PENDIENTE]**
+  **[APLICADO 2026-08-18]**
 - PARCHE 3 — el mismo archivo: **dos datos que antes salían de la entidad viva y ahora salen de la
   clase**, porque sin entidad habría que inventarlos. El **PrintName** trepando `.Base` con
   `GetStored` —que **no** hereda: sólo `weapons.Get` corre `TableInherit`, y deep-copea el árbol de
@@ -6280,7 +6282,7 @@ todo el árbol de Cargo. El agujero era de una familia, no del catálogo.
   una clase que no declara `PrintName` propio produce un ítem **llamado como su clase** y **nada
   falla**: la misma falla sin síntoma que ya midió el censo de `dev/other/` (9 de 99 SWEPs
   spawneables heredan el campo). El camino con entidad viva no cambia: sigue ganando el
-  `GetPrintName` real. **[PENDIENTE]**
+  `GetPrintName` real. **[APLICADO 2026-08-18]**
 
 ### El hallazgo de instrumento, y esta vez fue contra un check mío
 
@@ -6299,5 +6301,7 @@ los 8 en rojo.
 Harness `harness_cargo.py`: **838 → 852 verdes** (14 checks del bloque CRG-70), selftest **91 OK
 server** (eran 86) / 93 OK client, exit 0.
 
-**Falta la pasada en juego** — `cargo_selftest` y `cargo_selftest_cl`, los dos con 0 fallas. Y
-comparte esa deuda con el **entry 67**, que sigue `[PENDIENTE]` por lo mismo.
+**PASADA EN JUEGO ✓ (2026-08-18)**, la misma corrida que cerró el entry 67: `cargo_selftest`
+**91 OK, 0 fallas** (server) y `cargo_selftest_cl` **93 OK, 0 fallas** (client) — los 5 checks
+nuevos de esta superficie entre ellos, y los dos totales clavados con los que el harness offline
+había anticipado.

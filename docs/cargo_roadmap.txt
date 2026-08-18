@@ -1787,7 +1787,11 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     lo aprueba el de al lado. Reescrito comparando el motivo exacto, y la clase
     de `Ignore` sembrada en el padron para que el gate de abajo no pueda
     cubrirla. Los 8 gates verificados en negativo, uno por uno.
-    Harness: 838 -> 852 verdes; selftest server 86 -> 91. Falta pasada en juego.
+    Harness: 838 -> 852 verdes; selftest server 86 -> 91.
+    PASADA EN JUEGO OK el 2026-08-18: cargo_selftest 91 OK / cargo_selftest_cl
+    93 OK, 0 fallas en los dos, y los dos totales COINCIDEN con lo que el
+    harness offline habia predicho — que es lo unico que acredita al harness.
+    Cerro en la misma corrida el #63. CHANGELOG 67 y 68 [APLICADO].
 
 65. CERRAR LA PANTALLA DE TRADE DESDE EL SERVER [Cargo trade] — RATIFICADA el
     2026-08-18, SIN ESCRIBIR.
