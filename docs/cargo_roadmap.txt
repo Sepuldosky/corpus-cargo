@@ -1580,3 +1580,100 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Que OpenFor no compruebe dueno (cualquiera a 160 u abre cualquier
     contenedor) es un hecho de Cargo que el area hospital ENSANCHA — de 160 u a
     lo que mida la sala — pero no crea. Vive en el #12, no aca.
+61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — PEDIDO DEL
+    AUTOR, SIN DISEÑAR NI RATIFICAR. Abierto 2026-08-17.
+    DE DONDE SALE: de ponerle precio a los 15 comestibles de Craving para que
+    el trader de comida de corpus-stalker pueda venderlos. Con precios de la
+    vida real en USD (pan 1,81/libra, gaseosa 2,20 los 2 litros, leche 4,32 el
+    galon — FRED, jun-2026) las 15 defs caen TODAS en la banda 2-6, contra
+    municion de 8 a 900 por ronda y armas de miles. La comida queda
+    economicamente trivial: nadie decide nada por 2 dolares.
+    EL PEDIDO, en palabras del autor: "agreguemos un factor de multiplicacion
+    con un cvar a cargo, cosa que puedan encarecer distintas cosas, algo asi
+    como cargo_value_mult_food 10 (...) podriamos aplicar eso para toda
+    categoria, asi se multiplica la municion, armas, armaduras, misc, etc. Y es
+    mas sencillo digo yo para manejar la economia general del server o mapa".
+    POR QUE ES DE CARGO Y NO DEL QUE PIDE: el precio es de Cargo (CRG-18/19/20)
+    y la matematica vive en UN solo lugar, shared/corpus_cargo_trade.lua. Un
+    addon de contenido que quisiera encarecer su comida tendria que reescribir
+    los value de defs ajenas — que es exactamente lo que STK-1 le prohibe.
+    DONDE ENTRA, MEDIDO: Trade.UnitPrice es el unico punto donde se computa
+    precio, y lo usan las DOS puntas (el server al confirmar, el cliente al
+    pintar la celda y el total del basket). El multiplicador va ahi, sobre el
+    `value` base y ANTES del spread y del redondeo:
+        precio = round(value x mult_categoria x condicion x spread)
+    Sobre el value y no sobre el precio final para que el spread siga operando
+    sobre la magnitud escalada.
+    LA CONDICION QUE NO ES OPCIONAL — REPLICADA. El cliente pinta el precio con
+    la MISMA funcion pura que el server cobra (es el diseño de §4, y es lo que
+    permite que el basket sea intent puro). Una convar de servidor sin
+    FCVAR_REPLICATED deja al cliente multiplicando por su propio valor: la celda
+    diria un numero y el Confirm cobraria otro, y el jugador leeria eso como que
+    el trader lo estafa. Es la misma clase de defecto que CRG-18 evita, entrando
+    por la puerta de atras.
+    LA FORMA QUE SE PROPONE, y por que no la obvia: las categorias son un SET
+    ABIERTO (Items.RegisterCategory lo puede llamar cualquier addon; hoy son 10
+    propias + food de Craving). Una lista fija de convars no cubre la que
+    registre un addon mañana, y una sola convar con un string "food:10,ammo:2"
+    obliga a parsear, no autocompleta en consola y no tiene default por entrada.
+    La forma que sale sola del registro: que RegisterCategory CREE la convar de
+    su categoria, `cargo_value_mult_<id>`, default 1.0, ARCHIVE + REPLICATED.
+    Toda categoria — presente y futura — nace con su perilla y nadie mantiene
+    una lista. El nombre que propuso el autor es ademas el correcto: multiplica
+    el `value`, no el `price`, que son dos cosas distintas en este repo.
+    SUGERENCIA ENCIMA, no pedida: una global `cargo_value_mult` (default 1.0)
+    que componga multiplicativamente con la de categoria. Da "toda la economia
+    x2" en una perilla sin tocar diez, que es la mitad de lo que el autor
+    describe ("manejar la economia general del server o mapa").
+    LO QUE HAY QUE VOTAR ANTES DE ESCRIBIR:
+      a) Que significa mult 0. Hoy UnitPrice hace max(1, ...), asi que un 0
+         dejaria TODO a 1 en vez de sacarlo de venta. Las dos lecturas son
+         defendibles y son opuestas: "gratis" contra "no se vende" — y esta
+         segunda ya tiene dueño en el repo (ausencia de value). Un 0 que caiga
+         en la lectura equivocada es un exploit, no un ajuste.
+      b) Si el multiplicador afecta tambien lo que el trader PAGA (buy_mult) o
+         solo lo que cobra. Componiendolo sobre el value afecta a los dos por
+         construccion, que probablemente es lo que se quiere — pero conviene
+         decirlo, porque significa que subir food x10 tambien hace que vender
+         comida al trader rinda x10.
+      c) Donde queda el default de 5 USD para comestibles sin precio propio: NO
+         es de Cargo (Cargo no inventa el value de una def ajena, CRG-1). Vive
+         en quien arma el stock del trader, o sea en corpus-stalker.
+    LO QUE ESTA ENTRADA NO PIDE: ningun cambio en como se declara `value` en una
+    def, ni que Cargo conozca ninguna categoria en particular. La perilla es
+    ciega al significado — es CRG-1 otra vez: Cargo escala una magnitud y no
+    sabe que "food" es comida.
+62. QUE UN TRADER ELIJA QUE COMPRA [Cargo trade] — PEDIDO DEL AUTOR, SIN
+    DISEÑAR. Abierto 2026-08-17.
+    DE DONDE SALE: de la misma sesion que el 61. El autor, mirando la regla
+    "sin value no se vende", se pregunta en voz alta si no seria mejor al reves
+    — "dejar que se regale algo de 0 USD y al trader aplicar filtros sobre lo
+    que este quiera y no quiera comprar". No es un voto: es una pregunta, y se
+    anota como tal.
+    LA MITAD QUE NO ES DE CARGO, PARA NO CONFUNDIRLAS: que un trader VENDA solo
+    ciertas categorias no necesita nada de acá — lo decide quien arma el stock
+    al llamar AttachTrader, o sea la entidad. Los dos traders que corpus-stalker
+    va a tener (comida uno, municion+medicina+algunas armas el otro) se
+    resuelven enteros de ese lado.
+    LA MITAD QUE SI ES DE CARGO: lo que un trader ACEPTA del jugador. Hoy
+    compra cualquier cosa que tenga value, y el filtro no existe. Trade.Confirm
+    es donde se validaria, y tendria que ser el MISMO filtro que el cliente usa
+    para pintar/deshabilitar la celda — si no, el jugador arma el carrito y el
+    Confirm se lo rechaza entero sin decir cual linea sobra (peor UX que no
+    tener filtro).
+    LO QUE HAY QUE VOTAR, y son dos cosas independientes que conviene no
+    mezclar:
+      a) Semantica de `value = 0` DECLARADO, que hoy no existe como caso: la
+         ausencia ya significa "no esta a la venta" (contrato 13). Un 0
+         explicito podria significar "regalo" — pero ojo con la simetria: si el
+         trader lo REGALA, tambien lo COMPRA a 0, y un item de valor 0 que se
+         puede vender infinitas veces no rompe nada… salvo que ocupe grid del
+         trader. La lectura "0 = gratis" solo cierra si viene acompañada del
+         filtro de compra de (b).
+      b) La forma del filtro: lista blanca de categorias, lista negra, o un
+         predicado. Las tres se pueden expresar en opts de AttachTrader; la
+         diferencia esta en que pasa con una categoria que NO estaba prevista
+         (una que registre un addon mañana) — la blanca la excluye sola, la
+         negra la incluye sola, y esa es toda la decision.
+    LO QUE ESTA ENTRADA NO PIDE: nada sobre precios. El multiplicador es el 61 y
+    son independientes — se pueden hacer en cualquier orden o solo uno.
