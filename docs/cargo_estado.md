@@ -5,7 +5,23 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-18 (**nuevo: el catálogo se puede recorrer desde afuera** —
+**Última actualización:** 2026-08-18 (**nuevo: el ítem de una CLASE DE ARMA se puede pedir desde
+afuera** — `Capture.ItemIdFor(class)`, roadmap **#64**, CRG-70. Es el MISMO agujero que el #63 un
+día después: la regla por categoría ya se podía escribir, pero **las armas no estaban EN el
+catálogo**. Un arma capturada no tiene código propio —su def es autogen— y la acuñaba sólo la
+captura, cuando el engine entregaba el arma; `AttachTrader` resolvía cada línea de stock con
+`Items.Get`, no la encontraba, logueaba «stock desconocido» y **salteaba en silencio**, así que el
+trader vendía **cero armas con el pack montado entero** — que se lee igual que «el pack no está».
+**Lo que acuña lo persiste**: lo que un trader vende, un jugador lo compra, y un arma comprada tiene
+que sobrevivir al cambio de mapa. **Y sólo las armas**: censado, todo lo demás (comida, medicina,
+munición, NVG, attachments) se registra en el arranque desde `shared`; `autogen = true` aparece una
+sola vez en el árbol. **Segundo defecto de instrumento seguido, y otra vez mío:** el tramo de
+rechazos era **ciego** — borrando el gate `Ignore` la pasada seguía verde, porque el check sólo
+exigía «rechazado con algún motivo» y la clase caía **un gate más abajo** rechazándose igual. *Un
+check que no mira CUÁL guarda contestó no juzga ninguna: la firma la de al lado.* Reescrito por
+motivo exacto; los **8** gates verificados en negativo. Harness **852 verdes**, selftest **91
+server** / 93 client, exit 0; **falta la pasada en juego**, que comparte con el #63.
+Contexto previo: **el catálogo se puede recorrer desde afuera** —
 `Items.GetAll()` / `Items.ByCategory(id)`, roadmap **#63**, CRG-69. Lo pidió el trader de comida de
 corpus-stalker: su regla votada —*«vende todo lo que declare `category = food`»*, regla y no lista—
 no se podía escribir, porque `Items.Get` responde por UNA def y los tres recorridos que existían

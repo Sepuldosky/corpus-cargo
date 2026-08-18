@@ -1293,6 +1293,45 @@ function CARGO._SelfTest()
         CARGO.Money._providers.st_fake = nil
         CARGO.Money._active = prevActive
         check("fallback usd restaurado", CARGO.Money._providers[CARGO.Money._active] ~= nil)
+
+        -- ------------------------------------------------------------------
+        -- El id de ítem de una CLASE de arma (CRG-70). Acá se mide la mitad
+        -- SIN EFECTOS: acuñar una def escribe en `autogen_defs`, que es
+        -- config del server, y un selftest que corre en una partida real no
+        -- puede dejar ítems fantasma atrás. La mitad que ACUÑA se mide
+        -- offline, donde el padrón de SWEPs es una tabla nuestra —
+        -- dev/harness_cargo.py, bloque CRG-70.
+        -- ------------------------------------------------------------------
+        -- Se compara el MOTIVO EXACTO, no "rechazó con algo": un check que
+        -- no mira cuál de los gates contestó no juzga ninguno en particular
+        -- —lo aprueba el de al lado—, y eso ya pasó acá (ver el aviso del
+        -- bloque CRG-70 de dev/harness_cargo.py, 2026-08-18).
+        local Cap = CARGO.Capture
+        local function motivoDe(clase)
+            local wid, motivo = Cap.ItemIdFor(clase)
+            return wid == nil and isstring(motivo) and motivo or nil
+        end
+        check("ItemIdFor: argumento inválido se rechaza CON su motivo",
+            motivoDe(nil) == "invalid class" and motivoDe("") == "invalid class"
+                and motivoDe(42) == "invalid class")
+        -- `corpus_cargo_hands` y no `weapon_fists`: las manos de Cargo SÍ son
+        -- un SWEP registrado, así que si el gate `Ignore` no estuviera, la
+        -- clase pasaría el de existencia y este check lo vería. Con una clase
+        -- del engine (GetStored nil) el gate de abajo la taparía.
+        check("ItemIdFor: una clase de la lista Ignore se rechaza POR ESO, existiendo en el padrón",
+            motivoDe("corpus_cargo_hands") == "ignored class")
+        -- una clase inventada no puede dejar una def fantasma: un id que
+        -- nadie puede spawnear persistiría en autogen_defs para siempre
+        local claseFalsa = "st_clase_de_arma_inexistente"
+        check("ItemIdFor: clase inexistente se rechaza con su motivo",
+            motivoDe(claseFalsa) == "unknown weapon class")
+        check("ItemIdFor: y NO deja una def fantasma acuñada",
+            CARGO.Items.Get("wpn_" .. claseFalsa) == nil)
+        -- frag/SLAM ya tienen cara canónica (roadmap #32): ésa es la
+        -- respuesta, y no una def autogen nueva
+        check("ItemIdFor: una clase con cara canónica devuelve ESA, no una wpn_ nueva",
+            Cap.ItemIdFor("weapon_frag") == "cargo_throw_frag"
+                and CARGO.Items.Get("wpn_weapon_frag") == nil)
     end
 
     -- icon system, pure surface only (CLIENT realm — Cargo_ItemImages §2/§5/§7);

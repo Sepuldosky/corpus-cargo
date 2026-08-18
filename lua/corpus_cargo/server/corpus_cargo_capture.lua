@@ -357,6 +357,43 @@ local function ResolveCaliber(wep)
     return CARGO.Ammo.CaliberForType(hl2)
 end
 
+-- ------------------------------------------------------------------
+-- LOS MISMOS DOS DATOS, LEÍDOS DE LA CLASE Y NO DE UN ARMA VIVA.
+--
+-- Hasta hoy una def autogen se acuñaba SOLO cuando el engine entregaba el
+-- arma, así que siempre había una entidad a la que preguntarle. El accesor
+-- público de más abajo (`Capture.ItemIdFor`) acuña la def de una clase que
+-- NADIE tuvo en la mano, y estas dos son las que si no habría que inventar:
+-- sin ellas el ítem se llama "arc9_eft_ak74" y no lleva calibre.
+--
+-- POR QUÉ GetStored Y NO weapons.Get: Get deep-copea el SWEP entero —el
+-- árbol de attachments incluido— para leer un string. Se trepa `.Base` a
+-- mano, igual que Ammo.TypeOfClass y por el mismo motivo. GetStored NO
+-- hereda (garrysmod/lua/includes/modules/weapons.lua: sólo Get corre
+-- TableInherit), así que una clase que no declara PrintName propio lee nil
+-- y la trepada es lo que lo encuentra.
+-- ------------------------------------------------------------------
+
+local function StoredPrintName(class, depth)
+    local s = weapons.GetStored(class)
+    if not istable(s) then return nil end
+    if isstring(s.PrintName) and s.PrintName ~= "" then return s.PrintName end
+    local base = s.Base
+    if isstring(base) and base ~= class and (depth or 0) < 10 then
+        return StoredPrintName(base, (depth or 0) + 1)
+    end
+    return nil
+end
+
+-- Calibre de display de una CLASE. Ammo.TypeOfClass ya contesta "de qué pool
+-- come esta clase" sin instancia (trepa `.Base` igual y trae la tabla de
+-- escape para las armas del engine, que no son SWEPs).
+local function ClassCaliber(class)
+    if CARGO.Ammo == nil or not isfunction(CARGO.Ammo.TypeOfClass) then return nil end
+    local hl2 = CARGO.Ammo.TypeOfClass(class)
+    return hl2 ~= nil and CARGO.Ammo.CaliberForType(hl2) or nil
+end
+
 -- Autogen defs must survive restarts (CHANGELOG #6): they are born at
 -- runtime (EnsureDef, when the engine hands over the weapon), so without a
 -- registry of their own an equipped non-loadout weapon deserializes into a
@@ -419,15 +456,21 @@ if autogenDirty then Corpus.Data.Save("cargo", "autogen_defs", autogenDefs, CATA
 local function EnsureDef(class, wep)
     local id = "wpn_" .. class
 
-    local name = class
+    local name = nil
     -- engine weapons report a localization token ("#HL2_Pistol"); the client
     -- resolves it with language.GetPhrase when registering the synced def
     if IsValid(wep) then
         local ok, printName = pcall(function() return wep:GetPrintName() end)
         if ok and isstring(printName) and printName ~= "" then name = printName end
     end
+    -- sin entidad viva (o con una que no dio print name): la tabla de clase
+    -- sigue sabiendo el suyo, y trepar `.Base` con GetStored no copia nada.
+    -- La clase pelada queda como último recurso — es lo que HealOrphanDefs
+    -- ya usa de placeholder, y la próxima captura real lo mejora en sitio.
+    if name == nil then name = StoredPrintName(class) end
+    if name == nil then name = class end
 
-    local caliber = ResolveCaliber(wep)
+    local caliber = ResolveCaliber(wep) or ClassCaliber(class)
 
     local existing = CARGO.Items.Get(id)
     if existing ~= nil then
@@ -457,6 +500,72 @@ local function EnsureDef(class, wep)
     autogenDefs[id] = { name = name, weapon_class = class, caliber = caliber }
     Corpus.Data.Save("cargo", "autogen_defs", autogenDefs, CATALOG)
     return id
+end
+
+-- ------------------------------------------------------------------
+-- PÚBLICO: el id de ítem de Cargo que REPRESENTA una clase de arma (CRG-70).
+--
+-- DE DÓNDE SALE. El trader de corpus-stalker (su roadmap [1]) sortea ocho
+-- armas ARC9 EFT para su stock en cada re-sorteo. Para sembrar una necesita
+-- un id de ítem, y `Trade.AttachTrader` lo resuelve con `Items.Get` — que
+-- contesta nil para TODA arma que nadie haya tenido en la mano todavía,
+-- porque un arma capturada no tiene código propio: su def es autogen y hasta
+-- hoy la acuñaba SÓLO EnsureDef, cuando el engine entregaba el arma. O sea
+-- que el trader en un server FRESCO vendía cero armas con el pack montado
+-- entero, y `AttachTrader` logueaba "stock desconocido" y salteaba en
+-- silencio — que se lee exactamente igual que "el pack no está montado".
+-- Es la misma forma del agujero que llenó CRG-69 un día antes, y la misma
+-- respuesta: la superficie va ACÁ, donde viven el registro y la acuñación,
+-- porque STK-1 le prohíbe al consumidor agregarla y una función local ni
+-- siquiera se puede alcanzar desde afuera.
+--
+-- NO ES LA MISMA PREGUNTA QUE "¿EXISTE LA DEF?": `Items.Get("wpn_x")`
+-- pregunta por el REGISTRO y esto pregunta por el ARMA. El que sólo quería
+-- saber si la def ya existe siempre tuvo `Items.Get`.
+--
+-- SÓLO ARMAS SCRIPTEADAS. Las del engine (weapon_pistol, weapon_crowbar) no
+-- son SWEPs — `weapons.GetStored` devuelve nil, cosa que este archivo ya
+-- paga dos veces—, así que no hay tabla de clase de la que leer un nombre ni
+-- padrón contra el que validar la clase. Se rechazan con "unknown", y no
+-- pierden nada: siguen capturándose por la vía del pickup, que tiene una
+-- entidad viva y nunca necesitó esta puerta. Un caller que enumera
+-- `weapons.GetList()` / `GetStored` nos está pasando justo el padrón que
+-- esto sabe contestar.
+--
+-- LO QUE ACUÑA, LO PERSISTE, y no es prolijidad: el ítem que un trader pone
+-- en la repisa es un ítem que un jugador puede COMPRAR, y un arma comprada
+-- tiene que sobrevivir al cambio de mapa igual que una capturada. Ése es el
+-- motivo entero por el que existe `autogen_defs` (CHANGELOG #6). El efecto
+-- lateral es real y queda declarado: el catálogo deja de ser "lo que los
+-- jugadores tuvieron en la mano" y pasa a ser "y lo que los traders
+-- sortearon". Nada se acuña dos veces — la segunda llamada por una clase
+-- devuelve el id y no toca el disco.
+--
+-- Devuelve el id, o nil + un MOTIVO CORTO. El motivo es contrato: una
+-- respuesta vacía sin causa es lo que CRG-69 dedicó un párrafo a advertir, y
+-- acá hay cuatro causas distinguibles.
+-- ------------------------------------------------------------------
+
+function CARGO.Capture.ItemIdFor(class)
+    if not isstring(class) or class == "" then return nil, "invalid class" end
+    if CARGO.Capture.Ignore[class] then return nil, "ignored class" end
+
+    -- frag/SLAM ya tienen cara canónica en Cargo (roadmap #32) y nunca
+    -- autogeneran: contestar CON ESE id es la respuesta honesta a "qué ítem
+    -- es esta clase", y acuñar wpn_weapon_frag resucitaría la segunda cara
+    -- que ese frente existe para matar.
+    local throwFace = ThrowableFace(class)
+    if throwFace ~= nil then return throwFace end
+
+    if not istable(weapons.GetStored(class)) then
+        return nil, "unknown weapon class"
+    end
+    -- VJ NPC-only: un ítem acuñado para una de ésas es un vector de farmeo
+    -- inequipable (ver NpcOnlyWeapon arriba). El barrido de arranque ya las
+    -- purga; esto evita volver a meterlas por la puerta nueva.
+    if NpcOnlyWeapon(class) then return nil, "NPC-only weapon" end
+
+    return EnsureDef(class, nil)
 end
 
 -- Blobs saved BEFORE the autogen registry existed reference defs that died

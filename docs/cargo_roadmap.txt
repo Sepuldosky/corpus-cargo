@@ -1580,8 +1580,17 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Que OpenFor no compruebe dueno (cualquiera a 160 u abre cualquier
     contenedor) es un hecho de Cargo que el area hospital ENSANCHA — de 160 u a
     lo que mida la sala — pero no crea. Vive en el #12, no aca.
-61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — PEDIDO DEL
-    AUTOR, SIN DISEÑAR NI RATIFICAR. Abierto 2026-08-17.
+61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — RATIFICADA EN
+    RUMBO el 2026-08-18, SIN ESCRIBIR. Abierta 2026-08-17.
+    RATIFICACION: el autor la voto en la ronda de diseño del trader de
+    corpus-stalker, eligiendola sobre la 62 y sobre "ninguna de las dos". Lo
+    ratificado es el RUMBO y la forma propuesta (que RegisterCategory cree
+    `cargo_value_mult_<id>`, ARCHIVE + REPLICATED); los TRES SUB-VOTOS de mas
+    abajo siguen abiertos y se resuelven en la ronda que la escriba.
+    POR QUE ESTA ES Y LA 62 NO: es la que la comida NECESITA. Sin ella los 15
+    comestibles quedan en 2-12 USD contra municion de 8-900 y armas de miles, o
+    sea economicamente triviales. Lo que un trader VENDE ya lo decide la entidad
+    al llamar AttachTrader, asi que la 62 no la usa ningun tramo abierto.
     DE DONDE SALE: de ponerle precio a los 15 comestibles de Craving para que
     el trader de comida de corpus-stalker pueda venderlos. Con precios de la
     vida real en USD (pan 1,81/libra, gaseosa 2,20 los 2 litros, leche 4,32 el
@@ -1726,3 +1735,97 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     categoria) y el 62 (que un trader elija que compra) siguen PEDIDOS sin
     ratificar y son independientes de esto: el 63 es leer el catalogo, no
     preciarlo ni filtrarlo.
+
+64. EL ITEM DE UNA CLASE DE ARMA [Cargo capture/items] — RATIFICADA Y ESCRITA
+    el 2026-08-18. Hermana del 63 y del mismo dia siguiente.
+    DE DONDE SALE: de retomar el trader de corpus-stalker con el 63 ya escrito
+    y chocar con el MISMO agujero en otra superficie. La regla por categoria ya
+    se podia escribir, pero las ARMAS no estaban EN el catalogo: un arma
+    capturada no tiene codigo propio —su def es AUTOGEN— y hasta hoy la acuñaba
+    SOLO la captura, cuando el engine entregaba el arma. `EnsureDef` es una
+    funcion LOCAL de server/corpus_cargo_capture.lua: no habia puerta publica y
+    desde afuera ni siquiera se puede alcanzar.
+    EL SINTOMA, QUE ES EL QUE IMPORTA: `Trade.AttachTrader` resuelve cada linea
+    de `opts.stock` con `Items.Get`, no encontraba la def, logueaba "stock
+    desconocido" y salteaba EN SILENCIO. O sea que el trader en un server
+    FRESCO vendia CERO armas con el pack ARC9 EFT montado entero — y eso se lee
+    exactamente igual que "el pack no esta montado". Un falso negativo que
+    acredita al pack.
+    VOTO DEL AUTOR al presentarle el hallazgo, textual: "Si es bloqueante
+    paremos aca, guarda el prompt original, y solucionemos la bloqueante de
+    cargo". El trader vuelve a quedar en pausa y esto se escribe primero.
+    Y PREGUNTO SI PASA LO MISMO CON EL RESTO: no. Medido con `rg --no-ignore`
+    sobre TODOS los `Items.Register` del workspace — comida (Craving), medicina
+    (Coagulant), municion y suministros (Cargo), las 61 NVG y los attachments
+    de ARC9 se registran EN EL ARRANQUE desde archivos shared, y existen
+    mientras su addon este montado. Las armas capturadas `wpn_*` son la UNICA
+    familia acuñada en runtime: `autogen = true` aparece una sola vez en todo
+    el arbol de Cargo. El agujero era de una familia, no del catalogo.
+    LO QUE SE ESCRIBIO, en server/corpus_cargo_capture.lua:
+        CARGO.Capture.ItemIdFor(class)  -> id | nil, motivo
+    Acuña la def autogen si no existe y devuelve su id; si la clase ya tiene
+    cara canonica (frag/SLAM, roadmap #32) devuelve ESA. Cuatro motivos de
+    rechazo distinguibles: "invalid class", "ignored class", "unknown weapon
+    class" (las armas del ENGINE no son SWEPs) y "NPC-only weapon".
+    LO QUE ACUÑA LO PERSISTE, y es la mitad que no era obvia: `autogen_defs`
+    existe (CHANGELOG #6) para que un arma CAPTURADA sobreviva al cambio de
+    mapa, y un arma COMPRADA necesita exactamente lo mismo. Efecto lateral
+    declarado: el catalogo pasa a ser "lo que los jugadores tuvieron en la mano
+    Y lo que los traders sortearon".
+    DOS DATOS QUE ANTES SALIAN DE LA ENTIDAD VIVA y ahora salen de la clase: el
+    PrintName (trepando `.Base` con GetStored, que NO hereda) y el calibre (via
+    Ammo.TypeOfClass). Sin la trepada, una clase que no declara PrintName
+    propio produce un item LLAMADO COMO SU CLASE y nada falla — la misma falla
+    sin sintoma que midio el censo de dev/other/ (9 de 99 SWEPs spawneables
+    heredan el campo).
+    Acuñada como CRG-70, sede Cargo_Architecture.md §3.
+    HALLAZGO DE INSTRUMENTO DEL MISMO PARCHE, y salio de verificar en negativo:
+    la primera version del tramo de rechazos era CIEGA. Borrando el gate
+    `Ignore` la pasada seguia VERDE, porque el check solo exigia "rechazado con
+    algun motivo" y la clase caia un gate mas abajo —el de existencia— y se
+    rechazaba igual. Un check que no mira CUAL gate contesto no juzga ninguno:
+    lo aprueba el de al lado. Reescrito comparando el motivo exacto, y la clase
+    de `Ignore` sembrada en el padron para que el gate de abajo no pueda
+    cubrirla. Los 8 gates verificados en negativo, uno por uno.
+    Harness: 838 -> 852 verdes; selftest server 86 -> 91. Falta pasada en juego.
+
+65. CERRAR LA PANTALLA DE TRADE DESDE EL SERVER [Cargo trade] — RATIFICADA el
+    2026-08-18, SIN ESCRIBIR.
+    DE DONDE SALE: del diseño del re-sorteo del trader de corpus-stalker
+    (§-2.H de su handoff). El autor voto que el trader, en los ultimos N
+    segundos antes de re-sortear, EXPULSE al que este comerciando, avise en
+    pantalla y lo diga con una linea de voz — para que el restock sea
+    inbloqueable y ademas VISIBLE, en vez de un evento de fondo.
+    MEDIDO ANTES DE PEDIRLA, y es lo que la vuelve una entrada y no un capricho:
+    el net `trade_close` es CLIENTE→SERVER UNICAMENTE (client/…:184 lo manda,
+    server/…:560 lo recibe; el camino inverso no existe). O sea que hoy NADIE
+    puede cerrarle la pantalla a un jugador desde el server.
+    LO QUE YA ALCANZA HOY, PARA QUE NO SE LEA COMO BLOQUEANTE: `ClearViewers`
+    vacia el set de viewers y a partir de ahi `ViewedTrader` devuelve nil, asi
+    que el server contesta "The trader is out of reach." a cualquier intento —
+    expulsion FUNCIONAL, sin tocar este repo. Lo unico que falta es que el panel
+    del jugador SE CIERRE en vez de quedar dibujado hasta que lo cierre a mano.
+    corpus-stalker escribe su tramo con `ClearViewers` y esta entrada lo pule.
+    LA SEGUNDA COSA QUE SALDA, y es DEUDA YA DECLARADA de antes: el header de
+    `corpus_stalker_sidorovich.lua` dice que si el trader MUERE con pantallas
+    abiertas, quedan huerfanas y el jugador las cierra a mano — "Cargo no tiene
+    trade_close server→cliente". Es la misma superficie: UNA entrada, DOS
+    problemas, y el segundo lleva meses anotado como degradacion honesta.
+    FORMA PROPUESTA (no votada en detalle): `Trade.CloseFor(ply, trader)` que
+    saque al jugador del set de viewers Y le mande el net de cierre; y que
+    `ClearViewers` pase a hacerlo para todos, en vez de solo vaciar la tabla —
+    hoy su comentario declara explicitamente que deja "a stale panel".
+    LO QUE HAY QUE VOTAR ANTES DE ESCRIBIRLA:
+      a) Si `ClearViewers` cambia de comportamiento (cerrar de verdad) o si se
+         queda como esta y `CloseFor` es una funcion aparte. Cambiarla toca al
+         unico consumidor que tiene hoy, que es el OnKilled del trader de
+         corpus-stalker — y ahi cerrar de verdad es EXACTAMENTE lo que se
+         queria, asi que probablemente sea una mejora y no un riesgo.
+      b) Si el cierre lleva un MOTIVO que el cliente pueda pintar, o si el
+         aviso lo manda el que expulsa por su cuenta con `Inventory.Notice`
+         (que es lo que corpus-stalker va a hacer igual).
+    LO QUE ESTA ENTRADA NO PIDE: ningun re-sync de viewers. Ese hacia falta
+    mientras se pensaba re-sortear CON gente mirando; el diseño que se voto
+    expulsa ANTES de re-sortear, asi que nadie mira cuando el stock cambia y el
+    proximo que abra recibe un Snapshot fresco por el camino de siempre. La
+    superficie `Trade.SyncFor` que se habia propuesto SE CAYO ENTERA.

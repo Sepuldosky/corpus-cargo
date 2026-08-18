@@ -107,6 +107,23 @@ Cargo.Items.Register({
 
 El catálogo **bulk** (attachments de ARC9, armas capturadas `wpn_*`, las variantes de NVG) **sí** sale en `GetAll`: esconderlo es una decisión de **display** y vive en el listado de `dev`. Un accesor que descartara entradas mentiría sobre qué hay registrado. Ninguna de las dos es para un `Think`: recorren el registro entero y ordenan.
 
+### El ítem de una clase de arma (CRG-70)
+
+**`Cargo.Capture.ItemIdFor(class)`** (SERVER) devuelve **el id de ítem que representa esa clase de arma**, acuñando su def autogen si nadie tuvo una en la mano todavía. Devuelve `id`, o `nil` **más un motivo corto**.
+
+**Por qué existe.** Un arma capturada no tiene código propio: su def es *autogen* y hasta hoy la acuñaba **sólo** la captura, cuando el engine entregaba el arma. O sea que `Items.Get("wpn_<clase>")` contestaba `nil` para toda arma que nadie hubiera tocado — y el trader de `corpus-stalker`, que sortea armas ARC9 EFT para su stock, sembraba **cero** con el pack montado entero: `Trade.AttachTrader` resuelve cada línea con `Items.Get`, no la encuentra, loguea *«stock desconocido»* y saltea **en silencio**. Eso se lee exactamente igual que *«el pack no está montado»*. Es la misma forma del agujero que llenó CRG-69, y la misma respuesta: la superficie va donde viven el registro y la acuñación, porque STK-1 le prohíbe al consumidor agregarla.
+
+**No es la misma pregunta que «¿existe la def?».** `Items.Get("wpn_x")` pregunta por el **registro**; esto pregunta por el **arma**. El que sólo quería saber si la def ya existe siempre tuvo `Items.Get`.
+
+**Lo que acuña, lo persiste** en `autogen_defs`, y no es prolijidad: el ítem que un trader pone en la repisa es un ítem que un jugador puede **comprar**, y un arma comprada tiene que sobrevivir al cambio de mapa igual que una capturada — el motivo entero por el que ese catálogo existe. Efecto lateral **declarado**: el catálogo deja de ser *«lo que los jugadores tuvieron en la mano»* y pasa a ser *«y lo que los traders sortearon»*. Nada se acuña dos veces: la segunda llamada por una clase devuelve el id y no toca el disco.
+
+**Sólo armas scripteadas.** Las del engine (`weapon_pistol`, `weapon_crowbar`) **no son SWEPs** — `weapons.GetStored` devuelve `nil` para ellas —, así que no hay tabla de clase de la que leer un nombre ni padrón contra el que validar la clase: se rechazan con `"unknown weapon class"`, y no pierden nada porque siguen capturándose por la vía del pickup, que tiene una entidad viva y nunca necesitó esta puerta. Un caller que enumera `weapons.GetList()`/`GetStored` está pasando justo el padrón que esto contesta.
+
+**Los cuatro motivos son el contrato**, no decoración — una respuesta vacía sin causa es lo que CRG-69 dedicó un párrafo a advertir: `"invalid class"` · `"ignored class"` (la lista `Capture.Ignore`: unas manos no son equipo) · `"unknown weapon class"` · `"NPC-only weapon"` (una VJ `MadeForNPCsOnly` es un vector de farmeo inequipable). Una clase con **cara canónica** —frag y SLAM, roadmap #32— devuelve **ese** id (`cargo_throw_frag`), que es la respuesta honesta a *«qué ítem es esta clase»*; acuñarle una `wpn_*` resucitaría la segunda cara que ese frente existe para matar.
+
+**Dos datos que antes salían de la entidad viva y ahora salen de la clase**, porque sin entidad habría que inventarlos: el **PrintName** —trepando `.Base` con `GetStored`, que **no** hereda (sólo `weapons.Get` corre `TableInherit`, y deep-copea el árbol de attachments entero para leer un string)— y el **calibre**, vía `Ammo.TypeOfClass`. Sin la trepada, una clase que no declara `PrintName` propio produce un ítem **llamado como su clase**, y nada falla: es la misma falla sin síntoma que ya midió el censo de `dev/other/` (9 de 99 SWEPs spawneables heredan el campo).
+
+
 ### Lo que un def guarda de un tercero
 
 **CRG-63 — Un identificador POSICIONAL de un tercero (un ordinal de su tabla) no se persiste jamás: se persiste su clave estable y el ordinal se resuelve en el momento de usarlo.** Es CRG-42 en otra superficie —"`SWEP.Slot` no es la señal"— y la regla general es la misma: no guardar un dato que el tercero puede reordenar sin avisar.

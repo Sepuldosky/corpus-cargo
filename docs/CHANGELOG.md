@@ -6228,3 +6228,76 @@ dos gates nuevos verificados en negativo: con `GetAll` mutado, exit 1.
 **Falta la pasada en juego.** Nada de esto es UI ni comportamiento —es superficie pura y
 verificable offline—, pero el entry no pasa a `[APLICADO]` hasta que corra `cargo_selftest` y
 `cargo_selftest_cl` en juego y los dos reporten 0 fallas.
+
+## 68. El ítem de una clase de arma (roadmap #64) `[PENDIENTE]`
+
+**El mismo agujero que el 67, un día después y en otra superficie** — y esta vez el consumidor
+llegó con el anterior ya resuelto.
+
+**De dónde sale.** De retomar el trader de `corpus-stalker` con `Items.ByCategory` en el árbol y
+chocar con que la regla ya se podía escribir para comida y medicina, pero **las armas no estaban
+EN el catálogo**. Un arma capturada no tiene código propio: su def es **autogen** y hasta hoy la
+acuñaba **sólo la captura**, cuando el engine entregaba el arma. `EnsureDef` es una función
+**local** de `server/corpus_cargo_capture.lua` — no había puerta pública, y desde afuera una local
+ni siquiera se puede alcanzar.
+
+**El síntoma, que es el que importa.** `Trade.AttachTrader` resuelve cada línea de `opts.stock`
+con `Items.Get`, no encontraba la def, logueaba *«stock desconocido»* y **salteaba en silencio**.
+O sea que el trader en un server **fresco** vendía **cero** armas con el pack ARC9 EFT montado
+entero, y eso se lee exactamente igual que *«el pack no está montado»*: un falso negativo que
+además **acredita al pack**.
+
+Voto del autor al presentarle el hallazgo, textual: *«Si es bloqueante paremos acá, guarda el
+prompt original, y solucionemos la bloqueante de cargo»*.
+
+**Y preguntó si pasaba lo mismo con el resto de los ítems — no, y está medido.** `rg --no-ignore`
+sobre **todos** los `Items.Register` del workspace: comida (Craving), medicina (Coagulant),
+munición y suministros (Cargo), las 61 NVG y los attachments de ARC9 se registran **en el
+arranque** desde archivos `shared` y existen mientras su addon esté montado. Las armas capturadas
+`wpn_*` son la **única** familia acuñada en runtime — `autogen = true` aparece **una sola vez** en
+todo el árbol de Cargo. El agujero era de una familia, no del catálogo.
+
+- PARCHE 1 — `server/corpus_cargo_capture.lua`: **`CARGO.Capture.ItemIdFor(class)`** (SERVER).
+  Devuelve el id de ítem que representa esa clase, acuñando su def autogen si no existe; si la
+  clase ya tiene **cara canónica** (frag/SLAM, roadmap #32) devuelve **ésa** — acuñarle una
+  `wpn_*` resucitaría la segunda cara que ese frente existe para matar. Cuatro motivos de rechazo
+  **distinguibles**, y eso es contrato y no decoración (una respuesta vacía sin causa es lo que el
+  entry 67 dedicó un párrafo a advertir): `"invalid class"`, `"ignored class"`, `"unknown weapon
+  class"` y `"NPC-only weapon"`. **Sólo armas scripteadas**: las del engine no son SWEPs
+  (`GetStored` da `nil`), se rechazan, y no pierden nada — siguen capturándose por la vía del
+  pickup, que tiene entidad viva y nunca necesitó esta puerta. Acuñado como **CRG-70**, sede
+  `Cargo_Architecture.md` §3. **[PENDIENTE]**
+- PARCHE 2 — el mismo archivo: **lo que acuña, lo persiste**, y es la mitad que no era obvia.
+  `autogen_defs` existe (CHANGELOG #6) para que un arma **capturada** sobreviva al cambio de mapa;
+  un arma **comprada** necesita exactamente lo mismo, o el jugador se queda con un blob cuyo id no
+  resuelve. Efecto lateral **declarado y no escondido**: el catálogo pasa a ser *«lo que los
+  jugadores tuvieron en la mano Y lo que los traders sortearon»*. Nada se acuña dos veces.
+  **[PENDIENTE]**
+- PARCHE 3 — el mismo archivo: **dos datos que antes salían de la entidad viva y ahora salen de la
+  clase**, porque sin entidad habría que inventarlos. El **PrintName** trepando `.Base` con
+  `GetStored` —que **no** hereda: sólo `weapons.Get` corre `TableInherit`, y deep-copea el árbol de
+  attachments entero para leer un string— y el **calibre** vía `Ammo.TypeOfClass`. Sin la trepada,
+  una clase que no declara `PrintName` propio produce un ítem **llamado como su clase** y **nada
+  falla**: la misma falla sin síntoma que ya midió el censo de `dev/other/` (9 de 99 SWEPs
+  spawneables heredan el campo). El camino con entidad viva no cambia: sigue ganando el
+  `GetPrintName` real. **[PENDIENTE]**
+
+### El hallazgo de instrumento, y esta vez fue contra un check mío
+
+Verificando en negativo —borrando cada gate uno por uno y exigiendo rojo— salió que **el tramo de
+rechazos era CIEGO**. Con el gate `Ignore` borrado la pasada seguía **verde**: el check sólo exigía
+*«rechazado con algún motivo»*, y sin `Ignore` la clase caía **un gate más abajo** —el de
+existencia— y se rechazaba igual, con otro motivo que el check no miraba.
+
+**Un check que no mira CUÁL gate contestó no juzga ninguno en particular: lo aprueba el de al
+lado.** Es la misma familia del check de orden del entry 67 (comparaba dos elementos y un `pairs`
+sin ordenar acertaba la mitad de las veces), y volvió a salir por la misma vía. Reescrito
+comparando el **motivo exacto**, y la clase de `Ignore` sembrada en el padrón de SWEPs para que el
+gate de abajo **no pueda** cubrirla. Los **8** gates verificados en negativo después del arreglo:
+los 8 en rojo.
+
+Harness `harness_cargo.py`: **838 → 852 verdes** (14 checks del bloque CRG-70), selftest **91 OK
+server** (eran 86) / 93 OK client, exit 0.
+
+**Falta la pasada en juego** — `cargo_selftest` y `cargo_selftest_cl`, los dos con 0 fallas. Y
+comparte esa deuda con el **entry 67**, que sigue `[PENDIENTE]` por lo mismo.
