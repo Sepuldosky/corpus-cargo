@@ -1819,6 +1819,17 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     saque al jugador del set de viewers Y le mande el net de cierre; y que
     `ClearViewers` pase a hacerlo para todos, en vez de solo vaciar la tabla —
     hoy su comentario declara explicitamente que deja "a stale panel".
+    ORDEN: VA DESPUES DEL TRAMO DEL TRADER (voto del autor, 2026-08-18). No es
+    solo que se pueda —no bloquea nada—, es que CONVIENE: el sub-voto (a) de
+    aca abajo pregunta si `ClearViewers` cambia de comportamiento o si `CloseFor`
+    es aparte, y quien contesta bien eso es la pasada en juego del trader, que
+    va a mostrar si el panel muerto molesta y de que forma. Hacerla primero le
+    da el dato a la decision en vez de adivinarlo.
+    LO QUE EL TRADER TIENE QUE HACER PARA QUE ESTO NO LE CUESTE NADA DESPUES, y
+    ya esta escrito en su handoff: llamar a `ClearViewers` por el helper
+    perezoso `TradeAPI("ClearViewers")` que su `OnKilled` ya usa. Si esta
+    entrada termina cambiando `ClearViewers`, el trader no toca UNA linea; si
+    termina en una funcion aparte, es una linea y el lazy check ya esta puesto.
     LO QUE HAY QUE VOTAR ANTES DE ESCRIBIRLA:
       a) Si `ClearViewers` cambia de comportamiento (cerrar de verdad) o si se
          queda como esta y `CloseFor` es una funcion aparte. Cambiarla toca al
