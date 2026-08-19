@@ -93,11 +93,15 @@ local function PaintCellOver(self, w, h)
         draw.SimpleText(entry.blob.ammo_group, "CargoTiny", 4 + pricedW, 3, T.Colors.amber)
     end
 
-    -- condition: bar hugging the bottom edge + % above it, bottom-right
+    -- condition: bar hugging the bottom edge + the number above it,
+    -- bottom-right. The NUMBER is "67%" or "2/3" depending on whether the def
+    -- declared `uses` (roadmap #66) — Theme decides, so the cell, the tooltip
+    -- and the sub-slot row cannot drift apart. The BAR stays on the raw
+    -- condition either way: it is continuous and it is what the price reads.
     local cond = T.ConditionOf(entry)
     if cond ~= nil then
         T.DrawBar(0, h - 3, w, 3, cond / 100, T.ConditionColor(cond))
-        draw.SimpleText(math.Round(cond) .. "%", "CargoTiny", w - 4, h - 16,
+        draw.SimpleText(T.ConditionShort(def, cond), "CargoTiny", w - 4, h - 16,
             T.ConditionColor(cond), TEXT_ALIGN_RIGHT)
     end
 

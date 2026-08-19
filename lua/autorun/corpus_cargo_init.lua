@@ -41,6 +41,20 @@
 --                                                idles/voice); nil clears it
 --   def.value                                 -- base price; NO value => the item
 --                                                is not tradeable (Cargo_Trade §4)
+--   def.uses                                  -- integer >= 1, UNIQUE only: read
+--                                                the item's 0-100 condition as
+--                                                "n / uses" everywhere Cargo
+--                                                prints it. Presentation only —
+--                                                same stored number, same price,
+--                                                same persistence. Declaring it
+--                                                turns has_condition on.
+--   CARGO.Items.UsesLeft(def, condition) -> n | nil   -- nil = no `uses` declared
+--   CARGO.Items.ConditionForUses(def, n) -> condition -- the INVERSE, and the way
+--                                                the owner module spends a use:
+--                                                never by subtracting 100/uses,
+--                                                which drifts. At 0 the item
+--                                                STAYS: what an empty one is for
+--                                                is the owner's call (CRG-1).
 --   CARGO.StatusPanel.RegisterBar(module, spec)  -- CLIENT: status panel bars
 --   CARGO.Icons.Get(defid) -> IMaterial | nil -- CLIENT: item icon (nil =>
 --                                                letter placeholder/error)

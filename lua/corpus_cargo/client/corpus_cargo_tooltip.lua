@@ -38,15 +38,34 @@ end
 
 local function AddTitle(parent, def, condPct)
     return AddRow(parent, 24, function(_, w)
-        -- name must never collide with the condition text on the right
-        local name = T.FitText(def.name, "CargoHeading", w - 150)
+        -- name must never collide with the condition text on the right. The
+        -- reserve used to be a flat 150 px, which was tuned against
+        -- "Condition 100%"; the uses form ("2/3 uses · 67%", roadmap #66) is
+        -- longer, so it is MEASURED now instead of guessed — a magic number
+        -- that only fits the label it was tuned for is a defect waiting for
+        -- the next label. It counts BOTH things that sit to the right of the
+        -- name — the condition label AND the weight, which draws right after
+        -- it: the flat 150 covered the weight by accident, and measuring only
+        -- the label would have pushed the kg off the panel on a long name with
+        -- no condition at all, a case that worked before this pass.
+        local label = condPct ~= nil and T.ConditionLong(def, condPct) or nil
+        local kg = T.FormatKg(def.weight)
+        surface.SetFont("CargoSmall")
+        local reserve = surface.GetTextSize(kg) + 8
+        if label ~= nil then
+            surface.SetFont("CargoText")
+            reserve = reserve + surface.GetTextSize(label) + 12
+        end
+        local name = T.FitText(def.name, "CargoHeading", w - reserve)
         draw.SimpleText(name, "CargoHeading", 0, 2, T.Colors.text)
         surface.SetFont("CargoHeading")
         local nameW = surface.GetTextSize(name)
-        draw.SimpleText(T.FormatKg(def.weight), "CargoSmall", nameW + 8, 6, T.Colors.textDim)
-        if condPct ~= nil then
-            local label = condPct <= 0 and "Broken"
-                or ("Condition " .. math.Round(condPct) .. "%")
+        draw.SimpleText(kg, "CargoSmall", nameW + 8, 6, T.Colors.textDim)
+        if label ~= nil then
+            -- "Condition 67%" / "Broken", or "2/3 uses · 67%" when the def
+            -- declared `uses` (roadmap #66). The percent stays next to the uses
+            -- on purpose: it is what the resale price is computed from, so
+            -- hiding it turns a half-used jar selling at half into a price bug.
             draw.SimpleText(label, "CargoText", w, 4,
                 T.ConditionColor(condPct), TEXT_ALIGN_RIGHT)
         end
@@ -125,13 +144,17 @@ local function AddZoneRow(parent, label, pct)
     end)
 end
 
-local function AddSubEntryRow(parent, text, pct, empty)
+-- `def` is the def of the MOUNTED item, and it rides only so this row speaks
+-- the same unit as the cell the item came from: a thing with `uses` reads
+-- "2/3" here too, not a percent (roadmap #66). It is optional — the two
+-- callers that pass no pct pass no def either.
+local function AddSubEntryRow(parent, text, pct, empty, def)
     return AddRow(parent, 20, function(_, w)
         draw.RoundedBox(4, 0, 0, w, 20, empty and T.Colors.panelAlt or T.Colors.blueDark)
         draw.SimpleText(T.FitText(text, "CargoSmall", w - 60), "CargoSmall", 8, 3,
             empty and T.Colors.textDim or T.Colors.text)
         if pct ~= nil then
-            draw.SimpleText(math.Round(pct) .. "%", "CargoSmall", w - 8, 3,
+            draw.SimpleText(T.ConditionShort(def, pct), "CargoSmall", w - 8, 3,
                 T.ConditionColor(pct), TEXT_ALIGN_RIGHT)
         end
     end)
@@ -254,7 +277,7 @@ function CARGO.Tooltip.Show(cell, entry)
                     if subDef and subDef.material then
                         label = label .. " · " .. subDef.material
                     end
-                    y = y + AddSubEntryRow(tip, label, sub.condition)
+                    y = y + AddSubEntryRow(tip, label, sub.condition, false, subDef)
                     shown = shown + 1
                 end
             end

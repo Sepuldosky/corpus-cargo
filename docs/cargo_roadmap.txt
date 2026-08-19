@@ -1844,3 +1844,83 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     expulsa ANTES de re-sortear, asi que nadie mira cuando el stock cambia y el
     proximo que abra recibe un Snapshot fresco por el camino de siempre. La
     superficie `Trade.SyncFor` que se habia propuesto SE CAYO ENTERA.
+
+66. LOS USOS DE UN ITEM (def.uses) [Cargo items/ui] — CERRADA Y ESCRITA el
+    2026-08-19. FALTA LA PASADA EN JUEGO (planilla dev/checks/cargo-usos-r1.html).
+    DE DONDE SALE: pedido del autor el 2026-08-18, cerrando el diseno de la
+    cordura de Phantasmagoria — «tener un solo item pero con x usos mas que
+    varios items en un stack (...) el mismo tooltip deberia decir cuantos usos
+    le queda, eso parece que le queda pendiente a Cargo».
+    LO PRIMERO QUE SE MIDIO, Y ES LA MITAD DEL VALOR DE LA ENTRADA: NO estaba
+    pendiente. La barrita que el pedido describe ya estaba dibujada hacia rondas
+    (grid.lua, pegada al borde inferior de la celda), el tooltip ya tenia su fila
+    de condicion, `has_condition` ya existia en el contrato, y el precio de un
+    frasco a medio usar YA se partia al medio sin una linea escrita porque sale
+    de value x condicion x spread. Lo unico que faltaba era la UNIDAD: la celda
+    decia «67 %» donde un frasco de pastillas tiene que decir «2/3».
+    Y el prompt que la pidio decia que la condicion se dibuja en DOS lugares:
+    son TRES para el texto (celda del grid, titulo del tooltip, fila de sub-slot
+    montado) y CINCO para la barra (mas la celda de equipamiento y el sector del
+    wheel). El censo se hizo antes de tocar nada.
+    LO QUE SE ESCRIBIO: `def.uses = 3`, entero >= 1 y SOLO en uniques, que hace
+    que la condicion 0-100 se LEA como n/uses en las tres superficies de texto.
+    No hay un segundo numero guardado: misma condicion, mismo precio, misma
+    persistencia. La conversion son dos funciones puras en shared/items.lua
+    (`Items.UsesLeft` y su inversa `Items.ConditionForUses`), asi el harness las
+    mide en los dos realms y el modulo dueno gasta un uso sin restar a mano.
+    LOS CINCO VOTOS DEL AUTOR (2026-08-19), todos con su motivo escrito en
+    Cargo_Architecture.md §3 (sede de CRG-71):
+      a) ALCANCE: opcion (b) — la unidad Y habilitar la tecla rapida en uniques.
+      b) REDONDEO: TECHO. Compra «0 usos si y solo si condicion 0»; con piso, un
+         frasco en 33,3 lee 0 usos mientras todavia sirve y el jugador lo tira.
+      c) TOOLTIP: los usos Y el porcentaje («2/3 uses · 67 %»), porque el % es de
+         donde sale el precio y esconderlo hace que una reventa a la mitad se lea
+         como un error de precio. La celda, que no tiene lugar, dice solo «2/3».
+      d) `uses` IMPLICA `has_condition`. Sin el, Instances.Create no siembra
+         condition y el item no dibuja NADA, sin un solo error.
+      e) A CERO EL ITEM QUEDA. Cargo no lo borra: que significa un frasco vacio
+         es del modulo dueno (CRG-1).
+    LO QUE APARECIO AL MEDIR EL ALCANCE, y es lo que volvio la (b) barata en vez
+    de cara: el quick bind YA direccionaba por ID DE DEF y no por uid, que es la
+    clave correcta (un uid muere con la instancia y dejaria la tecla atada a nada
+    el primer frasco que se acaba). Faltaba resolver ese id a una INSTANCIA al
+    apretar. La regla votada es «el mas gastado que todavia sirve» — la regla de
+    STALKER —, y no es cosmetica: como Cargo no borra el item a cero, sin ella un
+    frasco vacio se sienta adelante y se come cada apretada para siempre.
+    DOS DEFECTOS VIVOS Y SILENCIOSOS que esa misma resolucion cerro:
+      · un UNIQUE con onUse era inalcanzable por la tecla — y se podia atar igual
+        ARRASTRANDOLO, porque el gate de clase estaba solo en el menu contextual
+        y el receiver del drag no tenia ninguno. La tecla contestaba «You are out
+        of that consumable» para siempre sobre una mochila con dos frascos. El
+        Tourniquet de Coagulant (unique + onUse + «Not consumed») lleva meses en
+        ese estado.
+      · un STACK CON CONDICION tambien, y ese ni siquiera avisaba: CountItem lo
+        contaba (pasaba el guard) y despues FindEntry fallaba por el
+        condition ~= nil, asi que UseEntry devolvia false sin un solo Notice.
+    LA PREGUNTA ABIERTA QUE EL PROMPT DEJO, contestada: cuando el modulo dueno
+    muta blob.condition desde su onUse, el cliente se entera SOLO — UseEntry
+    llama Touch DESPUES del onUse y el Sync lee el blob vivo de Instances._live.
+    Fuera del onUse (un timer, dano) el dueno tiene que llamar Inventory.Touch el.
+    Escrito en el header de cargo_dev_pills, que es la implementacion de
+    referencia del lado del dueno.
+    MEDICION: harness 852 -> 910 verdes (37 en server, 15 en cliente, 6 de un
+    GATE DE FUENTES nuevo); selftest server 91 -> 100, cliente 93 -> 107.
+    LOS 14 SABOTAJES VERIFICADOS EN NEGATIVO uno por uno: los 14 ponen la pasada
+    en rojo. Dos de ellos NO la ponian al principio, y ese es el hallazgo de
+    metodo de la tanda: sabotear el helper del theme daba rojo, pero revertir la
+    CELDA DEL GRID a imprimir el % a mano dejaba todo VERDE. Se estaba midiendo
+    el helper y no que alguien lo llamara. Los closures de PaintOver no tienen
+    nombre por el que agarrarlos desde Lua y no hay superficie que dibujar
+    offline, asi que lo unico que ve la diferencia es el TEXTO FUENTE — de ahi el
+    gate, que lee los archivos y dice que mide. Un check nacio ademas en ROJO
+    (estaba escrito con la intuicion del PISO, la opcion descartada) y se quedo
+    en la planilla con esa nota: es la prueba de que el instrumento discrimina.
+    LO QUE ESTA ENTRADA NO HIZO, a proposito: no toco el calculo de precio, no
+    agrego ni un mensaje de red (el estado ya viaja; esto es render), no
+    implemento el consumo (descontar es del modulo dueno, contrato #2) y no toco
+    Phantasmagoria, que es el consumidor que lo pidio y va en otra sesion.
+    LO QUE ESPERA DEL OTRO LADO: las pastillas de cordura de Phantasmagoria
+    (§19.8 de su diseno) y, del mismo doc §10.3, crucifijo/sal/smudge, el film de
+    la camara y las baterias. El reparto que ese doc escribio —«lo que se usa en
+    panico va a una tecla, lo que se gasta despacio va con barrita»— YA NO HACE
+    FALTA: con la (b) votada, un unique con usos tiene las dos cosas.

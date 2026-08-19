@@ -278,6 +278,35 @@ function T.ConditionOf(entry)
     return nil
 end
 
+-- The condition TEXT of an entry, and the ONE place that decides whether it
+-- reads as a percent or as uses (roadmap #66, CRG-71). Both forms live here
+-- and not at the three call sites on purpose: a cell, a tooltip title and a
+-- mounted sub-slot row showing three different units for the same jar is
+-- exactly the kind of drift a shared helper stops.
+--
+-- SHORT is for anywhere with 4 characters of room (the grid cell, the sub-slot
+-- row). LONG is the tooltip, and it keeps the PERCENT next to the uses on the
+-- author's vote (2026-08-19): the percent is what the price is computed from,
+-- so hiding it makes a half-used jar reselling at half read as a pricing bug.
+--
+-- `def` may be nil (an entry whose def this realm has not learned yet): with no
+-- def there is no `uses`, so it falls back to the percent of always.
+function T.ConditionShort(def, pct)
+    local left = CARGO.Items.UsesLeft(def, pct)
+    if left ~= nil then return left .. "/" .. CARGO.Items.UsesOf(def) end
+    return math.Round(pct) .. "%"
+end
+
+function T.ConditionLong(def, pct)
+    local left = CARGO.Items.UsesLeft(def, pct)
+    if left ~= nil then
+        return left .. "/" .. CARGO.Items.UsesOf(def) .. " uses · "
+            .. math.Round(pct) .. "%"
+    end
+    if pct <= 0 then return "Broken" end
+    return "Condition " .. math.Round(pct) .. "%"
+end
+
 function T.FormatKg(kg)
     return string.format("%.1f kg", kg)
 end

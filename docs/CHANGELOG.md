@@ -6305,3 +6305,117 @@ server** (eran 86) / 93 OK client, exit 0.
 **91 OK, 0 fallas** (server) y `cargo_selftest_cl` **93 OK, 0 fallas** (client) — los 5 checks
 nuevos de esta superficie entre ellos, y los dos totales clavados con los que el harness offline
 había anticipado.
+
+---
+
+## 69. Los usos de un ítem, y la tecla que un único no podía tener (roadmap #66) `[PENDIENTE]`
+
+**Pedido del autor (2026-08-18):** *«tener un solo item pero con x usos más que varios items en un
+stack (…) el mismo tooltip debería decir cuántos usos le queda, eso parece que le queda pendiente
+a Cargo, no lo había pensado.»*
+
+### Lo primero que se midió fue que NO estaba pendiente
+
+La barrita que el pedido describe **ya estaba dibujada** hacía rondas (`grid.lua`, pegada al borde
+inferior de la celda), el tooltip ya tenía su fila de condición, `has_condition` ya estaba en el
+contrato, y **el precio de un frasco a medio usar ya se partía al medio sin una línea escrita**,
+porque sale de `value × condición × spread`. Lo único que faltaba era la **unidad**: la celda decía
+`67 %` donde un frasco de pastillas tiene que decir `2/3`.
+
+De paso se corrigió una premisa del prompt que pedía la tanda: decía que la condición se dibuja en
+**dos** lugares. Son **tres** para el texto (celda del grid, título del tooltip, fila de un
+sub-slot montado) y **cinco** para la barra (más la celda de equipamiento y el sector del wheel).
+
+### Lo que se escribió
+
+- PARCHE 1 — `shared/corpus_cargo_items.lua`: el campo **`def.uses`** (entero ≥ 1, **sólo
+  `unique`**) y las **dos funciones puras** de conversión, `Items.UsesLeft(def, condition)` y su
+  inversa `Items.ConditionForUses(def, n)`. Van en **shared** y no en el theme a propósito: la
+  aritmética es la misma en los dos realms, el harness la mide en los dos, y el módulo dueño la
+  necesita del lado del server para **gastar** un uso sin restar a mano. Acuñado como **CRG-71**,
+  sede `Cargo_Architecture.md` §3. **[PENDIENTE]**
+- PARCHE 2 — el mismo archivo, **los dos portones del `Register`**, y los dos existen porque la
+  falla que frenan es **silenciosa**. `uses` sobre un **stackable** es `error()`: un stack lleva
+  UNA condición para sus N unidades (CRG-7), así que gastarle «un uso» se la gastaría a todas de
+  una, y no hay forma de eso que no sea un bug. Y declarar `uses` **prende `has_condition`**: sin
+  él `Instances.Create` no siembra `blob.condition`, `ConditionOf` contesta `nil` y el ítem **no
+  dibuja nada, sin un solo error** — exigir los dos campos no compra nada y deja ese no-op al
+  alcance de la mano. **[PENDIENTE]**
+- PARCHE 3 — `client/corpus_cargo_theme.lua`: `ConditionShort` y `ConditionLong`, **el único lugar
+  que decide si una condición se lee en % o en usos**. Las tres superficies de texto pasan por acá;
+  que cada una lo decidiera por su cuenta es exactamente cómo la celda y el tooltip terminan
+  diciendo unidades distintas del mismo frasco. El tooltip muestra **los dos** (`2/3 uses · 67 %`)
+  porque el % es de donde sale el precio: esconderlo hace que una reventa a la mitad se lea como un
+  error de precio. **[PENDIENTE]**
+- PARCHE 4 — `client/corpus_cargo_grid.lua` y `client/corpus_cargo_tooltip.lua`: las tres
+  superficies llaman a esos dos helpers. En el título del tooltip, además, **el reserve del ancho
+  del nombre dejó de ser un `150` mágico y se mide**: estaba calibrado contra `Condition 100%` y la
+  forma nueva es más larga. Un número mágico que sólo entra para la etiqueta con la que se calibró
+  es un defecto esperando a la próxima etiqueta. **[PENDIENTE]**
+- PARCHE 5 — `server/corpus_cargo_inventory.lua`: **`QuickTarget`**, que resuelve el id bindeado a
+  una **instancia** en cada apretada. La regla, votada: **el más gastado que todavía sirve** (la
+  condición más baja entre las mayores que 0, desempate por uid). Es la regla de STALKER —terminás
+  el frasco abierto antes de abrir otro— y no es cosmética: como Cargo **no borra** el ítem a cero,
+  sin ella un frasco vacío se sienta adelante y **se come cada apretada para siempre**. Con todos
+  gastados le pasa igual el primero al `onUse` del dueño, que es el que contesta. **[PENDIENTE]**
+- PARCHE 6 — `client/corpus_cargo_ui.lua`: se cae el gate `class == "stackable"` del submenú *Quick
+  bind*, y `UI.QuickCount` pasa a contar **las dos clases**. **[PENDIENTE]**
+- PARCHE 7 — `shared/corpus_cargo_dev.lua`: **`cargo_dev_pills`**, la implementación de referencia
+  del lado del módulo dueño, y **dos** en el kit — con un solo frasco toda regla de selección da la
+  misma respuesta y el check no discrimina. Las tres cosas que un consumidor hace mal por defecto
+  están en sus diez líneas: gasta con `ConditionForUses` (nunca restando 100/uses, que deriva),
+  devuelve **`false` siempre** (un `true` borraría el frasco con la primera pastilla en vez de
+  gastarle uno de tres) y a 0/3 **lo deja**. **[PENDIENTE]**
+
+### Dos defectos vivos y silenciosos que el parche 5 cerró
+
+La ruta vieja de la tecla armaba su ref a mano como `{ id = itemId }`, forma que `FindEntry` sólo
+empareja contra entradas con `uid == nil`:
+
+- **Un `unique` era inalcanzable** — y se podía atar igual **arrastrándolo**, porque el gate de
+  clase estaba sólo en el menú contextual y el receiver del drag no tenía ninguno. La tecla
+  contestaba *«You are out of that consumable»* **para siempre** sobre una mochila con dos frascos
+  adentro. El **Tourniquet de Coagulant** (`unique` + `onUse` + *«Not consumed»*) lleva meses en ese
+  estado exacto.
+- **Un stack CON condición también**, y ése ni siquiera avisaba: `CountItem` lo contaba (el guard
+  pasaba) y después `FindEntry` fallaba por el `condition ~= nil`, así que `UseEntry` devolvía
+  `false` **sin un solo `Notice`**. Un stack con condición es estado **legal** y lo declara
+  `shared/corpus_cargo_lan.lua` (una placa gastada que vuelve de un sub-slot, CRG-7).
+
+Los dos son la misma forma: **una ref construida a mano que sólo empareja una de las tres formas de
+entry que existen.**
+
+### La pregunta abierta que el prompt dejó, contestada
+
+*¿Cuando el módulo dueño muta `blob.condition` desde su `onUse`, el cliente se entera solo?* **Sí**:
+`UseEntry` llama `Touch` **después** del `onUse`, y el `Sync` que eso dispara lee el blob **vivo**
+de `Instances._live`. Fuera del `onUse` (un timer, daño) el dueño tiene que llamar
+`Inventory.Touch` él. Escrito en el header de `cargo_dev_pills`, que es donde lo va a leer el que
+lo necesite.
+
+### El hallazgo de instrumento, y es el que más paga de la tanda
+
+Verificando en negativo —14 sabotajes, uno por gate, exigiendo rojo— **dos dejaban la pasada verde
+entera**: revertir la **celda del grid** y el **título del tooltip** a imprimir el `%` a mano.
+Sabotear el *helper* daba rojo; sabotear el *sitio de llamada*, no.
+
+**Se estaba midiendo el helper y no que alguien lo llamara. Un helper impecable que nadie usa es un
+render viejo con un verde encima.** No se puede cerrar desde Lua: los overlays son closures
+`Paint`/`PaintOver` **locales**, sin nombre por el que agarrarlos y sin superficie que dibujar
+offline. Lo único que ve la diferencia es el **texto fuente**, así que el harness ganó un **gate de
+FUENTES** que lee los archivos del cliente y es honesto sobre qué mide: no comprueba que la celda
+dibuje bien, comprueba que **nadie fuera del theme vuelva a decidir por su cuenta cómo se escribe
+una condición**. Corre antes de los realms (es el más barato) y **sus checks cuentan en el total**:
+un gate que no suma es un gate que nadie mira.
+
+Un check además **nació en rojo**: estaba escrito con la intuición del **piso** —la opción que el
+autor descartó— y afirmaba que 33,4 % lee `1/3`. Con techo lee `2/3`. Quedó en el harness con esa
+nota al lado, porque un check que se equivocó una vez y se corrigió es la prueba de que discrimina.
+
+### Medición
+
+Harness `harness_cargo.py`: **852 → 910 verdes** (37 en server, 15 en cliente, 6 del gate de
+fuentes). Selftest: **91 → 100** server y **93 → 107** cliente, los dos en 0 fallas. `glua_check.py`:
+48/48 parsean. **Los 14 sabotajes en rojo, uno por uno.**
+
+**PASADA EN JUEGO PENDIENTE** — planilla `dev/checks/cargo-usos-r1.html`.

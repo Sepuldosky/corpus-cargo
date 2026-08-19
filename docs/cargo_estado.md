@@ -5,7 +5,32 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-18 (**nuevo: el ítem de una CLASE DE ARMA se puede pedir desde
+**Última actualización:** 2026-08-19 (**nuevo: un ítem puede tener USOS** — `def.uses = 3`,
+roadmap **#66**, CRG-71. **Lo primero que se midió fue que no estaba pendiente:** la barrita que el
+autor pedía **ya estaba dibujada** hacía rondas y el precio de un frasco a medio usar **ya se
+partía al medio solo**, porque sale de `value × condición × spread`. Faltaba la **unidad** — la
+celda decía `67 %` donde un frasco tiene que decir `2/3`. Es **presentación y nada más**: mismo
+número guardado, mismo precio, misma persistencia. Cinco votos del autor: **techo** en el redondeo
+(compra «0 usos ⟺ condición 0»; con piso, un frasco en 33,3 dice *0 usos* mientras todavía sirve y
+el jugador lo tira), el tooltip muestra **los usos Y el %** (el % es de donde sale el precio), `uses`
+**implica** `has_condition` (sin él el ítem no dibuja **nada, sin un solo error**), y **a cero el
+ítem QUEDA** (qué es un frasco vacío lo decide el módulo dueño, CRG-1). **Y midiendo el alcance
+aparecieron DOS defectos vivos y silenciosos** de la tecla rápida, que armaba su ref a mano como
+`{ id = itemId }`: un **único** era inalcanzable —y se podía atar igual **arrastrándolo**, porque
+el gate de clase estaba sólo en el menú contextual—, así que la tecla contestaba *«You are out of
+that consumable»* **para siempre** sobre una mochila con dos frascos; el **Tourniquet de Coagulant**
+lleva meses así. Y un **stack con condición** también, ése **sin ni un `Notice`**. Los cierra
+`QuickTarget`, que resuelve el id a la instancia **más gastada que todavía sirve** (la regla de
+STALKER), y no es cosmético: como Cargo no borra el vacío, sin esa regla el vacío **se come cada
+apretada para siempre**. **El hallazgo de instrumento, y es el que más paga:** de los 14 sabotajes
+de la verificación en negativo, **dos dejaban la pasada verde entera** — sabotear el *helper* daba
+rojo, revertir el **sitio de llamada** (la celda del grid) no. *Se estaba midiendo el helper y no
+que alguien lo llamara; un helper impecable que nadie usa es un render viejo con un verde encima.*
+Como los overlays son closures `PaintOver` locales, sin nombre y sin superficie que dibujar
+offline, el harness ganó un **gate de FUENTES** que lee los archivos y dice qué mide. Harness
+**852 → 910 verdes**, selftest **100 server / 107 client**, los 14 sabotajes en rojo. CHANGELOG
+**69 `[PENDIENTE]`**. **PASADA EN JUEGO PENDIENTE** — planilla `dev/checks/cargo-usos-r1.html`.
+Contexto previo: **el ítem de una CLASE DE ARMA se puede pedir desde
 afuera** — `Capture.ItemIdFor(class)`, roadmap **#64**, CRG-70. Es el MISMO agujero que el #63 un
 día después: la regla por categoría ya se podía escribir, pero **las armas no estaban EN el
 catálogo**. Un arma capturada no tiene código propio —su def es autogen— y la acuñaba sólo la

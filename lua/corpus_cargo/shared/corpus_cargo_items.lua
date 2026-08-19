@@ -166,6 +166,13 @@ end
 --   capacity_bonus kg added to carry capacity while equipped in Back
 --   quick_slots    quick slots unlocked while equipped in Body (0-4)
 --   has_condition  instance/sub-slot entries start with condition = 100
+--   uses           optional integer >= 1 (roadmap #66, CRG-71) — the DISPLAY
+--                  UNIT of that condition. With it declared, everywhere Cargo
+--                  prints condition prints "n / uses" instead of a percent.
+--                  Nothing else changes: the stored number is still the 0-100
+--                  condition, the price is still value x condition x spread,
+--                  and persistence is untouched. UNIQUE ONLY, and declaring it
+--                  IMPLIES has_condition (see Register).
 --   condition_zones { "torso", ... } instance starts zones table at 100 each
 --   ammo           { caliber = "9x19", hl2 = "Pistol" } — `hl2` is the ENGINE
 --                  ammo type and it is the pool key (§16: the belt IS the
@@ -221,6 +228,30 @@ function CARGO.Items.Register(def)
         error("Cargo.Items.Register: 'class' must be \"stackable\" or \"unique\" (item '" .. def.id .. "')", 2)
     end
 
+    -- USES (roadmap #66, CRG-71). Two gates, and both exist because the
+    -- failure they stop is SILENT:
+    --
+    --   · UNIQUE ONLY. A stack carries ONE condition for its N units (that is
+    --     what CRG-7 is about), so spending "one use" on it would spend it for
+    --     every unit at once. There is no shape of that which is not a bug.
+    --   · DECLARING IT TURNS has_condition ON. Without it, Instances.Create
+    --     never seeds blob.condition, ConditionOf answers nil and the item
+    --     renders NOTHING — no bar, no number, no error anywhere. Requiring
+    --     both fields buys nothing and leaves that no-op reachable (author
+    --     vote 2026-08-19: implying it is harder to use wrong).
+    if def.uses ~= nil then
+        if not isnumber(def.uses) or def.uses < 1 or def.uses ~= math.floor(def.uses) then
+            error("Cargo.Items.Register: 'uses' must be an integer >= 1 (item '"
+                .. def.id .. "')", 2)
+        end
+        if def.class ~= "unique" then
+            error("Cargo.Items.Register: 'uses' is unique-only (item '" .. def.id
+                .. "'): a stack holds ONE condition for its N units, so one use"
+                .. " would spend them all", 2)
+        end
+        def.has_condition = true
+    end
+
     def.category = def.category or "misc"
     if CARGO.Items._categories[def.category] == nil then
         CARGO.Items.RegisterCategory(def.category)
@@ -254,6 +285,80 @@ end
 
 function CARGO.Items.Get(id)
     return CARGO.Items._defs[id]
+end
+
+-- ------------------------------------------------------------------
+-- USES — condition read as a UNIT (roadmap #66, CRG-71).
+--
+-- The author's ask, textual: "un solo item pero con x usos mas que varios
+-- items en un stack (...) el tooltip deberia decir cuantos usos le queda".
+-- The bar he describes was already drawn — what was missing is the UNIT: the
+-- cell said 67 % where a jar of pills should say 2/3.
+--
+-- SO THIS IS A PRESENTATION LAYER AND NOTHING ELSE. There is no second stored
+-- number: the blob still holds the 0-100 condition, the price still comes out
+-- of `value x condition x spread` (Cargo_Trade §4) — which is why a half-used
+-- jar already resold at half without a line of code — and persistence does not
+-- change. Take `uses` off a def and every one of those keeps working.
+--
+-- THE ROUNDING IS CEILING, and it was a vote (author, 2026-08-19). The rule it
+-- buys is the only line Cargo and the owner module can agree on without
+-- talking to each other: **0 uses if and only if condition 0**. Under floor, an
+-- item at condition 33,3 with uses = 3 reads "0 uses" while it still works
+-- once, and the player throws away a working item — the expensive lie. Ceiling
+-- can only err the other way (say 3 when 2 remain) and ONLY if the owner
+-- module subtracts by hand, which is what ConditionForUses is here to prevent.
+--
+-- SPENDING A USE IS THE OWNER'S (CRG-1) BUT THE ARITHMETIC IS OURS, because
+-- the unit is ours. The owner spends one with:
+--
+--     local left = Cargo.Items.UsesLeft(def, blob.condition)
+--     blob.condition = Cargo.Items.ConditionForUses(def, left - 1)
+--
+-- and never by subtracting 33 — that is the drift the paragraph above
+-- describes, and it accumulates: three "33" off 100 leaves 1, which ceiling
+-- reads as one use that does not exist. The two functions ROUND-TRIP by
+-- construction (UsesLeft(def, ConditionForUses(def, n)) == n for every n), and
+-- the harness asserts exactly that over every n of every size up to 10.
+--
+-- AT ZERO THE ITEM STAYS (author vote 2026-08-19). Cargo does not delete it,
+-- does not hide it and does not refuse it: CRG-1 says what a spent item means
+-- belongs to the owner, which may want an empty jar to be sellable, refillable
+-- or thrown away by hand. It paints red at 0/3, the same way it already paints
+-- "Broken". Anyone consuming this will assume the opposite, so it is written
+-- here, in Cargo_Architecture.md §3 and in the contract block of the init.
+-- ------------------------------------------------------------------
+
+-- How many uses the def declares, or nil for the 99 % of defs that declare
+-- none. EVERY function below answers nil for those, and that nil is what keeps
+-- the conversion from leaking onto items that never asked for it.
+function CARGO.Items.UsesOf(def)
+    if not istable(def) or not isnumber(def.uses) then return nil end
+    if def.uses < 1 then return nil end
+    return math.floor(def.uses)
+end
+
+-- Uses left at a given condition. nil condition = the def tracks none yet, and
+-- an untouched item is full. The epsilon is not cosmetic: n/total*100 does not
+-- come back through /100*total as an exact integer in floating point, and
+-- without it ConditionForUses(def, 2) could read back as 3 — the exact "the
+-- item lies" this whole block exists to prevent.
+function CARGO.Items.UsesLeft(def, condition)
+    local total = CARGO.Items.UsesOf(def)
+    if total == nil then return nil end
+    local cond = tonumber(condition)
+    if cond == nil then return total end
+    if cond <= 0 then return 0 end
+    return math.Clamp(math.ceil(cond / 100 * total - 1e-9), 1, total)
+end
+
+-- The condition that reads as exactly n uses — the inverse, and the ONLY way
+-- the owner module should write one back.
+function CARGO.Items.ConditionForUses(def, n)
+    local total = CARGO.Items.UsesOf(def)
+    if total == nil then return nil end
+    n = math.Clamp(math.floor(tonumber(n) or 0), 0, total)
+    return n * 100 / total
 end
 
 -- ------------------------------------------------------------------

@@ -112,6 +112,55 @@ CARGO.Items.Register({
     end,
 })
 
+-- THE REFERENCE IMPLEMENTATION OF `def.uses` (roadmap #66, CRG-71), and it is
+-- here for the same reason cargo_dev_medkit is: the owner-module half of the
+-- contract has to exist somewhere Cargo can exercise it. Everything a real
+-- consumer (Phantasmagoria's sanity pills) has to get right is in these ten
+-- lines, and all three of them are things a consumer gets wrong by default:
+--
+--   1. It spends the use through Items.ConditionForUses, NEVER by subtracting
+--      100/uses by hand. Subtracting 33 three times off 100 leaves 1, which
+--      ceiling reads as a use that does not exist.
+--   2. It returns FALSE, always. Cargo consumes a whole unit only on `true`
+--      (contract #2), so returning true here would delete the bottle on the
+--      first pill instead of spending one of its three.
+--   3. At 0/3 the bottle STAYS (author vote 2026-08-19). Cargo does not delete
+--      it and neither does this: what an empty bottle is for — resale, refill,
+--      dropping it — is the owner module's call (CRG-1).
+--
+-- And it needs no re-render call: UseEntry runs the onUse and THEN calls
+-- Touch, whose Sync reads the blob live out of Instances._live. A mutation
+-- from anywhere ELSE (a timer, damage) does need the owner to call
+-- Inventory.Touch itself.
+CARGO.Items.Register({
+    id = "cargo_dev_pills", name = "Pill Bottle (dev)",
+    weight = 0.15, class = "unique", category = "medical",
+    size = { 1, 2 }, value = 240,
+    model = ZonaModel("models/stalker/item/medical/antirad.mdl",
+        "models/props_lab/jar01a.mdl"),
+    uses = 3, -- implies has_condition (see Items.Register)
+    effect_icon = "hemostatic",
+    trivia = "Test item for def.uses: ONE item with three uses instead of a stack of three. Empty bottles stay in the bag at 0/3.",
+    onUse = function(ply, ctx)
+        local mod = Corpus.GetModule("cargo")
+        local def = mod.Items.Get("cargo_dev_pills")
+        local blob = istable(ctx) and ctx.blob or nil
+        if not istable(blob) then return false end
+
+        local left = mod.Items.UsesLeft(def, blob.condition)
+        if left <= 0 then
+            mod.Inventory.Notice(ply, "The bottle is empty.")
+            return false
+        end
+
+        blob.condition = mod.Items.ConditionForUses(def, left - 1)
+        ply:SetHealth(math.min(ply:Health() + 10, ply:GetMaxHealth()))
+        mod.Inventory.Notice(ply, "You take a pill. " .. (left - 1)
+            .. "/" .. def.uses .. " left.")
+        return false
+    end,
+})
+
 -- The throwable slot's test item WAS cargo_dev_frag (entry 13); roadmap #32
 -- made the frag a REAL item (cargo_throw_frag, corpus_cargo_ammo.lua — the
 -- canonical face of the HL2 "Grenade" type), so the kit hands that one out
@@ -273,6 +322,10 @@ if SERVER then
         { "cargo_dev_helmet" }, { "cargo_dev_nvg" }, { "cargo_dev_vest" },
         { "cargo_dev_backpack" }, { "cargo_dev_plate", 3 },
         { "cargo_dev_medkit", 4 }, { "cargo_dev_food", 5 },
+        -- TWO bottles, not one (roadmap #66): the rule that says which
+        -- instance the quick key fires on cannot be checked with a single
+        -- one — with one bottle every rule gives the same answer.
+        { "cargo_dev_pills" }, { "cargo_dev_pills" },
         { "cargo_dev_ammo_9mm", 60 }, { "cargo_dev_smg" },
         { "cargo_dev_pistol" }, { "cargo_dev_melee" },
         { "cargo_dev_pda" }, { "cargo_dev_detector" },
@@ -1434,6 +1487,63 @@ function CARGO._SelfTest()
             end
         end
         check("ammo: todo tipo trae modelo, tope de stack y categoría", complete)
+    end
+
+    -- ------------------------------------------------------------------
+    -- Los USOS de un ítem (roadmap #66, CRG-71). En AMBOS realms, y no por
+    -- simetría: la conversión vive en shared/ pero la que decide qué se ve es
+    -- el cliente, y los dos catálogos son distintos (COR-12). Un verde en el
+    -- server no dice nada del texto que sale por pantalla.
+    --
+    -- El sujeto es cargo_dev_pills, que es la implementación de referencia del
+    -- lado del módulo dueño. Se mide SIN EFECTOS: sólo la conversión y la
+    -- forma de la def — gastar un uso de verdad muta un blob, y un selftest en
+    -- una partida real no puede dejar ítems tocados atrás.
+    -- ------------------------------------------------------------------
+    local pills = CARGO.Items.Get("cargo_dev_pills")
+    check("usos: la def de referencia existe en este realm (COR-12)",
+        istable(pills) and pills.uses == 3 and pills.class == "unique")
+    check("usos: declarar uses prendió has_condition solo",
+        istable(pills) and pills.has_condition == true)
+    check("usos: y trae el onUse en ESTE realm — sin él la UI no ofrece ni Use ni tecla",
+        istable(pills) and isfunction(pills.onUse))
+
+    check("usos: 100 lee 3/3 y 0 lee 0/3",
+        CARGO.Items.UsesLeft(pills, 100) == 3 and CARGO.Items.UsesLeft(pills, 0) == 0)
+    check("usos: el redondeo es TECHO — cualquier condición positiva vale 1 uso",
+        CARGO.Items.UsesLeft(pills, 0.4) == 1)
+    check("usos: la ida y vuelta se cierra (2 usos -> condición -> 2 usos)",
+        CARGO.Items.UsesLeft(pills, CARGO.Items.ConditionForUses(pills, 2)) == 2)
+
+    -- EL CONTROL NEGATIVO: un ítem que no pidió nada no puede haber cambiado
+    local casco = CARGO.Items.Get("cargo_dev_helmet")
+    check("usos CONTROL NEGATIVO: una def sin uses no declara ninguno y no convierte",
+        CARGO.Items.UsesOf(casco) == nil and CARGO.Items.UsesLeft(casco, 67) == nil)
+    check("usos CONTROL NEGATIVO: sin def las tres contestan nil en vez de reventar",
+        CARGO.Items.UsesOf(nil) == nil and CARGO.Items.UsesLeft(nil, 50) == nil
+            and CARGO.Items.ConditionForUses(nil, 1) == nil)
+
+    -- el precio no se enteró de nada: es lo que prueba que esto fue render
+    check("usos: el precio de un frasco a medio usar sigue saliendo de la condición",
+        CARGO.Trade.UnitPrice(pills, CARGO.Items.ConditionForUses(pills, 2), 1)
+            == CARGO.Trade.UnitPrice(pills, 200 / 3, 1))
+
+    if CLIENT then
+        -- El texto, que es lo que el autor va a leer en pantalla. Va sólo en
+        -- cliente porque el Theme es cliente, y es la mitad que ningún check
+        -- de server puede cubrir.
+        local T = CARGO.Theme
+        check("usos: la celda dice 2/3 donde antes decía 67%",
+            T.ConditionShort(pills, 200 / 3) == "2/3")
+        check("usos: el tooltip dice los usos Y el porcentaje del precio",
+            T.ConditionLong(pills, 200 / 3) == "2/3 uses · 67%")
+        check("usos CONTROL NEGATIVO: un ítem sin uses sigue diciendo 67% y Condition 67%",
+            T.ConditionShort(casco, 67) == "67%"
+                and T.ConditionLong(casco, 67) == "Condition 67%")
+        check("usos CONTROL NEGATIVO: y a cero sigue diciendo Broken",
+            T.ConditionLong(casco, 0) == "Broken")
+        check("usos: pero un frasco vacío dice 0/3 uses, no Broken",
+            T.ConditionLong(pills, 0) == "0/3 uses · 0%")
     end
 
     Corpus.Log("cargo", string.format("selftest %s: %d OK, %d fallas (realm %s)",

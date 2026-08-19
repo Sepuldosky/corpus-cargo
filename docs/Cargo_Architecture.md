@@ -63,6 +63,8 @@ Estos mocks son la fuente de verdad de layout hasta que exista una implementaci�
 
 Todo ítem registrado contra Cargo cae en una de dos clases. La clase se declara en la definición del ítem y determina si el ítem tiene **uid y blob de instancia propios**. No determina si lleva condición: un stackeable con `has_condition` la lleva en la propia entry del stack.
 
+SÍ determina si esa condición puede leerse en **usos** (`def.uses`, más abajo): eso es sólo de los únicos, porque un stack lleva una condición para sus N unidades.
+
 | Clase | Ejemplos | Persistencia | Stackea |
 |---|---|---|---|
 | **Stackeable** | munición, comida, componentes de crafteo, placas de armadura | entry `{id, count, condition?}` — sin blob ni uid; `condition` existe cuando el def declara `has_condition`, y **el stack se parte por condición** (mezclar desgastes sería una reparación gratis) | Sí, solo con condición idéntica |
@@ -123,6 +125,53 @@ El catálogo **bulk** (attachments de ARC9, armas capturadas `wpn_*`, las varian
 
 **Dos datos que antes salían de la entidad viva y ahora salen de la clase**, porque sin entidad habría que inventarlos: el **PrintName** —trepando `.Base` con `GetStored`, que **no** hereda (sólo `weapons.Get` corre `TableInherit`, y deep-copea el árbol de attachments entero para leer un string)— y el **calibre**, vía `Ammo.TypeOfClass`. Sin la trepada, una clase que no declara `PrintName` propio produce un ítem **llamado como su clase**, y nada falla: es la misma falla sin síntoma que ya midió el censo de `dev/other/` (9 de 99 SWEPs spawneables heredan el campo).
 
+
+### Los USOS de un ítem (CRG-71)
+
+**`def.uses = 3`** (entero ≥ 1, **sólo `unique`**) hace que la condición 0-100 de ese ítem se **lea como una unidad**: donde Cargo escribía `67 %` escribe `2/3`. Nada más cambia. El número guardado sigue siendo la condición, el precio sigue saliendo de `value × condición × spread` (`Cargo_Trade` §4) y la persistencia no se entera — sacale el campo a la def y todo eso sigue funcionando igual. **Es una capa de presentación, no un segundo estado.**
+
+De dónde salió, textual (autor, 2026-08-18, hablando de las pastillas de cordura de Phantasmagoria): *«tener un solo item pero con x usos más que varios items en un stack (…) el mismo tooltip debería decir cuántos usos le queda»*. Y la mitad del valor de la entrada fue **medir antes de diseñar**: la barrita que el pedido describe **ya estaba dibujada** desde hacía rondas (`client/corpus_cargo_grid.lua`, la barra pegada al borde inferior de la celda), y el precio de un frasco a medio usar **ya se partía al medio** sin una línea escrita. Lo único que faltaba era la unidad.
+
+**La conversión, y las dos funciones que la hacen** (`shared/corpus_cargo_items.lua`, así que el harness la mide en los dos realms):
+
+```lua
+Cargo.Items.UsesLeft(def, condition)   -- 100 -> 3 ; 66,67 -> 2 ; 0 -> 0 ; nil si el def no declara uses
+Cargo.Items.ConditionForUses(def, n)   -- la INVERSA: 2 -> 66,67
+```
+
+**El redondeo es TECHO**, y fue un voto del autor (2026-08-19). Lo que compra es la única línea que Cargo y el módulo dueño pueden acordar **sin hablarse**: **0 usos si y sólo si condición 0**. Con piso, un frasco en condición 33,3 con `uses = 3` leería *«0 usos»* mientras todavía sirve una vez, y el jugador tira un ítem que funciona — la mentira cara. El techo sólo puede errar para el otro lado (decir 3 cuando quedan 2) y **sólo** si el dueño resta a mano, que es exactamente lo que `ConditionForUses` existe para evitar: restar 33 tres veces desde 100 deja 1, y el techo lee ese 1 como un uso que no existe. Las dos funciones **cierran la ida y vuelta por construcción** (`UsesLeft(ConditionForUses(n)) == n`) y el harness lo afirma sobre **todos** los `n` de **todos** los tamaños hasta 10 — con un epsilon que no es cosmético: sin él, `2/3 × 100` no vuelve entero en punto flotante y la ida y vuelta falla en `uses = 7` (medido).
+
+**Gastar un uso es del dueño, la aritmética es de Cargo**, porque la unidad es de Cargo:
+
+```lua
+local left = Cargo.Items.UsesLeft(def, blob.condition)
+blob.condition = Cargo.Items.ConditionForUses(def, left - 1)
+return false   -- NUNCA true: `true` consume la UNIDAD entera (contrato #2)
+```
+
+La implementación de referencia vive en `cargo_dev_pills` (`shared/corpus_cargo_dev.lua`) y el `return false` es su trampa principal: devolver `true` borraría el frasco con la primera pastilla en vez de gastarle uno de tres.
+
+**Los dos portones del `Register`**, y los dos existen porque la falla que frenan es **silenciosa**:
+
+- **`uses` es sólo de `unique`.** Un stack lleva **una** condición para sus N unidades (es de lo que habla CRG-7), así que gastarle «un uso» se la gastaría a todas de una. No hay forma de eso que no sea un bug: es `error()`.
+- **Declarar `uses` prende `has_condition`.** Sin él, `Instances.Create` no siembra `blob.condition`, `ConditionOf` contesta `nil` y el ítem **no dibuja nada** — ni barra, ni número, ni error en ningún lado. Exigir los dos campos no compra nada y deja ese no-op al alcance de la mano (voto del autor: implicarlo es más difícil de usar mal).
+
+**A cero el ítem QUEDA** (voto del autor, 2026-08-19). Cargo no lo borra, no lo esconde y no lo rechaza: CRG-1 dice que qué *significa* un ítem gastado es del módulo dueño, que puede querer un frasco vacío vendible, rellenable o descartable a mano. Se pinta rojo en `0/3`, igual que ya se pinta `Broken`. **Está escrito porque el que consuma va a asumir lo contrario.**
+
+**Dónde se ve, y es UNA sola decisión.** El texto lo arma `Theme.ConditionShort` (celda del grid, fila de sub-slot montado) y `Theme.ConditionLong` (título del tooltip) — nunca los sitios de llamada. El tooltip muestra **los usos Y el porcentaje** (`2/3 uses · 67 %`), y eso también fue voto: el porcentaje es de donde sale el precio, así que esconderlo hace que una reventa a la mitad se lea como un error de precio. La barra sigue pintándose sobre la condición cruda en las cinco superficies que la dibujan: es continua, y es el número que el precio lee.
+
+> **El harness tiene un gate de FUENTES por esto.** Verificando en negativo se midió que sabotear `ConditionShort` ponía la pasada en rojo pero **revertir la celda del grid a imprimir el `%` a mano la dejaba verde entera**: se estaba midiendo el helper y no que alguien lo llamara, y un helper impecable que nadie usa es un render viejo con un verde encima. Los overlays son closures `PaintOver` locales, sin nombre por el que agarrarlos y sin superficie que dibujar offline, así que lo único que ve la diferencia es el texto fuente — y el gate lo lee, diciendo qué mide.
+
+### La tecla rápida direcciona por ID de def, y resuelve la INSTANCIA al usarla
+
+Un quick bind guarda **el id de la def** (`rec.quick[n] = itemId`), nunca un uid, y eso es deliberado: un uid **muere con la instancia**, así que el primer frasco que se acaba deja la tecla atada a nada y el jugador tiene que re-bindear — justo el estado que la tecla existe para sobrevivir. El id sobrevive a todas las instancias y el server lo resuelve **fresco en cada apretada**.
+
+**La regla de resolución** (voto del autor, 2026-08-19): **el más gastado que todavía sirve** — la condición más baja entre las mayores que 0, desempatando por uid para que dos frascos idénticos no dependan del orden del record (mismo motivo por el que CRG-69 ordena el catálogo). Es la regla de STALKER: terminás el frasco abierto antes de abrir otro. Y no es cosmética: como Cargo **no borra** el ítem a cero, sin ella un frasco vacío se sentaría adelante y se comería cada apretada para siempre. Si están todos gastados, Cargo le pasa igual el primero al `onUse` del dueño y **el dueño contesta** — decidir que un 0 significa «no hay» sería Cargo decidiendo qué significa la condición.
+
+**Esto reparó dos defectos que estaban vivos**, y los dos silenciosos. La ruta vieja armaba su ref a mano como `{ id = itemId }`, forma que `FindEntry` sólo empareja contra entradas con `uid == nil`:
+
+- **Un `unique` era inalcanzable.** El menú contextual escondía la opción de bind para uniques, pero el **drag-and-drop sobre la celda quick nunca la escondió** y el server sólo pedía un `onUse`: se podía atar arrastrándolo, y la tecla contestaba *«You are out of that consumable»* para siempre sobre una mochila con dos frascos adentro. El **Tourniquet de Coagulant** (`class = "unique"`, `onUse`, *«Not consumed»*) está en ese estado desde que existe.
+- **Un stack CON condición era inalcanzable y ni siquiera avisaba.** `CountItem` lo contaba (el guard pasaba) y después `FindEntry` fallaba por el `condition ~= nil`, así que `UseEntry` devolvía `false` sin un solo `Notice`. Un stack con condición es estado **legal** y lo declara `shared/corpus_cargo_lan.lua` (una placa gastada que vuelve de un sub-slot, CRG-7).
 
 ### Lo que un def guarda de un tercero
 
@@ -380,6 +429,8 @@ Mismo grid, panel de transferencia lado a lado (contenedor | inventario propio),
 ## 9. Inspección de ítems (tooltip)
 
 Al pasar el cursor sobre un ítem: nombre, peso, condición, trivia/descripción, stats comparativos con delta (barras + %), compatibilidad de munición si aplica.
+
+La fila de condición del título dice `Condition 67 %` — o `2/3 uses · 67 %` si el def declaró `uses` (§3, CRG-71). El texto lo arma `Theme.ConditionLong`, nunca el tooltip: la celda del grid, este título y la fila de un sub-slot montado son tres superficies que tienen que decir la misma unidad del mismo frasco.
 
 **Fuente de stats — jerarquía de lectura:**
 
