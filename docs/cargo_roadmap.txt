@@ -1845,8 +1845,11 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     proximo que abra recibe un Snapshot fresco por el camino de siempre. La
     superficie `Trade.SyncFor` que se habia propuesto SE CAYO ENTERA.
 
-66. LOS USOS DE UN ITEM (def.uses) [Cargo items/ui] — CERRADA Y ESCRITA el
-    2026-08-19. FALTA LA PASADA EN JUEGO (planilla dev/checks/cargo-usos-r1.html).
+66. LOS USOS DE UN ITEM (def.uses) [Cargo items/ui] — CERRADA el 2026-08-19,
+    PASADA EN JUEGO OK ese mismo dia: planilla dev/checks/cargo-usos-r1.html,
+    12 de 12, cargo_selftest 100 OK / cargo_selftest_cl 107 OK, 0 fallas los dos
+    y los dos totales CLAVADOS con los que el harness offline habia predicho.
+    Abrio la #71 (la unidad del chip). CHANGELOG 69 [APLICADO].
     DE DONDE SALE: pedido del autor el 2026-08-18, cerrando el diseno de la
     cordura de Phantasmagoria — «tener un solo item pero con x usos mas que
     varios items en un stack (...) el mismo tooltip deberia decir cuantos usos
@@ -2095,3 +2098,40 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     siendo el peso. Que quede escrito cual de las dos mitades se enmienda es
     justo lo que evita que dentro de un mes alguien lea la enmienda como
     permiso para poner un limite de casillas.
+
+71. QUE NUMERO MUESTRA EL CHIP DE UN ITEM CON USOS [Cargo ui] — PEDIDO DEL AUTOR
+    el 2026-08-19, ABIERTA, SIN DISENAR.
+    DE DONDE SALE: de la nota del check 07 de la pasada de la #66, textual — «el
+    wheelmenu y el quickmenu deberian mostrar del item la cantidad de usos mas
+    que la cantidad del item, o nose, tal vez deberia mostrar la cantidad de uso
+    de ese item».
+    POR QUE NO ES UN CAPRICHO, y esto es lo que la vuelve una entrada: el chip
+    dice «x2» —dos frascos— pero la tecla dispara sobre UNO SOLO, el mas gastado
+    (la regla que se voto en la #66). O sea que EL NUMERO QUE SE MUESTRA NO
+    PREDICE LO QUE VA A PASAR AL APRETAR: con dos frascos, uno en 0/3 y otro en
+    3/3, el chip dice «x2» y lo que va a salir es una pastilla del segundo. Es la
+    MISMA pregunta de la #66 —cual es la unidad— sobre una cuarta superficie que
+    esa tanda no censo, porque el censo se hizo sobre las que dibujan CONDICION y
+    el chip dibuja CUENTA.
+    IRONIA UTIL PARA NO REPETIRLA: el parche 6 de la #66 toco justo ese
+    QuickCount — lo arreglo para que contara las DOS clases, porque con uniques
+    pintaba un «x0» en rojo sobre una mochila con dos frascos. Quedo contando
+    bien LA COSA EQUIVOCADA. Arreglar el conteo de algo no responde si ese algo
+    era lo que habia que contar.
+    LAS TRES FORMAS, y el autor no eligio (dijo «o nose, tal vez»), asi que ESTO
+    SE VOTA ANTES DE ESCRIBIR:
+      a) los usos del que la tecla VA A USAR («2» = las que quedan en el frasco
+         que sale). Es el unico que predice el proximo apretar, y es la unica
+         forma que NECESITA resolver la instancia del lado del cliente — hoy esa
+         regla vive SOLO en el server (QuickTarget), asi que habria dos copias de
+         un criterio, que es exactamente lo que el ecosistema evita. Medir eso
+         PRIMERO: si duplica la regla, la (a) es mas cara de lo que parece.
+      b) la suma de usos de todos («5/6»). No duplica la regla y no predice nada.
+      c) las dos cosas («x2 · 2»). Es la salida del tooltip de la #66, y en 56 px
+         de chip puede no entrar: medir el ancho antes de votarla.
+    LO QUE NO HAY QUE HACER: tocar la regla de seleccion. Esta votada, medida y
+    verde en juego — esto es que numero se DIBUJA, no cual se USA.
+    ALCANCE: el chip del wheel (§17) y la celda quick del frame (§15). Son dos
+    superficies y hoy leen la MISMA funcion (CARGO.UI.QuickCount), asi que si se
+    cambia, se cambia ahi y no en los dos lugares — mismo argumento que llevo el
+    texto de condicion a Theme.ConditionShort en la #66.

@@ -6308,7 +6308,7 @@ había anticipado.
 
 ---
 
-## 69. Los usos de un ítem, y la tecla que un único no podía tener (roadmap #66) `[PENDIENTE]`
+## 69. Los usos de un ítem, y la tecla que un único no podía tener (roadmap #66) `[APLICADO 2026-08-19]`
 
 **Pedido del autor (2026-08-18):** *«tener un solo item pero con x usos más que varios items en un
 stack (…) el mismo tooltip debería decir cuántos usos le queda, eso parece que le queda pendiente
@@ -6333,39 +6333,39 @@ sub-slot montado) y **cinco** para la barra (más la celda de equipamiento y el 
   inversa `Items.ConditionForUses(def, n)`. Van en **shared** y no en el theme a propósito: la
   aritmética es la misma en los dos realms, el harness la mide en los dos, y el módulo dueño la
   necesita del lado del server para **gastar** un uso sin restar a mano. Acuñado como **CRG-71**,
-  sede `Cargo_Architecture.md` §3. **[PENDIENTE]**
+  sede `Cargo_Architecture.md` §3. **[APLICADO 2026-08-19]**
 - PARCHE 2 — el mismo archivo, **los dos portones del `Register`**, y los dos existen porque la
   falla que frenan es **silenciosa**. `uses` sobre un **stackable** es `error()`: un stack lleva
   UNA condición para sus N unidades (CRG-7), así que gastarle «un uso» se la gastaría a todas de
   una, y no hay forma de eso que no sea un bug. Y declarar `uses` **prende `has_condition`**: sin
   él `Instances.Create` no siembra `blob.condition`, `ConditionOf` contesta `nil` y el ítem **no
   dibuja nada, sin un solo error** — exigir los dos campos no compra nada y deja ese no-op al
-  alcance de la mano. **[PENDIENTE]**
+  alcance de la mano. **[APLICADO 2026-08-19]**
 - PARCHE 3 — `client/corpus_cargo_theme.lua`: `ConditionShort` y `ConditionLong`, **el único lugar
   que decide si una condición se lee en % o en usos**. Las tres superficies de texto pasan por acá;
   que cada una lo decidiera por su cuenta es exactamente cómo la celda y el tooltip terminan
   diciendo unidades distintas del mismo frasco. El tooltip muestra **los dos** (`2/3 uses · 67 %`)
   porque el % es de donde sale el precio: esconderlo hace que una reventa a la mitad se lea como un
-  error de precio. **[PENDIENTE]**
+  error de precio. **[APLICADO 2026-08-19]**
 - PARCHE 4 — `client/corpus_cargo_grid.lua` y `client/corpus_cargo_tooltip.lua`: las tres
   superficies llaman a esos dos helpers. En el título del tooltip, además, **el reserve del ancho
   del nombre dejó de ser un `150` mágico y se mide**: estaba calibrado contra `Condition 100%` y la
   forma nueva es más larga. Un número mágico que sólo entra para la etiqueta con la que se calibró
-  es un defecto esperando a la próxima etiqueta. **[PENDIENTE]**
+  es un defecto esperando a la próxima etiqueta. **[APLICADO 2026-08-19]**
 - PARCHE 5 — `server/corpus_cargo_inventory.lua`: **`QuickTarget`**, que resuelve el id bindeado a
   una **instancia** en cada apretada. La regla, votada: **el más gastado que todavía sirve** (la
   condición más baja entre las mayores que 0, desempate por uid). Es la regla de STALKER —terminás
   el frasco abierto antes de abrir otro— y no es cosmética: como Cargo **no borra** el ítem a cero,
   sin ella un frasco vacío se sienta adelante y **se come cada apretada para siempre**. Con todos
-  gastados le pasa igual el primero al `onUse` del dueño, que es el que contesta. **[PENDIENTE]**
+  gastados le pasa igual el primero al `onUse` del dueño, que es el que contesta. **[APLICADO 2026-08-19]**
 - PARCHE 6 — `client/corpus_cargo_ui.lua`: se cae el gate `class == "stackable"` del submenú *Quick
-  bind*, y `UI.QuickCount` pasa a contar **las dos clases**. **[PENDIENTE]**
+  bind*, y `UI.QuickCount` pasa a contar **las dos clases**. **[APLICADO 2026-08-19]**
 - PARCHE 7 — `shared/corpus_cargo_dev.lua`: **`cargo_dev_pills`**, la implementación de referencia
   del lado del módulo dueño, y **dos** en el kit — con un solo frasco toda regla de selección da la
   misma respuesta y el check no discrimina. Las tres cosas que un consumidor hace mal por defecto
   están en sus diez líneas: gasta con `ConditionForUses` (nunca restando 100/uses, que deriva),
   devuelve **`false` siempre** (un `true` borraría el frasco con la primera pastilla en vez de
-  gastarle uno de tres) y a 0/3 **lo deja**. **[PENDIENTE]**
+  gastarle uno de tres) y a 0/3 **lo deja**. **[APLICADO 2026-08-19]**
 
 ### Dos defectos vivos y silenciosos que el parche 5 cerró
 
@@ -6418,7 +6418,34 @@ Harness `harness_cargo.py`: **852 → 910 verdes** (37 en server, 15 en cliente,
 fuentes). Selftest: **91 → 100** server y **93 → 107** cliente, los dos en 0 fallas. `glua_check.py`:
 48/48 parsean. **Los 14 sabotajes en rojo, uno por uno.**
 
-**PASADA EN JUEGO PENDIENTE** — planilla `dev/checks/cargo-usos-r1.html`.
+### Pasada en juego ✓ (2026-08-19) — **12 de 12**, y los dos totales clavados
+
+Planilla `dev/checks/cargo-usos-r1.html`: **Pasa 12 · Falla 0 · Sin correr 0**. `cargo_selftest`
+**100 OK, 0 fallas** y `cargo_selftest_cl` **107 OK, 0 fallas** — los dos números **exactamente**
+los que el harness offline había anticipado, que es lo único que acredita a ese instrumento.
+
+Lo que la corrida dejó registrado y vale la pena citar, porque son los criterios que discriminaban:
+
+- **El descuento se vio en el mismo botón**, con su antes y su después: `You take a pill. 2/3
+  left.` → `1/3` → `0/3` → **`The bottle is empty.`** dos veces. El frasco **no desapareció** al
+  llegar a 0 y el que contestó fue el `onUse` del módulo dueño, no Cargo.
+- **El control negativo aguantó**: un ítem sin `uses` *«sigue diciendo condición de 100»*. La
+  conversión no se filtró a quien no la pidió.
+- **La regla de selección se vio hacer lo suyo dos veces**: con un frasco abierto y otro intacto,
+  F1 terminó el abierto (`2/3` → `1/3` → `0/3`) y recién con ese vacío saltó al lleno (`2/3
+  left`). Es la línea de log que separa «eligió bien» de «eligió cualquiera».
+- **Y con la mochila vacía** volvió el aviso de siempre: `You are out of that consumable.`
+
+### Lo que la pasada abrió, y es del autor
+
+Nota del check 07, textual: *«el wheelmenu y el quickmenu deberían mostrar del ítem la cantidad de
+usos más que la cantidad del ítem»*. Tiene razón y es **la misma pregunta de esta entrada sobre
+una cuarta superficie**: el chip dice `x2` —dos frascos— pero la tecla dispara sobre **uno solo**,
+el más gastado, así que **el número que se muestra no predice lo que va a pasar al apretar**. Es
+justamente el `QuickCount` que el parche 6 arregló para que contara las dos clases: quedó contando
+bien la cosa equivocada. **No se implementó acá** — el autor mismo dejó la forma abierta
+(*«o no sé, tal vez»*) y hay al menos tres, que es lo que la vuelve una entrada de roadmap y no un
+parche: **roadmap #71**.
 
 ---
 

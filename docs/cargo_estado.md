@@ -72,7 +72,7 @@ que alguien lo llamara; un helper impecable que nadie usa es un render viejo con
 Como los overlays son closures `PaintOver` locales, sin nombre y sin superficie que dibujar
 offline, el harness ganó un **gate de FUENTES** que lee los archivos y dice qué mide. Harness
 **852 → 910 verdes**, selftest **100 server / 107 client**, los 14 sabotajes en rojo. CHANGELOG
-**69 `[PENDIENTE]`**. **PASADA EN JUEGO PENDIENTE** — planilla `dev/checks/cargo-usos-r1.html`.
+**69 `[APLICADO]`**. **PASADA EN JUEGO ✓ 2026-08-19**: planilla `dev/checks/cargo-usos-r1.html` **12 de 12**, `cargo_selftest` **100 OK** y `cargo_selftest_cl` **107 OK**, 0 fallas los dos — y los dos totales **clavados** con los que el harness offline había predicho. **Abrió la #71**, del autor: el chip quick dice `x2` (dos frascos) pero la tecla dispara sobre **uno solo**, así que **el número que muestra no predice lo que va a pasar al apretar** — y es justo el `QuickCount` que esta tanda arregló para contar las dos clases: quedó contando bien la cosa equivocada.
 Contexto previo: **el ítem de una CLASE DE ARMA se puede pedir desde
 afuera** — `Capture.ItemIdFor(class)`, roadmap **#64**, CRG-70. Es el MISMO agujero que el #63 un
 día después: la regla por categoría ya se podía escribir, pero **las armas no estaban EN el
