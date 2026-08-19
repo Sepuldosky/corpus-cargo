@@ -6567,7 +6567,7 @@ el 107 y entra un 120»), **#69** (la gramática del clic en contenedores, que q
 con la del trade justo por este bloque) y **#70** (el nivel 2 del grid: el empaque sigue dejando
 huecos porque la altura de una fila es la del tile más alto).
 
-## 71. El ref de un stack nombra la celda que apretaste (roadmap #68) `[PENDIENTE]`
+## 71. El ref de un stack nombra la celda que apretaste (roadmap #68) `[APLICADO 2026-08-19]`
 
 **Pedido del autor (en juego, 2026-08-19):** *«al meter al belt, ese que tiene 107 se mete otro de
 120, incluso bote toda mi municion de pistola del grid y salieron 6 items de pistola en vez de los
@@ -6705,19 +6705,33 @@ Y el instrumento del #67 siguió a su código: el rename `StampOrder` → `Stamp
 anclas de `dev/sabotaje_cargo_67.py` apuntando a nada, o sea una verificación en negativo desarmada
 en silencio. Actualizadas y **re-corridas: 12/12 en rojo**.
 
-### Pasada en juego — PENDIENTE
+### Pasada en juego (2026-08-19) — PASÓ
 
-Lo que hay que probar, y el criterio es binario:
+**Los dos síntomas del reporte, cerrados**, y el segundo es el que discrimina de verdad:
 
-1. Con munición de pistola partida en varias celdas y una de count distinto (un 107 entre 120),
-   **arrastrar la celda del 107 al cinturón** ⇒ el slot dice **107**, no 120.
-2. **Botar el grid de munición entero, contando los ítems que caen** ⇒ tantos ítems como celdas
-   había, con los counts de las celdas. Nunca más ítems que celdas.
-3. Apretar **Sort** y repetir (1) ⇒ sigue dando 107. Es la diferencia entre el `cid` y el `ord`.
-4. **Equipar** una granada desde una celda de count distinto ⇒ el slot muestra el count de ESA celda.
-5. **Usar** (menú contextual) un consumible desde la segunda celda ⇒ baja ESA celda.
-6. **Montar** una placa en un sub-slot desde la segunda celda ⇒ baja ESA celda.
-7. **Control negativo:** en el **trader**, `SHIFT+M1` sobre una celda sigue cargando lo de esa celda
-   y `ALT+SHIFT+M1` sigue cargando todo. En un **contenedor**, transferir sigue cruzando celdas.
-8. **Control negativo de la tecla rápida:** con dos frascos de distinto desgaste, la tecla sigue
-   gastando el más gastado.
+1. **El cinturón** — *«Traspasar municion al belt que sea menor al stack funciona (Pase 84 balas
+   directo al belt sin dramas)»*. La celda que se arrastra es la que viaja.
+2. **El piso** — *«Parece que si cada stack contiene la municion que le corresponde al botar, tenia
+   7 stacks de ammo de pistol y salieron las 7»*. **Éste es el que no se puede cumplir por
+   casualidad:** con el código viejo, vaciar un grid de siete celdas dejaba **más ítems que celdas**
+   (los restos de 13 que quedaban al recortar contra la primera entrada). Siete celdas ⇒ siete
+   ítems es exactamente lo que el defecto impedía.
+
+**Selftests en juego, clavados con lo que el harness offline había predicho:** `cargo_selftest`
+**100 OK / 0 fallas** y `cargo_selftest_cl` **107 OK / 0 fallas**.
+
+**Un comportamiento que el autor verificó y NO es de este bloque:** sacar munición del cinturón
+**rellena** un stack del grid hasta el techo — *«Tienes 100 en un stack del inventario y 80 en el
+belt → traspasar al inventario → ahora tienes un stack de 120 y otro de 60»*. Es `AddStack`
+mergeando bajo `max_stack`, y es correcto desde el Block 1: una celda es un stack, así que lo que
+vuelve llena la que hay antes de abrir otra. El autor lo cerró él mismo con el control que
+correspondía —*«tire ambas y salen con los valores correctos»*—, que es medir la **conservación** en
+vez de discutir la forma.
+
+**Lo que quedó SIN CORRER, y se dice porque un check que no se corrió no es un verde** (precedente
+AB14 del #53): las filas 3 a 8 de la lista de arriba — Sort + repetir el arrastre, el equip desde una
+celda de count distinto, el uso por menú contextual, el montaje en sub-slot, y los dos controles
+negativos (trader y contenedor, y la tecla rápida). **Los seis están cubiertos offline** por el
+harness y por la verificación en negativo —los seis caen con sabotajes que se midieron en rojo—, así
+que no son deuda de corrección; son las superficies donde el offline no puede hablar por el juego.
+Si alguna se rompiera en juego, el harness no lo vería.

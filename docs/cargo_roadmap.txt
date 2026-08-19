@@ -1981,8 +1981,15 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 
 68. EL REF DE UN STACK NOMBRA LA PRIMERA ENTRADA, NO LA CELDA QUE APRETASTE
     [Cargo inventory/ui, bug] — CERRADO Y ESCRITO el 2026-08-19 (los dos votos
-    del autor tomados antes de escribir una linea), PASADA EN JUEGO PENDIENTE.
-    CHANGELOG 71. Sede de diseno: Cargo_Architecture.md §7.3, cita CRG-73.
+    del autor tomados antes de escribir una linea). PASADA EN JUEGO OK el
+    2026-08-19: los dos sintomas del reporte cerrados —el belt se lleva la celda
+    que arrastras (84 balas) y siete stacks de pistola dan SIETE items al botar,
+    que es justo lo que el defecto impedia—, mas los dos selftest en juego
+    clavados con el offline (100 server / 107 client, 0 fallas). Sin correr
+    quedaron las seis filas que el harness ya cubre offline (Sort+arrastre,
+    equip, use, sub-slot y los dos controles negativos), y se dice asi porque un
+    check que no se corrio no es un verde. CHANGELOG 71 [APLICADO].
+    Sede de diseno: Cargo_Architecture.md §7.3, cita CRG-73.
 
     LO QUE REPORTO EL AUTOR (en juego, 2026-08-19): «al meter al belt, ese que
     tiene 107 se mete otro de 120» y «bote toda mi municion de pistola del grid

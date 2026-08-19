@@ -47,8 +47,17 @@ Harness **945 → 985 verdes**, selftest **100 server / 107 client** (sin movers
 48/48, y **16 sabotajes en rojo, 16 de 16**, con control de apertura y cierre en verde
 (`dev/sabotaje_cargo_68.py`). El instrumento del #67 siguió a su código —el rename
 `StampOrder` → `StampEntries` le dejaba dos anclas apuntando a nada, o sea una verificación en
-negativo desarmada en silencio— y se **re-corrió: 12/12**. **PASADA EN JUEGO PENDIENTE** (los 8
-puntos están en el CHANGELOG). CHANGELOG **71 `[PENDIENTE]`**.
+negativo desarmada en silencio— y se **re-corrió: 12/12**. **PASADA EN JUEGO ✓ 2026-08-19**: los
+**dos síntomas del reporte cerrados** —el cinturón se lleva la celda que arrastrás (84 balas) y
+**siete stacks de pistola dan SIETE ítems al botar**, que es exactamente lo que el defecto impedía,
+porque el viejo dejaba restos y salían más ítems que celdas—, con `cargo_selftest` **100 OK** y
+`cargo_selftest_cl` **107 OK**, 0 fallas los dos y **clavados** con lo que el harness offline había
+predicho. **Quedaron SIN CORRER seis filas** (Sort+arrastre, equip, use, sub-slot y los dos controles
+negativos), todas cubiertas offline por el harness y por los 16 sabotajes — se dice así porque un
+check que no se corrió no es un verde. Y el autor verificó de paso algo que **no es de este bloque**:
+sacar munición del cinturón **rellena** un stack del grid hasta el techo (100+80 → 120+60), que es
+`AddStack` mergeando bajo `max_stack` desde el Block 1 — lo cerró él con el control correcto, botar
+ambos y mirar la **conservación**. CHANGELOG **71 `[APLICADO]`**.
 Contexto previo: **el ORDEN del grid es del JUGADOR** — `ord` por
 entrada, roadmap **#67**, CRG-72, sede §7.2. El autor pidió dos cosas —que los ítems dejen de quedar
 desordenados y guarden posición, y que apretar sobre un stack de munición opere sobre **ese** stack y
