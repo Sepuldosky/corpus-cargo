@@ -6419,3 +6419,123 @@ fuentes). Selftest: **91 → 100** server y **93 → 107** cliente, los dos en 0
 48/48 parsean. **Los 14 sabotajes en rojo, uno por uno.**
 
 **PASADA EN JUEGO PENDIENTE** — planilla `dev/checks/cargo-usos-r1.html`.
+
+---
+
+## 70. El orden del grid es del jugador, y una celda es un stack (roadmap #67) `[APLICADO 2026-08-19]`
+
+**Pedido del autor (2026-08-19):** *«quedan desordenados los items (…) que el inventario guarden
+posición los items entre el grid (aunque el grid sea infinito ya que el limitante del jugador es el
+peso)»* y *«de la munición de pistola (120 balas el stack), el límite para apretar sobre ese item
+del inventario sea 120 y que no vendas las 800 balas de inmediato»*.
+
+### Los dos pedidos tenían la misma raíz, y no era la que parecía
+
+Parecían dos frentes. El diagnóstico los juntó: **una entrada de stack no tiene identidad** — los
+únicos llevan `uid` y los stacks se nombran por `{ id, condition }`. Sobre eso no se puede colgar
+una posición (no hay a quién) ni acotar el SHIFT al stack clicado (no hay cómo nombrar *ése*).
+
+**Pero para la mitad del comercio la identidad resultó innecesaria, y ahí está el ahorro del
+bloque:** dos stacks del mismo `id` y la misma `condition` son **fungibles**. 120 balas de 9×19 son
+120 balas de 9×19 en cualquier celda. Lo que un clic tiene que mandar nunca fue *cuál* stack, sino
+**cuánto** — y eso lo arregla el cliente, en una función. La identidad sólo hacía falta para la
+posición, y ahí se llama `ord` y **no viaja en ningún ref**.
+
+### Lo que estaba mal, medido
+
+1. **La posición era una función del contenido.** El cliente re-derivaba el orden entero en cada
+   `Refresh()` (`grid.lua`), así que nada podía quedarse donde se lo puso y cada pickup reflowaba
+   el grid bajo el cursor.
+2. **Un desempate que no desempataba.** El comparador terminaba en
+   `(a.uid or "") < (b.uid or "")`; para dos *stacks* eso compara `""` contra `""`. `table.sort` de
+   Lua es quicksort y **no es estable**, así que el x120 y el x80 de la misma munición se
+   intercambiaban entre syncs sin que nada hubiera cambiado. Es la mitad del *«se ve desordenado»*
+   que no era el layout.
+3. **SHIFT+click vendía la reserva entera.** `ClickAmount` devolvía `Available`, el **agregado**
+   sobre las siete entradas que respaldan 800 balas. El agregado es correcto y se queda —nació de
+   un informe en juego del 2026-07-14, porque sin él el stack gemelo quedaba inalcanzable—, pero
+   como **cantidad de un clic** convierte un cargador en toda la mochila.
+4. **El contenedor no partía por `max_stack`.** `AddContStack` mergeaba sin techo y la siembra de
+   stock del trader tampoco partía, así que una caja podía mostrar una sola celda diciendo `x800`:
+   la regla *«una celda es un stack»* que el jugador aprende en su propio grid dejaba de valer al
+   abrir una caja.
+5. **Un falso «no pude mover todo», VIVO desde antes de este bloque.** `Take all`/`Move all` arma
+   una lista de refs, uno por entrada. Con 800 balas partidas en siete, el **primer** ref se lleva
+   las siete y los otros **seis no resuelven nada** — y «no resolvió» es lo que ese loop lee como
+   *bloqueado*. El aviso *«Couldn't move everything»* salía sobre una operación que había
+   funcionado entera. Estaba vivo del lado `put` (el grid del jugador siempre partió) y el punto 4
+   se lo habría traído también a `take`.
+
+### Lo que se escribió
+
+- PARCHE 1 — `shared/corpus_cargo_items.lua`: **`Items.MaxStack(def)`** y
+  **`Items.AutoSortLess(a, b)`**, las dos en shared. El techo estaba re-tipeado en cuatro archivos
+  como `def.max_stack or math.huge` y por eso el contenedor pudo quedarse sin él; el criterio de
+  orden estaba re-tipeado en el cliente. `MaxStack` además **pisa en 1** un techo declarado bajo 1:
+  los dos loops que parten stacks hacen `count - put` y con `put = 0` no terminan nunca. Acuñado
+  como **CRG-72**, sede `Cargo_Architecture.md` §7.2. **[PENDIENTE]**
+- PARCHE 2 — `server/corpus_cargo_inventory.lua`: el campo **`ord`**, estampado por los **dos
+  funnels** (`SaveRecord` y `BuildSnapshot`) para que las ~8 rutas que agregan una entrada no
+  tengan que acordarse. Dos regímenes decididos por el **estado del propio record** y no por un
+  flag persistido: nadie tiene `ord` ⇒ se siembra entero con el criterio (la primera carga se ve
+  igual que siempre); ya hay ⇒ los recién llegados van **al final**. Más
+  **`Inventory.SortGrid`** + el intent `cargo_sort`, rate-limitado a 0,25 s porque es el único
+  receptor **sin payload que validar**. **[PENDIENTE]**
+- PARCHE 3 — `client/corpus_cargo_grid.lua`: el comparador respeta `ord` cuando la lista lo trae y
+  cae a `Items.AutoSortLess` cuando no (contenedor y stock del trader — una caja no es del jugador
+  para acomodarla). Se borra la copia local del criterio. **[PENDIENTE]**
+- PARCHE 4 — `client/corpus_cargo_ui.lua`: el botón **Sort**, alineado a la derecha de la fila de
+  tabs. Ahora que hay un orden del jugador, volver al automático tiene que ser algo que él
+  **aprieta** y nunca algo que un refresh haga por atrás. **[PENDIENTE]**
+- PARCHE 5 — `client/corpus_cargo_trade.lua`: **tres** cantidades por clic, voto del autor.
+  `M1` = un cuarto del techo (30 de 120, sin cambios); **`SHIFT+M1` = el stack clicado**
+  (`entry.count`, o sea 120 en una celda llena y **80** en la del resto — la cantidad sale de la
+  celda, no del techo de la def); `CTRL+SHIFT+M1` = todo, el comportamiento viejo entero.
+  **[PENDIENTE]**
+- PARCHE 6 — `server/corpus_cargo_containers.lua` + `server/corpus_cargo_trade.lua`: el contenedor
+  y la siembra de stock parten por `max_stack`. Y como partir crea el problema de *«el clic pidió
+  120 y esta entrada tiene 80»*, la transferencia pasa a **derramar** sobre las entradas que
+  respaldan el ref (`StackTotal` + `DrainStack`) — que es lo que ya hacía el basket del trade.
+  **[PENDIENTE]**
+- PARCHE 7 — el mismo `containers.lua`: **la lista de refs de `Take all`/`Move all` se dedupea por
+  `RefKey`**. Cierra el punto 5. **[PENDIENTE]**
+
+### Lo que NO se hizo, y por qué
+
+El autor votó **nivel 1** de posicionamiento: orden persistido, sin arrastrar. **No** hay `slot` de
+celda, ni colisión de footprints, ni drag-to-place. La enmienda del 2026-07-11 (*«el footprint es
+sólo render, sin gestión espacial»*) **sigue en pie**; §7.2 sólo le saca al orden el ser una función
+del contenido.
+
+### El hallazgo de método
+
+**Lo más caro del bloque no fue el código: fue medir el alcance.** El pedido nombraba dos frentes
+grandes y uno de los dos (SHIFT sobre un stack) se cerró con **una función de cinco líneas en el
+cliente**, porque la premisa *«a la munición le falta información para separar stacks»* era falsa —
+`AddStack` parte por `max_stack` desde el Block 1 y las 800 balas **ya eran siete entradas**. Lo que
+faltaba no era partir: era **no volver a sumarlas al hacer clic**. Y de medir ese alcance salieron
+**dos defectos vivos que nadie había pedido** (el punto 2 y el punto 5), los dos silenciosos.
+
+### Medición
+
+Harness `harness_cargo.py`: **910 → 945 verdes** (25 en server, 8 en cliente, 6 del gate de
+fuentes, que además aprendió a leer archivos de `server/`). Selftest: **100** server y **107**
+cliente, los dos en 0 fallas y sin moverse — el bloque no toca su superficie. `glua_check.py`:
+48/48 parsean. **Verificación en negativo: 12 sabotajes, 12 en rojo**, con control de apertura y de
+cierre en verde (`dev/sabotaje_cargo_67.py`).
+
+### Pasada en juego (2026-08-19) — PASÓ, con una enmienda de tecla
+
+El autor verificó las tres cosas: el botón **Sort**, el `SHIFT+M1` sobre un stack y el «todo».
+**Enmienda votada en la misma pasada:** el «todo» pasa de `CTRL+SHIFT+M1` a **`ALT+SHIFT+M1`**,
+porque **CTRL está bindeado a agacharse** — sostenerlo para comprar munición deja al jugador en
+cuclillas apenas se cierra el menú. Un modificador de menú no puede ser una tecla de movimiento.
+Aplicada, con sus dos checks del harness re-escritos (y las constantes `KEY_LALT`/`KEY_RALT` reales
+en el prelude, que es lo que permite que el check distinga SHIFT de ALT+SHIFT en vez de estar verde
+por no poder fallar).
+
+De la misma pasada salieron **tres frentes nuevos**, todos anotados en el roadmap y ninguno tocado
+acá: **#68** (el ref de un stack nombra la primera entrada y no la celda que apretaste — el «meto
+el 107 y entra un 120»), **#69** (la gramática del clic en contenedores, que quedó inconsistente
+con la del trade justo por este bloque) y **#70** (el nivel 2 del grid: el empaque sigue dejando
+huecos porque la altura de una fila es la del tile más alto).

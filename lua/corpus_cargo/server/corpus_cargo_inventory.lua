@@ -72,6 +72,7 @@ local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
 local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
 local NET_BELT_MOVE  = Corpus.Net.Register("cargo", "belt_move")
 local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
+local NET_SORT       = Corpus.Net.Register("cargo", "sort")
 
 -- Lifecycle convars (server, archived):
 --   cargo_lose_on_death — death wipes the whole inventory + money (roadmap
@@ -244,10 +245,83 @@ function CARGO.Inventory.GetRecord(ply)
     return rec
 end
 
+-- ------------------------------------------------------------------
+-- GRID ORDER (roadmap #67)
+--
+-- `ord` is WHERE an entry sits in the player's grid, and it belongs to the
+-- PLAYER: it survives a pickup, a drop, a relog and a map change, and only the
+-- Sort button rewrites one that already exists. Before it, position was a
+-- function of the CONTENTS — the client re-derived the whole order on every
+-- refresh (§7 auto-sort), so nothing the player put somewhere could stay there
+-- and every pickup reflowed the grid under the cursor.
+--
+-- It is NOT an identity, and that is deliberate: no ref on the wire names it
+-- (CRG-6 refs stay `uid` / `id`+`condition`), so a re-sort can never re-target
+-- an intent already in flight. Two stack entries of the same id and condition
+-- are FUNGIBLE — 120 rounds of 9x19 are 120 rounds of 9x19 whichever cell they
+-- were drawn in — so naming a stack was never the question. Naming a QUANTITY
+-- was, and that is the client's side of #67.
+--
+-- The two funnels stamp: SaveRecord (disk) and BuildSnapshot (wire). Every
+-- mutation path in this file ends in one of them, which is why the ~8 places
+-- that append an entry do not each have to remember.
+-- ------------------------------------------------------------------
+
+local function StampOrder(rec)
+    if not istable(rec) or not istable(rec.items) then return end
+
+    local maxOrd, stamped = 0, 0
+    for _, entry in ipairs(rec.items) do
+        if isnumber(entry.ord) then
+            stamped = stamped + 1
+            if entry.ord > maxOrd then maxOrd = entry.ord end
+        end
+    end
+    if stamped == #rec.items then return end
+
+    -- A record where NOBODY carries one is legacy (or brand new) and gets
+    -- seeded WHOLE by the shared criterion, so the first load looks exactly
+    -- like it always did — no player ever sees his bag shuffled by the
+    -- upgrade. A record already in play stamps only the NEWCOMERS and puts
+    -- them at the END, which is the whole of "a pickup stops moving everything
+    -- else". The regime is read off the record's own state and not off a
+    -- flag: a flag would have to be persisted, and a persisted flag can lie.
+    if stamped == 0 then
+        local seeded = {}
+        for _, entry in ipairs(rec.items) do seeded[#seeded + 1] = entry end
+        table.sort(seeded, CARGO.Items.AutoSortLess)
+        for i, entry in ipairs(seeded) do entry.ord = i end
+        return
+    end
+
+    for _, entry in ipairs(rec.items) do
+        if not isnumber(entry.ord) then
+            maxOrd = maxOrd + 1
+            entry.ord = maxOrd
+        end
+    end
+end
+
+-- Re-sorts the grid with the SHARED criterion, on the player's say-so. The
+-- only thing in the module that rewrites an `ord` that already exists.
+function CARGO.Inventory.SortGrid(ply)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    if not istable(rec.items) then return end
+
+    local list = {}
+    for _, entry in ipairs(rec.items) do list[#list + 1] = entry end
+    table.sort(list, CARGO.Items.AutoSortLess)
+    for i, entry in ipairs(list) do entry.ord = i end
+
+    CARGO.Inventory.Touch(ply)
+end
+
 function CARGO.Inventory.SaveRecord(ply)
     if not cvPersist:GetBool() then return end -- session-only mode: nothing hits disk
     local rec = CARGO.Inventory._records[SteamKey(ply)]
     if rec == nil then return end
+
+    StampOrder(rec)
 
     -- RENDER (CRG-56/57), the same routine the persistent container runs:
     -- `instances` is rebuilt from scratch out of _live on every save, so a uid
@@ -316,8 +390,7 @@ end
 -- A worn plate returned from a sub-slot must never launder into a factory
 -- stack — that would be a free repair.
 local function AddStack(rec, id, count, condition)
-    local def = CARGO.Items.Get(id)
-    local maxStack = istable(def) and def.max_stack or math.huge
+    local maxStack = CARGO.Items.MaxStack(CARGO.Items.Get(id))
 
     for _, entry in ipairs(rec.items) do
         if entry.uid == nil and entry.id == id and entry.condition == condition
@@ -595,13 +668,17 @@ end
 
 local function EntrySnapshot(entry)
     if entry.uid then
-        return { id = entry.id, uid = entry.uid, blob = CARGO.Instances.Get(entry.uid) }
+        return { id = entry.id, uid = entry.uid, ord = entry.ord,
+            blob = CARGO.Instances.Get(entry.uid) }
     end
-    return { id = entry.id, count = entry.count or 1, condition = entry.condition }
+    return { id = entry.id, count = entry.count or 1, condition = entry.condition,
+        ord = entry.ord }
 end
 
 function CARGO.Inventory.BuildSnapshot(ply)
     local rec = CARGO.Inventory.GetRecord(ply)
+    StampOrder(rec) -- the wire funnel (see StampOrder): a cell without an `ord`
+                    -- would fall back to the auto-sort and drift from the rest
     local snap = { items = {}, equip = {}, quick = rec.quick, belt = rec.belt }
 
     for _, entry in ipairs(rec.items) do
@@ -1254,6 +1331,70 @@ function CARGO.Inventory.QuickBind(ply, slotN, itemId)
     CARGO.Inventory.Touch(ply)
 end
 
+-- WHICH ENTRY THE KEY FIRES ON (roadmap #66). Until this existed the quick
+-- route built its ref by hand as `{ id = itemId }`, and that ref only ever
+-- matched ONE shape of entry — a stack with no condition. Two things fell
+-- through the gap, and both were SILENT:
+--
+--   · A UNIQUE was unreachable, because FindEntry only matches `{ id = ... }`
+--     against entries with `uid == nil`, and the CountItem gate above it (stack
+--     units only, as its own comment says) answered 0 first. So a unique bound
+--     to a key answered "You are out of that consumable" forever, over a bag
+--     that held two of them. Nothing gated the bind: the context menu hid the
+--     option for uniques but the DRAG-AND-DROP onto the quick cell never did,
+--     and the server only ever asked for an onUse. Coagulant's Tourniquet
+--     (class = unique, onUse, "Not consumed") sits in exactly that state today.
+--   · A STACK WITH A CONDITION was unreachable too, and this one did not even
+--     say so: CountItem counted it, so the gate passed, and then FindEntry
+--     failed on `entry.condition ~= nil` and UseEntry returned false with no
+--     Notice at all. A stack carrying a condition is a LEGAL state and says so
+--     in corpus_cargo_lan.lua (a worn plate back from a sub-slot, CRG-7).
+--
+-- THE BIND STAYS KEYED BY DEF ID, and that is the half worth defending. A uid
+-- would look more precise and would be wrong: it dies with the instance, so
+-- the first time the jar runs out the key is bound to nothing and the player
+-- has to re-bind it — the state this route is supposed to survive. The id
+-- outlives every instance and this resolves it fresh on each press.
+--
+-- THE RULE IS "THE MOST-USED ONE THAT STILL WORKS" (author vote 2026-08-19):
+-- the lowest condition among those above 0. It is the STALKER rule — you
+-- finish the open jar before opening another — and the reason it matters is
+-- that Cargo never deletes an item at 0 (CRG-1: that call is the owner's), so
+-- without it a spent jar would sit at the front of the list and eat every
+-- press. Ties break by uid so two identical jars do not depend on record order,
+-- which is the same reason CRG-69 sorts the catalogue.
+--
+-- A def with NO condition at all is a plain consumable: always usable, and it
+-- sorts AFTER anything partially spent so a half jar still goes first.
+local function QuickTarget(rec, itemId)
+    local best, bestRank, first
+    for _, entry in ipairs(rec.items) do
+        if entry.id == itemId then
+            if first == nil then first = entry end
+            local cond = entry.condition
+            if entry.uid then
+                local blob = CARGO.Instances.Get(entry.uid)
+                cond = blob and blob.condition or nil
+            end
+            local rank = cond == nil and math.huge or cond
+            if cond == nil or cond > 0 then
+                if best == nil or rank < bestRank
+                    or (rank == bestRank and (entry.uid or "") < (best.uid or "")) then
+                    best, bestRank = entry, rank
+                end
+            end
+        end
+    end
+
+    -- every one of them spent: hand the owner module the first anyway and let
+    -- its onUse be the one that says so. Cargo deciding that a 0 means "gone"
+    -- would be Cargo deciding what condition MEANS, which is not its call.
+    best = best or first
+    if best == nil then return nil end
+    if best.uid then return { uid = best.uid } end
+    return { id = best.id, condition = best.condition }
+end
+
 function CARGO.Inventory.QuickUse(ply, slotN)
     local rec = CARGO.Inventory.GetRecord(ply)
 
@@ -1269,11 +1410,12 @@ function CARGO.Inventory.QuickUse(ply, slotN)
 
     local itemId = rec.quick[slotN]
     if itemId == nil then return end
-    if CARGO.Inventory.CountItem(ply, itemId) < 1 then
+    local ref = QuickTarget(rec, itemId)
+    if ref == nil then
         CARGO.Inventory.Notice(ply, "You are out of that consumable.")
         return
     end
-    CARGO.Inventory.UseEntry(ply, { id = itemId })
+    CARGO.Inventory.UseEntry(ply, ref)
 end
 
 -- ------------------------------------------------------------------
@@ -1508,6 +1650,16 @@ net.Receive(NET_DROP, function(_, ply)
     local ref = CARGO.Util.ReadBlob()
     local count = net.ReadUInt(16)
     if ref then CARGO.Inventory.DropEntry(ply, ref, count) end
+end)
+
+-- Rate-limited because it is the one intent with NO payload to validate: every
+-- other receiver here is gated by what it names, and this one would otherwise
+-- be a free disk write per packet.
+net.Receive(NET_SORT, function(_, ply)
+    if not IsValid(ply) then return end
+    if (ply.cargoNextSort or 0) > CurTime() then return end
+    ply.cargoNextSort = CurTime() + 0.25
+    CARGO.Inventory.SortGrid(ply)
 end)
 
 net.Receive(NET_QUICKBIND, function(_, ply)

@@ -5,7 +5,50 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-19 (**nuevo: un ítem puede tener USOS** — `def.uses = 3`,
+**Última actualización:** 2026-08-19 (**nuevo: el ORDEN del grid es del JUGADOR** — `ord` por
+entrada, roadmap **#67**, CRG-72, sede §7.2. El autor pidió dos cosas —que los ítems dejen de quedar
+desordenados y guarden posición, y que apretar sobre un stack de munición opere sobre **ese** stack y
+no sobre las 800 balas de la mochila— y **tenían la misma raíz**: una entrada de stack no tiene
+identidad. **Pero para el comercio la identidad resultó INNECESARIA, y ese fue el ahorro del
+bloque:** dos stacks del mismo `id` y `condition` son **fungibles**, así que lo que un clic manda no
+es *cuál* sino **cuánto**. **La premisa del pedido era falsa** —«tal vez a la munición le falta
+información para separar stacks»— y medirlo es lo que lo achicó: `AddStack` parte por `max_stack`
+desde el Block 1 y las 800 balas **ya eran siete entradas**; faltaba **no volver a sumarlas al hacer
+clic**. Votos: **nivel 1** de posición (orden persistido, **sin arrastrar** — la enmienda «el
+footprint es sólo render, sin gestión espacial» **sigue en pie**), `SHIFT+M1` = el stack clicado y
+`ALT+SHIFT+M1` = todo (**ALT y no CTRL: CTRL agacha**), y **una celda es un stack en TODAS las listas** (el contenedor y la siembra
+de stock del trader no partían: una caja podía decir `x800`). El `ord` lo estampan los **dos
+funnels** del record —disco y cable— para que las ~8 rutas que agregan una entrada no tengan que
+acordarse, y **no es una identidad**: ningún ref de red lo nombra, así que un `Sort` no puede
+re-apuntar un intent en vuelo. **Y de medir el alcance salieron DOS defectos vivos que nadie pidió,
+los dos silenciosos:** el comparador terminaba en `(a.uid or "") < (b.uid or "")`, que para dos
+stacks compara `""` contra `""` —empate total, y `table.sort` de Lua **no es estable**, así que el
+x120 y el x80 se cambiaban de lugar entre syncs sin que nada cambiara—; y **`Take all`/`Move all`
+avisaba «no pude mover todo» sobre operaciones que habían funcionado enteras**, porque la lista de
+refs traía uno por entrada, el primero se llevaba las siete y los otros seis «no resolvían nada»,
+que ese loop lee como *bloqueado*. Harness **910 → 945 verdes**, selftest **100 server / 107
+client** (sin moverse: el bloque no toca su superficie), `glua_check` 48/48, y **12 sabotajes en
+rojo, 12 de 12**, con control de apertura y cierre en verde (`dev/sabotaje_cargo_67.py`).
+**PASADA EN JUEGO ✓ 2026-08-19** — el Sort, el `SHIFT+M1` y el «todo», los tres OK en el trader;
+**enmienda de la pasada: el «todo» pasa de CTRL a ALT**, porque CTRL agacha. CHANGELOG **70
+`[APLICADO]`**.
+**Y de esa pasada salieron TRES frentes, que son las tres sesiones siguientes y en este orden:**
+**#68** — *el ref de un stack nombra la PRIMERA entrada, no la celda que apretaste*: `FindEntry`
+resuelve `{id, condition}` contra la primera de la fila, así que arrastrar la celda de **x107** al
+cinturón mete **la de 120**, y botar el grid deja **más ítems en el piso que celdas** (los restos).
+**No se crean balas — la conservación se cumple**; lo que falla es *cuál* entrada se mueve. Cinco
+caminos comparten ese `FindEntry` (use, drop, belt, equip, sub-slot); los dos que el #67 tocó a
+propósito (basket y transferencia) están bien, porque ahí la semántica correcta **es de cantidad**.
+La pregunta del autor —*«¿y si cada stack de 120 fuera un blob propio?»*— se puede, pero es la
+herramienta cara y equivocada: **un blob guarda HISTORIA y dos stacks de 9×19 no tienen ninguna que
+los distinga**. Lo que hace falta es que el ref **nombre la celda**, y la recomendación es un `sid`
+estable (no reusar `ord`) porque **es exactamente lo que el #70 necesita también**.
+**#69** — la gramática del clic en contenedores, que este mismo bloque dejó **inconsistente** con la
+del trade. **#70** — el **nivel 2** del grid: el orden ya no baila, pero el **empaque** sigue
+dejando huecos (la altura de una fila es la del tile más alto), y eso sólo se arregla dando a cada
+ítem una celda. Enmienda a la mitad *«sin gestión espacial»* del 2026-07-11 — **la otra mitad, «el
+costo es peso y no espacio», NO se toca**.
+Contexto previo: **un ítem puede tener USOS** — `def.uses = 3`,
 roadmap **#66**, CRG-71. **Lo primero que se midió fue que no estaba pendiente:** la barrita que el
 autor pedía **ya estaba dibujada** hacía rondas y el precio de un frasco a medio usar **ya se
 partía al medio solo**, porque sale de `value × condición × spread`. Faltaba la **unidad** — la
@@ -433,7 +476,8 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
   — la curva de peso lo cobra en velocidad; el límite sigue vigente para lo que se
   recoge del suelo (techo duro: **2× la capacidad**). Una línea del basket es un
   **agregado sobre todos los stacks** del ítem (entry 22); click = 25% del
-  `max_stack`, **SHIFT+click = todo**, click derecho = cantidad exacta.
+  `max_stack`, **SHIFT+click = el stack clicado** y **ALT+SHIFT+click = todo**
+  (re-votado 2026-08-19, entry 70), click derecho = cantidad exacta.
 - **Trivia de armas: la pone el SWEP, no una tabla** (entry 23, roadmap #38).
   La captura lee `SWEP.Description` y el bloque `SWEP.Trivia` de
   `weapons.Get(class)` (ya heredados por la cadena `SWEP.Base`) → `def.trivia`

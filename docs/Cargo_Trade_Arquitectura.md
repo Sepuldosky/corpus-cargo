@@ -81,10 +81,18 @@ cadáver son el mismo mecanismo.
 
 1. Mover un ítem del inventario propio al lado **Sell** (o del stock al lado
    **Buy**) lo agrega al **basket** — no ejecuta nada todavía. Cantidad por click
-   (enmienda 2026-07-14, CHANGELOG #22): **click = 25% del `max_stack`**,
-   **SHIFT+click = todo**, **click derecho = cantidad exacta**. Una línea de stack
-   es un **agregado** sobre todas las entries del mismo `id + condición` (`max_stack`
-   parte un pilón en varias) — el ítem lógico, no la celda.
+   (enmienda 2026-07-14, CHANGELOG #22; **re-votada por el autor el 2026-08-19**,
+   CHANGELOG #70 / roadmap #67): **click = 25% del `max_stack`**,
+   **SHIFT+click = EL STACK CLICADO** (lo que esa celda dice: 120 en una llena, 80
+   en la del resto), **ALT+SHIFT+click = todo**, **click derecho = cantidad
+   exacta**. SHIFT cargaba *todo* y eso convertía un cargador en la reserva entera.
+   Una línea de stack sigue siendo un **agregado** sobre todas las entries del mismo
+   `id + condición` (`max_stack` parte un pilón en varias) — el ítem lógico, no la
+   celda —, y ese agregado sigue siendo el **techo** de la línea: es lo que mantiene
+   alcanzable al stack gemelo, que es para lo que nació el 2026-07-14. Lo que cambió
+   no es el agregado: es qué tecla lo pide. Se puede, porque **dos entries del mismo
+   `id` y `condición` son fungibles** y lo que un clic nombra es una *cantidad*, no
+   una celda (CRG-72).
 2. El ítem en basket queda **marcado visualmente** (borde ámbar + contador de unidades
    pendientes en la celda). **El lock NO está implementado (slice 1):** el basket es
    *intent puro del cliente* —el servidor no guarda estado de basket— y el ítem sigue

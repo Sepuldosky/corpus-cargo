@@ -154,9 +154,18 @@ function CARGO.Trade.AttachTrader(ent, opts)
             if def == nil then
                 Corpus.Log("cargo", "Trade: stock desconocido '" .. tostring(line.id) .. "', ignorado")
             elseif def.class == "stackable" then
-                cont.items[#cont.items + 1] = {
-                    id = def.id, count = math.max(math.floor(line.count or 1), 1),
-                }
+                -- The seed obeys `max_stack` like every other list (roadmap
+                -- #67): 800 rounds is SEVEN cells, not one reading x800. The
+                -- resell loop below already split; only the seed did not, so a
+                -- fresh trader and a traded-with trader showed the same stock
+                -- in two different shapes.
+                local left = math.max(math.floor(line.count or 1), 1)
+                local maxStack = CARGO.Items.MaxStack(def)
+                while left > 0 do
+                    local put = math.min(left, maxStack)
+                    cont.items[#cont.items + 1] = { id = def.id, count = put }
+                    left = left - put
+                end
             else
                 for _ = 1, math.max(math.floor(line.count or 1), 1) do
                     local uid = CARGO.Instances.Create(def.id, line.seed)
@@ -481,7 +490,7 @@ function CARGO.Trade.Confirm(ply, trader, basket)
                 part.entry.count = (part.entry.count or 1) - part.take
             end
             local left = line.count
-            local maxStack = (CARGO.Items.Get(line.id) or {}).max_stack or math.huge
+            local maxStack = CARGO.Items.MaxStack(CARGO.Items.Get(line.id))
             -- top up the stock's own stacks first, then spill into new ones:
             -- the trader's list obeys the same max_stack the inventory does
             for _, stock in ipairs(cont.items) do

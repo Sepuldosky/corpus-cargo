@@ -23,12 +23,6 @@ local function Metrics()
     return math.Round(42 * s), math.max(math.Round(4 * s), 2)
 end
 
--- category order cache for the auto-sort
-local function CategoryOrder(catId)
-    local cat = CARGO.Items._categories[catId]
-    return cat and cat.order or 999
-end
-
 local function PaintCell(self, w, h)
     -- No filled tile behind items (author call, 2nd fullscreen pass
     -- 2026-07-12: the dark block dirtied the view — STALKER floats items on
@@ -197,17 +191,26 @@ function CARGO.Grid.Create(parent, opts)
 
         local entries = opts.getEntries() or {}
 
-        -- auto-sort: category order, then name — stable view across syncs
+        -- ORDER (roadmap #67). The player's own grid arrives with an `ord`
+        -- per entry — HIS order, stamped server-side, surviving pickups, drops
+        -- and relogs — and that is what wins. A list that carries none falls
+        -- back to the shared auto-sort criterion, which is the container and
+        -- the trader stock: a crate is not the player's to arrange.
+        --
+        -- The criterion itself lives in Items (shared) and NOT here on
+        -- purpose: it is the same one the server seeds and re-sorts `ord`
+        -- with, and a second copy on this side would go stale without a single
+        -- error. The old comparator ended in `(a.uid or "") < (b.uid or "")`,
+        -- which for two STACKS compares "" against "" — a full tie, and
+        -- table.sort is quicksort and not stable, so the x120 and the x80 of
+        -- the same ammo traded places between syncs with nothing changed.
         local sorted = {}
         for _, entry in ipairs(entries) do sorted[#sorted + 1] = entry end
         table.sort(sorted, function(a, b)
-            local da, db = CARGO.Items.Get(a.id), CARGO.Items.Get(b.id)
-            local oa = da and CategoryOrder(da.category) or 999
-            local ob = db and CategoryOrder(db.category) or 999
-            if oa ~= ob then return oa < ob end
-            local na, nb = da and da.name or a.id, db and db.name or b.id
-            if na ~= nb then return na < nb end
-            return (a.uid or "") < (b.uid or "")
+            if isnumber(a.ord) and isnumber(b.ord) and a.ord ~= b.ord then
+                return a.ord < b.ord
+            end
+            return CARGO.Items.AutoSortLess(a, b)
         end)
 
         for _, entry in ipairs(sorted) do

@@ -71,15 +71,38 @@ end
 
 CARGO.Trade.Available = Available -- the own grid (corpus_cargo_ui.lua) needs it too
 
--- What ONE left click loads (author call, 2nd in-game pass 2026-07-14): a
--- QUARTER of the item's stack ceiling, repeatable — and SHIFT+click loads
--- everything, the convention of every trade screen the author plays. A unique
--- is always 1.
+-- What ONE left click loads. Three amounts, and the middle one is roadmap #67
+-- (a unique is always 1):
+--
+--   M1              a QUARTER of the stack ceiling, repeatable — a magazine's
+--                   worth (author call, 2nd in-game pass 2026-07-14).
+--   SHIFT+M1        THE CLICKED STACK: what that cell shows, so 120 rounds.
+--   ALT+SHIFT+M1    everything of that item on that side.
+--
+-- ALT and not CTRL, and the reason is the game and not the UI (author, in-game
+-- 2026-08-19): CTRL is bound to duck. Holding it to buy ammunition makes the
+-- player crouch the moment the menu closes — a modifier for a menu must not be
+-- a movement key.
+--
+-- SHIFT used to load `Available`, the aggregate over every entry answering to
+-- the ref, so one click on one x120 cell of 9x19 loaded all 800 rounds the
+-- player was carrying and the deal jumped from a magazine to the whole
+-- reserve. The fix is NOT to name the clicked entry: stacks of the same id and
+-- condition are FUNGIBLE (120 rounds of 9x19 are 120 rounds of 9x19 whichever
+-- cell they were drawn in), so there is nothing to name and nothing would be
+-- gained by naming it. What the cell has to send is the QUANTITY it shows.
+-- Clicking the twin cell adds ITS 120 on top — which is how both stacks stay
+-- reachable, the very thing the aggregate was introduced for on 2026-07-14.
+-- The aggregate stays as the CAP (BasketAdd's `room`) and as ALT+SHIFT.
 function CARGO.Trade.ClickAmount(side, entry)
     if entry.uid then return 1 end
-    if input.IsKeyDown(KEY_LSHIFT) or input.IsKeyDown(KEY_RSHIFT) then
-        return Available(side, entry)
-    end
+
+    local shift = input.IsKeyDown(KEY_LSHIFT) or input.IsKeyDown(KEY_RSHIFT)
+    local alt = input.IsKeyDown(KEY_LALT) or input.IsKeyDown(KEY_RALT)
+
+    if shift and alt then return Available(side, entry) end
+    if shift then return math.max(1, math.floor(entry.count or 1)) end
+
     local def = CARGO.Items.Get(entry.id)
     local ceiling = istable(def) and isnumber(def.max_stack) and def.max_stack
         or Available(side, entry)

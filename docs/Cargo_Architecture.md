@@ -355,7 +355,7 @@ Mismo patrón en ambos casos — Cargo (o el módulo dueño del dato) define una
 
 ## 7. Grid de inventario y UI
 
-- **Grid uniforme**: 1 celda = 1 ítem, auto-sort por categoría, sin gestión espacial ni rotación.
+- **Grid uniforme**: 1 celda = 1 ítem, auto-sort por categoría, sin gestión espacial ni rotación. *(El auto-sort quedó enmendado por §7.2 — roadmap #67: el orden lo guarda el jugador y el criterio pasa a ser el estado inicial y el botón `Sort`.)*
 - **Overlays estándar por celda**: stack count (arriba-derecha), condición % (abajo-derecha, solo ítems con condición), icono de efecto (abajo-izquierda: hemostático, radiactividad, batería), calibre (abajo-izquierda, solo munición).
 - **Header de perfil**: identidad (Steam), facción/rango (provider Cortex), dinero (provider), retrato.
 - **Filtro por tab**: fila de tabs sobre el grid — **set fijo de 8**, agrupación de display sobre las categorías (§7.1).
@@ -414,6 +414,57 @@ Reglas de la fila:
 - Superficie shared: `Items.GetTabs()`, `Items.TabOf(category)`, `Items.MatchesTab(def, tabId)`
   (`corpus_cargo_items.lua`). El grid filtra por **tab**, no por categoría; el orden de
   auto-sort sigue siendo el `order` de la **categoría** (grano fino dentro del tab).
+
+### 7.2 El orden del grid es del JUGADOR (roadmap #67)
+
+**El problema.** El orden de una celda era una **función del contenido**: el cliente lo re-derivaba
+entero en cada `Refresh()` (categoría → nombre → uid). Tres consecuencias, y las tres se veían como
+la misma queja —*«quedan desordenados»*—:
+
+1. **Nada quedaba donde se lo ponía**, porque no había dónde guardarlo.
+2. **Cada pickup reflowaba el grid completo** bajo el cursor: un ítem nuevo corre de lugar a todos
+   los que van después de él.
+3. **Dos stacks del mismo ítem podían intercambiarse solos entre syncs.** El comparador terminaba
+   en `(a.uid or "") < (b.uid or "")`, que para dos *stacks* compara `""` contra `""`: empate
+   total. `table.sort` de Lua es quicksort y **no es estable**, así que el x120 y el x80 de la
+   misma munición cambiaban de lugar sin que nada hubiera cambiado.
+
+**CRG-72 — La POSICIÓN de una entrada es dato del jugador y se persiste; el criterio automático es
+sólo su estado inicial y un botón. Y una posición NO es una identidad: ningún ref de red la nombra.**
+
+Cada entrada de `rec.items` lleva un `ord` entero. Lo estampan los **dos funnels** del record —
+`SaveRecord` (disco) y `BuildSnapshot` (cable)—, que es lo que evita que las ~8 rutas que agregan
+una entrada tengan que acordarse cada una. Dos regímenes, y el que corre lo decide **el estado del
+propio record** y no un flag persistido (un flag puede mentir):
+
+- **Nadie tiene `ord`** (record legacy, o recién nacido) ⇒ se siembra **entero** con el criterio
+  compartido, así la primera carga se ve exactamente como antes y nadie ve su mochila revuelta por
+  la actualización.
+- **Ya hay `ord`** ⇒ sólo se estampan los recién llegados, **al final**. Eso es todo lo que hace
+  falta para que un pickup deje de mover el resto.
+
+`Inventory.SortGrid` (botón **Sort**, junto a la fila de tabs) es lo **único** en el módulo que pisa
+un `ord` que ya existe. Es un botón y no algo que un refresh haga por atrás, justamente porque
+ahora hay un orden del jugador que se puede perder.
+
+La mitad *«no es una identidad»* es lo que mantiene sano el resto: los refs siguen siendo `uid` para
+los únicos y `id`+`condition` para los stacks (CRG-6), así que un `Sort` **no puede** re-apuntar un
+intent en vuelo. Y no hace falta que lo sea: **dos entradas de stack del mismo `id` y la misma
+`condition` son fungibles** — 120 balas de 9×19 son 120 balas de 9×19 en cualquier celda —, de modo
+que lo que un clic tiene que nombrar nunca fue *cuál*, sino **cuánto**.
+
+El botón y las tres cantidades del clic quedaron **confirmados en juego el 2026-08-19**, con una enmienda: el «todo» pasa de `CTRL+SHIFT` a **`ALT+SHIFT`**, porque CTRL está bindeado a agacharse y un modificador de menú no puede ser una tecla de movimiento.
+
+**El criterio vive en UNA casa**, `Items.AutoSortLess` (shared): con él siembra y re-ordena el
+server, y a él cae el cliente para las listas que **no** traen `ord` (el contenedor y el stock del
+trader — una caja no es del jugador para acomodarla). Una copia del criterio en el cliente se
+desincroniza **sin un solo error**, que es el modo de falla que el gate de fuentes del harness
+vigila.
+
+**Un corolario del mismo bloque: una celda es un stack en TODAS las listas.** El inventario partía
+por `max_stack` desde siempre; el contenedor y la siembra de stock del trader **no**, así que una
+caja podía mostrar una celda que decía `x800`. El techo pasa a leerse en un solo lugar
+(`Items.MaxStack`) y las tres listas lo obedecen.
 
 ---
 

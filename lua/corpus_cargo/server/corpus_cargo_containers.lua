@@ -352,14 +352,65 @@ local function FindContEntry(cont, ref)
     return nil
 end
 
+-- Roadmap #67: the container splits by `max_stack`, exactly like the
+-- inventory's AddStack, and for the same reason the inventory does — ONE CELL
+-- IS ONE STACK everywhere, or the rule the player learns on his own grid stops
+-- holding the moment he opens a crate. Before this, a crate merged without a
+-- ceiling and a single cell could read x800: the SHIFT that loads "the clicked
+-- stack" would have loaded the whole pile on the loot side while behaving on
+-- the player's, which is worse than either rule applied consistently.
 local function AddContStack(cont, id, count, condition)
+    local maxStack = CARGO.Items.MaxStack(CARGO.Items.Get(id))
+
     for _, entry in ipairs(cont.items) do
-        if entry.uid == nil and entry.id == id and entry.condition == condition then
-            entry.count = (entry.count or 1) + count
-            return
+        if entry.uid == nil and entry.id == id and entry.condition == condition
+            and (entry.count or 1) < maxStack then
+            local room = maxStack - (entry.count or 1)
+            local moved = math.min(room, count)
+            entry.count = (entry.count or 1) + moved
+            count = count - moved
+            if count <= 0 then return end
         end
     end
-    cont.items[#cont.items + 1] = { id = id, count = count, condition = condition }
+    while count > 0 do
+        local put = math.min(count, maxStack)
+        cont.items[#cont.items + 1] = { id = id, count = put, condition = condition }
+        count = count - put
+    end
+end
+
+-- A stack ref names a QUANTITY, not a cell (roadmap #67). `max_stack` splits a
+-- pile into several entries and they are FUNGIBLE — 120 rounds of 9x19 are 120
+-- rounds of 9x19 whichever cell they were drawn in — so a click asking for 120
+-- has to get 120 even when the entry it resolved to only holds the 80 of the
+-- remainder. Without these two, splitting the container would have introduced
+-- exactly that wart: click the x120 cell, receive 80, no error anywhere.
+local function StackTotal(list, ref)
+    local total = 0
+    for _, e in ipairs(list) do
+        if e.uid == nil and e.id == ref.id and e.condition == ref.condition then
+            total = total + (e.count or 1)
+        end
+    end
+    return total
+end
+
+-- Drains `count` units across as many entries as it takes and drops the ones
+-- it empties. Walks BACKWARDS so table.remove cannot skip an entry, and so the
+-- newest cell is the one that shrinks. Returns what it actually took.
+local function DrainStack(list, ref, count)
+    local left = count
+    for i = #list, 1, -1 do
+        if left <= 0 then break end
+        local e = list[i]
+        if e.uid == nil and e.id == ref.id and e.condition == ref.condition then
+            local take = math.min(e.count or 1, left)
+            e.count = (e.count or 1) - take
+            left = left - take
+            if e.count <= 0 then table.remove(list, i) end
+        end
+    end
+    return count - left
 end
 
 local function EntryWeight(entry, count)
@@ -379,12 +430,12 @@ local function TransferOne(ply, cont, dir, ref, count)
             if not ok then return false, "too heavy" end
             table.remove(cont.items, idx)
         else
-            count = math.Clamp(math.floor(count or entry.count or 1), 1, entry.count or 1)
+            local total = StackTotal(cont.items, ref)
+            count = math.Clamp(math.floor(count or total), 1, total)
             local ok = CARGO.Inventory.GiveEntry(ply,
                 { id = entry.id, count = count, condition = entry.condition })
             if not ok then return false, "too heavy" end
-            entry.count = (entry.count or 1) - count
-            if entry.count <= 0 then table.remove(cont.items, idx) end
+            DrainStack(cont.items, ref, count)
         end
         return true
     end
@@ -403,7 +454,12 @@ local function TransferOne(ply, cont, dir, ref, count)
     end
     if entry == nil then return false end
 
-    count = entry.uid and 1 or math.Clamp(math.floor(count or entry.count or 1), 1, entry.count or 1)
+    if entry.uid then
+        count = 1
+    else
+        local total = StackTotal(rec.items, ref)
+        count = math.Clamp(math.floor(count or total), 1, total)
+    end
     if cont.capacity ~= nil
         and ContainerWeight(cont) + EntryWeight(entry, count) > cont.capacity then
         return false, "the container can't hold more weight"
@@ -413,8 +469,7 @@ local function TransferOne(ply, cont, dir, ref, count)
         table.remove(rec.items, idx)
         cont.items[#cont.items + 1] = { id = entry.id, uid = entry.uid }
     else
-        entry.count = (entry.count or 1) - count
-        if entry.count <= 0 then table.remove(rec.items, idx) end
+        DrainStack(rec.items, ref, count)
         AddContStack(cont, entry.id, count, entry.condition)
     end
     return true
@@ -450,12 +505,24 @@ net.Receive(NET_TAKEALL, function(_, ply)
     local cont = ViewedContainer(ply, contId)
     if cont == nil or (dir ~= "take" and dir ~= "put") then return end
 
-    -- snapshot of refs first: TransferOne mutates the source list
-    local refs = {}
+    -- Snapshot of refs first: TransferOne mutates the source list. DEDUPED by
+    -- RefKey, and that is a bug fix and not tidiness: a stack ref names a
+    -- QUANTITY, not a cell (roadmap #67), so with `max_stack` splitting 800
+    -- rounds into seven entries the FIRST ref moves all seven and the other six
+    -- resolve to nothing — which this loop reads as "blocked" and announces as
+    -- a failure that never happened. It was live on the PUT direction before
+    -- #67 (the player's grid always split), and #67 makes the container split
+    -- too, so it would have reached Take all as well.
+    local refs, seen = {}, {}
     local source = dir == "take" and cont.items or CARGO.Inventory.GetRecord(ply).items
     for _, entry in ipairs(source) do
-        refs[#refs + 1] = entry.uid and { uid = entry.uid }
+        local ref = entry.uid and { uid = entry.uid }
             or { id = entry.id, condition = entry.condition }
+        local key = CARGO.Trade.RefKey(ref)
+        if not seen[key] then
+            seen[key] = true
+            refs[#refs + 1] = ref
+        end
     end
 
     local blocked = false

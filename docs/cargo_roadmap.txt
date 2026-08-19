@@ -1924,3 +1924,174 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     la camara y las baterias. El reparto que ese doc escribio —«lo que se usa en
     panico va a una tecla, lo que se gasta despacio va con barrita»— YA NO HACE
     FALTA: con la (b) votada, un unique con usos tiene las dos cosas.
+
+
+67. EL ORDEN DEL GRID Y EL STACK QUE UN CLIC NOMBRA [Cargo ui/inventory/trade]
+    — CERRADO Y ESCRITO el 2026-08-19 (votos del autor en la misma pasada),
+    PASADA EN JUEGO PENDIENTE. CHANGELOG 70.
+
+    LO QUE PIDIO EL AUTOR: (a) que los items dejen de quedar desordenados y que
+    el inventario GUARDE la posicion de cada uno, aunque el grid sea infinito
+    porque el limitante es el peso; (b) que apretar sobre un stack de municion
+    opere sobre ESE stack (120 balas de pistola) y no sobre las 800 que hay en
+    la mochila, dejando M1 como esta (un cargador, 30) y SHIFT+M1 como el stack.
+
+    LOS DOS PEDIDOS TENIAN LA MISMA RAIZ y no era la que parecia: una entrada
+    de stack no tiene identidad (los unicos llevan uid, los stacks se nombran
+    por id+condition). PERO para el comercio la identidad resulto INNECESARIA:
+    dos stacks del mismo id y condition son FUNGIBLES, asi que lo que un clic
+    manda no es CUAL sino CUANTO. La identidad hacia falta solo para la
+    posicion, y ahi se llama `ord` y NO viaja en ningun ref.
+
+    LA PREMISA QUE ERA FALSA, y medirla fue lo que ahorro el bloque: «tal vez a
+    la municion le falta informacion para separar stacks» — no le falta.
+    AddStack parte por max_stack desde el Block 1 y las 800 balas YA eran siete
+    entradas de 120/.../80. Lo que faltaba no era partir: era no volver a
+    sumarlas al hacer clic.
+
+    VOTOS DEL AUTOR (2026-08-19):
+      - Posicion: NIVEL 1 — orden persistido, SIN arrastrar. No hay slot de
+        celda ni colision de footprints; la enmienda del 2026-07-11 («el
+        footprint es solo render, sin gestion espacial») SIGUE EN PIE.
+      - SHIFT+M1 = el stack clicado; CTRL+SHIFT+M1 = todo (el viejo).
+      - Contenedores y stock del trader TAMBIEN parten por max_stack: una celda
+        es un stack en todas las listas.
+
+    LO ESCRITO: `ord` por entrada estampado por los DOS funnels del record
+    (SaveRecord y BuildSnapshot), `Items.MaxStack` + `Items.AutoSortLess` en
+    shared (una sola casa para el techo y para el criterio), boton Sort junto a
+    las tabs, las tres cantidades de ClickAmount, y el derrame sobre las
+    entradas que respaldan un ref en la transferencia de contenedores.
+    Sede de diseno: Cargo_Architecture.md §7.2, cita CRG-72.
+
+    DOS DEFECTOS VIVOS QUE NADIE PIDIO, y salieron de medir el alcance:
+      - El comparador del grid terminaba en `(a.uid or "") < (b.uid or "")`,
+        que para dos stacks compara "" contra "": empate total, y table.sort de
+        Lua NO es estable. El x120 y el x80 de la misma municion se cambiaban
+        de lugar entre syncs sin que nada cambiara.
+      - Take all / Move all avisaba «no pude mover todo» sobre operaciones que
+        habian funcionado ENTERAS: la lista de refs traia uno por entrada, el
+        primero se llevaba las siete y los otros seis no resolvian nada — que
+        ese loop lee como «bloqueado». Vivo desde antes de este bloque del lado
+        `put`, porque el grid del jugador siempre partio.
+
+
+68. EL REF DE UN STACK NOMBRA LA PRIMERA ENTRADA, NO LA CELDA QUE APRETASTE
+    [Cargo inventory/ui, bug] — DIAGNOSTICADO 2026-08-19 contra el codigo vivo,
+    SIN DISENAR. Es la sesion que sigue.
+
+    LO QUE REPORTO EL AUTOR (en juego, 2026-08-19): «al meter al belt, ese que
+    tiene 107 se mete otro de 120» y «bote toda mi municion de pistola del grid
+    y salieron 6 items en vez de los 4 que tengo en el grid».
+
+    NO SE ESTAN CREANDO BALAS. La conservacion se cumple; lo que no se cumple
+    es CUAL entrada se mueve. `FindEntry` (corpus_cargo_inventory.lua) resuelve
+    un ref de stack —{ id, condition }— contra la PRIMERA entrada que empareja.
+    El cliente manda ese ref desde la celda que apretaste, pero la celda no
+    viaja: el server agarra la primera de la fila.
+      · BeltSet: arrastras la celda de x107 y el server mueve la primera
+        entrada de 9x19, que tiene 120. El slot muestra 120. Ese es el sintoma
+        exacto que reportaste.
+      · DropEntry: clampea `count` al `entry.count` de la PRIMERA. Botar la
+        celda de 107 saca 107 de una de 120 y deja un resto de 13, que se
+        convierte en un item mas en el piso. Simulado sobre [120,120,120,107]:
+        5 items de piso y 467 balas — mas items que celdas, mismo total.
+    CINCO caminos comparten `FindEntry` y todos dicen «la primera»: UseEntry,
+    DropEntry, BeltSet, el equip y el attach a sub-slot. Los DOS que si quedaron
+    bien son los que el #67 toco a proposito, porque ahi la semantica correcta
+    es de CANTIDAD y no de celda: el basket del trade y la transferencia de
+    contenedores.
+
+    LA PREGUNTA DEL AUTOR — «¿cada stack de 120 podria ser un blob propio que
+    sume balas hasta 120?». Se puede (es `class = "unique"` + Instances.Create
+    por stack) pero es la herramienta cara y equivocada: un blob existe para
+    guardar HISTORIA (condicion, attachments, clip1) y dos stacks de 9x19 no
+    tienen ninguna historia que los distinga. Costaria un blob persistido por
+    stack de municion en el record, rotacion de uid en cada merge y cada split,
+    y romperia el espejo cinturon-pool, que esta construido sobre «N balas del
+    tipo T» y no sobre «este monton». Arreglaria el sintoma, pero pagando con un
+    objeto de persistencia lo que resuelve un CAMPO.
+
+    LO QUE HACE FALTA DE VERDAD: que el ref pueda nombrar la celda. Dos formas.
+      (a) Reusar `ord` (#67): ya existe, ya se persiste, ya viaja en el
+          snapshot. Barato. Contra: un `Sort` re-escribe los `ord`, asi que un
+          ref en vuelo queda viejo — cae al comportamiento de hoy, no peor,
+          pero debilita la mitad «una posicion NO es una identidad» de CRG-72.
+      (b) Un `sid` estable por entrada, separado de `ord`: se acuña una vez y
+          no se reasigna nunca, asi que sobrevive al Sort y CRG-72 queda
+          intacta.
+    RECOMENDACION: (b), y el motivo no es el purismo — es que el NIVEL 2 (#70)
+    necesita exactamente lo mismo. Un intent de arrastre tiene que decir «mové
+    ESTA celda al slot 12», y eso es un ref que nombra una celda. `sid` se paga
+    una vez y cierra los dos frentes.
+
+    Y OJO CON EL ALCANCE: el arreglo es POR CAMINO, no global. Belt, drop, use,
+    equip y sub-slot pasan a nombrar la celda; trade y transferencia CONSERVAN
+    la semantica de cantidad (el agregado es lo que mantiene alcanzable al stack
+    gemelo — informe en juego 2026-07-14).
+
+    LO QUE NO ES UN BUG, para no perseguirlo: que exista un stack de 107 es
+    correcto. `AbsorbType` del pool (corpus_cargo_ammopool.lua) devuelve al
+    cinturon lo que sale de un cargador hasta el techo y derrama el resto al
+    grid via GiveOrDrop -> AddStack, que mergea bajo `max_stack`. Un 107 es una
+    descarga que volvio, no municion mal partida.
+
+
+69. LOS CONTENEDORES: EL CLIC DEBERIA TRANSFERIR, Y SHIFT+M1 TODO
+    [Cargo ui/containers] — PEDIDO DEL AUTOR 2026-08-19, SIN DISENAR. Va
+    despues del #68.
+
+    LO QUE PIDIO: «m1 en el inventario deberia enviar al otro contenedor o mi
+    inventario, deberia funcionar el shift+m1 para enviar todo el item de un
+    lado al otro».
+
+    ESTADO REAL HOY (corpus_cargo_ui.lua): estando en Loot, M1 sobre una celda
+    YA transfiere —manda `entry.count or 1`, o sea el stack entero de esa
+    celda— y el click derecho abre el menu de cantidad (1 / cantidad... / stack
+    entero). O sea que la mitad del pedido ya esta y lo que falta es la
+    GRADACION, que ademas quedo INCONSISTENTE con el trade despues del #67:
+    ahi un clic carga un cuarto del techo y SHIFT el stack. Dos pantallas del
+    mismo modulo con dos gramaticas distintas para el mismo gesto.
+
+    LO QUE HAY QUE VOTAR CON EL AUTOR: si la gramatica se unifica con la del
+    trade (M1 = un cuarto del techo, SHIFT+M1 = el stack clicado, ALT+SHIFT+M1
+    = todo) o si el loot se queda con «M1 = el stack, SHIFT+M1 = todo lo de ese
+    item», que es lo que la frase del pedido dice literalmente. Son dos
+    convenciones legitimas; lo que no puede quedar es una en cada pantalla.
+
+    DEPENDE DEL #68 en una parte: «todo lo de ese item» sobre un lado que
+    tiene varias entradas es una cantidad agregada, y eso ya funciona; pero
+    «el stack clicado» necesita que el ref nombre la celda.
+
+
+70. NIVEL 2 DEL GRID: POSICIONES REALES [Cargo ui/inventory] — PEDIDO DEL
+    AUTOR 2026-08-19, SIN DISENAR. Es la ultima de las tres sesiones.
+
+    POR QUE: el #67 le saco al orden el ser una funcion del contenido, pero el
+    autor lo miro en juego y «igual se ve medio desordenado». La causa que el
+    #67 NO toco es el empaque: el DIconLayout es flex-wrap y la altura de una
+    fila es la del tile mas alto, asi que un 1x1 al lado de un rifle 2x3 deja
+    celdas muertas debajo del chico que no las ocupa nadie. Eso no se arregla
+    ordenando: se arregla dandole a cada item una CELDA.
+
+    QUE INVOLUCRA (relevado, no disenado):
+      · Un `slot` por entrada (indice fila-mayor sobre un ancho FIJO de
+        columnas, alto infinito — el limitante sigue siendo el peso, no el
+        espacio).
+      · Cambiar el DIconLayout por un canvas de posicion absoluta.
+      · Colision de footprints w x h: colocar, rechazar, o empujar.
+      · Re-empaque al cargar si el ancho de columnas cambio (resolucion
+        distinta, mochila distinta) — un `slot` guardado con otro ancho apunta
+        a otro lado.
+      · El boton Sort pasa de re-ordenar a EMPAQUETAR.
+      · Un ref que nombre la celda para el intent de arrastre: ES EL MISMO
+        `sid` del #68. Hacer el #68 primero no es orden arbitrario, es que
+        paga la mitad de este.
+
+    Y HAY QUE DECIRLO EXPLICITO: esto ENMIENDA la decision del 2026-07-11 («el
+    footprint es solo render, sin gestion espacial, el costo de cargar es peso
+    y no espacio»). La primera mitad se cae —va a haber gestion espacial—; la
+    segunda NO: el grid sigue siendo infinito hacia abajo y el techo sigue
+    siendo el peso. Que quede escrito cual de las dos mitades se enmienda es
+    justo lo que evita que dentro de un mes alguien lea la enmienda como
+    permiso para poner un limite de casillas.

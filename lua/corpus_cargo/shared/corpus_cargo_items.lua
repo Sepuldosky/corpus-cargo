@@ -130,6 +130,72 @@ function CARGO.Items.MatchesTab(def, tabId)
 end
 
 -- ------------------------------------------------------------------
+-- Stack ceiling and auto-sort criterion (roadmap #67).
+--
+-- Both live HERE, shared, for the same reason: each is read from the two
+-- realms and from four files. A ceiling re-typed at the call site is how the
+-- container ended up merging without one while the inventory split by it; a
+-- criterion re-typed on the client is how the grid would drift from the order
+-- the server stamped. Neither drift raises a single error.
+-- ------------------------------------------------------------------
+
+-- Sane ceiling. NO max_stack declared = unlimited, which is what every reader
+-- meant by `def.max_stack or math.huge`. A DECLARED ceiling under 1 is a def
+-- bug and floors at 1: 0 would spin the split loops of the inventory and the
+-- container forever, and a hang is a worse answer than a stack of one.
+function CARGO.Items.MaxStack(def)
+    if not istable(def) then return math.huge end
+    local m = tonumber(def.max_stack)
+    if m == nil then return math.huge end
+    return math.max(math.floor(m), 1)
+end
+
+local UNKNOWN_ORDER = 999
+
+local function CatOrder(def)
+    if not istable(def) then return UNKNOWN_ORDER end
+    local cat = CARGO.Items._categories[def.category]
+    return cat and cat.order or UNKNOWN_ORDER
+end
+
+-- Strict weak order over ENTRIES (not defs), and the ONE house of the
+-- criterion: the server seeds and rewrites `ord` with it (roadmap #67) and the
+-- client falls back to it for the lists that carry no `ord` — the container and
+-- the trader stock, which are not the player's to arrange.
+--
+-- The last three keys are not decoration. `table.sort` in Lua is quicksort and
+-- is NOT stable: two entries that tie in every key it compares are free to swap
+-- places on every single refresh. That is what made the x120 and the x80 of the
+-- same ammo trade places between syncs with nothing having changed, and it is
+-- why the order has to be TOTAL over everything the player can tell apart on
+-- screen. Two entries that tie even in count are interchangeable by
+-- construction: their swap is invisible.
+function CARGO.Items.AutoSortLess(a, b)
+    if not istable(a) or not istable(b) then return false end
+
+    local da, db = CARGO.Items.Get(a.id), CARGO.Items.Get(b.id)
+
+    local oa, ob = CatOrder(da), CatOrder(db)
+    if oa ~= ob then return oa < ob end
+
+    local na = da and da.name or tostring(a.id)
+    local nb = db and db.name or tostring(b.id)
+    if na ~= nb then return na < nb end
+
+    if a.id ~= b.id then return tostring(a.id) < tostring(b.id) end
+
+    local ua, ub = a.uid or "", b.uid or ""
+    if ua ~= ub then return ua < ub end
+
+    -- better condition first, then the bigger pile first
+    local ca = isnumber(a.condition) and a.condition or -1
+    local cb = isnumber(b.condition) and b.condition or -1
+    if ca ~= cb then return ca > cb end
+
+    return (a.count or 1) > (b.count or 1)
+end
+
+-- ------------------------------------------------------------------
 -- Item registration.
 --
 -- Base schema (Cargo owns — Cargo_Architecture.md §3):

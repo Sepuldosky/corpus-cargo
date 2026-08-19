@@ -33,6 +33,7 @@ local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
 local NET_BELT_MOVE = Corpus.Net.Register("cargo", "belt_move")
 local NET_UNLOAD    = Corpus.Net.Register("cargo", "unload")
 local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
+local NET_SORT      = Corpus.Net.Register("cargo", "sort")
 
 local cvKey = CreateClientConVar("cargo_key_inventory", tostring(KEY_I), true, false,
     "Key (KEY_* enum) that opens the Cargo inventory")
@@ -101,6 +102,9 @@ end
 local function SendEquipDrop(slotId)
     net.Start(NET_EQUIP_DROP) net.WriteString(slotId) net.SendToServer()
     CARGO.Sounds.Play("drop")
+end
+local function SendSort()
+    net.Start(NET_SORT) net.SendToServer()
 end
 
 -- ------------------------------------------------------------------
@@ -285,7 +289,14 @@ local function OpenItemMenu(entry)
         end
     end
 
-    if isfunction(def.onUse) and def.class == "stackable" then
+    -- Quick bind is NOT stackable-only any more (roadmap #66): a unique with
+    -- an onUse is precisely what belongs on a key — a jar of pills taken
+    -- mid-panic. The `class == "stackable"` gate that used to be here was also
+    -- HALF a gate: the drag-and-drop receiver on the quick cell (below) never
+    -- had it, so a unique could already be bound by dragging it and the key
+    -- then failed forever. The server resolves the id to an instance on each
+    -- press (QuickTarget), so both routes now lead to the same place.
+    if isfunction(def.onUse) then
         local sub = menu:AddSubMenu("Quick bind...")
         for n = 1, CARGO.Slots.QUICK_COUNT do
             sub:AddOption("F" .. n, function() SendQuickBind(n, entry.id) end)
@@ -506,13 +517,18 @@ end
 -- Quick slot cells
 -- ------------------------------------------------------------------
 
--- exported: the wheel's quick chips (#31) show the same count
+-- exported: the wheel's quick chips (#31) show the same count.
+-- BOTH CLASSES COUNT (roadmap #66): a unique is one unit and carries no
+-- `count` field, and skipping them painted a red "x0" over a bag holding two
+-- jars — the client half of the same defect the server's QuickTarget fixes.
 function CARGO.UI.QuickCount(itemId)
     local snap = S()
     if snap == nil or itemId == nil then return 0 end
     local n = 0
     for _, entry in ipairs(snap.items or {}) do
-        if entry.uid == nil and entry.id == itemId then n = n + (entry.count or 1) end
+        if entry.id == itemId then
+            n = n + (entry.uid ~= nil and 1 or (entry.count or 1))
+        end
     end
     return n
 end
@@ -846,6 +862,30 @@ local function BuildTabs(bar)
         end
         x = x + bw + 6
     end
+
+    -- Sort (roadmap #67). Now that the grid keeps the player's order, putting
+    -- it back in category order has to be something he PRESSES — it is the one
+    -- thing in the module that rewrites an `ord` that already exists, and it
+    -- must never be something a refresh does behind him. Right-aligned on the
+    -- last row, dropping to a row of its own if the tabs already reach that
+    -- far (the tiny-resolution wrap the loop above guards for).
+    surface.SetFont("CargoSmall")
+    local sortW = surface.GetTextSize("Sort") + 22
+    local sortX = math.max(barW - sortW, 0)
+    if x > sortX then rowY = rowY + 26 end
+    local sortBtn = vgui.Create("DButton", bar)
+    sortBtn:SetText("")
+    sortBtn:SetPos(sortX, rowY)
+    sortBtn:SetSize(sortW, 24)
+    sortBtn.Paint = function(self, w, h)
+        surface.SetDrawColor(T.Colors.borderHi)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+        draw.SimpleText("Sort", "CargoSmall", w / 2, h / 2,
+            self:IsHovered() and T.Colors.accent or T.Colors.textDim,
+            TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+    sortBtn.DoClick = SendSort
+
     bar:SetTall(rowY + 26)
 end
 
