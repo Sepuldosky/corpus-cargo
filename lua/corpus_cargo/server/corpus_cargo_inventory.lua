@@ -255,21 +255,39 @@ end
 -- refresh (§7 auto-sort), so nothing the player put somewhere could stay there
 -- and every pickup reflowed the grid under the cursor.
 --
--- It is NOT an identity, and that is deliberate: no ref on the wire names it
--- (CRG-6 refs stay `uid` / `id`+`condition`), so a re-sort can never re-target
--- an intent already in flight. Two stack entries of the same id and condition
--- are FUNGIBLE — 120 rounds of 9x19 are 120 rounds of 9x19 whichever cell they
--- were drawn in — so naming a stack was never the question. Naming a QUANTITY
--- was, and that is the client's side of #67.
+-- `ord` is NOT an identity, and that is deliberate: the Sort button rewrites
+-- every one of them at once, so an intent that named an `ord` could be
+-- re-targeted by a re-sort landing between the click and the packet. That is
+-- the whole reason #68 did not reuse this field for naming a cell.
+--
+-- `cid` IS the identity, and it is the other half of this same header (CRG-73,
+-- roadmap #68): one integer per entry, minted once here and never reassigned,
+-- which is what lets a click name the CELL it landed on instead of the first
+-- entry that happens to match. Two things make it work, and both are
+-- deliberate:
+--   · Sort never touches it. It rewrites `ord` and only `ord`, so the player
+--     can re-arrange his bag without invalidating an intent already in flight.
+--   · The counter lives ON THE RECORD, is persisted, and only ever counts up.
+--     Deriving "the highest cid plus one" from the live entries would recycle
+--     the number of an entry that just left, and a recycled number is the one
+--     thing that would let a stale intent fire on a cell the player never
+--     clicked — the exact failure this field exists to prevent.
+--
+-- Two stack entries of the same id and condition stay FUNGIBLE whenever the
+-- question is a QUANTITY — 120 rounds of 9x19 are 120 rounds of 9x19 whichever
+-- cell they were drawn in — and that is why the trade basket and the container
+-- transfer keep aggregating (#67) while the five paths that MOVE a cell resolve
+-- through the `cid` (#68). Those are two different questions, not two answers
+-- to one, and over there the aggregate is what keeps the twin stack reachable.
 --
 -- The two funnels stamp: SaveRecord (disk) and BuildSnapshot (wire). Every
 -- mutation path in this file ends in one of them, which is why the ~8 places
 -- that append an entry do not each have to remember.
 -- ------------------------------------------------------------------
 
-local function StampOrder(rec)
-    if not istable(rec) or not istable(rec.items) then return end
-
+-- WHERE an entry sits. Two regimes, read off the record's own state — see the
+-- header above.
+local function StampOrd(rec)
     local maxOrd, stamped = 0, 0
     for _, entry in ipairs(rec.items) do
         if isnumber(entry.ord) then
@@ -302,6 +320,39 @@ local function StampOrder(rec)
     end
 end
 
+-- WHICH entry it is (CRG-73). Monotonic, persisted on the record, never reused
+-- - the header above says why reuse is the failure mode this field exists to
+-- prevent.
+local function StampCid(rec)
+    local nextCid = isnumber(rec.cidNext) and rec.cidNext or 1
+
+    -- A record that carries cids but arrived WITHOUT its counter - a file
+    -- written before this field existed, a LAN import that rebuilt its entries
+    -- from scratch - must not hand out a number that is already on the table.
+    -- The counter is authoritative when it is the higher of the two and the
+    -- entries are when they are; taking the max of both is what makes the
+    -- seeding safe from either direction.
+    for _, entry in ipairs(rec.items) do
+        if isnumber(entry.cid) and entry.cid >= nextCid then nextCid = entry.cid + 1 end
+    end
+
+    for _, entry in ipairs(rec.items) do
+        if not isnumber(entry.cid) then
+            entry.cid = nextCid
+            nextCid = nextCid + 1
+        end
+    end
+    rec.cidNext = nextCid
+end
+
+-- THE funnel. One guard, then the two independent stamps: position and identity
+-- are different questions and neither reads the other.
+local function StampEntries(rec)
+    if not istable(rec) or not istable(rec.items) then return end
+    StampOrd(rec)
+    StampCid(rec)
+end
+
 -- Re-sorts the grid with the SHARED criterion, on the player's say-so. The
 -- only thing in the module that rewrites an `ord` that already exists.
 function CARGO.Inventory.SortGrid(ply)
@@ -321,7 +372,7 @@ function CARGO.Inventory.SaveRecord(ply)
     local rec = CARGO.Inventory._records[SteamKey(ply)]
     if rec == nil then return end
 
-    StampOrder(rec)
+    StampEntries(rec)
 
     -- RENDER (CRG-56/57), the same routine the persistent container runs:
     -- `instances` is rebuilt from scratch out of _live on every save, so a uid
@@ -410,17 +461,59 @@ local function AddStack(rec, id, count, condition)
 end
 
 -- ref from the client: { uid = "..." } for uniques, { id = "...",
--- condition = n|nil } for stacks. Returns index, entry.
+-- condition = n|nil } for stacks, plus `cid` when the intent names one specific
+-- CELL (CRG-73, roadmap #68). Returns index, entry.
+--
+-- THE `cid` CONJUNCT IS THE WHOLE OF #68. A ref that carries one resolves to
+-- THAT cell and to no other, and it deliberately does NOT fall back to the
+-- first match: the fallback IS the bug the author reported on 2026-08-19 - drag
+-- the cell that says x107 onto the belt and the belt fills with the 120 of the
+-- first 9x19 entry, because the cell never travelled in the ref. Same defect,
+-- other symptom: DropEntry clamped `count` to the first entry, so dropping the
+-- 107 took 107 out of a 120 and left a remainder of 13 - one more item on the
+-- floor than there were cells in the grid, with the total conserved.
+--
+-- A ref WITHOUT a cid keeps resolving against the first match, and that is not
+-- a leftover: savegames, the LAN import (CRG-61) and every entry CleanStack
+-- rebuilds from scratch send refs with no cid, and a ref that cannot name a
+-- cell must never become unreachable.
+--
+-- id and condition are still matched on the way through. A `cid` alone would be
+-- enough on a healthy record, and checking all three is what makes it enough on
+-- an unhealthy one too: a number that somehow pointed at another item could
+-- never fire.
 local function FindEntry(rec, ref)
     if not istable(ref) then return nil end
     for i, entry in ipairs(rec.items) do
         if ref.uid ~= nil then
             if entry.uid == ref.uid then return i, entry end
-        elseif entry.uid == nil and entry.id == ref.id and entry.condition == ref.condition then
+        elseif entry.uid == nil and entry.id == ref.id and entry.condition == ref.condition
+            and (ref.cid == nil or entry.cid == ref.cid) then
             return i, entry
         end
     end
     return nil
+end
+
+-- The five paths that MOVE a named cell - equip, use, drop, belt, sub-slot -
+-- resolve through this instead of calling FindEntry directly. A ref that names
+-- a cell and misses it must not fall back (that is #68) and must not fail
+-- MUTELY either, or a click the player really did make reads as a dead button:
+-- author vote 2026-08-19. The cell can legitimately be gone by the time the
+-- packet lands - another path merged it, spent it or emptied it.
+--
+-- Returns index, entry, stale. `stale` is true ONLY when the ref did name a
+-- cell, so each caller keeps its own wording for the ordinary miss instead of
+-- printing two notices for one failure.
+local function FindCell(ply, rec, ref)
+    local idx, entry = FindEntry(rec, ref)
+    if entry ~= nil then return idx, entry, false end
+
+    local stale = istable(ref) and ref.cid ~= nil
+    if stale then
+        CARGO.Inventory.Notice(ply, "That stack is no longer in that cell.")
+    end
+    return nil, nil, stale
 end
 
 -- Inserts an existing entry (from a container, drop pickup or ejection).
@@ -668,16 +761,19 @@ end
 
 local function EntrySnapshot(entry)
     if entry.uid then
-        return { id = entry.id, uid = entry.uid, ord = entry.ord,
+        return { id = entry.id, uid = entry.uid, ord = entry.ord, cid = entry.cid,
             blob = CARGO.Instances.Get(entry.uid) }
     end
+    -- `cid` rides so the client can name back the cell it drew (#68). It rides
+    -- on the unique too, even though its ref is the uid: #70 addresses a DRAG
+    -- by cell, and a field only some cells carry would be a second rule.
     return { id = entry.id, count = entry.count or 1, condition = entry.condition,
-        ord = entry.ord }
+        ord = entry.ord, cid = entry.cid }
 end
 
 function CARGO.Inventory.BuildSnapshot(ply)
     local rec = CARGO.Inventory.GetRecord(ply)
-    StampOrder(rec) -- the wire funnel (see StampOrder): a cell without an `ord`
+    StampEntries(rec) -- the wire funnel (see StampEntries): a cell without an `ord`
                     -- would fall back to the auto-sort and drift from the rest
     local snap = { items = {}, equip = {}, quick = rec.quick, belt = rec.belt }
 
@@ -1082,9 +1178,12 @@ end
 
 function CARGO.Inventory.Equip(ply, ref, slotId)
     local rec = CARGO.Inventory.GetRecord(ply)
-    local idx, entry = FindEntry(rec, ref)
+    local idx, entry, stale = FindCell(ply, rec, ref)
     if entry == nil then
-        CARGO.Inventory.Notice(ply, "That item is not in your inventory.")
+        -- FindCell already spoke for the stale cell; this is the other miss
+        if not stale then
+            CARGO.Inventory.Notice(ply, "That item is not in your inventory.")
+        end
         return false
     end
 
@@ -1157,7 +1256,7 @@ end
 -- interprets what the item did.
 function CARGO.Inventory.UseEntry(ply, ref)
     local rec = CARGO.Inventory.GetRecord(ply)
-    local idx, entry = FindEntry(rec, ref)
+    local idx, entry = FindCell(ply, rec, ref)
     if entry == nil then return false end
 
     local def = CARGO.Items.Get(entry.id)
@@ -1190,7 +1289,7 @@ end
 
 function CARGO.Inventory.DropEntry(ply, ref, count)
     local rec = CARGO.Inventory.GetRecord(ply)
-    local idx, entry = FindEntry(rec, ref)
+    local idx, entry = FindCell(ply, rec, ref)
     if entry == nil then return false end
 
     local dropped
@@ -1392,7 +1491,13 @@ local function QuickTarget(rec, itemId)
     best = best or first
     if best == nil then return nil end
     if best.uid then return { uid = best.uid } end
-    return { id = best.id, condition = best.condition }
+    -- The `cid` is not decoration here: this function PICKED one entry out of
+    -- several and the ref has to be able to say which one. Without it the rule
+    -- above chooses the most-worn jar and then hands UseEntry a ref that
+    -- resolves to the FIRST - the selection would be computed and discarded.
+    -- This is the second and last place in the module that builds a stack ref
+    -- by hand; the other is Grid.RefOf on the client (#68).
+    return { id = best.id, condition = best.condition, cid = best.cid }
 end
 
 function CARGO.Inventory.QuickUse(ply, slotN)
@@ -1439,7 +1544,7 @@ function CARGO.Inventory.BeltSet(ply, slotN, ref)
     if slotN < 1 or slotN > CARGO.Slots.BELT_COUNT then return end
     local rec = CARGO.Inventory.GetRecord(ply)
 
-    local idx, entry = FindEntry(rec, ref)
+    local idx, entry = FindCell(ply, rec, ref)
     if entry == nil or entry.uid ~= nil then return end
 
     local def = CARGO.Items.Get(entry.id)
@@ -1579,7 +1684,7 @@ function CARGO.Inventory.SubSlotAttach(ply, hostUid, subId, ref)
         return
     end
 
-    local idx, entry = FindEntry(rec, ref)
+    local idx, entry = FindCell(ply, rec, ref)
     if entry == nil then return end
     local def = CARGO.Items.Get(entry.id)
     if def == nil or not CARGO.Items.MatchesFilter(def, spec.filter) then

@@ -1980,8 +1980,9 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 
 
 68. EL REF DE UN STACK NOMBRA LA PRIMERA ENTRADA, NO LA CELDA QUE APRETASTE
-    [Cargo inventory/ui, bug] — DIAGNOSTICADO 2026-08-19 contra el codigo vivo,
-    SIN DISENAR. Es la sesion que sigue.
+    [Cargo inventory/ui, bug] — CERRADO Y ESCRITO el 2026-08-19 (los dos votos
+    del autor tomados antes de escribir una linea), PASADA EN JUEGO PENDIENTE.
+    CHANGELOG 71. Sede de diseno: Cargo_Architecture.md §7.3, cita CRG-73.
 
     LO QUE REPORTO EL AUTOR (en juego, 2026-08-19): «al meter al belt, ese que
     tiene 107 se mete otro de 120» y «bote toda mi municion de pistola del grid
@@ -2027,6 +2028,38 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     necesita exactamente lo mismo. Un intent de arrastre tiene que decir «mové
     ESTA celda al slot 12», y eso es un ref que nombra una celda. `sid` se paga
     una vez y cierra los dos frentes.
+
+    VOTOS DEL AUTOR (2026-08-19), tomados ANTES de escribir:
+      - (b), el campo estable. En el codigo se llama `cid` y no `sid`: `sid`
+        significa SteamID en las 40 apariciones que tiene el modulo, cuatro de
+        ellas en GetRecord, que es la funcion vecina de la que lo hospeda.
+      - La celda perdida FALLA Y AVISA, no cae a la primera. Cae un clic en una
+        carrera rara; lo que se compra es que si algo se mueve, es la celda que
+        apretaste.
+
+    LO ESCRITO: `cid` estable por entrada, acuñado una vez en el mismo funnel
+    del `ord` (StampEntries -> StampOrd + StampCid, llamado por SaveRecord y
+    BuildSnapshot) y nunca reasignado, con el contador EN EL RECORD y persistido
+    porque derivarlo de lo vivo reciclaria numeros; FindEntry honra el `cid` y
+    sigue cayendo a la primera cuando el ref no lo trae (savegames, import LAN);
+    FindCell para los cinco caminos que mueven una celda, con el aviso de la
+    celda perdida; el `cid` en EntrySnapshot y en QuickTarget; y Grid.RefOf del
+    lado del cliente, que es el unico sitio donde el cliente arma un ref de
+    stack. CRG-72 quedo ENMENDADA en su mitad de alcance, explicito en §7.2.
+
+    EL FRENTE QUE EL PEDIDO NO NOMBRABA, y salio del censo: QuickTarget ELEGIA
+    una entrada —la regla de la #66, el frasco mas gastado— y despues le
+    entregaba a UseEntry un ref que resolvia al PRIMERO. La eleccion se
+    calculaba y se tiraba. Es el segundo y ultimo sitio del modulo que arma un
+    ref de stack a mano; el censo con denominador (45 lineas con `condition =`,
+    19 tablas literales) es lo que lo encontro y lo que evito tocar las otras 17.
+
+    LA LECCION DE METODO: el sabotaje 14 —«el boton Sort pisa el cid»— salio
+    VERDE la primera vez, y no por el codigo: en un grid RECIEN NACIDO los `cid`
+    coinciden con sus posiciones, asi que pisarlos con la posicion re-escribe los
+    MISMOS numeros. El check estaba verde por una coincidencia del sujeto y no
+    por el mecanismo. Se arreglo dandole churn al grid del check y una
+    PRECONDICION que lo delata.
 
     Y OJO CON EL ALCANCE: el arreglo es POR CAMINO, no global. Belt, drop, use,
     equip y sub-slot pasan a nombrar la celda; trade y transferencia CONSERVAN

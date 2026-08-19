@@ -430,7 +430,9 @@ la misma queja —*«quedan desordenados»*—:
    misma munición cambiaban de lugar sin que nada hubiera cambiado.
 
 **CRG-72 — La POSICIÓN de una entrada es dato del jugador y se persiste; el criterio automático es
-sólo su estado inicial y un botón. Y una posición NO es una identidad: ningún ref de red la nombra.**
+sólo su estado inicial y un botón. Y una posición NO es una identidad: ningún ref de red nombra un
+`ord`.** *(Enmendada el 2026-08-19 por **CRG-73**, §7.3: la identidad de una entrada sí existe y sí
+viaja. Lo que sigue intacto es esta norma tal como está escrita — el `ord` no viaja en ningún ref.)*
 
 Cada entrada de `rec.items` lleva un `ord` entero. Lo estampan los **dos funnels** del record —
 `SaveRecord` (disco) y `BuildSnapshot` (cable)—, que es lo que evita que las ~8 rutas que agregan
@@ -447,11 +449,16 @@ propio record** y no un flag persistido (un flag puede mentir):
 un `ord` que ya existe. Es un botón y no algo que un refresh haga por atrás, justamente porque
 ahora hay un orden del jugador que se puede perder.
 
-La mitad *«no es una identidad»* es lo que mantiene sano el resto: los refs siguen siendo `uid` para
-los únicos y `id`+`condition` para los stacks (CRG-6), así que un `Sort` **no puede** re-apuntar un
-intent en vuelo. Y no hace falta que lo sea: **dos entradas de stack del mismo `id` y la misma
-`condition` son fungibles** — 120 balas de 9×19 son 120 balas de 9×19 en cualquier celda —, de modo
-que lo que un clic tiene que nombrar nunca fue *cuál*, sino **cuánto**.
+La mitad *«no es una identidad»* es lo que mantiene sano el resto: **ningún ref nombra un `ord`**,
+así que un `Sort` **no puede** re-apuntar un intent en vuelo. Eso vale hoy igual que el día que se
+escribió, y es justo el motivo por el que el #68 **no** reusó este campo para nombrar una celda.
+
+Lo que este bloque afirmó **de más**, y hay que leerlo con la enmienda al lado: *«y no hace falta
+que lo sea»*. Para el **comercio** era cierto y sigue siéndolo — **dos entradas de stack del mismo
+`id` y la misma `condition` son fungibles**, 120 balas de 9×19 son 120 balas de 9×19 en cualquier
+celda, y lo que un clic del basket nombra es *cuánto*. Para **mover una celda** era falso, y el
+autor lo encontró en juego tres semanas después: arrastrar la celda que dice `x107` al cinturón
+mandaba 120. Ésa es la §7.3.
 
 El botón y las tres cantidades del clic quedaron **confirmados en juego el 2026-08-19**, con una enmienda: el «todo» pasa de `CTRL+SHIFT` a **`ALT+SHIFT`**, porque CTRL está bindeado a agacharse y un modificador de menú no puede ser una tecla de movimiento.
 
@@ -465,6 +472,74 @@ vigila.
 por `max_stack` desde siempre; el contenedor y la siembra de stock del trader **no**, así que una
 caja podía mostrar una celda que decía `x800`. El techo pasa a leerse en un solo lugar
 (`Items.MaxStack`) y las tres listas lo obedecen.
+
+### 7.3 El ref de un stack nombra LA CELDA que se apretó (roadmap #68)
+
+**El problema, en las palabras del autor** (en juego, 2026-08-19): *«al meter al belt, ese que tiene
+107 se mete otro de 120, incluso bote toda mi municion de pistola del grid y salieron 6 items de
+pistola en vez de los 4 que tengo en el grid»*. Y al confirmarle que el stack de 107 no era un bug:
+*«que en vez de mandar 120 de otro stack, se mande justo ese stack de 107 al belt»*.
+
+**No se estaban creando balas**, y decirlo primero es lo que ahorra la ronda: la conservación se
+cumplía. Lo que no se cumplía era **cuál** entrada se movía. `FindEntry` resolvía un ref de stack
+—`{ id, condition }`— contra la **primera entrada que emparejaba**; el cliente armaba ese ref desde
+la celda que se apretó, pero **la celda no viajaba**.
+
+**Los dos síntomas del reporte son UN defecto.** El cinturón se llevaba la primera entrada de 9×19,
+que tenía 120. Y `DropEntry` clampeaba `count` al `entry.count` de la primera, así que botar la de
+107 sacaba 107 de una de 120 y dejaba un resto de 13 — un ítem más en el piso que celdas en el grid,
+con el total conservado. Vaciar el grid apretando siempre la celda más chica tomaba **siete** clics.
+
+**CRG-73 — Una entrada lleva un `cid` estable —acuñado una vez en el funnel del record, nunca
+reasignado, con contador persistido que sólo sube— y un ref de stack que lo trae resuelve a ESA
+celda y a ninguna otra. Un ref SIN `cid` sigue cayendo a la primera.**
+
+- **Dónde se acuña.** En el mismo funnel del `ord`: `StampEntries` (que llama a `StampOrd` y a
+  `StampCid`), invocado por `SaveRecord` (disco) y `BuildSnapshot` (cable). Las ~8 rutas que agregan
+  una entrada no tienen que acordarse — es el patrón del #67 y por eso se reusó.
+- **Por qué el contador se persiste en el record** y no se deriva de «el mayor `cid` vivo más uno»:
+  derivarlo **recicla** el número de una entrada que acaba de irse, y un número reciclado es
+  exactamente lo que dejaría a un intent viejo disparar sobre una celda que el jugador nunca
+  apretó. Es la falla que el campo existe para evitar; sólo cuenta hacia arriba.
+- **Por qué NO es el `ord`.** Era la opción barata (ya existe, ya se persiste, ya viaja), pero el
+  botón **Sort** reescribe todos los `ord` de una: un intent que nombrara un `ord` lo podía
+  re-apuntar un re-orden aterrizando entre el clic y el paquete. El `cid` sobrevive al Sort, y de
+  paso paga la mitad del **#70**, donde un intent de arrastre tiene que decir *«mové ESTA celda al
+  slot 12»*.
+- **Por qué NO es un blob por stack**, que fue la propuesta del autor: un blob existe para guardar
+  **historia** (condición, attachments, `clip1`) y dos stacks de 9×19 no tienen ninguna que los
+  distinga. Costaría un blob persistido por stack de munición en el record, rotación de `uid` en
+  cada merge y cada split, y rompería el espejo cinturón↔pool, que está construido sobre «N balas
+  del tipo T». Sería pagar con un **objeto de persistencia** lo que resuelve un **campo**.
+
+**El alcance es POR CAMINO, y ésa es la mitad que hay que defender.** Los cinco que **mueven** una
+celda resuelven por `FindCell` y honran el `cid`: `Equip`, `UseEntry`, `DropEntry`, `BeltSet`,
+`SubSlotAttach`. Los dos que preguntan una **cantidad** siguen agregando y **no miran el campo**: el
+basket del trade (`MatchesRef`, `Trade.RefKey`) y la transferencia de contenedores (`StackTotal`,
+`DrainStack`). Ahí el agregado es lo que mantiene **alcanzable** al stack gemelo — informe en juego
+del 2026-07-14 —, así que «arreglarlos» rompería aquello. El harness lleva **dos controles
+negativos** que lo sostienen, y los dos se verifican en negativo.
+
+**La celda perdida falla y avisa** (voto del autor, 2026-08-19). Un ref que **sí** nombra una celda
+y no la encuentra —otro camino la mergeó, la gastó o la vació entre el clic y el paquete— no cae a
+la primera, porque *ese fallback es el defecto*; y no falla mudo, porque un clic que el jugador sí
+hizo se leería como un botón muerto. `FindCell` es quien habla, una sola vez, y cada camino conserva
+su propia frase para el fallo ordinario.
+
+**Un ref sin `cid` no puede quedar inalcanzable**, y no es un fleco: los savegames, el import LAN
+(CRG-61) y cada entrada que `CleanStack` reconstruye de cero mandan refs sin el campo. Ésos siguen
+resolviendo contra la primera, exactamente como antes. **Frontera declarada:** un import LAN
+reconstruye las entradas y su contador arranca de nuevo, así que un ref emitido *antes* del import
+podría coincidir con un `cid` nuevo del mismo ítem. Requiere un import aterrizando entre un clic y
+su paquete; no se cierra y queda escrito.
+
+**Los dos únicos sitios que arman un ref de stack** son `Grid.RefOf` (cliente) y `QuickTarget`
+(server). El segundo importa más de lo que parece: **elige** una entrada entre varias —la regla de
+la #66, el frasco más gastado— y sin el `cid` la elección se calculaba y se tiraba.
+
+**Se llama `cid` y no `sid`**, que es como lo nombró el roadmap, por una razón medida: `sid` significa
+SteamID en las 40 apariciones que tiene el módulo, cuatro de ellas en `GetRecord` — la función
+vecina de la que hospeda el campo.
 
 ---
 

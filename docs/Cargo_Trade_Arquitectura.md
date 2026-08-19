@@ -92,7 +92,12 @@ cadáver son el mismo mecanismo.
    alcanzable al stack gemelo, que es para lo que nació el 2026-07-14. Lo que cambió
    no es el agregado: es qué tecla lo pide. Se puede, porque **dos entries del mismo
    `id` y `condición` son fungibles** y lo que un clic nombra es una *cantidad*, no
-   una celda (CRG-72).
+   una celda (CRG-72). **Y eso sigue valiendo ACÁ y sólo acá:** desde el 2026-08-19 un
+   ref de stack **sí** puede nombrar una celda (`cid`, **CRG-73** — roadmap #68), pero
+   el basket lo ignora a propósito. `Trade.RefKey` y `MatchesRef` agrupan por
+   `id + condición` y nada más, con dos controles negativos en el harness que lo
+   sostienen: si el basket empezara a nombrar la celda, una compra de 800 balas se
+   partiría en siete líneas y el techo dejaría de ser uno.
 2. El ítem en basket queda **marcado visualmente** (borde ámbar + contador de unidades
    pendientes en la celda). **El lock NO está implementado (slice 1):** el basket es
    *intent puro del cliente* —el servidor no guarda estado de basket— y el ítem sigue

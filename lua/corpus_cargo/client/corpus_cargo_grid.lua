@@ -275,9 +275,22 @@ function CARGO.Grid.Create(parent, opts)
     return controller
 end
 
--- Snapshot entry -> server-side ref (the wire format the server resolves
--- with FindEntry): uid for uniques, id+condition for stacks.
+-- Snapshot entry -> server-side ref (the wire format the server resolves with
+-- FindEntry): uid for uniques, id+condition+cid for stacks.
+--
+-- The `cid` is what makes a click name THE CELL it landed on and not the first
+-- entry of the same ammunition (CRG-73, roadmap #68). It rides on every stack
+-- ref because this is the ONE funnel the client has for building them, and the
+-- two sides read it differently ON PURPOSE:
+--   - the five paths that MOVE a cell - equip, use, drop, belt, sub-slot -
+--     resolve through it, so dragging the cell that says x107 moves 107;
+--   - the two that ask a QUANTITY - the trade basket and the container
+--     transfer - match on id+condition and never look at it (MatchesRef,
+--     StackTotal, RefKey), which is exactly what keeps the twin stack
+--     reachable there (#67, in-game report 2026-07-14).
+-- Adding it here therefore cannot change what the basket does, and the harness
+-- carries the negative control that says so.
 function CARGO.Grid.RefOf(entry)
     if entry.uid then return { uid = entry.uid } end
-    return { id = entry.id, condition = entry.condition }
+    return { id = entry.id, condition = entry.condition, cid = entry.cid }
 end

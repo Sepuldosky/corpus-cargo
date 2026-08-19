@@ -5,7 +5,51 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-19 (**nuevo: el ORDEN del grid es del JUGADOR** — `ord` por
+**Última actualización:** 2026-08-19 (**nuevo: el ref de un stack nombra LA CELDA que apretaste** —
+`cid` estable por entrada, roadmap **#68**, CRG-73, sede §7.3. El autor lo encontró en juego: *«al
+meter al belt, ese que tiene 107 se mete otro de 120, incluso bote toda mi municion de pistola del
+grid y salieron 6 items de pistola en vez de los 4 que tengo en el grid»*, y precisó el pedido —*«que
+en vez de mandar 120 de otro stack, se mande justo ese stack de 107 al belt»*. **NO SE ESTABAN
+CREANDO BALAS, y decirlo primero es lo que ahorró la ronda:** la conservación se cumplía y lo que no
+se cumplía era **cuál** entrada se movía — `FindEntry` resolvía `{ id, condition }` contra la
+**primera** que emparejaba y la celda no viajaba en el ref. **Los dos síntomas del reporte son UN
+defecto:** el cinturón se llevaba la primera (120), y `DropEntry` clampeaba al `count` de la primera,
+así que botar la de 107 sacaba 107 de una de 120 y dejaba un resto de 13 — vaciar el grid apretando
+siempre la celda más chica tomaba **siete clics y dejaba siete ítems** (107, 13, 107, 13, 107, 13,
+107). Y el **107 no era el bug**: es una descarga que volvió del pool. Votos del autor, tomados antes
+de escribir: **campo estable** y no el `ord` del #67 (el botón **Sort** reescribe todos los `ord` de
+una, así que un intent que nombrara un `ord` lo podía re-apuntar un re-orden aterrizando entre el
+clic y el paquete — y el `cid` **paga además la mitad del #70**), y **la celda perdida falla y
+AVISA** en vez de caer a la primera, porque *ese fallback es el defecto*. **Se descartó el blob por
+stack**, que fue la propuesta del autor: un blob guarda **historia** y dos stacks de 9×19 no tienen
+ninguna que los distinga — sería pagar con un objeto de persistencia lo que resuelve un campo. Se
+acuña en el **mismo funnel** del `ord` (`StampEntries`, los dos funnels del record) y **el contador
+vive en el record y se persiste**, porque derivarlo de lo vivo **recicla** el número de una entrada
+que se fue, que es el único modo en que un intent viejo puede disparar sobre una celda que nadie
+apretó. **El alcance es POR CAMINO:** los cinco que **mueven** una celda la nombran (equip, use,
+drop, belt, sub-slot); el basket del trade y la transferencia de contenedores **siguen agregando**,
+porque ahí el agregado es lo que mantiene alcanzable al stack gemelo (informe en juego 2026-07-14) —
+con **cuatro controles negativos** que lo miden en vez de suponerlo, y los dos del server
+verificados en negativo. **Un ref SIN el campo sigue cayendo a la primera** (savegames, import LAN,
+`CleanStack`): un ref que no puede nombrar una celda no puede quedar inalcanzable. **Se llama `cid` y
+no `sid`** porque `sid` significa SteamID en las 40 apariciones del módulo, cuatro en `GetRecord`.
+**El frente que el pedido no nombraba, y salió del censo con denominador:** `QuickTarget` **elegía**
+el frasco más gastado y después le pasaba a `UseEntry` un ref que resolvía al **primero** — la
+elección se calculaba y se tiraba. Son **dos** los sitios del módulo que arman un ref de stack
+(`Grid.RefOf` y ése), no uno. **EL HALLAZGO DE MÉTODO, y es el que más paga:** el sabotaje 14 —*«el
+Sort pisa el `cid`»*— salió **VERDE**, y no por el código: en un grid **recién nacido** los `cid`
+coinciden con sus posiciones, así que pisarlos con la posición reescribe **los mismos números**. *El
+check estaba verde por una coincidencia del sujeto y no por el mecanismo.* Se arregló dándole
+**churn** al grid del check y una **precondición** que lo delata. Y dos gates de fuente nuevos no
+preguntan si un patrón existe sino **cuántas veces** (5 sitios de `FindCell`, 3 de `FindEntry`):
+un gate de existencia deja pasar la reversión de un **sitio de llamada**, que es la lección 89.
+Harness **945 → 985 verdes**, selftest **100 server / 107 client** (sin moverse), `glua_check`
+48/48, y **16 sabotajes en rojo, 16 de 16**, con control de apertura y cierre en verde
+(`dev/sabotaje_cargo_68.py`). El instrumento del #67 siguió a su código —el rename
+`StampOrder` → `StampEntries` le dejaba dos anclas apuntando a nada, o sea una verificación en
+negativo desarmada en silencio— y se **re-corrió: 12/12**. **PASADA EN JUEGO PENDIENTE** (los 8
+puntos están en el CHANGELOG). CHANGELOG **71 `[PENDIENTE]`**.
+Contexto previo: **el ORDEN del grid es del JUGADOR** — `ord` por
 entrada, roadmap **#67**, CRG-72, sede §7.2. El autor pidió dos cosas —que los ítems dejen de quedar
 desordenados y guarden posición, y que apretar sobre un stack de munición opere sobre **ese** stack y
 no sobre las 800 balas de la mochila— y **tenían la misma raíz**: una entrada de stack no tiene
@@ -32,22 +76,13 @@ rojo, 12 de 12**, con control de apertura y cierre en verde (`dev/sabotaje_cargo
 **PASADA EN JUEGO ✓ 2026-08-19** — el Sort, el `SHIFT+M1` y el «todo», los tres OK en el trader;
 **enmienda de la pasada: el «todo» pasa de CTRL a ALT**, porque CTRL agacha. CHANGELOG **70
 `[APLICADO]`**.
-**Y de esa pasada salieron TRES frentes, que son las tres sesiones siguientes y en este orden:**
-**#68** — *el ref de un stack nombra la PRIMERA entrada, no la celda que apretaste*: `FindEntry`
-resuelve `{id, condition}` contra la primera de la fila, así que arrastrar la celda de **x107** al
-cinturón mete **la de 120**, y botar el grid deja **más ítems en el piso que celdas** (los restos).
-**No se crean balas — la conservación se cumple**; lo que falla es *cuál* entrada se mueve. Cinco
-caminos comparten ese `FindEntry` (use, drop, belt, equip, sub-slot); los dos que el #67 tocó a
-propósito (basket y transferencia) están bien, porque ahí la semántica correcta **es de cantidad**.
-La pregunta del autor —*«¿y si cada stack de 120 fuera un blob propio?»*— se puede, pero es la
-herramienta cara y equivocada: **un blob guarda HISTORIA y dos stacks de 9×19 no tienen ninguna que
-los distinga**. Lo que hace falta es que el ref **nombre la celda**, y la recomendación es un `sid`
-estable (no reusar `ord`) porque **es exactamente lo que el #70 necesita también**.
-**#69** — la gramática del clic en contenedores, que este mismo bloque dejó **inconsistente** con la
-del trade. **#70** — el **nivel 2** del grid: el orden ya no baila, pero el **empaque** sigue
-dejando huecos (la altura de una fila es la del tile más alto), y eso sólo se arregla dando a cada
-ítem una celda. Enmienda a la mitad *«sin gestión espacial»* del 2026-07-11 — **la otra mitad, «el
-costo es peso y no espacio», NO se toca**.
+**De esa pasada salieron TRES frentes; el #68 ya cerró (arriba) y quedan DOS:**
+**#69** — la gramática del clic en contenedores, que el #67 dejó **inconsistente** con la del trade
+(en Loot un M1 manda el stack de la celda; en el trade manda un cuarto del techo). **#70** — el
+**nivel 2** del grid: el orden ya no baila, pero el **empaque** sigue dejando huecos (la altura de
+una fila es la del tile más alto), y eso sólo se arregla dando a cada ítem una celda. **El #68 ya le
+pagó la mitad**: el `cid` es el ref que un intent de arrastre necesita. Enmienda a la mitad *«sin
+gestión espacial»* del 2026-07-11 — **la otra mitad, «el costo es peso y no espacio», NO se toca**.
 Contexto previo: **un ítem puede tener USOS** — `def.uses = 3`,
 roadmap **#66**, CRG-71. **Lo primero que se midió fue que no estaba pendiente:** la barrita que el
 autor pedía **ya estaba dibujada** hacía rondas y el precio de un frasco a medio usar **ya se

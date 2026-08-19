@@ -6566,3 +6566,158 @@ acá: **#68** (el ref de un stack nombra la primera entrada y no la celda que ap
 el 107 y entra un 120»), **#69** (la gramática del clic en contenedores, que quedó inconsistente
 con la del trade justo por este bloque) y **#70** (el nivel 2 del grid: el empaque sigue dejando
 huecos porque la altura de una fila es la del tile más alto).
+
+## 71. El ref de un stack nombra la celda que apretaste (roadmap #68) `[PENDIENTE]`
+
+**Pedido del autor (en juego, 2026-08-19):** *«al meter al belt, ese que tiene 107 se mete otro de
+120, incluso bote toda mi municion de pistola del grid y salieron 6 items de pistola en vez de los
+4 que tengo en el grid, esa es la inconsistencia que quiero arreglar»*. Y al confirmarle que el
+stack de 107 no era un bug, precisó el pedido: *«Si se que no es bug lo del 107, pero eso es lo que
+quiero, que en vez de mandar 120 de otro stack, se mande justo ese stack de 107 al belt»*.
+
+O sea: **la celda que apretás tiene que ser la celda que se mueve.** No era «arreglar la munición».
+La munición estaba bien.
+
+### No se estaban creando balas, y decirlo primero es lo que ahorró la ronda
+
+La conservación se cumplía. Lo que no se cumplía era **cuál** entrada se movía. `FindEntry`
+resolvía un ref de stack —`{ id, condition }`— contra la **primera entrada que emparejaba**; el
+cliente armaba ese ref desde la celda que se apretó, pero **la celda no viajaba en el ref**.
+
+Perseguir un duplicador habría costado la ronda entera. Y el 107 tampoco era el defecto: `AbsorbType`
+del pool devuelve al cinturón lo que sale de un cargador hasta el techo y derrama el resto al grid,
+que mergea bajo `max_stack`. **Un 107 es una descarga que volvió**, no munición mal partida.
+
+### Los dos síntomas del reporte son UN defecto
+
+1. **El cinturón.** `BeltSet` movía la primera entrada de 9×19, que tenía 120. El slot mostraba 120.
+2. **El piso.** `DropEntry` clampeaba `count` al `entry.count` de la **primera**, así que botar la
+   celda de 107 sacaba 107 de una de 120 y dejaba **un resto de 13** — un ítem más en el piso que
+   celdas en el grid, con el total intacto. Vaciar el grid apretando siempre la celda más chica (que
+   es lo que hace cualquiera mirando un 107 entre tres 120) tomaba **siete clics y dejaba siete
+   ítems**: 107, 13, 107, 13, 107, 13, 107. De ahí el *«salieron 6 en vez de 4»*.
+
+Y eran **cinco** los caminos que compartían ese `FindEntry` y decían «la primera»: `Equip`,
+`UseEntry`, `DropEntry`, `BeltSet` y `SubSlotAttach`.
+
+### Lo que se escribió
+
+- PARCHE 1 — `server/corpus_cargo_inventory.lua`: el campo **`cid`**, una identidad estable por
+  entrada. Se acuña **una vez** en el mismo funnel del `ord` —`StampEntries`, que llama a `StampOrd`
+  y a `StampCid`, invocado por `SaveRecord` (disco) y `BuildSnapshot` (cable)— y **no se reasigna
+  nunca**. El contador vive **en el record** y se persiste: derivarlo de «el mayor `cid` vivo más
+  uno» reciclaría el número de una entrada que acaba de irse, y un número reciclado es exactamente
+  lo que dejaría a un intent viejo disparar sobre una celda que el jugador nunca apretó. Sólo cuenta
+  hacia arriba. Acuñado como **CRG-73**, sede `Cargo_Architecture.md` §7.3. **[PENDIENTE]**
+- PARCHE 2 — el mismo archivo: **`FindEntry` honra el `cid`** cuando el ref lo trae, resolviendo a
+  esa celda y **a ninguna otra**, y sigue matcheando `id`+`condition` de paso. Un ref **sin** `cid`
+  cae a la primera igual que siempre. **[PENDIENTE]**
+- PARCHE 3 — el mismo archivo: **`FindCell`**, por donde resuelven los cinco caminos que mueven una
+  celda. Una celda que ya no está no cae a la primera —*ese fallback es el defecto*— y tampoco falla
+  muda: avisa *«That stack is no longer in that cell.»*, una sola vez, y cada camino conserva su
+  propia frase para el fallo ordinario. **[PENDIENTE]**
+- PARCHE 4 — el mismo archivo: **`EntrySnapshot`** lleva el `cid` al cable (también en los únicos,
+  para que el #70 no tenga que inventar una segunda regla), y **`QuickTarget`** lo devuelve. Ese
+  segundo importa más de lo que parece: **elige** una entrada entre varias —la regla de la #66, el
+  frasco más gastado— y sin el `cid` la elección se calculaba y se tiraba. **[PENDIENTE]**
+- PARCHE 5 — `client/corpus_cargo_grid.lua`: **`Grid.RefOf`** pone el `cid` en el ref. Es el único
+  sitio del cliente que arma un ref de stack —los 16 intents pasan por ahí—, así que sin este
+  renglón todo lo anterior es inalcanzable. **[PENDIENTE]**
+
+### Las tres decisiones, con lo que se descartó
+
+- **`cid` estable y no el `ord` del #67** (voto del autor). El `ord` era la opción barata: ya existe,
+  ya se persiste, ya viaja. Pero el botón **Sort** reescribe todos los `ord` de una, así que un
+  intent que nombrara un `ord` lo podía re-apuntar un re-orden aterrizando entre el clic y el
+  paquete — el bug volvería justo después del gesto que el #67 le acaba de dar al jugador. El `cid`
+  se paga una vez y **paga también la mitad del #70**, donde un intent de arrastre tiene que decir
+  *«mové ESTA celda al slot 12»*. Por eso el #68 iba antes que el #70.
+- **La celda perdida falla y avisa** (voto del autor), en vez de caer a la primera. Cae un clic en
+  una carrera rara; lo que se compra es que **si algo se mueve, es la celda que apretaste**.
+- **NO un blob por stack**, que fue la propuesta del autor (*«¿cada stack de 120 podría ser un blob
+  propio?»*). Se puede, y es la herramienta cara y equivocada: un blob existe para guardar
+  **historia** (condición, attachments, `clip1`) y dos stacks de 9×19 no tienen ninguna que los
+  distinga. Costaría un blob persistido por stack de munición en el record de cada jugador,
+  rotación de `uid` en cada merge y cada split, y rompería el espejo cinturón↔pool, construido sobre
+  «N balas del tipo T» y no sobre «este montón». Sería pagar con un **objeto de persistencia** lo
+  que resuelve un **campo**.
+
+### El alcance es POR CAMINO, y esa mitad es la que hay que defender
+
+Pasan a nombrar la celda: `Equip`, `UseEntry`, `DropEntry`, `BeltSet`, `SubSlotAttach`.
+
+**Conservan la semántica de cantidad, a propósito:** el basket del trade (`MatchesRef`,
+`Trade.RefKey`) y la transferencia de contenedores (`StackTotal`, `DrainStack`). Ahí el agregado es
+lo que mantiene **alcanzable** al stack gemelo — informe en juego del 2026-07-14 —, así que
+«arreglarlos» rompería aquello. Los tres resolvedores ignoran el campo nuevo **sin una línea de
+cambio**, y el bloque lleva **cuatro controles negativos** que lo miden en vez de suponerlo: pedir
+200 sobre una celda de 120 sigue cruzando las dos celdas, y dos celdas con `cid` distinto siguen
+cayendo en la misma línea del basket. Los dos controles se verificaron **en negativo** (sabotajes 15
+y 16): sabotear `StackTotal` y `RefKey` para que mirasen el `cid` los pone en rojo, o sea que no
+están verdes por no ejercitarse.
+
+### El censo que decidió el tamaño del parche
+
+Antes de escribir se contó, con denominador, **quién arma un ref de stack** en todo el módulo: 45
+líneas con `condition =`, 19 tablas literales candidatas, y de ésas exactamente **dos** alimentan a
+`FindEntry` — `Grid.RefOf` y `QuickTarget`. Las otras 17 son snapshots, payloads al mundo, slots de
+equipo y del cinturón, o entradas que `CleanStack` reconstruye. Ese censo es lo que evitó tocarlas:
+la lección 89 dice que medir el helper no mide que alguien lo llame, y acá el helper del cliente
+tenía **un** hermano oculto, no ninguno.
+
+Y ese hermano —`QuickTarget`— es un frente que el pedido no nombraba: elegía el frasco más gastado
+y le entregaba a `UseEntry` un ref que resolvía al primero.
+
+### El hallazgo de método: un verde que no podía fallar
+
+El sabotaje 14 —*«el botón Sort pisa el `cid`»*— salió **VERDE** en la primera corrida de la
+verificación en negativo. La causa no era el código: en un grid **recién nacido** los `cid`
+coinciden con sus posiciones (1..N), así que pisarlos con la posición reescribe **los mismos
+números** y el check no tenía cómo fallar. Estaba verde por una coincidencia del sujeto, no por el
+mecanismo.
+
+El arreglo fue darle **churn** al grid del check —un grid real lo tiene, así que la forma sin churn
+era la excepción— y dejarle una **precondición** que lo delate: *«los `cid` de este grid NO coinciden
+con sus posiciones»*. Sin esa fila, el mismo agujero puede volver la próxima vez que alguien toque el
+bloque.
+
+En la misma tanda hubo un segundo defecto de instrumento, más chico: el gate de fuentes imprimía 18
+checks y su total decía **4**, porque el `for` del control por cuenta usaba `n` como variable y `n`
+era el contador del `check`.
+
+### Los controles POR CUENTA (lección 89)
+
+Dos gates de fuente nuevos no preguntan si un patrón **existe** sino **cuántas veces**: `FindCell`
+tiene que aparecer en **5** sitios de llamada y `FindEntry(rec, ref)` en **3** (el propio `FindCell`
+más las dos re-resoluciones internas de `Equip`). Un gate de existencia deja pasar la reversión de un
+**sitio de llamada** — devolver uno de los cinco caminos a `FindEntry` pelado deja verde a los otros
+cuatro. El sabotaje 12 lo prueba: revierte sólo `BeltSet` y la pasada se pone roja.
+
+### Medición
+
+Harness `harness_cargo.py`: **945 → 985 verdes** (25 en server, 8 en cliente, 6 del gate de fuentes
+— dos de ellos por cuenta —, más la fila de precondición del Sort). Selftest: **100** server y
+**107** cliente, los dos en 0 fallas y sin moverse. `glua_check.py`: 48/48 parsean. **Verificación en
+negativo: 16 sabotajes, 16 en rojo**, con control de apertura y de cierre en verde
+(`dev/sabotaje_cargo_68.py`).
+
+Y el instrumento del #67 siguió a su código: el rename `StampOrder` → `StampEntries` dejaba dos
+anclas de `dev/sabotaje_cargo_67.py` apuntando a nada, o sea una verificación en negativo desarmada
+en silencio. Actualizadas y **re-corridas: 12/12 en rojo**.
+
+### Pasada en juego — PENDIENTE
+
+Lo que hay que probar, y el criterio es binario:
+
+1. Con munición de pistola partida en varias celdas y una de count distinto (un 107 entre 120),
+   **arrastrar la celda del 107 al cinturón** ⇒ el slot dice **107**, no 120.
+2. **Botar el grid de munición entero, contando los ítems que caen** ⇒ tantos ítems como celdas
+   había, con los counts de las celdas. Nunca más ítems que celdas.
+3. Apretar **Sort** y repetir (1) ⇒ sigue dando 107. Es la diferencia entre el `cid` y el `ord`.
+4. **Equipar** una granada desde una celda de count distinto ⇒ el slot muestra el count de ESA celda.
+5. **Usar** (menú contextual) un consumible desde la segunda celda ⇒ baja ESA celda.
+6. **Montar** una placa en un sub-slot desde la segunda celda ⇒ baja ESA celda.
+7. **Control negativo:** en el **trader**, `SHIFT+M1` sobre una celda sigue cargando lo de esa celda
+   y `ALT+SHIFT+M1` sigue cargando todo. En un **contenedor**, transferir sigue cruzando celdas.
+8. **Control negativo de la tecla rápida:** con dos frascos de distinto desgaste, la tecla sigue
+   gastando el más gastado.
