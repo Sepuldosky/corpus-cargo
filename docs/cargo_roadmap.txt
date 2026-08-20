@@ -961,8 +961,10 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     bloquea, la linterna encendio en pleno transito. Si (h) se ejecuta algun
     dia, arranca sin esa incognita.
 
-49. EL CLICK QUE NO CIERRA: CICLAR SIN REABRIR EL WHEEL [Cargo UI] — ESCRITO
-    2026-07-29, entry 56 [PENDIENTE], esperando la planilla (seccion X).
+49. EL CLICK QUE NO CIERRA: CICLAR SIN REABRIR EL WHEEL [Cargo UI] — CERRADA
+    el 2026-07-30. Entry 56 [APLICADO 2026-07-29]; planilla X cerrada. La
+    cabecera decia "[PENDIENTE], esperando la planilla" hasta el 2026-08-20:
+    drift de tres entradas que el cierre del arco #48-#52 no bajo al rumbo.
     (Pedido del autor 2026-07-29, al cerrar el #48 con la planilla W en 10/10.)
     LAS DOS DECISIONES SE CONSULTARON ANTES DE ESCRIBIR y las dos las tomo el
     autor: (a) el modo es SOLO para los chips de luz; (b) si hubo un click
@@ -1021,8 +1023,9 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     sticky entra, el derecho se vuelve mas util todavia — pero son dos
     bloques, no uno.
 
-50. EL BOTON DERECHO CICLA EN REVERSA [Cargo UI] — ESCRITO 2026-07-29,
-    entry 57 [PENDIENTE], esperando la planilla (seccion Y).
+50. EL BOTON DERECHO CICLA EN REVERSA [Cargo UI] — CERRADA el 2026-07-30.
+    Entry 57 [APLICADO 2026-07-29]; planilla Y cerrada. Cabecera corregida el
+    2026-08-20 (mismo drift que la 49 y la 51).
     Pedido del autor EN LA NOTA DE X1, un check que PASO — quinta vez en el
     arco que el hallazgo sale del campo de notas y no de un rojo: "sobre los
     ARC9 lo unico que pediria seria que con el clic secundario del raton se
@@ -1056,8 +1059,9 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     del bloque del #46, no sobre una fuente sintetica— y 4 reversiones en
     negativo.
 
-51. LA LINTERNA TAPADA POR EL DISPOSITIVO DEL ARMA [Cargo UI] — ESCRITO
-    2026-07-29, entry 58 [PENDIENTE], esperando la planilla (seccion Z).
+51. LA LINTERNA TAPADA POR EL DISPOSITIVO DEL ARMA [Cargo UI] — CERRADA el
+    2026-07-30. Entry 58 [APLICADO 2026-07-29]; planilla Z cerrada. Cabecera
+    corregida el 2026-08-20 (mismo drift que la 49 y la 50).
     Pedido del autor EN LA NOTA DE Y3, un check que PASO — SEXTA vez en el
     arco: "al tener el arma de ARC9 con dispositivo se bloquee visualmente la
     linterna con tachas, mejor que rojo se puede copiar las tachas que tienen
