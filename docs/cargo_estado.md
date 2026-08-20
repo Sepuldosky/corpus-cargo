@@ -52,9 +52,16 @@ negativo desarmada en silencio— y se **re-corrió: 12/12**. **PASADA EN JUEGO 
 **siete stacks de pistola dan SIETE ítems al botar**, que es exactamente lo que el defecto impedía,
 porque el viejo dejaba restos y salían más ítems que celdas—, con `cargo_selftest` **100 OK** y
 `cargo_selftest_cl` **107 OK**, 0 fallas los dos y **clavados** con lo que el harness offline había
-predicho. **Quedaron SIN CORRER seis filas** (Sort+arrastre, equip, use, sub-slot y los dos controles
-negativos), todas cubiertas offline por el harness y por los 16 sabotajes — se dice así porque un
-check que no se corrió no es un verde. Y el autor verificó de paso algo que **no es de este bloque**:
+predicho. **Las seis filas que quedaron SIN CORRER se cerraron el mismo día** con la planilla **AD**
+(`dev/checks/cargo-celda-r1.html`): **12 PASA · 1 RETIRADO**, con los cinco caminos verdes uno por
+uno y la celda perdida contestando las **dos** mitades del voto (no movió nada **y** lo dijo en el
+chat). **AD11 se retira por premisa mal escrita y no es un rojo:** pedía *«pedir 200 sobre una celda
+de x120»*, y el server sí derrama pero **la UI nunca ofreció ese gesto** — el menú anuncia
+`1 - 120` y clampea al cell. El criterio estaba escrito desde la capacidad del **server** y
+redactado como un gesto de **interfaz**, así que sólo podía dar rojo. **El mecanismo que esa fila
+protegía SÍ quedó verificado por su otra mitad:** `Move all` mueve las 467 de las cuatro celdas con
+un solo ref, que es exactamente lo que no pasaría si el campo nuevo se hubiera filtrado al
+contenedor. Y el autor verificó de paso algo que **no es de este bloque**:
 sacar munición del cinturón **rellena** un stack del grid hasta el techo (100+80 → 120+60), que es
 `AddStack` mergeando bajo `max_stack` desde el Block 1 — lo cerró él con el control correcto, botar
 ambos y mirar la **conservación**. CHANGELOG **71 `[APLICADO]`**.

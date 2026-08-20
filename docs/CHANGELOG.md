@@ -6728,10 +6728,33 @@ vuelve llena la que hay antes de abrir otra. El autor lo cerró él mismo con el
 correspondía —*«tire ambas y salen con los valores correctos»*—, que es medir la **conservación** en
 vez de discutir la forma.
 
-**Lo que quedó SIN CORRER, y se dice porque un check que no se corrió no es un verde** (precedente
-AB14 del #53): las filas 3 a 8 de la lista de arriba — Sort + repetir el arrastre, el equip desde una
-celda de count distinto, el uso por menú contextual, el montaje en sub-slot, y los dos controles
-negativos (trader y contenedor, y la tecla rápida). **Los seis están cubiertos offline** por el
-harness y por la verificación en negativo —los seis caen con sabotajes que se midieron en rojo—, así
-que no son deuda de corrección; son las superficies donde el offline no puede hablar por el juego.
-Si alguna se rompiera en juego, el harness no lo vería.
+**La deuda que dejó, cerrada el mismo día.** Las filas 3 a 8 quedaron SIN CORRER en esta primera
+pasada y se declararon así en vez de acreditarse (precedente AB14 del #53). Las cerró una planilla de
+13 filas — sección **AD**, `dev/checks/cargo-celda-r1.html`.
+
+### Planilla AD (2026-08-19) — 12 PASA · 1 RETIRADO
+
+Los cinco caminos, uno por uno y todos verdes: el cinturón con la celda rara, el piso con las cuatro
+celdas, el **Sort seguido del arrastre** (que es la fila que separa el `cid` del `ord`), el equip
+desde la celda de `x2`, el uso desde la segunda celda de medkits y el montaje en sub-slot desde la
+de `x1`. La **celda perdida** contestó las dos mitades del voto: no movió nada **y** el chat dijo
+`[Cargo] That stack is no longer in that cell.`. Y los controles negativos del trader, de la tecla
+rápida y del relleno del cinturón quedaron intactos.
+
+**AD11 se RETIRA por premisa mal escrita, y no es un rojo pendiente.** La fila pedía *«pedir 200
+sobre una celda de x120 y que cruce a la de al lado»*. El server hace exactamente eso —`StackTotal`
+y `DrainStack` derraman sobre todas las entradas que respaldan el ref—, pero **la UI nunca ofreció
+ese gesto**: `Transfer.Menu` anuncia `1 - 120` y clampea con `math.min(n, entry.count)`, o sea al
+**cell** clicado. El criterio estaba escrito desde la capacidad del **server** y redactado como un
+gesto de **interfaz**, así que sólo podía dar rojo. Confundir eso con un defecto dejaría deuda
+fantasma en el registro (misma distinción que AB8 y AC2).
+
+**Y el mecanismo que esa fila existía para proteger SÍ quedó verificado, por su otra mitad:**
+*«Move all y take all funciona bien»*. `Move all` manda **un** ref deduplicado por las cuatro celdas
+de 9 mm y mueve las 467. Si el campo nuevo se hubiera filtrado al contenedor, ese mismo gesto habría
+movido **120** y se habría quedado con tres celdas adentro. El control negativo del alcance está
+medido; lo que estaba mal escrito era el gesto con que se lo pedía.
+
+**Lo que la fila destapó de verdad es un pedido, no un defecto**, y el autor lo dijo así: el
+contenedor no tiene la **gradación** del clic que el trade sí tiene. Va al roadmap **#69**, que
+salió de esta pasada con la gramática ya votada.

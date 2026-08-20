@@ -2080,7 +2080,7 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     descarga que volvio, no municion mal partida.
 
 
-69. LOS CONTENEDORES: EL CLIC DEBERIA TRANSFERIR, Y SHIFT+M1 TODO
+69. LA GRAMATICA DEL MOUSE: M1 SELECCIONA, M3 DESELECCIONA, M2 ES EL MENU
     [Cargo ui/containers] — PEDIDO DEL AUTOR 2026-08-19, SIN DISENAR. Va
     despues del #68.
 
@@ -2096,15 +2096,51 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     ahi un clic carga un cuarto del techo y SHIFT el stack. Dos pantallas del
     mismo modulo con dos gramaticas distintas para el mismo gesto.
 
-    LO QUE HAY QUE VOTAR CON EL AUTOR: si la gramatica se unifica con la del
-    trade (M1 = un cuarto del techo, SHIFT+M1 = el stack clicado, ALT+SHIFT+M1
-    = todo) o si el loot se queda con «M1 = el stack, SHIFT+M1 = todo lo de ese
-    item», que es lo que la frase del pedido dice literalmente. Son dos
-    convenciones legitimas; lo que no puede quedar es una en cada pantalla.
+    VOTADO POR EL AUTOR el 2026-08-19, al correr la planilla AD del #68. Ya no
+    hay que votar la convencion: la eligio, y es la del trade, mas una MITAD
+    NUEVA que el pedido original no tenia.
 
-    DEPENDE DEL #68 en una parte: «todo lo de ese item» sobre un lado que
-    tiene varias entradas es una cantidad agregada, y eso ya funciona; pero
-    «el stack clicado» necesita que el ref nombre la celda.
+    LA NORMA, en sus palabras: «como norma es que M1 selecciona, M3
+    deselecciona y M2 es el boton contextual». O sea que esto dejo de ser una
+    entrada sobre contenedores y paso a ser la gramatica del mouse del modulo
+    ENTERO — y por eso cambio de titulo.
+
+      · M1          -> un cuarto del stack
+      · SHIFT+M1    -> el stack clicado, completo
+      · ALT+SHIFT+M1-> todos los del mismo tipo
+      · M3          -> lo mismo pero DESELECCIONANDO (un cuarto / el stack /
+                       todos del tipo). ESTA MITAD NO EXISTE EN NINGUNA
+                       PANTALLA HOY: en el trade se saca del basket sin
+                       gradacion, y en el loot no hay «deshacer» de ningun tipo.
+      · M2          -> el menu contextual, y nada mas. El «enviar cantidad» que
+                       ya tiene se queda como esta: el autor lo declaro bien.
+
+    ESTADO REAL MEDIDO (2026-08-19, contra el codigo vivo):
+      · LOOT: M1 manda `entry.count or 1` — el stack ENTERO de esa celda, sin
+        gradacion. No hay SHIFT ni ALT. (corpus_cargo_ui.lua, onLeftClick de
+        los dos grids.)
+      · LOOT, el menu de M2: «Take/Move 1», «amount...» y «whole stack». El
+        `amount...` anuncia `1 - <count de la celda>` y clampea con
+        `math.min(n, entry.count)` — o sea AL CELL, no al agregado
+        (corpus_cargo_transfer.lua:55 y :60). El server SI derrama sobre las
+        entradas que respaldan el ref (StackTotal/DrainStack), asi que el tope
+        es del CLIENTE y es una decision, no una falla. Coherente con «una
+        celda es un stack» del #67; incoherente con el agregado del trade. La
+        planilla AD11 pidio 200 sobre una celda de 120 y por eso salio rojo: el
+        criterio estaba escrito desde la capacidad del server y redactado como
+        un gesto de interfaz. Se RETIRO por premisa, no es un defecto abierto.
+      · TRADE: M1 = un cuarto del techo, SHIFT+M1 = el stack clicado,
+        ALT+SHIFT+M1 = todo (#67). La mitad de M3 no existe.
+
+    LO QUE YA NO DEPENDE DEL #68: «el stack clicado» necesitaba que el ref
+    nombrara la celda, y eso CERRO. La mitad de M1 en el loot se puede escribir
+    entera; la de M3 es toda nueva.
+
+    OBSERVADO Y ACEPTADO en la misma pasada, para que nadie lo lea como bug
+    despues: SHIFT+M1 dos veces sobre el mismo item carga el stack DOS VECES en
+    el basket. Es correcto — `BasketAdd` clampea contra `Available - have`
+    (corpus_cargo_trade.lua:125), asi que acumula pero nunca pasa del total real
+    del lado. El autor lo miro y dijo «igual no lo veo mal».
 
 
 70. NIVEL 2 DEL GRID: POSICIONES REALES [Cargo ui/inventory] — PEDIDO DEL
@@ -2175,3 +2211,70 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     superficies y hoy leen la MISMA funcion (CARGO.UI.QuickCount), asi que si se
     cambia, se cambia ahi y no en los dos lugares — mismo argumento que llevo el
     texto de condicion a Theme.ConditionShort en la #66.
+
+72. DROP DESDE EL CINTURON [Cargo ui/inventory] — PEDIDO DEL AUTOR el
+    2026-08-19, al correr la planilla AD del #68. SIN DISENAR.
+
+    LO QUE PIDIO, textual: «Falta drop desde el belt para expulsarlo del
+    inventario a la municion».
+
+    ESTADO REAL: la munición que está en un slot del cinturón sólo puede
+    volver al grid (BeltClear) y recién desde ahí botarse. O sea que sacar 120
+    balas del inventario son DOS gestos, y el segundo depende de que haya lugar
+    de peso en el grid — que es justo lo que no hay cuando querés tirar algo.
+    Los otros dos contenedores de equipo ya tienen su salida directa:
+    `DropEquipped` (roadmap #28) bota desde un slot de equipo sin pasar por el
+    grid, y esa es la maquinaria a la que esto se parece.
+
+    LO QUE HAY QUE MIRAR ANTES DE ESCRIBIR: el cinturón NO es almacenamiento
+    inerte, ES el pool de munición del engine (§16, roadmap #19). Un drop tiene
+    que pasar por el mismo espejo que BeltClear —AmmoPool.Push— o el jugador
+    tira las balas y las sigue teniendo cargadas. Ese es el defecto que la
+    entrada existe para evitar, y no se ve en pantalla: se ve al disparar.
+
+73. SEPARAR UN STACK A MANO [Cargo ui] — PEDIDO DEL AUTOR el 2026-08-19,
+    al correr la planilla AD del #68. SIN DISENAR.
+
+    LO QUE PIDIO: «creo que si hace falta una funcionalidad para separar
+    stacks, tal vez dentro del menu contextual».
+
+    DE DONDE SALE, y esto es lo que la vuelve una entrada en vez de un
+    capricho: la planilla misma lo necesitó. Las filas AD7 y AD8 —los caminos
+    `UseEntry` y `SubSlotAttach`— NO se podían correr con el kit de dev, porque
+    `cargo_dev_medkit` y `cargo_dev_plate` no declaran `max_stack` y entonces
+    el grid nunca los parte en dos celdas. Hubo que partirlas con un `lua_run`
+    sobre el record. Si el instrumento necesita una función que el juego no
+    tiene, el jugador la necesita también.
+
+    LO QUE HABILITA, que es más que la comodidad: hoy la única forma de tener
+    dos celdas del mismo ítem es que `max_stack` las parta. Con separar a mano,
+    el jugador puede dejar 30 balas en el cinturón y el resto en la mochila sin
+    depender del techo — y eso ya es una decisión de carga, que es de lo que se
+    trata el módulo.
+
+    OJO CON EL ALCANCE: separar es lo inverso de `AddStack`, y `AddStack`
+    MERGEA solo. Una celda separada que se toca con la de al lado se vuelve a
+    fundir en el próximo funnel si la regla no dice otra cosa — o sea que esto
+    NO es sólo un botón: es decidir si el merge automático deja de ser
+    automático, y eso toca el #67 y el #70. Medir eso PRIMERO.
+
+74. EL MENU CONTEXTUAL ESTA SIN TEMATIZAR [Cargo ui] — PEDIDO DEL AUTOR el
+    2026-08-19, al correr la planilla AD del #68. SIN DISENAR.
+
+    LO QUE DIJO: «tambien el menu contextual tiene color derma, deberia tomar
+    el color del hud de DGL4 que tiene cargo».
+
+    ES EL UNICO PEDAZO DE UI DEL MODULO QUE NO PASA POR EL THEME. Todo lo demás
+    —el frame, las celdas, el wheel, el tooltip, los chips— deriva su paleta de
+    `CARGO.Theme`, que a su vez la saca del acento de HoloHUD/DGL4 cuando está
+    montado (§theme). El menú del click derecho es un `DermaMenu()` pelado
+    (corpus_cargo_transfer.lua y corpus_cargo_ui.lua), así que aparece con el
+    gris de fábrica de Derma encima de una interfaz que no es gris.
+
+    ES CHICO PERO NO ES TRIVIAL: `DermaMenu` no acepta una paleta, hay que
+    pintarle el `Paint` al panel y a cada `DMenuOption`, y los sub-menús se
+    crean solos al abrirse. La forma correcta es un helper ÚNICO
+    —`Theme.Menu()`— y que los tres o cuatro sitios que abren menús lo llamen,
+    en vez de repetir el pintado; mismo argumento que llevó el texto de
+    condición a `Theme.ConditionShort` en la #66 y el criterio de orden a
+    `Items.AutoSortLess` en el #67.
