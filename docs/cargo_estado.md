@@ -54,11 +54,21 @@ y las dos listas del loot son **distintas** (caja 200, jugador 120) para que el 
 adaptador equivocado; (b) **mudar la gradación de `corpus_cargo_trade.lua` a `corpus_cargo_grid.lua`
 dejó el sabotaje 10 de `sabotaje_cargo_67.py` apuntando a NADA**, y ese script **no revienta**:
 imprime `ANCLA x0` y sale 1, o sea que desarma una verificación en negativo vieja **en silencio**. Se
-re-apuntó y se re-corrió (**12/12**); el del #68 sigue en **16/16**. **PENDIENTE: pasada en juego** —
-planilla **AE** (`dev/checks/cargo-mouse-r1.html`), cuya **primera fila es una medición y no un
-veredicto**: que el botón del medio **llegue**. Es lo único que el harness no puede contestar (mide
-el cableado, no el despacho del motor), y **si no pasa, todas las filas de M3 quedan SIN CORRER y no
-en rojo**. CHANGELOG **72 `[PENDIENTE]`**.
+re-apuntó y se re-corrió (**12/12**); el del #68 sigue en **16/16**. **1.ª PASADA EN JUEGO 2026-08-20: PARCIAL — 4 PASA · 0 FALLA · 10 SIN CORRER** (planilla **AE**,
+`dev/checks/cargo-mouse-r1.html`; se cortó por cansancio del autor, no por un defecto). **Cero rojos**,
+y las cuatro que corrieron son las que decían si el resto tenía sentido. **AE2 CIERRA LA ÚNICA INCÓGNITA
+DE LA TANDA:** el botón del medio **LLEGA** a un `DButton` que además es `Droppable` — control positivo
+de M1 **y** `[AE2] M3 LLEGO` **cuatro veces**, o sea repetible y no un golpe de suerte. Lo que era
+**indicio** —que la capa de drag-and-drop no se come el press del medio— queda **medido en el motor**,
+y las filas 09-12 pasan de riesgo abierto a cobertura pendiente. **AE4: la gradación LLEGÓ AL JUEGO**
+— un clic pelado sobre la celda del contenedor trajo **30**, un cuarto del **techo** (120) y no de la
+celda (habría dado 26) ni el stack entero. **AE1** clavó los selftests en 100/107 con lo predicho y
+**AE3** dejó el sujeto bien formado (cuatro celdas con una de count distinto del techo, sin lo cual
+las filas de niveles no discriminan — lección 94). **Lo que NO acredita:** los otros dos niveles ni
+ninguna de las dos excepciones votadas — las diez restantes se declaran **SIN CORRER** y no se dan por
+buenas por parentesco con las que pasaron. Falta: **AE5/AE6/AE7** (cierran M1), **AE9/AE10/AE11** (M3 y
+la fila del carrito) y **AE12/AE13/AE14** (los controles negativos de alcance). Las marcas viven en el
+`localStorage` de la planilla, así que se retoma donde quedó. CHANGELOG **72 `[PENDIENTE]`**.
 Contexto previo: **el ref de un stack nombra LA CELDA que apretaste** —
 `cid` estable por entrada, roadmap **#68**, CRG-73, sede §7.3. El autor lo encontró en juego: *«al
 meter al belt, ese que tiene 107 se mete otro de 120, incluso bote toda mi municion de pistola del

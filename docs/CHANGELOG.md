@@ -6941,7 +6941,46 @@ medio **llegue**. **Si esa fila no pasa, todas las de M3 quedan SIN CORRER y NO 
 cableado que no dispara se ve exactamente igual que una regla mal escrita, y marcarlas rojas
 acreditaría un defecto de reglas que nadie midió.
 
-**Pendiente:** pasada en juego con la planilla **AE** (`dev/checks/cargo-mouse-r1.html`).
+**Pendiente:** completar la pasada en juego con la planilla **AE** (`dev/checks/cargo-mouse-r1.html`).
+
+### Addendum — 1.ª pasada en juego (2026-08-20): PARCIAL, 4 PASA · 0 FALLA · 10 SIN CORRER
+
+La corrida se cortó por cansancio del autor (6 de la mañana), no por un defecto. **Cero rojos**, y
+las cuatro que corrieron son justamente las que decidían si el resto tenía sentido:
+
+- **AE1** — selftests **100 server / 107 client**, 0 fallas, **clavados** con lo que el harness
+  offline predijo. El juego corre el código medido.
+- **AE2 — LA MEDICIÓN, y es la que cierra la única incógnita de la tanda.** El botón del medio
+  **LLEGA** a un `DButton` que además es `Droppable`: la consola imprimió el control positivo de M1
+  **y** `[AE2] M3 LLEGO` — **cuatro veces** en la sesión, o sea que dispara de forma repetible y no
+  fue un golpe de suerte. Con esto queda **probado en el motor** lo que sólo era indicio: la capa de
+  drag-and-drop **no se come el press del medio** antes del release. Las filas 09-12 dejan de
+  depender de una incógnita y pasan a ser cobertura pendiente, no riesgo abierto.
+- **AE3** — el sujeto quedó bien formado (cuatro celdas de 9 mm con una de count distinto del techo),
+  que es la precondición sin la cual las filas de niveles no discriminarían (lección 94).
+- **AE4 — la gradación LLEGÓ AL JUEGO.** Un clic pelado sobre la celda del contenedor trajo **30**:
+  un cuarto del **techo** (120) y no de la celda (que habría dado 26) ni el stack entero. Es el nivel
+  que no existía en el loot, y es el que más se va a usar.
+
+**Lo que esto acredita y lo que no.** Acredita el mecanismo nuevo y su cableado en las dos mitades
+—M1 gradúa, M3 llega—. **No** acredita los otros dos niveles ni ninguna de las excepciones votadas:
+las diez filas restantes se declaran **SIN CORRER** y **no** se dan por buenas por parentesco con las
+que pasaron. La entry sigue `[PENDIENTE]` por eso.
+
+**Lo que falta, en orden de valor:** AE5/AE6 (los otros dos niveles de M1 en el loot) y AE7 (el
+control negativo de la tecla suelta) cierran la mitad de M1; AE9/AE10/AE11 la de M3 y la excepción de
+la fila; AE12/AE13/AE14 son los controles negativos de alcance. Las marcas de esta corrida quedan en
+el `localStorage` de la planilla, así que se retoma donde quedó.
+
+**Un defecto de INSTRUMENTO que la pasada destapó, y no es de este bloque:** la fila AE2 creaba un
+popup que toma el mouse y su desmontaje estaba en la prosa de al lado, así que dejó al autor sin
+poder seguir la planilla. Se corrigió llevando el `B:Remove()` a la **última línea del comando** (el
+campo que se copia) y quedó como **regla 7** de `dev/PLANTILLA_CHECKS.md`. Al corregirlo se rompió el
+string del campo y la planilla abrió con **0 0 0 y ninguna tarjeta** mientras
+`dev/auditar_planilla.py` la declaraba **SANA**: sus chequeos leen el archivo como texto y ninguno
+veía un error de sintaxis de JavaScript. Se le agregó la puerta que faltaba —`node --check` sobre el
+`<script>`, y **SIN CORRER** en vez de OK si no hay node—, verificada en las dos direcciones y
+barrida sobre las **101** planillas de `dev/checks/`: las 101 parsean, **cero falsos positivos**.
 
 ---
 

@@ -2082,8 +2082,14 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 
 69. LA GRAMATICA DEL MOUSE: M1 SELECCIONA, M3 DESELECCIONA, M2 ES EL MENU
     [Cargo ui/containers] — ESCRITA el 2026-08-19, acunada como CRG-74 con
-    sede Cargo_Architecture.md §15.6. CHANGELOG 72 [PENDIENTE]: falta la
-    PASADA EN JUEGO (planilla AE, dev/checks/cargo-mouse-r1.html).
+    sede Cargo_Architecture.md §15.6. CHANGELOG 72 [PENDIENTE].
+    1.ª PASADA EN JUEGO 2026-08-20: PARCIAL, 4 PASA / 0 FALLA / 10 SIN
+    CORRER (planilla AE), cortada por cansancio y no por un defecto. AE2
+    CIERRA LA UNICA INCOGNITA: el boton del MEDIO llega a un DButton
+    Droppable, cuatro disparos, o sea repetible — lo que era indicio sobre
+    el drag-and-drop queda medido EN EL MOTOR. Y AE4 acredita la gradacion
+    en juego: un clic pelado trajo 30, un cuarto del TECHO y no de la celda.
+    Las diez restantes NO se dan por buenas por parentesco.
     Harness 1038 (eran 985), 53 checks nuevos y 19 sabotajes en rojo 19 de
     19. glua_check 48/48. Selftest sin moverse (100/107): no toca su
     superficie.
