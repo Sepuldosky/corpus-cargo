@@ -31,6 +31,7 @@ local NET_SUB_DET   = Corpus.Net.Register("cargo", "subslot_detach")
 local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
 local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
 local NET_BELT_MOVE = Corpus.Net.Register("cargo", "belt_move")
+local NET_BELT_DROP = Corpus.Net.Register("cargo", "belt_drop")
 local NET_UNLOAD    = Corpus.Net.Register("cargo", "unload")
 local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
 local NET_SORT      = Corpus.Net.Register("cargo", "sort")
@@ -95,6 +96,10 @@ local function SendBeltClear(n)
 end
 local function SendBeltMove(fromN, toN)
     net.Start(NET_BELT_MOVE) net.WriteUInt(fromN, 4) net.WriteUInt(toN, 4) net.SendToServer()
+end
+local function SendBeltDrop(n, count)
+    net.Start(NET_BELT_DROP) net.WriteUInt(n, 4) net.WriteUInt(count or 1, 16) net.SendToServer()
+    CARGO.Sounds.Play("drop")
 end
 local function SendUnload()
     net.Start(NET_UNLOAD) net.SendToServer()
@@ -226,7 +231,7 @@ local function OpenItemMenu(entry)
     local def = CARGO.Items.Get(entry.id)
     if def == nil then return end
     local ref = CARGO.Grid.RefOf(entry)
-    local menu = DermaMenu()
+    local menu = CARGO.Theme.Menu()
 
     -- equip targets: uniques into regular slots, stackables into stack
     -- slots (throwable) — CanEquip arbitrates both sides
@@ -326,7 +331,7 @@ local function OpenSlotMenu(slotId)
     local slotEntry = snap and snap.equip and snap.equip[slotId]
     if slotEntry == nil then return end
     local def = CARGO.Items.Get(slotEntry.id)
-    local menu = DermaMenu()
+    local menu = CARGO.Theme.Menu()
 
     menu:AddOption("Unequip", function() SendUnequip(slotId) end)
 
@@ -480,7 +485,7 @@ local function MakeSlotCell(parent, slot, tall)
                 local ply = LocalPlayer()
                 local wep = IsValid(ply) and ply:GetWeapon(hostDef.weapon_class) or nil
                 if IsValid(wep) then
-                    local menu = DermaMenu()
+                    local menu = CARGO.Theme.Menu()
                     local any = false
                     for _, tgt in ipairs(CARGO.ARC9.CompatibleTargets(entry.id)) do
                         if tgt.wep == wep then
@@ -587,7 +592,7 @@ local function MakeQuickCell(parent, n)
     cell.DoRightClick = function()
         local snap = S()
         if snap == nil or snap.quick == nil or snap.quick[n] == nil then return end
-        local menu = DermaMenu()
+        local menu = CARGO.Theme.Menu()
         menu:AddOption("Use", function() SendQuickUse(n) end)
         menu:AddOption("Unbind", function() SendQuickBind(n, "") end)
         menu:Open()
@@ -668,10 +673,20 @@ local function MakeBeltCell(parent, n)
         if entry then CARGO.Tooltip.Show(self, entry) end
     end
 
+    -- (#72) the belt gets its own way OUT to the world. The wording is the
+    -- GRID's, verbatim: "Drop" / "Drop all (xN)". A second vocabulary for the
+    -- same verb is what the #69 just finished closing.
     cell.DoRightClick = function()
-        if BeltEntryOf(n) == nil then return end
-        local menu = DermaMenu()
+        local entry = BeltEntryOf(n)
+        if entry == nil then return end
+        local menu = CARGO.Theme.Menu()
         menu:AddOption("Return to inventory", function() SendBeltClear(n) end)
+        menu:AddOption("Drop", function() SendBeltDrop(n, 1) end)
+        if (entry.count or 1) > 1 then
+            menu:AddOption("Drop all (x" .. entry.count .. ")", function()
+                SendBeltDrop(n, entry.count)
+            end)
+        end
         menu:Open()
     end
 
@@ -776,7 +791,7 @@ local function MakeToolCircle(parent, tool)
 
     cell.DoRightClick = function()
         if SlotEntryOf(tool.slotId) == nil then return end
-        local menu = DermaMenu()
+        local menu = CARGO.Theme.Menu()
         menu:AddOption("Unequip", function() SendUnequip(tool.slotId) end)
         menu:AddOption("Drop", function() SendEquipDrop(tool.slotId) end)
         menu:Open()

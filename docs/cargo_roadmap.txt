@@ -2263,8 +2263,30 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     cambia, se cambia ahi y no en los dos lugares — mismo argumento que llevo el
     texto de condicion a Theme.ConditionShort en la #66.
 
-72. DROP DESDE EL CINTURON [Cargo ui/inventory] — PEDIDO DEL AUTOR el
-    2026-08-19, al correr la planilla AD del #68. SIN DISENAR.
+72. DROP DESDE EL CINTURON [Cargo ui/inventory] — ESCRITA el 2026-08-20 en
+    tanda con la #74. CHANGELOG 74 [PENDIENTE]: falta la pasada en juego
+    (planilla AG, dev/checks/cargo-belt-drop-r1.html).
+    QUE SE ESCRIBIO: CARGO.Inventory.BeltDrop(ply, slotN, count) + intent
+    belt_drop, con la forma de la rama de stack de DropEquipped (#28) y no
+    una ruta nueva; y el menu de M2 del slot pasa de UNA opcion a TRES
+    —Return to inventory, Drop, Drop all (xN)— con el vocabulario del GRID
+    palabra por palabra (voto del autor). El ARRASTRE no bota (voto del
+    autor): el drag del cinturon ya significa devolver al grid o reordenar.
+    NO ACUNA CRG: es aplicacion de CRG-15 / §16.3. Lo que si se hizo es
+    escribir en §16.3 la TABLA DE LAS CUATRO PUERTAS que empujan el espejo
+    (BeltSet, BeltMove, BeltClear, BeltDrop), justo porque la que falte NO
+    DA ERROR.
+    LA LECCION DE LA TANDA, y la dijo el sabotaje y no la lectura: el
+    control del gate de RANGO de slot, escrito sobre slots VACIOS, pasaba
+    con el gate puesto Y con el gate sacado —un slot fuera de rango siempre
+    esta vacio, asi que el `entry == nil` contestaba primero y el guardia
+    nunca se ejercia. Un guardia cuya unica prueba no puede alcanzarlo es un
+    guardia que nadie midio. Se reescribio plantando una entrada en belt[9].
+    Verificacion: 28 checks nuevos (20 server + 8 cliente) y 9 sabotajes en
+    rojo, entre ellos el que le saca el AmmoPool.Push al drop nuevo — si ese
+    saliera verde, el check estrella no mediria.
+
+72. (texto original de la entrada, para leer de que salio)
 
     LO QUE PIDIO, textual: «Falta drop desde el belt para expulsarlo del
     inventario a la municion».
@@ -2309,8 +2331,31 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     NO es sólo un botón: es decidir si el merge automático deja de ser
     automático, y eso toca el #67 y el #70. Medir eso PRIMERO.
 
-74. EL MENU CONTEXTUAL ESTA SIN TEMATIZAR [Cargo ui] — PEDIDO DEL AUTOR el
-    2026-08-19, al correr la planilla AD del #68. SIN DISENAR.
+74. EL MENU CONTEXTUAL ESTA SIN TEMATIZAR [Cargo ui] — ESCRITA el 2026-08-20
+    en tanda con la #72, acunada como CRG-75 con sede
+    Cargo_Architecture.md §15.7. CHANGELOG 73 [PENDIENTE]: falta la pasada
+    en juego (planilla AF, dev/checks/cargo-menu-tema-r1.html).
+    QUE SE ESCRIBIO: CARGO.Theme.Menu(), la PUERTA UNICA, y los OCHO sitios
+    que abrian un DermaMenu() pelado pasan a llamarla (6 en ui.lua, 1 en
+    trade.lua, 1 en transfer.lua). El tenido de DGL4 sale gratis: T.Colors
+    ya deriva del acento del mod y muta EN SITIO (CRG-29), asi que no hay
+    una sola linea de compat nueva. Votos del autor: los OCHO menus, y hover
+    cellHover + borde border (sin acento pleno, que en una lista de ocho
+    opciones queda chillon).
+    ⚠ LA PREMISA CON LA QUE SE ENTRO A LA TANDA ERA FALSA, y se corrigio
+    leyendo la FUENTE de GMod en disco (vgui/dmenu.lua + dmenuoption.lua):
+    NO es cierto que «un DMenu hijo se crea al abrirse». Se crea al
+    DECLARARSE — DMenuOption:AddSubMenu() lo construye en el acto con un
+    DermaMenu(true, self) PELADO. La conclusion (pintar la DESCENDENCIA y no
+    la instancia) sobrevivio intacta, pero por otro mecanismo: con la
+    premisa falsa el helper se habria escrito enganchando el Open() del
+    hijo, mas caro y apuntado al lugar equivocado.
+    Verificacion: 22 checks nuevos (12 de conducta en cliente + 10 en el
+    gate de FUENTES, tres de ellos POR CUENTA y por ARCHIVO SEPARADO, porque
+    con el total mudar un menu de archivo lo tapa) y 11 sabotajes en rojo.
+    NO se toco el CONTENIDO de ningun menu: es pintura.
+
+74. (texto original de la entrada, para leer de que salio)
 
     LO QUE DIJO: «tambien el menu contextual tiene color derma, deberia tomar
     el color del hud de DGL4 que tiene cargo».

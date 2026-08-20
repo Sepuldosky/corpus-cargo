@@ -163,6 +163,125 @@ function T.SkinScroll(scroll)
     end
 end
 
+-- ------------------------------------------------------------------
+-- THE context menu of the module (CRG-75, roadmap #74)
+--
+-- In-game report (2026-08-19): "tambien el menu contextual tiene color derma,
+-- deberia tomar el color del hud de DGL4 que tiene cargo". It was the LAST
+-- piece of UI in the module that did not read this file -- frame, cells,
+-- wheel, tooltip and chips all derive from T.Colors, and a bare DermaMenu()
+-- drew stock Derma gray on top of an interface that is not gray.
+--
+-- The DGL4 tint costs nothing here ON PURPOSE: T.Colors already derives the
+-- whole palette from the mod's accent and mutates its Color objects IN PLACE
+-- (CRG-29), so a menu that reads T.Colors takes the HUD color with no compat
+-- line of its own, and re-skins live. Reading the mod a second time from here
+-- would be a second house that desyncs in silence.
+--
+-- WHY IT WRAPS AddOption/AddSubMenu INSTEAD OF JUST PAINTING THE PANEL. This
+-- is the trap of the front and it does NOT show on the first pass:
+--   · a DMenuOption paints ITSELF (derma.SkinHook "MenuOption"), so a helper
+--     that only sets menu.Paint leaves every row stock gray.
+--   · DMenu:AddSubMenu builds its child with a BARE DermaMenu(true, self) --
+--     READ in GMod's own vgui/dmenuoption.lua, not assumed -- which is a
+--     SEPARATE menu this helper never saw. The four submenus of the item menu
+--     would stay gray, and you only find out by opening one.
+-- So the skin lands on the DESCENDANCY, not on the instance.
+-- ------------------------------------------------------------------
+
+-- the submenu marker: DMenuOption's own arrow is a stock Derma texture, which
+-- on a dark panel is a dark smudge. Same DrawPoly primitive as every other
+-- shape here -- no baked texture, so the palette tints it too.
+local function PaintMenuArrow(w, h, col)
+    local cx, cy = w * 0.5, h * 0.5
+    local s = math.max(3, math.floor(math.min(w, h) * 0.3))
+    draw.NoTexture()
+    surface.SetDrawColor(col)
+    surface.DrawPoly({
+        { x = cx - s * 0.5, y = cy - s },
+        { x = cx + s * 0.8, y = cy },
+        { x = cx - s * 0.5, y = cy + s },
+    })
+end
+
+-- Hover and enabled/disabled read the SAME two signals the stock skin reads
+-- (panel.Hovered / panel.Highlight and IsEnabled), so a themed option cannot
+-- disagree with an unthemed one about its own state.
+local function SkinMenuOption(opt)
+    if not IsValid(opt) then return opt end
+    opt:SetFont("CargoText")
+
+    opt.Paint = function(self, w, h)
+        -- Unlike every other Paint in this file, this one cannot merely READ
+        -- the palette: DLabel keeps the text color as a SNAPSHOT (UpdateFGColor
+        -- copies the rgba into the engine), so it has to PUSH it. Pushing every
+        -- frame is what keeps CRG-29 true here -- a live DGL4 re-tint reaches an
+        -- open menu the same way it reaches the frame behind it.
+        local enabled = self:IsEnabled()
+        self:SetTextColor(enabled and T.Colors.text or T.Colors.textDim)
+        if enabled and (self.Hovered or self.Highlight) then
+            surface.SetDrawColor(T.Colors.cellHover)
+            surface.DrawRect(0, 0, w, h)
+        end
+        -- false, like DMenuOption's own Paint: the engine still draws the label
+        -- text. Returning true would paint a row with nothing written on it.
+        return false
+    end
+
+    if IsValid(opt.SubMenuArrow) then
+        opt.SubMenuArrow.Paint = function(_, w, h)
+            PaintMenuArrow(w, h, T.Colors.textDim)
+        end
+    end
+    return opt
+end
+
+local function SkinMenu(menu)
+    if not IsValid(menu) then return menu end
+
+    menu.Paint = function(_, w, h)
+        T.PaintPanel(w, h, T.Colors.panel, T.Colors.border)
+    end
+    -- a DMenu IS a DScrollPanel (MaxHeight is 90% of the screen), so a long
+    -- one grows the same stock scrollbar the inventory grew before #24
+    T.SkinScroll(menu)
+
+    local addOption, addSubMenu, addSpacer = menu.AddOption, menu.AddSubMenu, menu.AddSpacer
+
+    menu.AddOption = function(self, text, fn)
+        return SkinMenuOption(addOption(self, text, fn))
+    end
+
+    -- AddSubMenu returns (SubMenu, option). BOTH need it: the option carries
+    -- the arrow, and the submenu is a whole new DMenu -- skinned RECURSIVELY so
+    -- a submenu of a submenu cannot fall out of the norm either.
+    menu.AddSubMenu = function(self, text, fn)
+        local sub, opt = addSubMenu(self, text, fn)
+        SkinMenuOption(opt)
+        return SkinMenu(sub), opt
+    end
+
+    menu.AddSpacer = function(self)
+        local pnl = addSpacer(self)
+        if IsValid(pnl) then
+            pnl.Paint = function(_, w, h)
+                surface.SetDrawColor(T.Colors.border)
+                surface.DrawRect(0, 0, w, h)
+            end
+        end
+        return pnl
+    end
+
+    return menu
+end
+
+-- The ONE door: every context menu in the module opens through here (CRG-75).
+-- A ninth menu written straight on DermaMenu() is a gray menu again, which is
+-- exactly how this entry was born.
+function T.Menu()
+    return SkinMenu(DermaMenu())
+end
+
 -- THE circle primitive (in-game finding 2026-07-13: the sandbox tool circles
 -- had hard, flat edges). draw.RoundedBox with radius = half the size does NOT
 -- make a circle — its radius is quantized to GMod's corner materials — and the

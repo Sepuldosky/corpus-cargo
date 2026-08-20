@@ -1098,6 +1098,77 @@ En el loot un M1 pelado **pasa a mandar un cuarto**, así que mover un stack com
 clics — o un `SHIFT`+M1. Es lo que el autor pidió explícitamente, pero es la pantalla que más se usa
 y el cambio se siente ahí.
 
+### 15.7 Todo menú del módulo se abre por una sola puerta (roadmap #74 — entry 73)
+
+*(**CRG-75**. Norma del **módulo entero**, al lado de CRG-74 y por el mismo motivo: vive en la sede
+de la UI porque su valor es que la próxima pantalla no vuelva a inventar la suya.)*
+
+**CRG-75 — Ningún archivo del módulo abre un `DermaMenu()`: todos llaman a `CARGO.Theme.Menu()`.**
+
+**De dónde salió,** en juego el 2026-08-19: *«también el menú contextual tiene color derma, debería
+tomar el color del hud de DGL4 que tiene cargo»*. Era **el único pedazo de UI del módulo que no
+pasaba por el theme** — el frame, las celdas, el wheel, el tooltip y los chips ya derivan su paleta
+de `CARGO.Theme`, y el menú del click derecho salía con el gris de fábrica de Derma encima de una
+interfaz que no es gris.
+
+**El teñido de DGL4 sale gratis, y eso es literalmente lo que se pidió.** `T.Colors` **muta en
+sitio** (CRG-29): los objetos `Color` se crean una vez y una paleta sólo cambia sus rgba. Con
+HoloHUD/DGL4 montado la paleta entera deriva de su acento (§15.5), así que **un menú que lee
+`T.Colors` toma el color del HUD sin una sola línea de compat** y se re-tiñe en vivo. Ir a buscar
+el acento a DGL4 desde acá sería una **segunda casa** que se desincroniza en silencio.
+
+#### Por qué es una NORMA y no un parche
+
+Son **ocho** los sitios que abren un menú —seis en `corpus_cargo_ui.lua` (grid, slot de equipo,
+drop de attachment, celda quick, cinturón, círculo de herramienta), uno en `corpus_cargo_trade.lua`
+y uno en `corpus_cargo_transfer.lua`— y pintarlos a mano deja el problema intacto: **el noveno menú
+que alguien escriba vuelve a salir gris**, que es exactamente cómo nació esta entrada. Mismo
+argumento que llevó el texto de condición a `Theme.ConditionShort` (#66), el criterio de orden a
+`Items.AutoSortLess` (#67) y la gradación a `Grid.ClickAmount` (#69).
+
+#### La trampa, y no es la que parecía
+
+Un helper que pinte **el panel** no alcanza, por **dos** razones distintas:
+
+1. Un `DMenuOption` **se pinta a sí mismo** (`derma.SkinHook "MenuOption"`), así que el panel queda
+   tematizado y **todas las filas de fábrica**.
+2. `DMenu:AddSubMenu` construye el hijo con un **`DermaMenu(true, self)` pelado** — o sea un menú
+   **aparte** que el helper nunca vio. Los **cuatro** submenús del menú de ítem (*Equip on…*,
+   *Insert into…*, *Attach to…*, *Quick bind…*) quedarían grises, y **eso no se ve en la primera
+   pasada**: hay que abrir uno.
+
+> ⚠ **El punto 2 se leyó en la FUENTE del motor (`vgui/dmenu.lua` + `vgui/dmenuoption.lua`), y
+> corrigió lo que el prompt de la tanda afirmaba.** La creencia era que *«un `DMenu` hijo se crea al
+> abrirse, no cuando lo declarás»* — **es falso**: `DMenuOption:AddSubMenu()` lo construye en el
+> acto y `DMenu:AddSubMenu` lo devuelve ya vivo. La conclusión (pintar la descendencia y no la
+> instancia) sobrevive intacta, pero **por otro mecanismo**, y con la premisa falsa el helper se
+> habría escrito enganchando el `Open()` del hijo — más caro y apuntado al lugar equivocado.
+
+Por eso el helper **envuelve `AddOption`, `AddSubMenu` y `AddSpacer`** del menú que devuelve, y
+`AddSubMenu` re-envuelve **recursivamente** el hijo: la norma no tiene una profundidad máxima
+tácita.
+
+#### Lo que el helper decide
+
+| Superficie | Color |
+|---|---|
+| panel | `T.PaintPanel` con `panel` + borde `border` |
+| fila bajo el cursor | `cellHover` — lo mismo que una celda del grid (voto del autor: sin realce de acento, que en una lista de ocho opciones queda chillón) |
+| texto | `text`, y `textDim` si la opción está **deshabilitada** |
+| flecha de submenú | triángulo de `DrawPoly` en `textDim` (la de fábrica es una textura oscura, invisible sobre un panel oscuro) |
+| tipografía | `CargoText`, la del módulo |
+| scrollbar | `T.SkinScroll` — un `DMenu` **es** un `DScrollPanel` y su `MaxHeight` es el 90 % de la pantalla |
+
+> **El color del texto es el único de este archivo que se EMPUJA en vez de leerse.** `DLabel` guarda
+> el foreground como **snapshot** (`UpdateFGColor` copia la rgba al engine), así que una fila que lo
+> seteara al crearse **no vería nunca** un re-teñido de DGL4 en vivo. El `Paint` lo re-empuja cada
+> frame, que es lo que mantiene CRG-29 cierto también acá.
+
+**Lo que esta entrada NO tocó:** el **contenido** de los menús. Ni una opción movida, ni un
+`AddSpacer` agregado, ni un orden cambiado — es pintura, y un rojo de contenido se leería como un
+rojo de tema. (La única excepción es el menú del **cinturón**, y no es de esta entrada sino de la
+#72, que le agrega su drop.)
+
 ---
 
 ## 16. Sistema de munición: el cinturón ES el pool
@@ -1173,6 +1244,20 @@ Las dos direcciones son reales:
 |---|---|---|
 | **cinturón → pool** (`Push`) | al colgar/sacar un stack, y en cada spawn | `SetAmmo(total)` — asigna, nunca suma, así que empujar dos veces no infla nada |
 | **pool → cinturón** (`Reconcile`) | poll a 4 Hz | el pool es la **verdad del consumo**: recargar lo drena, descargar el cargador lo devuelve, granadas y cohetes lo gastan directo. El cinturón lo sigue, así que el conteo de la celda es el conteo real |
+
+> **Las CUATRO puertas que empujan el espejo** (`Push`), y la lista está acá porque la que falte
+> **no da error**: el inventario queda impecable y el jugador descubre la desincronización al
+> recargar.
+>
+> | Puerta | Qué saca del cinturón |
+> |---|---|
+> | `BeltSet` | grid → cinturón (y el ocupante desplazado vuelve al grid) |
+> | `BeltMove` | cinturón → cinturón (el desplazado sale del cinturón) |
+> | `BeltClear` | cinturón → grid |
+> | `BeltDrop` | cinturón → **mundo** — roadmap #72, la cuarta y la más nueva |
+>
+> Los tres primeros mueven un stack **adentro** del record; `BeltDrop` pone una **entidad en el
+> mundo**, y es el único de los cuatro con gate de `Alive()` y de rango de slot por eso mismo.
 
 **Por qué un poll y no hooks:** el pool lo muta la base de arma que el jugador tenga en la mano
 (ARC9, HL2, TFA, la que sea). Pollear `GetAmmoCount` es **agnóstico de base** y cuesta once
@@ -1336,6 +1421,40 @@ convar `cargo_weapon_world_pickup` sigue gateando **solo** la rama de armas, no 
 
 **Sin convars nuevas** en este bloque. Net nuevo: `belt_move`, `unload` (ambos vía
 `Corpus.Net.Register("cargo", …)`, como todo mensaje del módulo).
+
+#### Botar desde el cinturón (#72 — entry 74)
+
+Reporte del autor, en juego el 2026-08-19: *«Falta drop desde el belt para expulsarlo del inventario
+a la munición»*.
+
+**El estado previo, y por qué era un problema y no una comodidad:** la munición colgada del cinturón
+sólo podía volver al grid (`BeltClear`) y recién desde ahí botarse. Sacar 120 balas del inventario
+eran **dos gestos**, y el segundo dependía de que **hubiera lugar de peso en el grid** — que es justo
+lo que no hay cuando quieres tirar algo.
+
+[`CARGO.Inventory.BeltDrop(ply, slotN, count)`](../lua/corpus_cargo/server/corpus_cargo_inventory.lua)
+(server), intent `belt_drop`. Su forma es la **rama de stack de `DropEquipped`** (#28) y no una ruta
+nueva: vaciar (o decrementar) el slot → `SpawnDropped` → `Touch` → **`AmmoPool.Push`**.
+
+- **Sale por `SpawnDropped`**, el helper compartido, porque una entrada de cinturón **siempre es un
+  stack** — el server rechaza lo que no sea `category = "ammo"` — así que nunca toca la ruta de arma.
+- **No lleva `cid`.** Un slot de cinturón se nombra por su **número**: `rec.belt[n]` ya *es* la
+  entrada, y meterle un ref sería inventar identidad donde hay índice (CRG-73 no aplica acá).
+- **El `count` se recorta contra lo que hay**, no contra lo que pide el cliente (CRG-6).
+- **Gate de `Alive()`** en el receiver, copiado de `NET_EQUIP_DROP`, y **gate de rango de slot**: es
+  el único de los cuatro intents del cinturón que pone una **entidad en el mundo**, y el cliente
+  manda el slot en un `UInt(4)` — 0 a 15 sobre un cinturón de 6.
+
+**El defecto que la entrada existe para evitar no se ve en pantalla: se ve al disparar.** El
+cinturón **ES** el pool (§16.3, CRG-15), así que un drop que se saltee el `Push` deja al jugador
+**habiendo tirado la caja y teniendo las balas todavía en la reserva**. El inventario queda
+impecable y el error aparece en la próxima recarga. Es la **cuarta puerta** de la tabla de §16.3.
+
+Cliente (`corpus_cargo_ui.lua`): el menú de M2 sobre el slot pasa de **una** opción a **tres** —
+`Return to inventory`, `Drop` y `Drop all (xN)`. El vocabulario es el del **grid, palabra por
+palabra** (voto del autor): un segundo vocabulario para el mismo verbo es lo que la #69 acaba de
+cerrar. **El arrastre no bota** (voto del autor): el drag del cinturón ya significa devolver al grid
+o reordenar, y darle un destino "mundo" obligaría a decidir qué pasa al soltar en el vacío.
 
 ### 16.9 Enmiendas del espejo: throwables y cajas de mundo (entries 13/16)
 

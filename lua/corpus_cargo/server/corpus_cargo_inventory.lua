@@ -71,6 +71,7 @@ local NET_SUB_DET   = Corpus.Net.Register("cargo", "subslot_detach")
 local NET_BELT_SET  = Corpus.Net.Register("cargo", "belt_set")
 local NET_BELT_CLR  = Corpus.Net.Register("cargo", "belt_clear")
 local NET_BELT_MOVE  = Corpus.Net.Register("cargo", "belt_move")
+local NET_BELT_DROP  = Corpus.Net.Register("cargo", "belt_drop")
 local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
 local NET_SORT       = Corpus.Net.Register("cargo", "sort")
 
@@ -1630,6 +1631,47 @@ function CARGO.Inventory.BeltClear(ply, slotN)
     if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
 end
 
+-- Drop straight from a belt slot to the world (roadmap #72). Author report:
+-- "Falta drop desde el belt para expulsarlo del inventario a la municion" --
+-- until now the only way out was BeltClear and then a second drop from the
+-- grid, which needs weight room in the grid, which is exactly what you do not
+-- have when you want to throw something away.
+--
+-- Shape is the stack branch of DropEquipped (#28), not a new route: empty (or
+-- decrement) the slot -> spawn -> Touch -> Push.
+--
+-- THE Push IS THE POINT OF THE ENTRY, and it is invisible on screen. The belt
+-- is NOT inert storage: it IS the engine ammo pool (§16.3, CRG-15). This is the
+-- FOURTH door that takes something off the belt -- BeltSet, BeltMove and
+-- BeltClear are the other three -- and a door that skips the mirror leaves the
+-- player having thrown the box and still carrying the rounds in reserve. The
+-- inventory looks right; it shows up on the next reload.
+--
+-- A belt entry is ALWAYS a stack (the server refuses anything whose category
+-- is not "ammo"), so it goes out through the shared SpawnDropped and never
+-- through the weapon route -- and it never needs a `cid`: a belt slot is named
+-- by its NUMBER, and rec.belt[slotN] already IS the entry.
+function CARGO.Inventory.BeltDrop(ply, slotN, count)
+    if slotN < 1 or slotN > CARGO.Slots.BELT_COUNT then return false end
+    local rec = CARGO.Inventory.GetRecord(ply)
+    local entry = rec.belt[slotN]
+    if entry == nil then return false end
+
+    local have = entry.count or 1
+    count = math.Clamp(math.floor(count or 1), 1, have)
+    if count >= have then
+        rec.belt[slotN] = nil
+    else
+        entry.count = have - count
+    end
+
+    SpawnDropped(ply:EyePos() + ply:GetAimVector() * 32,
+        { id = entry.id, count = count, condition = entry.condition })
+    CARGO.Inventory.Touch(ply)
+    if CARGO.AmmoPool then CARGO.AmmoPool.Push(ply) end
+    return true
+end
+
 -- ------------------------------------------------------------------
 -- Ammo group A/B (generic blob field on weapons, §3)
 -- ------------------------------------------------------------------
@@ -1791,6 +1833,16 @@ net.Receive(NET_BELT_MOVE, function(_, ply)
     local fromN = net.ReadUInt(4)
     local toN = net.ReadUInt(4)
     CARGO.Inventory.BeltMove(ply, fromN, toN)
+end)
+
+-- The Alive() gate is copied from NET_EQUIP_DROP and is the only belt intent
+-- that needs it: the other three move a stack INSIDE the record, this one puts
+-- an entity in the world.
+net.Receive(NET_BELT_DROP, function(_, ply)
+    if not IsValid(ply) or not ply:Alive() then return end
+    local slotN = net.ReadUInt(4)
+    local count = net.ReadUInt(16)
+    CARGO.Inventory.BeltDrop(ply, slotN, count)
 end)
 
 net.Receive(NET_EQUIP_DROP, function(_, ply)

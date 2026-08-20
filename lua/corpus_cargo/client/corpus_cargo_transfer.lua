@@ -71,7 +71,7 @@ end
 
 -- transfer amount menu (right click on either grid while looting)
 function CARGO.Transfer.Menu(dir, entry)
-    local menu = DermaMenu()
+    local menu = CARGO.Theme.Menu()
     local verb = dir == "take" and "Take" or "Move"
     menu:AddOption(verb .. " 1", function()
         CARGO.Transfer.Send(dir, CARGO.Grid.RefOf(entry), 1)

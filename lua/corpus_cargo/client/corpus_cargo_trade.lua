@@ -476,7 +476,7 @@ function CARGO.Trade.AmountMenu(side, entry)
         return
     end
     local verb = side == "buy" and "Buy" or "Sell"
-    local menu = DermaMenu()
+    local menu = CARGO.Theme.Menu()
     menu:AddOption(verb .. " 1", function() CARGO.Trade.BasketAdd(side, entry, 1) end)
     menu:AddOption(verb .. " amount...", function()
         Derma_StringRequest(verb .. " how many?", "1 - " .. avail, "", function(txt)

@@ -7035,3 +7035,205 @@ como se declararon (la rueda muda en el loot, y la fila del carrito quitando con
 negativos del #68 siguen verdes: el contenedor y el carrito **siguen agregando**.
 
 CHANGELOG **72 `[APLICADO 2026-08-20]`**. Planilla **AE** cerrada 14/14.
+
+---
+
+## 73. El menú contextual toma el tema, y pasa a haber una sola puerta (roadmap #74) `[PENDIENTE]`
+
+**Pedido del autor (en juego, 2026-08-19, al llenar la planilla AD del #68), textual:**
+
+> *«tambien el menu contextual tiene color derma, deberia tomar el color del hud de DGL4 que tiene
+> cargo»*
+
+Era **el único pedazo de UI del módulo que no pasaba por el theme**. El frame, las celdas, el wheel,
+el tooltip y los chips ya derivan su paleta de `CARGO.Theme`; el menú del click derecho era un
+`DermaMenu()` pelado y salía con el gris de fábrica de Derma **encima de una interfaz que no es
+gris**.
+
+### El teñido de DGL4 sale gratis, y eso es literalmente lo que se pidió
+
+`T.Colors` **muta en sitio** (CRG-29): los objetos `Color` se crean una vez y una paleta sólo cambia
+sus rgba, conservando identidad de tabla. Con HoloHUD/DGL4 montado **la paleta entera deriva de su
+acento** (§15.5). O sea que **un menú que lee `T.Colors` toma el color del HUD sin una sola línea de
+compat**, y se re-tiñe en vivo cuando el autor cambia el preset.
+
+Ir a buscar el acento a DGL4 desde el menú habría sido una **segunda casa** que se desincroniza en
+silencio, y de paso rompería CRG-29. No se hizo.
+
+### Por qué el entregable es una NORMA y no ocho parches
+
+Son **ocho** los sitios que abren un menú, y el censo tiene denominador (`DermaMenu()` aparecía
+**8 veces** en todo `lua/`):
+
+| Archivo | Cuántos | Cuáles |
+|---|---:|---|
+| `corpus_cargo_ui.lua` | **6** | el del grid, el de un slot de equipo, el del drop de attachment, el de una celda quick, **el del cinturón** y el de un círculo de herramienta |
+| `corpus_cargo_trade.lua` | 1 | el `AmountMenu` del trade |
+| `corpus_cargo_transfer.lua` | 1 | el `Transfer.Menu` del loot |
+
+Pintarlos a mano deja el problema intacto: **el noveno menú que alguien escriba vuelve a salir
+gris**, que es exactamente cómo nació esta entrada. Va un helper único —`CARGO.Theme.Menu()`— y los
+ocho lo llaman. Mismo argumento que llevó el texto de condición a `Theme.ConditionShort` (#66), el
+criterio de orden a `Items.AutoSortLess` (#67) y la gradación a `Grid.ClickAmount` (#69).
+
+Se acuña **CRG-75**, sede `Cargo_Architecture.md` **§15.7**, al lado de CRG-74.
+
+### La trampa de la entrada, y la premisa que resultó falsa
+
+Un helper que pinte **el panel** no alcanza, por **dos** razones distintas:
+
+1. Un `DMenuOption` **se pinta a sí mismo** (`derma.SkinHook "MenuOption"`). Pintar sólo el panel
+   deja el marco tematizado y **todas las filas de fábrica**.
+2. `DMenu:AddSubMenu` construye el hijo con un **`DermaMenu(true, self)` pelado** — un menú
+   **aparte** que el helper nunca vio. Los **cuatro** submenús del menú de ítem (*Equip on…*,
+   *Insert into…*, *Attach to…*, *Quick bind…*) quedarían grises, y **eso no se ve en la primera
+   pasada: hay que abrir uno**.
+
+> ⚠ **El punto 2 se leyó en la FUENTE del motor y corrigió la premisa con la que se entró a la
+> tanda.** La creencia escrita era que *«un `DMenu` hijo se crea al abrirse, no cuando lo
+> declarás»* — **es falso**: `DMenuOption:AddSubMenu()` lo construye **en el acto** con
+> `DermaMenu(true, self)`, y `DMenu:AddSubMenu` lo devuelve ya vivo, junto con su opción.
+> La conclusión (**pintar la descendencia y no la instancia**) sobrevivió intacta, pero **por otro
+> mecanismo** — y con la premisa falsa el helper se habría escrito enganchando el `Open()` del hijo,
+> más caro y apuntado al lugar equivocado. *Leer la fuente costó diez segundos y cambió el diseño.*
+
+Por eso el helper **envuelve `AddOption`, `AddSubMenu` y `AddSpacer`** del menú que devuelve, y
+`AddSubMenu` re-envuelve **recursivamente** el hijo: la norma no tiene una profundidad máxima
+tácita.
+
+### Qué decide el helper
+
+| Superficie | Color |
+|---|---|
+| panel | `T.PaintPanel` con `panel` + borde `border` |
+| fila bajo el cursor | `cellHover` — **lo mismo que una celda del grid** (voto del autor: sin realce de acento, que en una lista de ocho opciones queda chillón) |
+| texto | `text`, y `textDim` si la opción está **deshabilitada** |
+| flecha de submenú | triángulo de `DrawPoly` en `textDim` (la de fábrica es una textura oscura, invisible sobre un panel oscuro) |
+| tipografía | `CargoText`, la del módulo |
+| scrollbar | `T.SkinScroll` — un `DMenu` **es** un `DScrollPanel` y su `MaxHeight` es el 90 % de la pantalla |
+
+> **El color del texto es el único de todo el theme que se EMPUJA en vez de leerse**, y se dice
+> porque parece un olvido de CRG-29 y no lo es: `DLabel` guarda el foreground como **snapshot**
+> (`UpdateFGColor` copia la rgba al engine), así que una fila que lo seteara al crearse **no vería
+> nunca** un re-teñido en vivo. El `Paint` lo re-empuja cada frame.
+
+### Lo que NO se tocó
+
+**El contenido de los menús.** Ni una opción movida, ni un `AddSpacer` agregado, ni un orden
+cambiado: esta entrada es **pintura**, y un rojo de contenido se leería como un rojo de tema. La
+única excepción es el menú del **cinturón**, y no es de esta entrada sino de la **#72** (entry 74),
+que corre en la misma tanda.
+
+### Verificación
+
+`glua_check` 48/48. Harness **1038 → 1089** con la #72 (**22 checks** son de esta entrada: **12 de
+conducta** en el realm cliente y **10** en el gate de FUENTES, **tres de ellos POR CUENTA y por
+archivo separado** — con el total, mudar un menú de archivo lo tapa).
+
+**Los 12 de conducta son más de lo que la entrada prometía.** Un `Paint` es una closure sin nombre y
+sin superficie que dibujar offline, así que lo normal habría sido medirla sólo por texto. Lo que la
+volvió medible es que **el stub de vgui del harness se derivó de la fuente de GMod leída en disco**
+(`vgui/dmenu.lua`, `vgui/dmenuoption.lua`, `skins/default.lua`): con `AddSubMenu` devolviendo sus dos
+valores, su `SubMenuArrow` y un `IsEnabled` de verdad, la closure **se puede invocar y mirar qué
+decidió**. Incluye el **sitio de llamada real** —M2 sobre la celda del cinturón del frame vivo— y no
+sólo el helper en el aire.
+
+**Verificación en negativo:** `dev/sabotaje_cargo_74_72.py`, **20/20 en rojo** (11 de esta entrada),
+con control de apertura y de cierre en verde. Y se re-corrieron `sabotaje_cargo_67/68/69`
+(**12/12, 16/16, 19/19**) porque la tanda tocó `ui/trade/transfer`: un ancla rota no revienta,
+imprime `ANCLA x0` y desarma una verificación vieja en silencio.
+
+**Planilla AF — SIN CORRER.** Lo que el harness **no** puede contestar y la planilla sí: que con
+DGL4 montado el menú **cambie de color junto con el HUD**, y que sin DGL4 **no reviente ni salga
+ilegible**. Sin la primera fila esto sólo dice que el menú es oscuro; sin la segunda, que anda en la
+máquina del autor.
+
+---
+
+## 74. El cinturón puede botar al mundo (roadmap #72) `[PENDIENTE]`
+
+**Pedido del autor (en juego, 2026-08-19, al llenar la planilla AD del #68), textual:**
+
+> *«Falta drop desde el belt para expulsarlo del inventario a la municion»*
+
+**El estado previo, y por qué era un problema y no una comodidad:** la munición colgada del cinturón
+sólo podía volver al grid (`BeltClear`) y **recién desde ahí** botarse. Sacar 120 balas del
+inventario eran **dos gestos**, y el segundo dependía de que **hubiera lugar de peso en el grid** —
+que es justo lo que no hay cuando quieres tirar algo. Los otros contenedores de equipo ya tenían su
+salida directa: `DropEquipped` (#28) bota desde un slot de equipo sin pasar por el grid.
+
+### La maquinaria es la que ya existía
+
+`CARGO.Inventory.BeltDrop(ply, slotN, count)` (server), intent `belt_drop`. Su forma es la **rama de
+stack de `DropEquipped`**, no una ruta nueva: vaciar (o decrementar) el slot → `SpawnDropped` →
+`Touch` → **`AmmoPool.Push`**.
+
+- **Sale por `SpawnDropped`**, el helper compartido, porque una entrada de cinturón **siempre es un
+  stack** (el server rechaza lo que no sea `category = "ammo"`): nunca toca la ruta de arma.
+- **No lleva `cid`.** Un slot de cinturón se nombra por su **número** — `rec.belt[n]` ya *es* la
+  entrada, y meterle un ref sería inventar identidad donde hay índice. CRG-73 no aplica acá.
+- **El `count` se recorta contra lo que hay**, no contra lo que pide el cliente (CRG-6).
+- **Gate de `Alive()`** en el receiver, copiado de `NET_EQUIP_DROP`, **y gate de rango de slot**: es
+  el único de los cuatro intents del cinturón que pone una **entidad en el mundo**, y el cliente
+  manda el slot en un `UInt(4)` — 0 a 15 sobre un cinturón de **6**.
+
+### El defecto que la entrada existe para evitar no se ve en pantalla: se ve al disparar
+
+El cinturón **no es almacenamiento inerte: ES el pool de munición del engine** (§16.3, CRG-15). Un
+drop que se saltee el `Push` deja al jugador **habiendo tirado la caja y teniendo las balas todavía
+en la reserva**. El ítem cae al piso, el inventario se ve impecable, y el error aparece **en la
+próxima recarga**.
+
+`BeltDrop` es la **cuarta puerta** que saca algo del cinturón, y la tabla de las cuatro quedó escrita
+en §16.3 justo porque la que falte **no da error**:
+
+| Puerta | Qué saca del cinturón |
+|---|---|
+| `BeltSet` | grid → cinturón (y el ocupante desplazado vuelve al grid) |
+| `BeltMove` | cinturón → cinturón |
+| `BeltClear` | cinturón → grid |
+| `BeltDrop` | cinturón → **mundo** — el nuevo |
+
+**No acuña CRG:** es una **aplicación** de CRG-15 / §16.3, no una norma nueva.
+
+### El menú, con el vocabulario del grid palabra por palabra
+
+El slot del cinturón pasa de **una** opción a **tres**: `Return to inventory`, **`Drop`** (bota 1) y
+**`Drop all (xN)`** (bota el stack). Es el texto exacto que ya usa el menú del grid — **voto del
+autor**: un segundo vocabulario para el mismo verbo es lo que la #69 acaba de cerrar.
+
+**El arrastre no bota** (voto del autor): el drag del cinturón ya significa devolver al grid o
+reordenar, y darle un destino «mundo» obligaría a decidir qué pasa al soltar en el vacío. Si se
+quiere, es una entrada aparte.
+
+### Verificación
+
+`glua_check` 48/48. Harness **1038 → 1089** con la #74 (**28 checks** son de esta entrada: **20** de
+conducta en el realm **server** y **8** en el cliente; la 51.ª es la precondición que las dos
+entradas comparten, porque la celda del cinturón es el único punto donde se cruzan).
+
+**El check estrella no mira el inventario: mira el pool.** Tras botar 1 de un slot de 80, el pool del
+engine tiene **79**. Los números se eligieron con la **lección 94** en la mano: el slot lleva 80 y el
+`max_stack` del 9 mm es **120**, dos números distintos, así que una fila que se equivoque de fuente
+no puede salir verde igual. Y las dos opciones botan **cantidades distintas** (1 y 79), medido
+también del lado del cliente sobre el menú real.
+
+Además: **conservación** (1 + 79 al suelo + 0 en el cinturón + 0 en el grid = las 80 que había), el
+**ledger** (la entidad **existe** en el suelo — que el slot baje pasa igual si el objeto se evaporó),
+el control de alcance de que **no pasó por el grid**, y cuatro controles negativos (slot vacío, slot
+fuera de rango **con algo adentro**, jugador muerto, y **`BeltClear` intacto y todavía empujando el
+espejo**).
+
+> ⚠ **El control de rango se escribió mal la primera vez y lo dijo el sabotaje, no la lectura.**
+> Medido sobre slots **vacíos**, el check pasaba con el gate puesto **y** con el gate sacado: un slot
+> fuera de rango siempre está vacío, así que el `entry == nil` contestaba primero y el guardia nunca
+> se ejercía. *Un guardia cuya única prueba no puede alcanzarlo es un guardia que nadie midió.* Se
+> reescribió plantando una entrada en `belt[9]`, que es el único estado en el que el gate es
+> alcanzable — y es un estado real, porque el cliente puede nombrar el slot 9 en su `UInt(4)`.
+
+**Verificación en negativo:** `dev/sabotaje_cargo_74_72.py`, **20/20 en rojo** (9 de esta entrada),
+entre ellos ⭐ **sacarle el `AmmoPool.Push` al drop nuevo**: si ése saliera verde, el check estrella
+no mediría y la entrada entera se caería.
+
+**Planilla AG — SIN CORRER.** Su fila decisiva es **recargar después de botar**: el defecto del
+espejo no se ve en el inventario.

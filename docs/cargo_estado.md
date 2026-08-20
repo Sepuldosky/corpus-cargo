@@ -5,7 +5,75 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-19 (**nuevo: LA GRAMÁTICA DEL MOUSE** — roadmap **#69**, CRG-74,
+**Última actualización:** 2026-08-20 (**tanda doble: EL MENÚ TOMA EL TEMA + EL CINTURÓN PUEDE
+BOTAR** — roadmap **#74** y **#72**, CHANGELOG **73** y **74**, las dos `[PENDIENTE]`. Van juntas
+porque **tocan superficies DISJUNTAS** —la #74 es pintado de cliente, la #72 es semántica de
+munición en server— así que un rojo de una no se puede confundir con un rojo de la otra, y cada una
+tiene su entry, su letra de planilla y su bloque de sabotaje para poder cerrar sola.
+**#74 — EL MENÚ CONTEXTUAL TOMA EL TEMA, y el entregable es una NORMA:** era el **único** pedazo de
+UI del módulo que no pasaba por el theme, y salía con el gris de fábrica de Derma encima de una
+interfaz que no es gris (*«tambien el menu contextual tiene color derma, deberia tomar el color del
+hud de DGL4 que tiene cargo»*). **El teñido de DGL4 sale gratis y eso es literalmente lo pedido:**
+`T.Colors` **muta en sitio** (CRG-29) y con DGL4 montado la paleta entera deriva de su acento, así
+que un menú que lee `T.Colors` toma el color del HUD **sin una línea de compat** y se re-tiñe en
+vivo. Ir a buscar el acento al mod habría sido una **segunda casa**. Son **ocho** los sitios que
+abren un menú (6 en `ui.lua`, 1 en `trade.lua`, 1 en `transfer.lua`) y **pintarlos a mano deja el
+problema intacto**: el noveno vuelve a salir gris, que es cómo nació la entrada. Va **una puerta
+única** —`CARGO.Theme.Menu()`— acuñada como **CRG-75**, sede **§15.7**, al lado de CRG-74.
+**LA TRAMPA, y la premisa con la que se entró era FALSA:** un `DMenuOption` **se pinta a sí mismo**,
+y `DMenu:AddSubMenu` construye el hijo con un `DermaMenu(true, self)` **pelado** — un menú **aparte**
+que el helper nunca vio, así que los **cuatro** submenús quedarían grises y **eso no se ve en la
+primera pasada: hay que abrir uno**. El prompt de la tanda decía que *«el hijo se crea al abrirse»*;
+**se crea al DECLARARSE**, leído en `vgui/dmenuoption.lua` en disco. La conclusión —pintar la
+**descendencia** y no la instancia— sobrevivió, pero **por otro mecanismo**: con la premisa falsa el
+helper se habría escrito enganchando el `Open()` del hijo, más caro y apuntado al lugar equivocado.
+*Leer la fuente costó diez segundos y cambió el diseño.* El helper envuelve
+`AddOption`/`AddSubMenu`/`AddSpacer` y **re-envuelve recursivamente** al hijo. **Votos del autor:**
+los **ocho** menús (no sólo los de ítems) y **hover `cellHover` + borde `border`**, lo mismo que una
+celda del grid — el acento pleno en una lista de ocho opciones queda chillón. **Único detalle que se
+EMPUJA en vez de leerse, y se dice porque parece un olvido de CRG-29:** `DLabel` guarda el
+foreground como **snapshot**, así que el color de texto se re-empuja **cada frame** o un re-teñido en
+vivo no llegaría nunca a un menú abierto. **NO se tocó el CONTENIDO** de ningún menú: es pintura, y
+un rojo de contenido se leería como un rojo de tema.
+**#72 — EL CINTURÓN PUEDE BOTAR AL MUNDO:** *«Falta drop desde el belt para expulsarlo del
+inventario a la municion»*. Hasta hoy la munición del cinturón sólo podía **volver al grid** y recién
+desde ahí botarse, o sea **dos gestos**, y el segundo dependía de que **hubiera lugar de peso en el
+grid** — justo lo que no hay cuando quieres tirar algo. `CARGO.Inventory.BeltDrop(ply, slotN, count)`
++ intent `belt_drop`, con la forma de la **rama de stack de `DropEquipped`** (#28) y no una ruta
+nueva. **Sin `cid`:** un slot de cinturón se nombra por su **número**, `rec.belt[n]` ya *es* la
+entrada. **EL DEFECTO QUE LA ENTRADA EXISTE PARA EVITAR NO SE VE EN PANTALLA: SE VE AL DISPARAR** —
+el cinturón **ES** el pool del engine (§16.3, CRG-15), así que un drop que se saltee el
+`AmmoPool.Push` deja al jugador **habiendo tirado la caja y teniendo las balas todavía cargadas**;
+el ítem cae al piso, el inventario queda impecable, y aparece en la próxima recarga. Es la **cuarta
+puerta** que saca algo del cinturón y **la tabla de las cuatro quedó escrita en §16.3** justo porque
+la que falte no da error. **No acuña CRG:** es aplicación de CRG-15. **Votos del autor:** el menú
+espeja el **vocabulario del grid palabra por palabra** (`Drop` / `Drop all (xN)`, además del
+`Return to inventory` que ya estaba) porque dos vocabularios para el mismo verbo es lo que la #69
+acaba de cerrar; y **el arrastre NO bota** — el drag del cinturón ya significa devolver/reordenar.
+**VERIFICACIÓN:** `glua_check` **48/48**, harness **1038 → 1089 verdes** (51 nuevos: **20** de
+conducta en el realm server, **21** en el cliente y **10** en el gate de FUENTES, **tres de ellos POR
+CUENTA y por archivo separado** — con el total, mudar un menú de archivo lo tapa; reparto por
+entrada: **22 la #74**, **28 la #72** y **1 precondición compartida**), selftest **100 server / 107 client**
+sin moverse, y **20 sabotajes en rojo, 20 de 20** (`dev/sabotaje_cargo_74_72.py`), etiquetados por
+entrada, con control de apertura y de cierre en verde. Se re-corrieron `sabotaje_cargo_67/68/69`
+(**12/12, 16/16, 19/19**) porque la tanda tocó `ui/trade/transfer`: un ancla rota **no revienta**,
+imprime `ANCLA x0` y desarma una verificación vieja en silencio.
+**LO QUE MÁS ENSEÑÓ ESTA TANDA, y las dos veces habló el instrumento y no la lectura:** (a) el
+control de rango de slot, escrito sobre slots **vacíos**, pasaba con el gate puesto **y** con el
+gate sacado —un slot fuera de rango siempre está vacío, así que el `entry == nil` contestaba primero
+y el guardia **nunca se ejercía**; *un guardia cuya única prueba no puede alcanzarlo es un guardia
+que nadie midió*, y se reescribió plantando una entrada en `belt[9]`, el único estado donde el gate
+es alcanzable (y es real: el cliente manda el slot en un `UInt(4)`, 0 a 15 sobre un cinturón de 6);
+(b) el propio **stub de vgui del harness** cayó en la autovivificación que su comentario de al lado
+advertía —`self._options or {}` nunca corre porque el `__index` devuelve una **función**, que es
+truthy— y hubo que leerlo con `rawget`, el mismo cuidado que los checks usan para no barrer las
+doscientas panels del frame.
+**LO QUE FALTA:** las **dos pasadas en juego**. Planilla **AF** (#74) —sus dos filas propias son los
+controles del tema: con DGL4 montado el menú **cambia de color con el HUD**, y **sin** DGL4 no
+revienta ni sale ilegible— y planilla **AG** (#72), cuya fila decisiva es **recargar después de
+botar**, porque el defecto del espejo no se ve en el inventario.)
+
+Contexto previo: **LA GRAMÁTICA DEL MOUSE** — roadmap **#69**, CRG-74,
 sede §15.6. **`M1` selecciona · `M3` deselecciona · `M2` es el menú contextual**, y es una **norma
 del módulo entero**, no un feature de una pantalla: son las palabras del autor al cerrar la planilla
 AD del #68 — *«Al final como norma es que M1 selecciona, M3 deselecciona y M2 es el boton
