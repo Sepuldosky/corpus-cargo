@@ -54,21 +54,27 @@ y las dos listas del loot son **distintas** (caja 200, jugador 120) para que el 
 adaptador equivocado; (b) **mudar la gradación de `corpus_cargo_trade.lua` a `corpus_cargo_grid.lua`
 dejó el sabotaje 10 de `sabotaje_cargo_67.py` apuntando a NADA**, y ese script **no revienta**:
 imprime `ANCLA x0` y sale 1, o sea que desarma una verificación en negativo vieja **en silencio**. Se
-re-apuntó y se re-corrió (**12/12**); el del #68 sigue en **16/16**. **1.ª PASADA EN JUEGO 2026-08-20: PARCIAL — 4 PASA · 0 FALLA · 10 SIN CORRER** (planilla **AE**,
-`dev/checks/cargo-mouse-r1.html`; se cortó por cansancio del autor, no por un defecto). **Cero rojos**,
-y las cuatro que corrieron son las que decían si el resto tenía sentido. **AE2 CIERRA LA ÚNICA INCÓGNITA
-DE LA TANDA:** el botón del medio **LLEGA** a un `DButton` que además es `Droppable` — control positivo
-de M1 **y** `[AE2] M3 LLEGO` **cuatro veces**, o sea repetible y no un golpe de suerte. Lo que era
-**indicio** —que la capa de drag-and-drop no se come el press del medio— queda **medido en el motor**,
-y las filas 09-12 pasan de riesgo abierto a cobertura pendiente. **AE4: la gradación LLEGÓ AL JUEGO**
-— un clic pelado sobre la celda del contenedor trajo **30**, un cuarto del **techo** (120) y no de la
-celda (habría dado 26) ni el stack entero. **AE1** clavó los selftests en 100/107 con lo predicho y
-**AE3** dejó el sujeto bien formado (cuatro celdas con una de count distinto del techo, sin lo cual
-las filas de niveles no discriminan — lección 94). **Lo que NO acredita:** los otros dos niveles ni
-ninguna de las dos excepciones votadas — las diez restantes se declaran **SIN CORRER** y no se dan por
-buenas por parentesco con las que pasaron. Falta: **AE5/AE6/AE7** (cierran M1), **AE9/AE10/AE11** (M3 y
-la fila del carrito) y **AE12/AE13/AE14** (los controles negativos de alcance). Las marcas viven en el
-`localStorage` de la planilla, así que se retoma donde quedó. CHANGELOG **72 `[PENDIENTE]`**.
+re-apuntó y se re-corrió (**12/12**); el del #68 sigue en **16/16**. **PASADA EN JUEGO ✓ 2026-08-20 — planilla AE CERRADA 14/14, 0 fallas, en dos rondas** (la 1.ª quedó
+en 4 por cansancio y no por un defecto). **AE2 cerró la única incógnita de la norma:** el botón del
+medio **LLEGA** a un `DButton` que además es `Droppable` —control positivo de M1 más `[AE2] M3 LLEGO`
+cuatro veces, o sea repetible—, así que lo que era **indicio** sobre la capa de drag-and-drop quedó
+**medido en el motor**. Los repartos que trajo el autor miden, de yapa, lo que el bloque no se
+propuso: **AE4** caja 120+107, clic pelado sobre la de 107 deja **77** y trae **30** (un cuarto del
+TECHO, no de la celda); **AE5** `SHIFT` sobre la de 77 la trae entera y del lado del jugador queda
+**107** — los 30 previos y las 77 **se fundieron**, que es `AddStack` bajo el techo; **AE8** manda 30
+y queda caja **120·120·17** / inventario **120·90**, que **suman 467**, o sea conservación intacta y
+el 17 es el resto de re-empacar 257 bajo un techo de 120, no munición mal partida; **AE7** ALT solo
+vuelve al cuarto (control negativo de la tecla suelta); **AE9** los tres niveles andan en las **dos
+direcciones y los dos lados del trato**, y M3 los replica; **AE11** la fila del carrito saca 30 con
+un clic y todo con `SHIFT`, y `ALT+SHIFT` hace **lo mismo** que `SHIFT` — el comportamiento
+**declarado por construcción**, ahora visto en juego. **OBSERVADO Y ACEPTADO:** arrastrar sigue
+moviendo el **stack entero** en las dos direcciones (el autor lo llamó *«el símil de SHIFT+M1»*) —
+es por diseño (§15.6): el arrastre no es un clic. **QUÉ SE MIDIÓ CON GESTO Y QUÉ POR COBERTURA, y se
+dice:** las filas con reparto anotado (AE4/AE5/AE7/AE8/AE9/AE11) corrieron por su gesto; **AE10,
+AE12, AE13 y AE14 se acreditan por el uso extendido del trader y por las filas que las cubren**, no
+por una corrida aislada — declarado por el autor (*«no llené todas porque hay otras que me lo
+confirman»*). *Un verde por cobertura y uno por gesto no son lo mismo.* CHANGELOG **72
+`[APLICADO]`**.
 Contexto previo: **el ref de un stack nombra LA CELDA que apretaste** —
 `cid` estable por entrada, roadmap **#68**, CRG-73, sede §7.3. El autor lo encontró en juego: *«al
 meter al belt, ese que tiene 107 se mete otro de 120, incluso bote toda mi municion de pistola del

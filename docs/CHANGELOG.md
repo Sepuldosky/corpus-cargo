@@ -6761,7 +6761,7 @@ salió de esta pasada con la gramática ya votada.
 
 ---
 
-## 72. La gramática del mouse: M1 selecciona, M3 deselecciona, M2 es el menú (roadmap #69) `[PENDIENTE]`
+## 72. La gramática del mouse: M1 selecciona, M3 deselecciona, M2 es el menú (roadmap #69) `[APLICADO 2026-08-20]`
 
 **Pedido del autor (en juego, 2026-08-19, al llenar la planilla AD del #68).** Cuatro frases, y la
 última es la entrada:
@@ -6941,7 +6941,7 @@ medio **llegue**. **Si esa fila no pasa, todas las de M3 quedan SIN CORRER y NO 
 cableado que no dispara se ve exactamente igual que una regla mal escrita, y marcarlas rojas
 acreditaría un defecto de reglas que nadie midió.
 
-**Pendiente:** completar la pasada en juego con la planilla **AE** (`dev/checks/cargo-mouse-r1.html`).
+**Pasada en juego:** planilla **AE** (`dev/checks/cargo-mouse-r1.html`), **cerrada 14/14 el 2026-08-20** en dos rondas.
 
 ### Addendum — 1.ª pasada en juego (2026-08-20): PARCIAL, 4 PASA · 0 FALLA · 10 SIN CORRER
 
@@ -6984,3 +6984,54 @@ barrida sobre las **101** planillas de `dev/checks/`: las 101 parsean, **cero fa
 
 ---
 
+
+### Addendum 2 — 2.ª pasada en juego (2026-08-20): **CERRADA, 14 PASA · 0 FALLA · 0 SIN CORRER**
+
+Las diez que faltaban corrieron y pasaron. **Ningún rojo en toda la sección**, y ningún check
+retirado.
+
+**Los números que el autor reportó, y por qué valen más que un «anda bien»:** varias filas trajeron
+el reparto exacto de las celdas, así que además del gesto quedó medida la **conservación** y el
+**merge bajo `max_stack`** — que no era lo que el bloque se propuso medir y es lo que lo respalda.
+
+- **AE4** — caja con 120 y 107; clic pelado sobre la de 107 → le quedan **77** a la caja y llegan
+  **30**. Un cuarto del **techo**, no de la celda.
+- **AE5** — caja con 120 y 77; `SHIFT` sobre la de 77 → llegan las **77** y del lado del jugador
+  queda **107**. O sea que los 30 anteriores y las 77 **se fundieron en una sola celda**: es
+  `AddStack` mergeando bajo el techo, correcto y no un stack perdido.
+- **AE7** — ALT solo manda y trae de **30** (vuelve al cuarto de techo) y SHIFT manda el stack. El
+  control negativo de la tecla suelta discrimina.
+- **AE8** — M1 manda 30: la caja queda **120 · 120 · 17** y el inventario **120 · 90**. Suman
+  **467**, que es el total original: la conservación se sostiene, y el 17 no es munición mal partida
+  sino el resto de re-empacar 257 bajo un techo de 120.
+- **AE9** — los tres niveles andan **en las dos direcciones y en los dos lados del trato** (comprar y
+  vender), y M3 los replica para quitar.
+- **AE11** — la fila del carrito: un clic saca **30**, `SHIFT` saca todo. Y `ALT+SHIFT` **hace lo
+  mismo que `SHIFT`**, que es exactamente el comportamiento declarado: una línea de basket **ya es**
+  el agregado de su ref, así que los dos niveles son el mismo número **por construcción**. Quedó
+  observado en juego, no sólo escrito.
+
+**OBSERVADO Y ACEPTADO, para que nadie lo lea como bug después:** arrastrar sigue moviendo el
+**stack entero**, en las dos direcciones — la caja recibe dos celdas de 120 y 107, y traerlas de
+vuelta devuelve dos celdas de 120 y 107. El autor lo notó y lo describió como *«el símil de
+SHIFT+M1»*. **Es por diseño** (§15.6): el arrastre **no es un clic**, la gramática es de los
+botones, y un drag ya dice *qué* y *adónde* con el gesto. No es una gradación que se escapó.
+
+**QUÉ SE MIDIÓ CON UN GESTO AISLADO Y QUÉ POR CONFIRMACIÓN CRUZADA, dicho porque la distinción es
+la que hace citable a la planilla.** El autor lo declaró él mismo: *«no llené todas porque hay otras
+que me lo confirman, y he comprado tanto al trader verificando que sí está funcional sin dramas»*.
+Las filas con reparto anotado (AE4, AE5, AE7, AE8, AE9, AE11) se corrieron por su gesto y traen su
+número. **AE10, AE12, AE13 y AE14 se acreditan por el uso extendido del trader y por las filas que
+las cubren**, no por una corrida aislada: AE10 (la línea que se borra a cero) queda cubierta por el
+`ALT+SHIFT`+M3 de AE9 y por el AE11 de la fila; AE13 por los `Move all` / `Take all` que el autor
+ejercitó; AE14 por haber usado el menú contextual durante toda la pasada. **Es una acreditación
+válida y se dice cuál es**, en vez de dejar entender que las catorce salieron de catorce gestos
+medidos — *un verde por cobertura y un verde por gesto no son lo mismo, y confundirlos es lo que
+deja deuda fantasma en el registro*.
+
+**Con esto la norma queda acreditada en juego en sus tres mitades:** M1 gradúa en el loot y en el
+trade, M3 deselecciona con los mismos tres niveles, y las **dos excepciones votadas** se comportan
+como se declararon (la rueda muda en el loot, y la fila del carrito quitando con M1). Los controles
+negativos del #68 siguen verdes: el contenedor y el carrito **siguen agregando**.
+
+CHANGELOG **72 `[APLICADO 2026-08-20]`**. Planilla **AE** cerrada 14/14.

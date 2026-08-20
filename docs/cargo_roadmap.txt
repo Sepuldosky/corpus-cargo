@@ -2081,15 +2081,21 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 
 
 69. LA GRAMATICA DEL MOUSE: M1 SELECCIONA, M3 DESELECCIONA, M2 ES EL MENU
-    [Cargo ui/containers] — ESCRITA el 2026-08-19, acunada como CRG-74 con
-    sede Cargo_Architecture.md §15.6. CHANGELOG 72 [PENDIENTE].
-    1.ª PASADA EN JUEGO 2026-08-20: PARCIAL, 4 PASA / 0 FALLA / 10 SIN
-    CORRER (planilla AE), cortada por cansancio y no por un defecto. AE2
-    CIERRA LA UNICA INCOGNITA: el boton del MEDIO llega a un DButton
-    Droppable, cuatro disparos, o sea repetible — lo que era indicio sobre
-    el drag-and-drop queda medido EN EL MOTOR. Y AE4 acredita la gradacion
-    en juego: un clic pelado trajo 30, un cuarto del TECHO y no de la celda.
-    Las diez restantes NO se dan por buenas por parentesco.
+    [Cargo ui/containers] — CERRADA el 2026-08-20, acunada como CRG-74 con
+    sede Cargo_Architecture.md §15.6. PASADA EN JUEGO OK: planilla AE
+    (dev/checks/cargo-mouse-r1.html) 14 de 14, 0 fallas, en dos rondas.
+    CHANGELOG 72 [APLICADO].
+    AE2 CERRO LA UNICA INCOGNITA de la norma: el boton del MEDIO llega a un
+    DButton Droppable, cuatro disparos y repetible, asi que lo que era
+    indicio sobre la capa de drag-and-drop quedo MEDIDO EN EL MOTOR.
+    Los repartos que trajo el autor miden ademas lo que el bloque no se
+    propuso: 120+120+17 en la caja y 120+90 en el grid SUMAN 467, o sea que
+    la conservacion se sostiene y el 17 es re-empaque bajo el techo.
+    OBSERVADO Y ACEPTADO: arrastrar sigue moviendo el stack ENTERO en las
+    dos direcciones. Es por diseno (§15.6): el arrastre no es un clic.
+    SE DICE QUE SE MIDIO CON GESTO Y QUE POR COBERTURA: AE10/AE12/AE13/AE14
+    se acreditan por el uso extendido del trader y por las filas que las
+    cubren, no por una corrida aislada (declarado por el autor).
     Harness 1038 (eran 985), 53 checks nuevos y 19 sabotajes en rojo 19 de
     19. glua_check 48/48. Selftest sin moverse (100/107): no toca su
     superficie.
