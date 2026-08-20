@@ -994,6 +994,112 @@ comercio.
 
 ---
 
+### 15.6 La gramática del mouse (roadmap #69 — entry 72)
+
+*(**CRG-74**. Norma del **módulo entero**, no de una pantalla. Vive acá, en la sede de la UI,
+porque su valor es que la próxima pantalla no vuelva a inventar la suya.)*
+
+**M1 selecciona · M3 deselecciona · M2 es el menú contextual.** Palabras del autor, en juego el
+2026-08-19. `M3` es la rueda del medio (confirmado por él: su mapa es M1=izquierdo, M2=derecho).
+
+**Por qué es una norma y no un feature:** la entrada nació porque dos pantallas del mismo módulo
+tenían dos gramáticas para el mismo gesto — en el trade un clic cargaba un cuarto desde el #67, en
+el loot mandaba el stack entero. **Nadie lo decidió:** se escribieron en tandas distintas y cada una
+eligió sola. Sin un ID que diga qué significa cada botón, la próxima superficie repite el ciclo.
+
+#### Los tres niveles, y la única casa que los resuelve
+
+Los dos botones que mueven una cantidad leen **los mismos tres**:
+
+| Gesto | Cuánto |
+|---|---|
+| pelado | un **cuarto del TECHO** (`def.max_stack`), repetible — un cargador |
+| `SHIFT` | **la CELDA que se apretó**: lo que esa celda dice (#67) |
+| `ALT`+`SHIFT` | **todo lo de ese ítem de ese lado** — el agregado |
+
+Un `unique` es siempre 1. Una def **sin `max_stack`** no tiene techo del que sacar un cuarto y cae
+al agregado, que para un arma o un botiquín da 1 — la respuesta honesta para algo que no apila.
+
+**El cuarto es del TECHO y no de la celda**, y no es un detalle: tiene que ser el mismo bocado con
+una celda llena que con una de siete balas, o vaciar un stack casi vacío costaría los mismos cuatro
+clics que vaciar uno lleno.
+
+**`ALT` y nunca `CTRL`, y el motivo es del JUEGO y no de la UI** (voto del autor, 2026-08-19): CTRL
+está bindeado a agacharse, así que sostenerlo para comprar munición deja al jugador en cuclillas
+apenas se cierra el menú. **Un modificador de menú no puede ser una tecla de movimiento.**
+
+**Una sola función lo resuelve** — `CARGO.Grid.ClickAmount(entry, aggregate)`, en
+`corpus_cargo_grid.lua`, que es **el único lugar del módulo que lee una tecla modificadora**. Las
+cuatro superficies llegan por dos adaptadores que sólo eligen **sobre qué lista** se cuenta el
+agregado (`Trade.ClickAmount` por lado del trato, `Transfer.ClickAmount` por dirección de la
+transferencia). Escribir la gradación dos veces la desincroniza **sin un solo error** — es el mismo
+argumento que llevó el texto de condición a `Theme.ConditionShort` (#66) y el criterio de orden a
+`Items.AutoSortLess` (#67).
+
+Y **M1 y M3 preguntan a la MISMA función**: seleccionar y deseleccionar no pueden derivar si el
+número sale del mismo lugar.
+
+#### La mitad de M3, que no existía en ninguna pantalla
+
+Hasta esta entrada, «deseleccionar» era **un solo gesto sin gradación**: hacer clic en la fila del
+basket, que borraba la línea entera. `Trade.BasketTake` es la mitad nueva: saca del carrito lo mismo
+que `BasketAdd` puso, con los tres niveles. Una línea que llega a cero **se borra** en vez de quedar
+como un `x0` en la tira — el basket es intent (`Cargo_Trade` §3) y un intent vacío no es un intent.
+
+El botón llega a la celda por herencia de Derma, **leído en la fuente del motor y no de memoria**:
+un `DButton` deriva de `DLabel`, y `DLabel:OnMouseReleased` despacha `MOUSE_MIDDLE` a
+`DoMiddleClick`. El grid lo cablea **una vez**, en la celda, y no en las tres superficies: lo que
+cambia entre ellas es qué le cuelgan, no cómo les llega.
+
+> ⚠ **El despacho es en `OnMouseReleased`, NO en pressed.** Hoy nada pisa esos dos handlers en una
+> celda. Si algún día hace falta, hay que **re-emitir el despacho** o M3 deja de disparar **sin un
+> solo error**.
+
+#### Las dos excepciones, y las dos son votos del autor
+
+**No están disimuladas: están acá para que se lean como decisiones.**
+
+1. **M3 no hace nada en el LOOT.** La otra lectura era la transferencia inversa —M3 manda de vuelta,
+   con los mismos tres niveles— y el autor la rechazó por contraintuitiva: *«jamás había visto un
+   sistema así de inventario en juego donde tomes por transferencia inversa»*. La norma se lee
+   entonces como **«M3 deselecciona donde hay algo seleccionado»**, y en el loot la transferencia es
+   inmediata: no hay carrito, así que «deseleccionar» no tiene referente. El camino de vuelta ya
+   existe y es **M1 sobre la otra columna**, que es donde todo inventario lo pone.
+2. **En la FILA del basket, M1 quita.** Es el único lugar del módulo donde M1 no agrega. Una fila es
+   una entrada de **LISTA** y no una celda: existe sólo porque algo ya está seleccionado, y quitarlo
+   con un clic es el gesto que el autor ya tiene en el dedo. Lo que la fila **gana** son las
+   cantidades, para que el vocabulario sea el mismo aunque el botón no lo sea. Ahí `ALT`+`SHIFT`
+   saca **lo mismo** que `SHIFT` —la línea— porque **una línea de basket YA ES el agregado de su
+   ref** (una por `RefKey`): no es un nivel que la fila no distingue, es el mismo número **por
+   construcción**, y se dice para que ningún check afirme distinguir dos cantidades que son una.
+
+#### Qué NO cambia
+
+- **`Transfer.Menu`** (el «amount…» del click derecho) queda **exactamente como está**: el autor lo
+  declaró bien. Su clamp `math.min(n, entry.count)` es una **decisión del cliente** coherente con
+  «una celda es un stack» (#67) — no una falla. Es lo que hizo dar rojo a la fila AD11 del #68, que
+  se retiró por premisa mal escrita.
+- **M2 no cambia de significado en ninguna pantalla**, con lo que ya tiene adentro.
+- **El `cid` de CRG-73 no se toca.** Lo que una celda manda por estos gestos es una **CANTIDAD**, no
+  una identidad: los dos caminos que preguntan cuánto —el basket y la transferencia de
+  contenedores— siguen **agregando**, y sus cuatro controles negativos siguen verdes sin haber sido
+  tocados. Dos stacks del mismo `id` y `condition` son fungibles.
+- **El estado suelto** del grid propio (sin trader ni caja) sigue con `OpenItemMenu` en M2 y sin
+  transferencia: no hay a dónde mandar nada, y tampoco nada que deseleccionar.
+- **El ARRASTRE no es un clic.** Soltar una celda en la otra columna sigue moviendo el **stack
+  entero** (`onReceiveDrop` manda `cell.cargoEntry.count`), sin modificadores. La gramática es de los
+  **botones**: un drag ya dice *qué* y *adónde* con el gesto, y meterle tres niveles obligaría a
+  sostener una tecla mientras se arrastra. Queda escrito porque es la pregunta obvia al leer esto —
+  y de paso es la forma de llenar una caja de una sola vez cuando M1 pasó a mandar un cuarto.
+
+#### El costo, dicho antes y no después
+
+En el loot un M1 pelado **pasa a mandar un cuarto**, así que mover un stack completo son cuatro
+clics — o un `SHIFT`+M1. Es lo que el autor pidió explícitamente, pero es la pantalla que más se usa
+y el cambio se siente ahí.
+
+---
+
 ## 16. Sistema de munición: el cinturón ES el pool
 
 *(Bloque B, roadmap #19. Cierra la semántica que §15.2 dejó como forma vacía.)*

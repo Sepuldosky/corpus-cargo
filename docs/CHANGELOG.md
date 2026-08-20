@@ -6758,3 +6758,190 @@ medido; lo que estaba mal escrito era el gesto con que se lo pedía.
 **Lo que la fila destapó de verdad es un pedido, no un defecto**, y el autor lo dijo así: el
 contenedor no tiene la **gradación** del clic que el trade sí tiene. Va al roadmap **#69**, que
 salió de esta pasada con la gramática ya votada.
+
+---
+
+## 72. La gramática del mouse: M1 selecciona, M3 deselecciona, M2 es el menú (roadmap #69) `[PENDIENTE]`
+
+**Pedido del autor (en juego, 2026-08-19, al llenar la planilla AD del #68).** Cuatro frases, y la
+última es la entrada:
+
+> *«Hay que mejorar el como funcionan los contenedores (…) el enviar tiene que ir de cuartos por
+> stack y completo el stack con SHIFT+M1, todos del mismo tipo con ALT+SHIFT+M1»*
+> *«Otra cosa del trader, hay que permitir deseleccionar de a cuartos con M3, deseleccionar un stack
+> completo con SHIFT+M3 y deseleccionar todos del mismo tipo con ALT+SHIFT+M3»*
+> **«Al final como norma es que M1 selecciona, M3 deselecciona y M2 es el boton contextual»**
+
+Las tres primeras son **casos**. La última es la norma, y por eso la entrada del roadmap dejó de
+llamarse *«los contenedores: el clic debería transferir»* y pasó a nombrar el módulo entero.
+
+### Por qué esto es una norma y no un feature
+
+Dos pantallas del mismo módulo tenían **dos gramáticas para el mismo gesto**: en el trade un clic
+cargaba un cuarto del techo desde el #67, en el loot mandaba el stack entero de la celda. **Nadie lo
+decidió.** Se escribieron en tandas distintas y cada una eligió sola.
+
+Sin un ID que diga qué significa cada botón, la próxima pantalla vuelve a inventar la suya — que es
+exactamente cómo nació esta entrada. Por eso el entregable no es «los contenedores ahora graduan»:
+es **CRG-74**, con sede en §15.6, la sede de la UI.
+
+### Los tres niveles, y la única casa que los resuelve
+
+Los dos botones que mueven una cantidad leen **los mismos tres**:
+
+| Gesto | Cuánto |
+|---|---|
+| pelado | un **cuarto del TECHO** (`def.max_stack`), repetible — un cargador |
+| `SHIFT` | **la CELDA que se apretó**: lo que esa celda dice (#67) |
+| `ALT`+`SHIFT` | **todo lo de ese ítem de ese lado** — el agregado |
+
+Un `unique` es siempre 1. Una def **sin `max_stack`** no tiene techo del que sacar un cuarto y cae al
+agregado, que para un arma o un botiquín da 1 — la respuesta honesta para algo que no apila.
+
+**El cuarto es del TECHO y no de la celda**, y no es un detalle de implementación: tiene que ser el
+mismo bocado con una celda llena que con una de siete balas, o vaciar un stack casi vacío costaría
+los mismos cuatro clics que vaciar uno lleno.
+
+**`ALT` y nunca `CTRL`, y el motivo es del JUEGO y no de la UI** (voto del autor): CTRL está bindeado
+a agacharse, así que sostenerlo para comprar munición deja al jugador en cuclillas apenas se cierra
+el menú. Un modificador de menú no puede ser una tecla de movimiento.
+
+**Una sola función lo resuelve** — `CARGO.Grid.ClickAmount(entry, aggregate)`, que es **el único
+lugar del módulo que lee una tecla modificadora**. Las cuatro superficies llegan por **dos
+adaptadores** que sólo eligen *sobre qué lista* se cuenta el agregado:
+
+- `Trade.ClickAmount(side, entry)` — el stock del trader o el grid del jugador;
+- `Transfer.ClickAmount(dir, entry)` — el contenedor o el grid del jugador.
+
+Escribir la gradación dos veces la desincroniza **sin un solo error**. Es el mismo argumento que
+llevó el texto de condición a `Theme.ConditionShort` (#66) y el criterio de orden a
+`Items.AutoSortLess` (#67). Y **M1 y M3 preguntan a la MISMA función**: seleccionar y deseleccionar
+no pueden derivar si el número sale del mismo lugar.
+
+### La mitad de M3, que no existía en ninguna pantalla
+
+Esto **no es «agregarle niveles a algo que existía»**. Hasta esta entrada, «deseleccionar» era un
+solo gesto sin gradación: hacer clic en la fila del basket, que borraba la línea entera. En el loot
+no había «deshacer» de ningún tipo.
+
+`Trade.BasketTake(side, key, count)` es la mitad nueva. Una línea que llega a cero **se borra** en
+vez de quedar como un `x0` en la tira: el basket es intent puro (`Cargo_Trade` §3) y un intent vacío
+no es un intent.
+
+**El botón llega a la celda por herencia de Derma, y se leyó en la FUENTE del motor y no de memoria:**
+un `DButton` deriva de `DLabel` (`dbutton.lua:179`) y `DLabel:OnMouseReleased` despacha
+`MOUSE_MIDDLE` a `DoMiddleClick` (`dlabel.lua:257`). El grid no pisa `OnMousePressed` ni
+`OnMouseReleased` en sus celdas, y `Droppable` no toca los handlers (sólo llena `m_DragSlot`). Se
+cablea **una vez, en la celda del grid** y no en las tres superficies: lo que cambia entre ellas es
+qué le cuelgan, no cómo les llega.
+
+> ⚠ **El despacho es en `OnMouseReleased`, NO en pressed.** Si algún día hace falta pisar uno de esos
+> dos handlers en una celda, hay que **re-emitir el despacho** o M3 deja de disparar **sin un solo
+> error**.
+
+### Las dos excepciones, y las dos son votos del autor
+
+Van **escritas**, no disimuladas:
+
+1. **M3 no hace nada en el LOOT.** La otra lectura era la **transferencia inversa** —M3 manda de
+   vuelta, con los mismos tres niveles— y era la recomendación del diseño. El autor la rechazó:
+   *«es contraintuitivo, jamás había visto un sistema así de inventario en juego donde tomes por
+   transferencia inversa»*. La norma se lee entonces como **«M3 deselecciona donde hay algo
+   seleccionado»**, y en el loot la transferencia es inmediata: no hay carrito, así que
+   «deseleccionar» no tiene referente. El camino de vuelta ya existe y es **M1 sobre la otra
+   columna**, que es donde todo inventario lo pone.
+2. **En la FILA del basket, M1 quita.** Es el único lugar del módulo donde M1 no agrega. El diseño
+   recomendaba dejarla como «sacar todo» y decir por qué; el autor eligió **darle las cantidades**:
+   *«es más consistente de verdad, apretar shift+m1 se va a aprender fácilmente para todo, así el
+   jugador no memoriza mil formas distintas de interactuar con funcionalidades similares»*. Se
+   conserva el botón porque una fila es una entrada de **LISTA** y no una celda: existe sólo porque
+   algo ya está seleccionado. Y ahí `ALT+SHIFT` saca **lo mismo** que `SHIFT` —la línea— porque **una
+   línea de basket YA ES el agregado de su ref** (una por `RefKey`): no es un nivel que la fila no
+   distingue, es el mismo número **por construcción**, y se declara así para que ningún check afirme
+   distinguir dos cantidades que son una sola.
+
+### Qué NO cambia
+
+- **`Transfer.Menu`** (el «enviar cantidad» del click derecho) queda **exactamente como está**: el
+  autor lo declaró bien (*«el enviar cantidad esta bien segun stack y como funciona actualmente»*).
+  Su clamp `math.min(n, entry.count)` es una **decisión del cliente**, coherente con «una celda es un
+  stack» (#67) — no una falla. Es lo que hizo dar rojo a la fila **AD11** del #68, que se retiró por
+  premisa mal escrita.
+- **M2 no cambia de significado** en ninguna pantalla.
+- **El `cid` de CRG-73 no se toca.** Lo que una celda manda por estos gestos es una **CANTIDAD**, no
+  una identidad: los dos caminos que preguntan cuánto —el basket y la transferencia de
+  contenedores— siguen **agregando**, y sus cuatro controles negativos quedaron verdes **sin haber
+  sido tocados**. Dos stacks del mismo `id` y `condition` son fungibles.
+- **El estado suelto** del grid propio sigue con `OpenItemMenu` en M2 y sin transferencia: no hay a
+  dónde mandar nada, y tampoco nada que deseleccionar.
+
+### El costo, dicho antes de la pasada y no después
+
+En el loot un M1 pelado **pasa a mandar un cuarto**, así que mover un stack completo son cuatro
+clics — o un `SHIFT+M1`. Es lo que el autor pidió explícitamente, así que no es una objeción, pero
+es la pantalla que más se usa y el cambio se siente ahí.
+
+### Archivos
+
+- `client/corpus_cargo_grid.lua` — **`Grid.ClickAmount`** (la casa única) y **`Grid.Aggregate`** (el
+  conteo, mudado desde el trade porque ahora lo pide también el loot), más el cableado de
+  `cell.DoMiddleClick` y el `opts.onMiddleClick` del contrato del grid.
+- `client/corpus_cargo_trade.lua` — `Trade.ClickAmount` pasa a ser un **adaptador**;
+  `Trade.BasketTake` (la mitad de M3); el `onMiddleClick` del stock; la fila de la tira gradada, con
+  `LineAsEntry` para que lea **la línea** y no la última celda que la alimentó; y dos marcas
+  (`cargoBasketSide`/`cargoBasketKey`) que le dan a la fila un asidero, igual que `cargoEntry` en una
+  celda.
+- `client/corpus_cargo_transfer.lua` — **`Transfer.ClickAmount`**, el adaptador del loot.
+- `client/corpus_cargo_ui.lua` — las **dos** superficies del loot piden su cantidad al adaptador; el
+  grid propio gana `onMiddleClick` **sólo en estado `trade`**.
+
+### Verificación
+
+- `glua_check` **48/48**.
+- Harness **985 → 1038 verdes** (`dev/harness_cargo.py`): **39** checks de conducta en CLIENT y
+  **14** en el gate de FUENTES, **seis de ellos POR CUENTA**. Selftest **100 server / 107 client**,
+  sin moverse: el bloque no toca su superficie.
+- **19 sabotajes en rojo, 19 de 19** (`dev/sabotaje_cargo_69.py`), con control de apertura y de
+  cierre en verde.
+
+**Cómo se mide una casa única, que es lo que esta tanda tuvo que inventar:** que `Grid.ClickAmount`
+exista no dice nada. Lo que hace que la gradación sea **una** es que **ningún otro archivo lea una
+tecla**, así que el gate cuenta los **cuatro** únicos usos de `input.IsKeyDown(KEY_…)` del módulo
+entero y **prohíbe el patrón** en los otros tres archivos de cliente. Un segundo lector no revienta
+ni se ve: devuelve otro número y se desincroniza en silencio.
+
+**Y los sitios de llamada se CUENTAN, no se comprueban** (lección 89): sabotear la gradación pone la
+pasada entera en rojo, pero **devolver UNA de las cuatro superficies a su cantidad de antes la deja
+verde**, porque las otras tres siguen midiendo bien. Dos de los 19 sabotajes son exactamente eso y no
+tocan la gradación en absoluto. Además, el bloque aprieta **las celdas de verdad**: abre un
+contenedor por su receiver real, busca los paneles que el grid creó y llama sus `DoClick` /
+`DoMiddleClick` interceptando `Transfer.Send`.
+
+**Dos cuidados de instrumento que la tanda pagó:**
+
+1. **Los tres niveles sólo discriminan sobre una celda cuyo `count` NO sea el `max_stack`** — con la
+   celda al tope, «un cuarto del techo» y «lo que dice la celda» dan 30 y 120, pero el `ALT+SHIFT` de
+   un stack solo da 120 también y la fila deja de distinguir dos niveles (**lección 94**, que costó
+   una vuelta en el #68). El bloque mide sobre una **x80 con agregado 200**. Y las **dos listas del
+   loot son distintas a propósito** (caja 200, jugador 120): con las dos iguales, un adaptador que se
+   equivocara de lista devolvería un número creíble y ningún check lo vería.
+2. **Mudar la gradación de `corpus_cargo_trade.lua` a `corpus_cargo_grid.lua` dejó el sabotaje 10 de
+   `dev/sabotaje_cargo_67.py` apuntando a NADA**, y ese script **no revienta**: imprime `ANCLA x0` y
+   sale 1, o sea que **desarma una verificación en negativo vieja en silencio**. Se re-apuntó al
+   archivo nuevo y se **re-corrió**: **12/12**. El del #68 se re-corrió también y sigue en **16/16**.
+
+### Lo que el harness NO puede decir, y por eso hay planilla
+
+Que `cell.DoMiddleClick` esté cableado y haga lo correcto está probado offline. Que **el motor lo
+despache** hasta ahí, no: la cadena se leyó en la fuente de GMod, pero que la capa de drag-and-drop
+no se coma el press antes del release es **indicio y no prueba**.
+
+Por eso la **primera fila de la planilla AE** es una **medición y no un veredicto**: que el botón del
+medio **llegue**. **Si esa fila no pasa, todas las de M3 quedan SIN CORRER y NO en rojo** — un
+cableado que no dispara se ve exactamente igual que una regla mal escrita, y marcarlas rojas
+acreditaría un defecto de reglas que nadie midió.
+
+**Pendiente:** pasada en juego con la planilla **AE** (`dev/checks/cargo-mouse-r1.html`).
+
+---
+

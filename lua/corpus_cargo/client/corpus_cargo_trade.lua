@@ -58,55 +58,40 @@ end
 -- max_stack splits 240 rounds into two entries of 120 and both answer to the
 -- same ref, so a basket line is an aggregate over all of them (in-game report
 -- 2026-07-14: selling "all" of one stack left the twin stack unreachable).
+--
+-- The count itself lives in Grid (CRG-74): the loot view needs the same
+-- aggregate over the container and over the player's grid, and two copies of
+-- a sum are two chances to answer a different number. What is trade-specific
+-- is only which LIST to count over, and that is what this adapter binds.
 local function Available(side, entry)
-    local key = CARGO.Trade.RefKey(entry)
-    local total = 0
-    for _, e in ipairs(SourceItems(side)) do
-        if CARGO.Trade.RefKey(e) == key then
-            total = total + (e.uid and 1 or (e.count or 1))
-        end
-    end
-    return total
+    return CARGO.Grid.Aggregate(SourceItems(side), entry)
 end
 
 CARGO.Trade.Available = Available -- the own grid (corpus_cargo_ui.lua) needs it too
 
--- What ONE left click loads. Three amounts, and the middle one is roadmap #67
--- (a unique is always 1):
+-- What ONE click moves on this side — the trade's adapter onto the module's
+-- single gradation (CARGO.Grid.ClickAmount, CRG-74). It serves BOTH halves of
+-- the grammar: M1 loads this much into the basket, M3 takes this much back
+-- out. That is the whole point of one house — select and deselect cannot
+-- drift apart if they ask the same function.
 --
---   M1              a QUARTER of the stack ceiling, repeatable — a magazine's
---                   worth (author call, 2nd in-game pass 2026-07-14).
---   SHIFT+M1        THE CLICKED STACK: what that cell shows, so 120 rounds.
---   ALT+SHIFT+M1    everything of that item on that side.
---
--- ALT and not CTRL, and the reason is the game and not the UI (author, in-game
--- 2026-08-19): CTRL is bound to duck. Holding it to buy ammunition makes the
--- player crouch the moment the menu closes — a modifier for a menu must not be
--- a movement key.
+-- All this adds is the binding of `side` to the list the aggregate is counted
+-- over. The three amounts, the keys and the reason ALT is not CTRL live in
+-- corpus_cargo_grid.lua and are documented there.
 --
 -- SHIFT used to load `Available`, the aggregate over every entry answering to
 -- the ref, so one click on one x120 cell of 9x19 loaded all 800 rounds the
 -- player was carrying and the deal jumped from a magazine to the whole
--- reserve. The fix is NOT to name the clicked entry: stacks of the same id and
--- condition are FUNGIBLE (120 rounds of 9x19 are 120 rounds of 9x19 whichever
--- cell they were drawn in), so there is nothing to name and nothing would be
--- gained by naming it. What the cell has to send is the QUANTITY it shows.
--- Clicking the twin cell adds ITS 120 on top — which is how both stacks stay
--- reachable, the very thing the aggregate was introduced for on 2026-07-14.
--- The aggregate stays as the CAP (BasketAdd's `room`) and as ALT+SHIFT.
+-- reserve. The fix (roadmap #67) is NOT to name the clicked entry: stacks of
+-- the same id and condition are FUNGIBLE (120 rounds of 9x19 are 120 rounds of
+-- 9x19 whichever cell they were drawn in), so there is nothing to name and
+-- nothing would be gained by naming it. What the cell has to send is the
+-- QUANTITY it shows. Clicking the twin cell adds ITS 120 on top — which is how
+-- both stacks stay reachable, the very thing the aggregate was introduced for
+-- on 2026-07-14. The aggregate stays as the CAP (BasketAdd's `room`) and as
+-- ALT+SHIFT.
 function CARGO.Trade.ClickAmount(side, entry)
-    if entry.uid then return 1 end
-
-    local shift = input.IsKeyDown(KEY_LSHIFT) or input.IsKeyDown(KEY_RSHIFT)
-    local alt = input.IsKeyDown(KEY_LALT) or input.IsKeyDown(KEY_RALT)
-
-    if shift and alt then return Available(side, entry) end
-    if shift then return math.max(1, math.floor(entry.count or 1)) end
-
-    local def = CARGO.Items.Get(entry.id)
-    local ceiling = istable(def) and isnumber(def.max_stack) and def.max_stack
-        or Available(side, entry)
-    return math.max(1, math.floor(ceiling * 0.25))
+    return CARGO.Grid.ClickAmount(entry, Available(side, entry))
 end
 
 function CARGO.Trade.BasketAdd(side, entry, count)
@@ -136,6 +121,27 @@ function CARGO.Trade.BasketAdd(side, entry, count)
         line.count = line.count + add
         line.entry = entry
     end
+    CARGO.UI.RefreshTrade()
+end
+
+-- M3, the DESELECT half of the grammar (CRG-74, roadmap #69). It takes off the
+-- basket what M1 put on, with the SAME three amounts — the caller hands the
+-- count, and the count comes from ClickAmount above, so there is no second
+-- gradation to keep in step.
+--
+-- Keyed and not by entry because the row of the strip has no cell behind it:
+-- a line can be the sum of clicks on several twin cells, and what it shows is
+-- the line. Falling to zero DELETES the line instead of leaving an x0 sitting
+-- in the strip, so "deselect it all" and "click the row" land on the same
+-- state — the basket is client-side intent (§3) and an empty intent is no
+-- intent.
+function CARGO.Trade.BasketTake(side, key, count)
+    local lines = Side(side)
+    local line = lines[key]
+    if line == nil then return end
+
+    line.count = line.count - math.max(1, math.floor(count or 1))
+    if line.count <= 0 then lines[key] = nil end
     CARGO.UI.RefreshTrade()
 end
 
@@ -240,13 +246,44 @@ CARGO.Trade.PruneBasket = PruneBasket
 -- Panels. Both are built by corpus_cargo_ui.lua's frame in the trade state.
 -- ------------------------------------------------------------------
 
+-- The line seen as if it were a cell, so the row can ask the SAME gradation
+-- the grid asks. `line.entry` is only the LAST cell that fed the line — a line
+-- of 227 rounds built from an x120 and an x107 carries the x107 — so the count
+-- has to be overridden with the line's, or SHIFT on the row would take out
+-- whatever the last click happened to be instead of the line the row shows.
+local function LineAsEntry(line)
+    return { id = line.entry.id, condition = line.entry.condition,
+        uid = line.entry.uid, count = line.count }
+end
+
+-- THE ONE DOCUMENTED EXCEPTION TO THE GRAMMAR (CRG-74, author's call
+-- 2026-08-19): on the basket ROW, M1 REMOVES. Everywhere else M1 selects and
+-- M3 deselects, and the reason the row is not made to follow is that a row is
+-- a LIST entry, not a cell: it exists only because something is already
+-- selected, and taking it out with one click is the gesture the author already
+-- has in his hand. What the row GAINS is the amounts, so the vocabulary is the
+-- same everywhere even where the button is not:
+--
+--   M1            a quarter of the stack ceiling
+--   SHIFT+M1      the whole line — what one bare click used to do
+--   ALT+SHIFT+M1  the whole line as well, and this is not an oversight: a
+--                 basket line IS the aggregate of its ref (one line per
+--                 RefKey, which is what keeps the twin stack in one deal), so
+--                 there is no larger set of "all of that type" to reach for.
+--                 Said out loud so no check ever claims to tell the two apart
+--                 — they are the same number by construction, not by accident.
 local function StripLine(parent, side, key, line, mult)
     local row = vgui.Create("DButton", parent)
     row:Dock(TOP)
     row:SetTall(20)
     row:DockMargin(0, 0, 0, 2)
     row:SetText("")
-    row:SetTooltip("Click to take it out of the basket")
+    row:SetTooltip("Click to take a quarter out · SHIFT: the whole line")
+    -- what this row stands for, same idea as `cell.cargoEntry` on a tile: the
+    -- row is the only panel of the module that acts on a basket line, and
+    -- without a handle on it there is no way to press it from outside a mouse
+    row.cargoBasketSide = side
+    row.cargoBasketKey = key
     row.Paint = function(self, w, h)
         if self:IsHovered() then
             surface.SetDrawColor(T.Colors.cellHover)
@@ -265,7 +302,10 @@ local function StripLine(parent, side, key, line, mult)
         draw.SimpleText(total, "CargoSmall", w - 4, h / 2, T.Colors.money,
             TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
     end
-    row.DoClick = function() CARGO.Trade.BasketRemove(side, key) end
+    row.DoClick = function()
+        CARGO.Trade.BasketTake(side, key,
+            CARGO.Grid.ClickAmount(LineAsEntry(line), line.count))
+    end
     return row
 end
 
@@ -324,9 +364,15 @@ function CARGO.Trade.BuildStockColumn(left)
         dragSource = "stock",
         priceOf = function(entry) return CARGO.Trade.CellPrice("buy", entry) end,
         basketOf = function(entry) return CARGO.Trade.BasketCount("buy", entry) end,
-        -- click = a quarter of the stack ceiling, SHIFT+click = all of it
+        -- M1 selects, M3 deselects, M2 is the menu (CRG-74). Both halves ask
+        -- the same ClickAmount, so a quarter goes in with one and a quarter
+        -- comes back out with the other.
         onLeftClick = function(entry)
             CARGO.Trade.BasketAdd("buy", entry, CARGO.Trade.ClickAmount("buy", entry))
+        end,
+        onMiddleClick = function(entry)
+            CARGO.Trade.BasketTake("buy", CARGO.Trade.RefKey(entry),
+                CARGO.Trade.ClickAmount("buy", entry))
         end,
         onRightClick = function(entry) CARGO.Trade.AmountMenu("buy", entry) end,
     })

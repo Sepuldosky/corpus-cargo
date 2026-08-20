@@ -5,7 +5,61 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-19 (**nuevo: el ref de un stack nombra LA CELDA que apretaste** —
+**Última actualización:** 2026-08-19 (**nuevo: LA GRAMÁTICA DEL MOUSE** — roadmap **#69**, CRG-74,
+sede §15.6. **`M1` selecciona · `M3` deselecciona · `M2` es el menú contextual**, y es una **norma
+del módulo entero**, no un feature de una pantalla: son las palabras del autor al cerrar la planilla
+AD del #68 — *«Al final como norma es que M1 selecciona, M3 deselecciona y M2 es el boton
+contextual»*. Las otras tres frases de esa nota —los cuartos por stack, el `SHIFT+M1`, el
+`ALT+SHIFT+M1` y los tres niveles para deseleccionar— son **casos** de la norma. **Por qué existe la
+entrada:** dos pantallas del mismo módulo tenían **dos gramáticas para el mismo gesto** —en el trade
+un clic cargaba un cuarto desde el #67, en el loot mandaba el stack entero— y **nadie lo decidió**:
+se escribieron en tandas distintas y cada una eligió sola. **Los tres niveles**, iguales para los dos
+botones que mueven cantidad: pelado **un cuarto del TECHO**, `SHIFT` **la celda que apretaste**,
+`ALT+SHIFT` **todo lo de ese ítem de ese lado** (un único es siempre 1; una def sin `max_stack` cae
+al agregado y da 1). **El cuarto es del techo y no de la celda** a propósito: tiene que ser el mismo
+bocado con una celda llena que con una de siete balas. **`ALT` y nunca `CTRL`, y el motivo es del
+JUEGO:** CTRL agacha, así que sostenerlo deja al jugador en cuclillas al cerrarse el menú. **UNA sola
+función lo resuelve** —`Grid.ClickAmount`, el **único lugar del módulo que lee una tecla
+modificadora**— y las cuatro superficies llegan por dos adaptadores que sólo eligen **sobre qué
+lista** se cuenta el agregado; una segunda copia se desincroniza **sin un solo error**. Y **`M1` y
+`M3` preguntan a la MISMA función**: seleccionar y deseleccionar no pueden derivar. **La mitad de
+`M3` no existía en ninguna pantalla:** hasta hoy «deseleccionar» era un solo gesto sin gradación —el
+clic en la fila del basket, que borraba la línea entera—; `Trade.BasketTake` es lo nuevo, y una línea
+que llega a cero **se borra** en vez de quedar como un `x0` (el basket es intent). **El botón del
+medio llega a la celda por herencia de Derma, leído en la FUENTE del motor y no de memoria**
+(`DButton` → `DLabel:OnMouseReleased` → `DoMiddleClick`), y el grid lo cablea **una vez**, en la
+celda. ⚠ **El despacho es en `OnMouseReleased`, NO en pressed**: pisar cualquiera de los dos
+handlers sin re-emitirlo apaga `M3` sin un solo error. **Las DOS excepciones son votos del autor y
+van escritas, no disimuladas:** (1) **`M3` no hace nada en el LOOT** —rechazó la transferencia
+inversa por contraintuitiva, *«jamás había visto un sistema así de inventario en juego»*—, así que la
+norma se lee **«M3 deselecciona donde hay algo seleccionado»** y el camino de vuelta sigue siendo
+`M1` sobre la otra columna; (2) **en la FILA del basket `M1` quita**, porque una fila es una entrada
+de **lista** y no una celda — lo que gana son las cantidades, y ahí `ALT+SHIFT` saca **lo mismo** que
+`SHIFT` porque una línea **ya es** el agregado de su ref: el mismo número **por construcción**, dicho
+para que ningún check afirme distinguir dos cantidades que son una. **Lo que NO cambia:**
+`Transfer.Menu` (el «enviar cantidad») queda **exactamente como está** —el autor lo declaró bien y su
+clamp es una decisión del cliente, no una falla—, `M2` no cambia de significado, y **el `cid` de
+CRG-73 no se toca**: lo que estos gestos mandan es una **cantidad**, no una identidad, así que el
+basket y la transferencia de contenedores **siguen agregando** y sus cuatro controles negativos
+quedaron verdes **sin ser tocados**. **EL COSTO, dicho antes y no después:** en el loot un `M1`
+pelado pasa a mandar un cuarto, o sea que un stack completo son cuatro clics — o un `SHIFT+M1`. Es lo
+pedido, pero es la pantalla que más se usa. **Verificación:** harness **985 → 1038 verdes** (39
+checks de conducta + 14 de FUENTES, **seis de ellos POR CUENTA**), selftest **100 server / 107
+client** sin moverse, `glua_check` 48/48, y **19 sabotajes en rojo, 19 de 19** con control de
+apertura y cierre en verde (`dev/sabotaje_cargo_69.py`). **Dos cosas del método que esta tanda
+pagó:** (a) los tres niveles sólo discriminan sobre una celda cuyo `count` **no** sea el `max_stack`
+—con la celda al tope, «un cuarto del techo» y «lo que dice la celda» dan 30 y 120 pero el
+`ALT+SHIFT` de un stack solo da 120 también— así que el bloque mide sobre una x80 con agregado 200,
+y las dos listas del loot son **distintas** (caja 200, jugador 120) para que el número delate un
+adaptador equivocado; (b) **mudar la gradación de `corpus_cargo_trade.lua` a `corpus_cargo_grid.lua`
+dejó el sabotaje 10 de `sabotaje_cargo_67.py` apuntando a NADA**, y ese script **no revienta**:
+imprime `ANCLA x0` y sale 1, o sea que desarma una verificación en negativo vieja **en silencio**. Se
+re-apuntó y se re-corrió (**12/12**); el del #68 sigue en **16/16**. **PENDIENTE: pasada en juego** —
+planilla **AE** (`dev/checks/cargo-mouse-r1.html`), cuya **primera fila es una medición y no un
+veredicto**: que el botón del medio **llegue**. Es lo único que el harness no puede contestar (mide
+el cableado, no el despacho del motor), y **si no pasa, todas las filas de M3 quedan SIN CORRER y no
+en rojo**. CHANGELOG **72 `[PENDIENTE]`**.
+Contexto previo: **el ref de un stack nombra LA CELDA que apretaste** —
 `cid` estable por entrada, roadmap **#68**, CRG-73, sede §7.3. El autor lo encontró en juego: *«al
 meter al belt, ese que tiene 107 se mete otro de 120, incluso bote toda mi municion de pistola del
 grid y salieron 6 items de pistola en vez de los 4 que tengo en el grid»*, y precisó el pedido —*«que
@@ -92,9 +146,8 @@ rojo, 12 de 12**, con control de apertura y cierre en verde (`dev/sabotaje_cargo
 **PASADA EN JUEGO ✓ 2026-08-19** — el Sort, el `SHIFT+M1` y el «todo», los tres OK en el trader;
 **enmienda de la pasada: el «todo» pasa de CTRL a ALT**, porque CTRL agacha. CHANGELOG **70
 `[APLICADO]`**.
-**De esa pasada salieron TRES frentes; el #68 ya cerró (arriba) y quedan DOS:**
-**#69** — la gramática del clic en contenedores, que el #67 dejó **inconsistente** con la del trade
-(en Loot un M1 manda el stack de la celda; en el trade manda un cuarto del techo). **#70** — el
+**De esa pasada salieron TRES frentes; el #68 y el #69 ya cerraron (arriba) y queda UNO:**
+**#70** — el
 **nivel 2** del grid: el orden ya no baila, pero el **empaque** sigue dejando huecos (la altura de
 una fila es la del tile más alto), y eso sólo se arregla dando a cada ítem una celda. **El #68 ya le
 pagó la mitad**: el `cid` es el ref que un intent de arrastre necesita. Enmienda a la mitad *«sin

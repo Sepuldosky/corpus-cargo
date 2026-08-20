@@ -33,6 +33,34 @@ function CARGO.Transfer.Send(dir, ref, count)
     net.SendToServer()
 end
 
+-- What ONE click transfers, per direction — the loot view's adapter onto the
+-- module's single gradation (CARGO.Grid.ClickAmount, CRG-74, roadmap #69).
+-- Same shape as CARGO.Trade.ClickAmount and for the same reason: all an
+-- adapter adds is WHICH LIST the aggregate is counted over — the container for
+-- a take, the player's grid for a put — while the three amounts and the keys
+-- live in one place for the whole module.
+--
+-- This is the half the loot view did not have: until now M1 sent
+-- `entry.count or 1`, the whole stack of the cell, with no SHIFT and no ALT,
+-- so the same gesture meant one thing here and another at the trader. The cost
+-- of closing that, and the author was told before the pass: a bare M1 now
+-- moves a quarter, so a full stack is four clicks — or one SHIFT+M1.
+--
+-- There is NO M3 here, and that is a decision and not an omission (author,
+-- 2026-08-19): a loot transfer is immediate, so there is no basket and nothing
+-- to deselect. The inverse transfer was the other reading and he turned it
+-- down as counter-intuitive — it is already reachable as M1 on the other
+-- column, which is where every inventory puts it.
+function CARGO.Transfer.ClickAmount(dir, entry)
+    local list
+    if dir == "take" then
+        list = contState and contState.items or {}
+    else
+        list = CARGO.ClientState and CARGO.ClientState.items or {}
+    end
+    return CARGO.Grid.ClickAmount(entry, CARGO.Grid.Aggregate(list, entry))
+end
+
 function CARGO.Transfer.TakeAll(dir)
     if contState == nil then return end
     net.Start(NET_TAKEALL)

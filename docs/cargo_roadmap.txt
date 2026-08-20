@@ -2081,8 +2081,43 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 
 
 69. LA GRAMATICA DEL MOUSE: M1 SELECCIONA, M3 DESELECCIONA, M2 ES EL MENU
-    [Cargo ui/containers] — PEDIDO DEL AUTOR 2026-08-19, SIN DISENAR. Va
-    despues del #68.
+    [Cargo ui/containers] — ESCRITA el 2026-08-19, acunada como CRG-74 con
+    sede Cargo_Architecture.md §15.6. CHANGELOG 72 [PENDIENTE]: falta la
+    PASADA EN JUEGO (planilla AE, dev/checks/cargo-mouse-r1.html).
+    Harness 1038 (eran 985), 53 checks nuevos y 19 sabotajes en rojo 19 de
+    19. glua_check 48/48. Selftest sin moverse (100/107): no toca su
+    superficie.
+
+    LOS DOS VOTOS QUE EL AUTOR DIO ANTES DE QUE SE ESCRIBIERA UNA LINEA, y
+    los dos quedan como EXCEPCIONES DECLARADAS de la norma:
+      · M3 NO HACE NADA EN EL LOOT. La recomendacion del diseno era la
+        transferencia inversa (M3 manda de vuelta, mismos tres niveles) y la
+        rechazo: «es contraintuitivo, jamas habia visto un sistema asi de
+        inventario en juego donde tomes por transferencia inversa». La norma
+        se lee entonces «M3 deselecciona DONDE HAY ALGO SELECCIONADO», y el
+        camino de vuelta sigue siendo M1 sobre la otra columna.
+      · LA FILA DEL BASKET CONSERVA M1 = SACAR, pero gradado. La
+        recomendacion era dejarla como «sacar todo» y decir por que; eligio
+        darle las cantidades: «es mas consistente de verdad, apretar shift+m1
+        se va a aprender facilmente para todo, asi el jugador no memoriza mil
+        formas distintas de interactuar con funcionalidades similares». Es el
+        unico lugar del modulo donde M1 no agrega, y el motivo es que una
+        fila es una entrada de LISTA y no una celda.
+    Y confirmo la derivacion que faltaba: M3 es la RUEDA DEL MEDIO.
+
+    LO QUE LA TANDA DEJO COMO METODO, y no es del feature:
+      · UNA CASA UNICA SE MIDE POR LA AUSENCIA DEL RESTO. Que la funcion
+        exista no dice nada; lo que la hace unica es que NADIE MAS lea una
+        tecla. El gate cuenta los CUATRO unicos usos de input.IsKeyDown(KEY_)
+        del modulo y prohibe el patron en los otros tres archivos.
+      · MUDAR UNA LINEA ANCLADA DESARMA EN SILENCIO UNA VERIFICACION VIEJA.
+        La gradacion se fue de corpus_cargo_trade.lua a corpus_cargo_grid.lua
+        y dejo el sabotaje 10 de sabotaje_cargo_67.py apuntando a nada: ese
+        script NO revienta, imprime ANCLA x0 y sale 1. Se re-apunto y se
+        re-corrio (12/12); el del #68 sigue en 16/16.
+
+    LO QUE SIGUE ABAJO ES EL RELEVAMIENTO CON QUE SE ESCRIBIO, y se deja
+    porque es lo que explica por que la entrada cambio de titulo.
 
     LO QUE PIDIO: «m1 en el inventario deberia enviar al otro contenedor o mi
     inventario, deberia funcionar el shift+m1 para enviar todo el item de un

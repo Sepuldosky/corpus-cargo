@@ -113,6 +113,13 @@ end
 --   getEntries    function() -> array of snapshot entries
 --   onLeftClick   function(entry, cell)?
 --   onRightClick  function(entry, cell)?
+--   onMiddleClick function(entry, cell)? — M3, the DESELECT half of the mouse
+--                 grammar (CRG-74). Wired here ONCE and not in the three
+--                 surfaces, because the surfaces differ in what they do with
+--                 it, not in how the button reaches them. A surface with
+--                 nothing to deselect (the loot view transfers immediately:
+--                 there is no basket to take anything out of) passes nil, and
+--                 the cell simply has no middle click.
 --   dragSource    string tag stored on cells ("own"/"cont"/"stock"), nil = no drag
 --   onReceiveDrop function(droppedCell)? — makes the canvas a drop target
 --   onCellDrop    function(targetEntry, droppedCell) -> handled? — makes every
@@ -246,6 +253,20 @@ function CARGO.Grid.Create(parent, opts)
                 cell.DoRightClick = function(self)
                     if isfunction(opts.onRightClick) then opts.onRightClick(entry, self) end
                 end
+                -- M3. A cell is a DButton, DButton derives from DLabel, and
+                -- DLabel:OnMouseReleased dispatches MOUSE_MIDDLE to
+                -- DoMiddleClick (garrysmod/lua/vgui/dlabel.lua:257) — read in
+                -- the ENGINE SOURCE, not assumed: nothing else in the module
+                -- had ever wired one.
+                --
+                -- THE DISPATCH IS ON RELEASE, NOT ON PRESS. Nothing here
+                -- overrides OnMousePressed/OnMouseReleased on a cell today and
+                -- nothing may start to without re-emitting it, or M3 stops
+                -- firing without a single error. `Droppable` below is safe:
+                -- all it does is fill m_DragSlot (dragndrop.lua:306).
+                cell.DoMiddleClick = function(self)
+                    if isfunction(opts.onMiddleClick) then opts.onMiddleClick(entry, self) end
+                end
 
                 if opts.dragSource then
                     cell:Droppable("cargo_item")
@@ -293,4 +314,73 @@ end
 function CARGO.Grid.RefOf(entry)
     if entry.uid then return { uid = entry.uid } end
     return { id = entry.id, condition = entry.condition, cid = entry.cid }
+end
+
+-- ------------------------------------------------------------------
+-- THE MOUSE GRAMMAR (CRG-74, roadmap #69)
+--
+-- M1 selects, M3 deselects, M2 is the context menu — the author's words, and
+-- a NORM of the module and not a feature of one screen. The two halves that
+-- move a quantity read the SAME three amounts, and this is the one place in
+-- the module that reads the modifier keys. A second copy would go stale
+-- without a single error: that is the failure mode this file exists to close
+-- (the same argument that took the condition text to Theme.ConditionShort and
+-- the sort criterion to Items.AutoSortLess).
+--
+-- ALT and not CTRL, and the reason is the game and not the UI (author,
+-- in-game 2026-08-19): CTRL is bound to duck, so holding it leaves the player
+-- crouching the moment the menu closes. A modifier for a menu must not be a
+-- movement key.
+-- ------------------------------------------------------------------
+
+-- How many units of this ITEM live in `items` — the aggregate over every
+-- entry answering to the same ref, NOT the clicked cell. max_stack splits 240
+-- rounds into two entries of 120 and both answer to the same ref (in-game
+-- report 2026-07-14: taking "all" of one stack left the twin unreachable).
+--
+-- It takes the LIST and not a side, because the three surfaces count it over
+-- three different lists — the trader's stock, the container, the player's
+-- grid — and a helper that knew which was which would have to know about all
+-- three.
+function CARGO.Grid.Aggregate(items, entry)
+    local key = CARGO.Trade.RefKey(entry)
+    local total = 0
+    for _, e in ipairs(items or {}) do
+        if CARGO.Trade.RefKey(e) == key then
+            total = total + (e.uid and 1 or (e.count or 1))
+        end
+    end
+    return total
+end
+
+-- What ONE click moves. Three amounts, and a unique is always 1:
+--
+--   M1 / M3            a QUARTER of the stack CEILING, repeatable — a
+--                      magazine's worth (author call, in-game 2026-07-14).
+--   SHIFT + M1/M3      THE CLICKED CELL: what that cell shows, so 120 rounds
+--                      (roadmap #67).
+--   ALT+SHIFT + M1/M3  everything of that item on that side — `aggregate`.
+--
+-- The quarter is of the CEILING and not of the cell on purpose: it has to be
+-- the same bite whether the cell says 120 or 7, or a nearly empty stack would
+-- need as many clicks as a full one.
+--
+-- A def with no `max_stack` has no ceiling to take a quarter of, so it falls
+-- back to the aggregate — for a weapon or a medkit that lands on 1, which is
+-- the honest answer for something that does not stack.
+function CARGO.Grid.ClickAmount(entry, aggregate)
+    if entry.uid then return 1 end
+
+    local shift = input.IsKeyDown(KEY_LSHIFT) or input.IsKeyDown(KEY_RSHIFT)
+    local alt = input.IsKeyDown(KEY_LALT) or input.IsKeyDown(KEY_RALT)
+
+    if shift and alt then
+        return math.max(1, math.floor(aggregate or entry.count or 1))
+    end
+    if shift then return math.max(1, math.floor(entry.count or 1)) end
+
+    local def = CARGO.Items.Get(entry.id)
+    local ceiling = istable(def) and isnumber(def.max_stack) and def.max_stack
+        or (aggregate or entry.count or 1)
+    return math.max(1, math.floor(ceiling * 0.25))
 end

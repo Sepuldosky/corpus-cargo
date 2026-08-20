@@ -1151,8 +1151,12 @@ function BuildFrame(state)
                 return cont and cont.items or {}
             end,
             dragSource = "cont",
+            -- M1 takes: a quarter, SHIFT the clicked cell, ALT+SHIFT every
+            -- one of that item in the crate (CRG-74). No M3: a transfer is
+            -- immediate, so there is nothing selected to deselect.
             onLeftClick = function(entry)
-                CARGO.Transfer.Send("take", CARGO.Grid.RefOf(entry), entry.count or 1)
+                CARGO.Transfer.Send("take", CARGO.Grid.RefOf(entry),
+                    CARGO.Transfer.ClickAmount("take", entry))
             end,
             onRightClick = function(entry) CARGO.Transfer.Menu("take", entry) end,
             -- dropping an own-inventory cell here puts it into the container
@@ -1300,17 +1304,27 @@ function BuildFrame(state)
         basketOf = state == "trade"
             and function(entry) return CARGO.Trade.BasketCount("sell", entry) end or nil,
         -- while looting, clicks transfer (old side-by-side panel behavior);
-        -- while trading they load the basket; solo keeps the item context menu
+        -- while trading they load the basket; solo keeps the item context menu.
+        -- The three states share ONE gradation (CRG-74): a quarter of the stack
+        -- ceiling, SHIFT the clicked cell, ALT+SHIFT everything of that item.
         onLeftClick = function(entry)
             if state == "loot" then
-                CARGO.Transfer.Send("put", CARGO.Grid.RefOf(entry), entry.count or 1)
+                CARGO.Transfer.Send("put", CARGO.Grid.RefOf(entry),
+                    CARGO.Transfer.ClickAmount("put", entry))
             elseif state == "trade" then
-                -- a quarter of the stack ceiling per click; SHIFT+click loads it
-                -- all (author call, 2nd in-game pass). Exact amounts: right click.
                 CARGO.Trade.BasketAdd("sell", entry,
                     CARGO.Trade.ClickAmount("sell", entry))
             end
         end,
+        -- M3 DESELECTS, and only where something is selected: the trade
+        -- basket. In loot the transfer is immediate and in solo there is no
+        -- selection at all, so the cell gets no middle click there — the norm
+        -- reads "M3 deselects", and a screen with nothing selected has nothing
+        -- for it to do (author's call, 2026-08-19).
+        onMiddleClick = state == "trade" and function(entry)
+            CARGO.Trade.BasketTake("sell", CARGO.Trade.RefKey(entry),
+                CARGO.Trade.ClickAmount("sell", entry))
+        end or nil,
         onRightClick = function(entry)
             if state == "loot" then
                 CARGO.Transfer.Menu("put", entry)
