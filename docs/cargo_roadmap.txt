@@ -2339,6 +2339,43 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     NO es sólo un botón: es decidir si el merge automático deja de ser
     automático, y eso toca el #67 y el #70. Medir eso PRIMERO.
 
+75. EL CUADRO DE «HOW MUCH» ESTA SIN TEMATIZAR [Cargo ui] — PEDIDO DEL AUTOR
+    el 2026-08-20, en el MISMO mensaje en que cerro la #74 y la #72 en juego.
+    ESCRITA el 2026-08-20. CHANGELOG 75 [PENDIENTE]: falta la pasada en juego
+    (planilla AH, dev/checks/cargo-prompt-tema-r1.html).
+
+    LO QUE PIDIO, textual: «el unico cambio menor que quiero es que el menu
+    de "how much" cuando mandas por amount o compras por amount tambien tiene
+    que tener el color del hud asi como el menu contextual».
+
+    ES LA MISMA NORMA CON OTRA PUERTA, y por eso NO acuna un CRG nuevo:
+    AMPLIA CRG-75, que nacio nombrando solo DermaMenu(). Dos IDs para «la UI
+    del modulo pasa por el theme» seria justo la duplicacion que la norma
+    existe para evitar.
+    DE DONDE SALIO, y vale anotarlo como forma: el cuadro era la ULTIMA
+    superficie Derma de fabrica del modulo, y solo se hizo visible cuando los
+    menus dejaron de ser grises. Arreglar lo que se veia dejo a la vista lo
+    que quedaba debajo.
+
+    QUE SE ESCRIBIO: CARGO.Theme.Prompt(), y los DOS sitios lo llaman (el
+    Buy/Sell amount... del trade y el Take/Move amount... del loot). Envuelve
+    Derma_StringRequest en vez de re-implementarlo: la funcion del engine
+    posee el LAYOUT —dimensiona desde su etiqueta, centra, cablea el Enter,
+    hace la ventana modal— y reescribir eso para cambiar seis colores seria
+    un diff mucho mayor con un modo de falla mucho peor.
+
+    ⭐ EL RENGLON QUE NO SE VE COMO UN COLOR EQUIVOCADO SINO COMO «NO HAY
+    TEXTO»: el texto de un DTextEntry NO lo dibuja el engine solo, lo dibuja
+    el SKIN (skins/default.lua PaintTextEntry termina en
+    panel:DrawTextEntryText). Un Paint propio que reemplace al skin y se
+    olvide de esa llamada deja UNA CAJA DONDE SE PUEDE TIPEAR Y NO SE VE
+    NADA. Leido en la fuente antes de escribir, no descubierto en juego.
+    Tiene check de conducta Y sabotaje propio.
+
+    Verificacion: 18 checks nuevos (11 de conducta en cliente + 7 en el gate
+    de FUENTES, dos POR CUENTA y por archivo separado) y 8 sabotajes en rojo;
+    la tanda entera queda en 28/28.
+
 74. EL MENU CONTEXTUAL ESTA SIN TEMATIZAR [Cargo ui] — CERRADA el 2026-08-20,
     acunada como CRG-75 con sede Cargo_Architecture.md §15.7. PASADA EN
     JUEGO OK: planilla AF (dev/checks/cargo-menu-tema-r1.html), declarada

@@ -282,6 +282,112 @@ function T.Menu()
     return SkinMenu(DermaMenu())
 end
 
+-- ------------------------------------------------------------------
+-- THE prompt of the module (CRG-75 too, roadmap #75)
+--
+-- Author, right after closing the #74 in game: "el unico cambio menor que
+-- quiero es que el menu de 'how much' cuando mandas por amount o compras por
+-- amount tambien tiene que tener el color del hud asi como el menu contextual".
+-- It is the same norm and the same reason: the "amount..." box of the trade and
+-- of the loot was the LAST stock Derma surface of the module, and it only
+-- became visible once the menus stopped being gray.
+--
+-- IT WRAPS Derma_StringRequest INSTEAD OF RE-IMPLEMENTING IT. The engine
+-- function owns the layout -- it sizes the window from the label, centers it,
+-- wires Enter, and makes it modal -- and rewriting all of that to change six
+-- colors would be a far bigger diff with a far worse failure mode. It returns
+-- its Window (read in derma/derma_utils.lua), so the whole subtree is reachable
+-- from right here.
+--
+-- Dispatch is by `panel.ClassName`, which vgui.Create stamps on every instance
+-- (includes/extensions/client/panel/scriptedpanels.lua) -- and NOT by
+-- `GetClassName()`, which returns the ENGINE class ("EditablePanel") and cannot
+-- tell a DButton from a DLabel. Both were read on disk, not assumed.
+-- ------------------------------------------------------------------
+
+local function SkinPromptChild(pnl)
+    local cls = pnl.ClassName
+
+    if cls == "DLabel" then
+        pnl:SetFont("CargoText")
+        pnl:SetTextColor(T.Colors.text)
+
+    elseif cls == "DTextEntry" then
+        pnl:SetFont("CargoText")
+        pnl:SetTextColor(T.Colors.text)
+        pnl:SetCursorColor(T.Colors.text)
+        pnl:SetHighlightColor(T.Colors.accentDim)
+        pnl.Paint = function(self, w, h)
+            T.PaintPanel(w, h, T.Colors.cell,
+                self:HasFocus() and T.Colors.borderHi or T.Colors.border)
+            -- ⚠ THE TEXT OF A DTextEntry IS NOT DRAWN BY THE ENGINE ON ITS OWN:
+            -- the SKIN draws it (skins/default.lua PaintTextEntry calls this),
+            -- so a Paint that replaces the skin and forgets this line leaves a
+            -- box you can type into and never see. It is the one difference
+            -- between this and every other Paint in this file.
+            self:DrawTextEntryText(T.Colors.text, T.Colors.accentDim, T.Colors.text)
+            return true
+        end
+
+    elseif cls == "DButton" then
+        pnl:SetFont("CargoText")
+        pnl:SetTextColor(T.Colors.text)
+        pnl.Paint = function(self, w, h)
+            local bg = T.Colors.cell
+            if self:IsDown() then
+                bg = T.Colors.accentDim
+            elseif self.Hovered then
+                bg = T.Colors.cellHover
+            end
+            T.PaintPanel(w, h, bg, T.Colors.border)
+            -- false, like DButton's own Paint: the engine still draws the label
+            return false
+        end
+    end
+end
+
+function T.Prompt(title, text, default, onOk, onCancel)
+    local win = Derma_StringRequest(title, text, default, onOk, onCancel)
+    if not IsValid(win) then return win end
+
+    win.Paint = function(self, w, h)
+        if self:GetBackgroundBlur() and isfunction(Derma_DrawBackgroundBlur) then
+            Derma_DrawBackgroundBlur(self, self.m_fCreateTime)
+        end
+        T.PaintPanel(w, h, T.Colors.panel, T.Colors.border)
+        return true
+    end
+
+    -- The frame's OWN furniture is skipped, not skinned: the three window
+    -- buttons are hidden here (Derma_StringRequest calls ShowCloseButton(false))
+    -- and painting them would put three boxes back on a title bar that is meant
+    -- to be empty. The title is a DLabel but wants the heading font, so it is
+    -- handled here instead of by the generic walk.
+    local skip = {}
+    for _, key in ipairs({ "btnClose", "btnMaxim", "btnMinim" }) do
+        local b = win[key]
+        if IsValid(b) then skip[b] = true end
+    end
+    if IsValid(win.lblTitle) then
+        skip[win.lblTitle] = true
+        win.lblTitle:SetFont("CargoHeading")
+        win.lblTitle:SetTextColor(T.Colors.text)
+    end
+
+    -- recursive because the pieces live TWO levels down: Derma_StringRequest
+    -- hangs the label and the entry off an InnerPanel and the two buttons off a
+    -- ButtonPanel, so a one-level pass would skin nothing at all.
+    local function walk(p)
+        for _, child in ipairs(p:GetChildren()) do
+            if not skip[child] then SkinPromptChild(child) end
+            walk(child)
+        end
+    end
+    walk(win)
+
+    return win
+end
+
 -- THE circle primitive (in-game finding 2026-07-13: the sandbox tool circles
 -- had hard, flat edges). draw.RoundedBox with radius = half the size does NOT
 -- make a circle — its radius is quantized to GMod's corner materials — and the

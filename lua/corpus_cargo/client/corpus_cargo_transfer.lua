@@ -79,7 +79,7 @@ function CARGO.Transfer.Menu(dir, entry)
     if (entry.count or 1) > 1 then
         -- partial amount (author ask, first fullscreen pass): prompt for N
         menu:AddOption(verb .. " amount...", function()
-            Derma_StringRequest(verb .. " how many?",
+            CARGO.Theme.Prompt(verb .. " how many?",
                 "1 - " .. entry.count, "",
                 function(txt)
                     local n = math.floor(tonumber(txt) or 0)

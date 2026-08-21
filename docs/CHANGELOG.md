@@ -7276,3 +7276,64 @@ Las demás (AG1, AG2, AG6, AG8, AG9, AG10) se acreditan por **cobertura** — *�
 problema»* — y no por un gesto anotado. Se declara la diferencia.
 
 CHANGELOG **74 `[APLICADO 2026-08-20]`**.
+
+---
+
+## 75. El cuadro de «how much» también toma el tema (roadmap #75) `[PENDIENTE]`
+
+**Pedido del autor (2026-08-20), en el mismo mensaje en que cerró la #74 y la #72 en juego:**
+
+> *«el único cambio menor que quiero es que el menu de "how much" cuando mandas por amount o compras
+> por amount tambien tiene que tener el color del hud asi como el menu contextual»*
+
+**Es la misma norma con otra puerta, y por eso no acuña un CRG nuevo: amplía CRG-75.** Dos IDs para
+«la UI del módulo pasa por el theme» sería exactamente la duplicación que la norma existe para
+evitar. El cuadro de cantidad era **la última superficie Derma de fábrica del módulo**, y sólo se
+hizo visible cuando los menús dejaron de ser grises — que es la forma habitual en que aparece el
+resto de un problema: *arreglar lo que se veía deja a la vista lo que quedaba debajo.*
+
+### Qué se escribió
+
+`CARGO.Theme.Prompt(title, text, default, onOk, onCancel)`, y los **dos** sitios lo llaman: el
+`Buy/Sell amount…` de `corpus_cargo_trade.lua` y el `Take/Move amount…` de
+`corpus_cargo_transfer.lua`. El censo tiene denominador: `Derma_StringRequest` aparecía **2 veces**
+en todo `lua/`, y ahora **0** fuera del theme.
+
+**Envuelve `Derma_StringRequest` en vez de re-implementarlo.** La función del engine posee el
+layout —dimensiona desde la etiqueta, centra, cablea el Enter, hace la ventana modal— y reescribir
+eso para cambiar seis colores sería un diff mucho mayor con un modo de falla mucho peor. Devuelve su
+`Window`, así que el subárbol entero es alcanzable desde el helper.
+
+### Las tres cosas que se leyeron en la fuente y no se asumieron
+
+1. **`Derma_StringRequest` devuelve su ventana** (`derma/derma_utils.lua`), y arma el árbol en **dos
+   niveles**: etiqueta y campo dentro de un `InnerPanel`, los dos botones dentro de un
+   `ButtonPanel`. Un recorrido de un solo nivel **no pintaría nada**.
+2. **`panel.ClassName` lo estampa `vgui.Create` en la instancia** (`scriptedpanels.lua`). El
+   despacho **no** puede ir por `GetClassName()`, que devuelve la clase del **engine**
+   (`EditablePanel`) y no distingue un `DButton` de un `DLabel`.
+3. ⭐ **El texto de un `DTextEntry` lo dibuja el SKIN, no el engine.** `skins/default.lua`
+   `PaintTextEntry` termina en `panel:DrawTextEntryText(...)`, así que un `Paint` propio que
+   reemplace al skin y se olvide de esa llamada deja **una caja donde se puede tipear y no se ve
+   nada**. No es un color equivocado: es la ausencia del texto, y se habría descubierto en juego
+   tratando de escribir una cantidad. Tiene check de conducta **y** sabotaje propio.
+
+**Se saltea el mobiliario del `DFrame`** (`btnClose`, `btnMaxim`, `btnMinim`), que está oculto acá:
+pintarlo devolvería tres cajas a una barra de título que tiene que estar vacía. Tiene control
+negativo.
+
+### Verificación
+
+`glua_check` 48/48. Harness **1089 → 1107** (**18 checks**: 11 de conducta en el realm cliente y 7
+en el gate de FUENTES, **dos de ellos POR CUENTA y por archivo separado**).
+
+Los de conducta incluyen el **sitio de llamada real** —abrir `Take amount…` desde el menú del loot y
+mirar el cuadro que sale— y dos controles negativos: que el mobiliario oculto **no** se pinte, y que
+el cuadro **siga funcionando** (aceptar devuelve lo que se tipeó). Ese último importa porque el
+helper envuelve el diálogo **entero**: podía romper el callback sin cambiar un solo color.
+
+**Verificación en negativo:** `dev/sabotaje_cargo_74_72.py`, **28/28 en rojo** (8 de esta entrada),
+con control de apertura y de cierre en verde.
+
+**Planilla AH — SIN CORRER.** Lo que el harness no puede contestar: que el cuadro **se vea** con la
+paleta y **cambie con el HUD**, y que el campo **muestre lo que se tipea**.

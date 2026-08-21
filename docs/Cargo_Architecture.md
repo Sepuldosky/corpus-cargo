@@ -1103,7 +1103,14 @@ y el cambio se siente ahí.
 *(**CRG-75**. Norma del **módulo entero**, al lado de CRG-74 y por el mismo motivo: vive en la sede
 de la UI porque su valor es que la próxima pantalla no vuelva a inventar la suya.)*
 
-**CRG-75 — Ningún archivo del módulo abre un `DermaMenu()`: todos llaman a `CARGO.Theme.Menu()`.**
+**CRG-75 — Ningún archivo del módulo abre una superficie Derma cruda: los menús por
+`CARGO.Theme.Menu()` y los cuadros de entrada por `CARGO.Theme.Prompt()`.**
+
+> *(Ampliada el 2026-08-20 por el roadmap **#75**, entry 75. Nació nombrando sólo `DermaMenu()`;
+> la pasada en juego de la #74 dejó a la vista que el cuadro de «how much» era la **misma norma
+> con otra puerta**, y el autor lo pidió en el mismo mensaje en que cerró la entrada. Se amplia el
+> alcance en vez de acuñar un CRG nuevo porque **es la misma regla**: dos IDs para «la UI del
+> módulo pasa por el theme» es exactamente la duplicación que la norma existe para evitar.)*
 
 **De dónde salió,** en juego el 2026-08-19: *«también el menú contextual tiene color derma, debería
 tomar el color del hud de DGL4 que tiene cargo»*. Era **el único pedazo de UI del módulo que no
@@ -1168,6 +1175,36 @@ tácita.
 `AddSpacer` agregado, ni un orden cambiado — es pintura, y un rojo de contenido se leería como un
 rojo de tema. (La única excepción es el menú del **cinturón**, y no es de esta entrada sino de la
 #72, que le agrega su drop.)
+
+#### La segunda puerta: el cuadro de «how much» (#75)
+
+`CARGO.Theme.Prompt(title, text, default, onOk, onCancel)`. Dos sitios: el `Buy/Sell amount…` del
+trade y el `Take/Move amount…` del loot.
+
+**Envuelve `Derma_StringRequest` en vez de re-implementarlo.** La función del engine posee el
+**layout** —dimensiona la ventana desde su etiqueta, la centra, cablea el Enter y la hace modal— y
+reescribir todo eso para cambiar seis colores sería un diff mucho mayor con un modo de falla mucho
+peor. Devuelve su `Window`, así que el subárbol entero es alcanzable desde el helper.
+
+**El despacho va por `panel.ClassName`**, que `vgui.Create` estampa en **la instancia**
+(`scriptedpanels.lua`), y **no** por `GetClassName()`, que devuelve la clase del **engine**
+(`EditablePanel`) y no distingue un `DButton` de un `DLabel`. Las dos cosas se leyeron en disco.
+
+**El recorrido es recursivo porque las piezas cuelgan DOS niveles abajo:** `Derma_StringRequest`
+pone la etiqueta y el campo dentro de un `InnerPanel`, y los dos botones dentro de un `ButtonPanel`.
+Un pase de un solo nivel no pintaría **nada**.
+
+> ⚠ **El renglón que no se ve como un color equivocado sino como «no hay texto».** El texto de un
+> `DTextEntry` **no lo dibuja el engine solo: lo dibuja el SKIN** — `skins/default.lua`
+> `PaintTextEntry` termina llamando a `panel:DrawTextEntryText(...)`. Un `Paint` propio que
+> reemplace al skin y se olvide de esa llamada deja **una caja donde se puede tipear y no se ve
+> nada**. Es la única diferencia entre este `Paint` y todos los demás del archivo, y tiene su
+> sabotaje propio.
+
+**Se saltea el mobiliario del `DFrame`** (`btnClose`, `btnMaxim`, `btnMinim`): están **ocultos** acá
+—`Derma_StringRequest` llama a `ShowCloseButton(false)`— y pintarlos devolvería tres cajas a una
+barra de título que tiene que estar vacía. El `lblTitle` sí se pinta, con la tipografía de
+encabezado.
 
 ---
 

@@ -83,8 +83,19 @@ después de botar** y el arma tomara de la reserva correcta es lo que convierte 
 una línea escrita en una línea **medida**. Las otras seis se acreditan por **cobertura** (*«no he
 visto ningún problema»*) y no por un gesto anotado — *un verde por cobertura y uno por gesto no son
 lo mismo*.
-**LO QUE ABRIÓ LA PASADA:** el menú de **«how much»** (el `amount…` del trade y del loot) sigue con
-el gris de Derma — pedido del autor en el mismo mensaje. Es la **#75**.)
+**LO QUE ABRIÓ LA PASADA Y YA ESTÁ ESCRITO — la #75, CHANGELOG 75 `[PENDIENTE]`:** el cuadro de
+**«how much»** (el `amount…` del trade y del loot) era la **última superficie Derma de fábrica del
+módulo**, y sólo se hizo visible cuando los menús dejaron de ser grises — *arreglar lo que se veía
+dejó a la vista lo que quedaba debajo*. `CARGO.Theme.Prompt()`, los **dos** sitios lo llaman, y
+**NO acuña un CRG nuevo: AMPLIA CRG-75**, porque es la misma regla con otra puerta y dos IDs para
+«la UI del módulo pasa por el theme» sería la duplicación que la norma existe para evitar.
+**Envuelve `Derma_StringRequest` en vez de re-implementarlo:** la función del engine posee el
+*layout*, y reescribirlo para cambiar seis colores sería un diff mucho mayor con un modo de falla
+mucho peor. ⭐ **El renglón que no se ve como un color equivocado sino como «no hay texto»:** el
+texto de un `DTextEntry` lo dibuja el **SKIN** y no el engine, así que un `Paint` propio que se
+olvide de `DrawTextEntryText` deja **una caja donde se puede tipear y no se ve nada** — leído en la
+fuente **antes** de escribir, y con sabotaje propio. Harness **1089 → 1107**, y la tanda entera queda
+en **28/28 sabotajes en rojo**. Falta su pasada en juego: planilla **AH**.)
 
 Contexto previo: **LA GRAMÁTICA DEL MOUSE** — roadmap **#69**, CRG-74,
 sede §15.6. **`M1` selecciona · `M3` deselecciona · `M2` es el menú contextual**, y es una **norma

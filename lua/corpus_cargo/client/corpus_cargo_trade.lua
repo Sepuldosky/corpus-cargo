@@ -479,7 +479,7 @@ function CARGO.Trade.AmountMenu(side, entry)
     local menu = CARGO.Theme.Menu()
     menu:AddOption(verb .. " 1", function() CARGO.Trade.BasketAdd(side, entry, 1) end)
     menu:AddOption(verb .. " amount...", function()
-        Derma_StringRequest(verb .. " how many?", "1 - " .. avail, "", function(txt)
+        CARGO.Theme.Prompt(verb .. " how many?", "1 - " .. avail, "", function(txt)
             local n = math.floor(tonumber(txt) or 0)
             if n >= 1 then CARGO.Trade.BasketAdd(side, entry, math.min(n, avail)) end
         end)
