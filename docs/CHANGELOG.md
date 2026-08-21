@@ -7279,7 +7279,7 @@ CHANGELOG **74 `[APLICADO 2026-08-20]`**.
 
 ---
 
-## 75. El cuadro de «how much» también toma el tema (roadmap #75) `[PENDIENTE]`
+## 75. El cuadro de «how much» también toma el tema (roadmap #75) `[APLICADO 2026-08-20]`
 
 **Pedido del autor (2026-08-20), en el mismo mensaje en que cerró la #74 y la #72 en juego:**
 
@@ -7335,5 +7335,27 @@ helper envuelve el diálogo **entero**: podía romper el callback sin cambiar un
 **Verificación en negativo:** `dev/sabotaje_cargo_74_72.py`, **28/28 en rojo** (8 de esta entrada),
 con control de apertura y de cierre en verde.
 
-**Planilla AH — SIN CORRER.** Lo que el harness no puede contestar: que el cuadro **se vea** con la
-paleta y **cambie con el HUD**, y que el campo **muestre lo que se tipea**.
+**Planilla AH.** Lo que el harness no puede contestar: que el cuadro **se vea** con la paleta y
+**cambie con el HUD**, y que el campo **muestre lo que se tipea**.
+
+### Pasada en juego (2026-08-20) — OK
+
+> *«Si los colores del menu contextual y de los StringRequest estan perfectos, nada mas que probar,
+> del tiempo que he jugado, "Ya varias horas" no he detectado errores»*
+
+**Cómo se acredita, y las dos mitades no son iguales:**
+
+- **Por declaración directa** — las filas de **color** (AH2 el cuadro del loot, AH5 el del trader,
+  AH7 el teñido, AH6 la barra de título vacía): el autor las nombró, *«los colores … están
+  perfectos»*, y son exactamente lo que la entrada prometía.
+- **Por USO EXTENDIDO** — **AH3** (que el campo muestre lo que se tipea) y **AH4** (que el cuadro
+  siga transfiriendo la cantidad escrita). No las nombró una por una, pero **varias horas de juego
+  con comercio y saqueo no se sostienen si el campo está en blanco al escribir o si aceptar no
+  transfiere**: los dos defectos son de los que detienen la sesión, no de los que pasan
+  desapercibidos. Se declara que es esa clase de acreditación y no un gesto anotado.
+
+**La #75 es la única de las tres entradas cuyo defecto estrella era invisible en la pasada**: si
+`DrawTextEntryText` faltara, el número llegaría igual al server y sólo se vería la caja vacía. Que
+haya jugado horas escribiendo cantidades es, para esa fila, mejor evidencia que un gesto único.
+
+CHANGELOG **75 `[APLICADO 2026-08-20]`**. **CRG-75 acreditada en juego en sus DOS puertas.**

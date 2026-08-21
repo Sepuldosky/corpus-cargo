@@ -2339,10 +2339,17 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     NO es sólo un botón: es decidir si el merge automático deja de ser
     automático, y eso toca el #67 y el #70. Medir eso PRIMERO.
 
-75. EL CUADRO DE «HOW MUCH» ESTA SIN TEMATIZAR [Cargo ui] — PEDIDO DEL AUTOR
-    el 2026-08-20, en el MISMO mensaje en que cerro la #74 y la #72 en juego.
-    ESCRITA el 2026-08-20. CHANGELOG 75 [PENDIENTE]: falta la pasada en juego
-    (planilla AH, dev/checks/cargo-prompt-tema-r1.html).
+75. EL CUADRO DE «HOW MUCH» ESTA SIN TEMATIZAR [Cargo ui] — CERRADA el
+    2026-08-20, el mismo dia que se pidio. Amplia CRG-75 a los prompts.
+    PASADA EN JUEGO OK: planilla AH (dev/checks/cargo-prompt-tema-r1.html).
+    CHANGELOG 75 [APLICADO].
+    Las filas de COLOR se acreditan por declaracion directa del autor («los
+    colores del menu contextual y de los StringRequest estan perfectos»); las
+    dos de CONDUCTA —que el campo muestre lo que se tipea y que aceptar
+    transfiera— por USO EXTENDIDO («varias horas» de juego), y se dice cual es
+    cual. Para la fila del texto ese uso es MEJOR evidencia que un gesto
+    unico: si DrawTextEntryText faltara, el numero llegaria igual al server y
+    lo unico visible seria la caja vacia al escribir.
 
     LO QUE PIDIO, textual: «el unico cambio menor que quiero es que el menu
     de "how much" cuando mandas por amount o compras por amount tambien tiene

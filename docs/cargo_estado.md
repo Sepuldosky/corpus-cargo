@@ -95,7 +95,9 @@ mucho peor. ⭐ **El renglón que no se ve como un color equivocado sino como «
 texto de un `DTextEntry` lo dibuja el **SKIN** y no el engine, así que un `Paint` propio que se
 olvide de `DrawTextEntryText` deja **una caja donde se puede tipear y no se ve nada** — leído en la
 fuente **antes** de escribir, y con sabotaje propio. Harness **1089 → 1107**, y la tanda entera queda
-en **28/28 sabotajes en rojo**. Falta su pasada en juego: planilla **AH**.)
+en **28/28 sabotajes en rojo**. **PASADA EN JUEGO ✓ 2026-08-20 — OK** (*«Si los colores del menu contextual y de los StringRequest estan perfectos, nada mas que probar, del tiempo que he jugado, varias horas, no he detectado errores»*): las filas de **color** por declaración directa, y las **dos de conducta** —que el campo muestre lo tipeado y que aceptar transfiera— por **uso extendido**, que para la primera es *mejor* evidencia que un gesto único, porque si faltara el dibujo del texto el número llegaría igual al server y lo único visible sería la caja vacía. CHANGELOG **75 `[APLICADO]`**, y **CRG-75 acreditada en juego en sus DOS puertas**.)
+
+**LAS TRES ENTRADAS DE LA TANDA ESTÁN CERRADAS EN JUEGO** (#74, #72 y #75). El módulo no tiene deuda de verificación abierta: lo pendiente es rumbo, no cierre.)
 
 Contexto previo: **LA GRAMÁTICA DEL MOUSE** — roadmap **#69**, CRG-74,
 sede §15.6. **`M1` selecciona · `M3` deselecciona · `M2` es el menú contextual**, y es una **norma
