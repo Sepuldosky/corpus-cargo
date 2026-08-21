@@ -1108,7 +1108,7 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Próximo paso
 
-1. **Slice 2 del comercio** — el **plan de persistencia quedó cerrado** con B5: B6 (perfiles reales y GC
+1. **Slice 2 del comercio** *(sigue vigente, pero NO es el frente que el autor viene tocando: las últimas seis entradas cerradas son todas de UI de inventario)* — el **plan de persistencia quedó cerrado** con B5: B6 (perfiles reales y GC
    jerárquico) está **diferido a Cortex**, con el diseño congelado en §6 del
    [`plan madre`](../../dev/PLAN_cargo_persistencia_gc.md), y no se ejecuta hasta que Cortex tenga código y
    `CLAUDE.md` — B1-B5 no le cerraron la puerta. Una decisión que B5 dejó ABIERTA para B6 a propósito: qué
@@ -1119,13 +1119,31 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
    confirm). Semilla del chat nuevo:
    [`../../dev/HANDOFF_cargo_trade_slice2.md`](../../dev/HANDOFF_cargo_trade_slice2.md).
    La entry 27 se confirma de paso en esa pasada (checklist en el artifact).
-2. **#56 — el peso de la munición cargada** (abierto el 2026-07-31, **va antes del #55**): las
-   mismas 30 balas pesan 0,36 kg en el cinturón y **0 kg adentro del arma**, y un RPG cargado
-   esconde **3 kg**. Semilla de investigación y diseño:
-   [`../../dev/PROMPT_cargo_56_peso_municion.txt`](../../dev/PROMPT_cargo_56_peso_municion.txt).
-   Lo que bloquea el diseño no es el peso sino **de dónde sale el tipo HL2 de un arma sin entidad
-   viva**, y la decisión de **cadencia** que es del autor: hoy el ledger sólo se mueve cuando se
-   mueve el cinturón, y el espejo es barato exactamente por eso.
+2. **El frente de UI del inventario, que es donde el autor viene mirando** — y va en este orden
+   porque **cada una paga parte de la siguiente**:
+   · **#71 (chip con usos)** — *primero, y es barata: lo que falta es un VOTO tuyo, no código.* Hoy
+     el chip dice `x2` (dos frascos) pero la tecla dispara sobre **uno solo**, el más gastado, así
+     que **el número que se muestra no predice lo que va a pasar al apretar**. Tres formas, y la
+     (a) hay que **medirla antes de votarla**: es la única que necesita resolver la instancia del
+     lado del cliente, y esa regla hoy vive **sólo en el server** (`QuickTarget`) — si la duplica,
+     es más cara de lo que parece. *Medir eso es media hora y decide el voto.*
+   · **#58 (el tooltip miente el peso)** — chica, pedido explícito tuyo en la planilla AC. El
+     cálculo ya existe y es uno solo (`Instances.WeightOf`), pero es **SERVER**, así que el número
+     tiene que **viajar en el snapshot**: recalcularlo en el cliente sería la segunda verdad que
+     CRG-56/57 evitan. Decisión tuya: ¿peso **efectivo** en la ficha, o el de la def con el extra
+     al lado?
+   · **#70 (nivel 2 del grid: posiciones reales)** — **la grande, y el `cid` del #68 ya le pagó la
+     mitad**. Es la causa de fondo del *«igual se ve medio desordenado»*: el #67 le sacó al orden
+     ser una función del contenido, pero el empaque sigue siendo `DIconLayout` flex-wrap, y la
+     altura de una fila es la del tile más alto — un 1×1 al lado de un rifle 2×3 deja **celdas
+     muertas que no ocupa nadie**. Eso no se arregla ordenando: se arregla dándole a cada ítem una
+     **celda**. ⚠ Enmienda la decisión del 2026-07-11, y **sólo su primera mitad**: va a haber
+     gestión espacial, pero el grid sigue siendo infinito hacia abajo y **el techo sigue siendo el
+     peso**.
+   · **#73 (separar un stack a mano)** — **va DESPUÉS del #70 y no antes**, porque no es un botón:
+     separar es lo inverso de `AddStack`, que **mergea solo**, así que una celda separada se vuelve
+     a fundir en el próximo funnel. Decidir si el merge deja de ser automático toca el #67 **y** el
+     #70. Medir eso primero.
 3. **#54 — íconos que distingan dos armas de la misma clase** (abierto por la nota de AB9, un check
    que PASÓ): el ícono se autogenera del world model, así que dos AS VAL con builds distintas se ven
    idénticas en el grid. Y recién ahí el **#55** (qué attachments pesan), cuya pregunta difícil ya
