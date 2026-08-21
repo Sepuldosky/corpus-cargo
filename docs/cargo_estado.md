@@ -68,10 +68,23 @@ es alcanzable (y es real: el cliente manda el slot en un `UInt(4)`, 0 a 15 sobre
 advertía —`self._options or {}` nunca corre porque el `__index` devuelve una **función**, que es
 truthy— y hubo que leerlo con `rawget`, el mismo cuidado que los checks usan para no barrer las
 doscientas panels del frame.
-**LO QUE FALTA:** las **dos pasadas en juego**. Planilla **AF** (#74) —sus dos filas propias son los
-controles del tema: con DGL4 montado el menú **cambia de color con el HUD**, y **sin** DGL4 no
-revienta ni sale ilegible— y planilla **AG** (#72), cuya fila decisiva es **recargar después de
-botar**, porque el defecto del espejo no se ve en el inventario.)
+**PASADA EN JUEGO ✓ 2026-08-20 — LAS DOS OK, y los dos CHANGELOG quedaron `[APLICADO]`.**
+**#74:** *«Si esta bien el menu contextual ya revise todas y funciona como corresponde»* — declarada
+como **barrido** y no fila por fila, y se dice: lo que la declaración cubre sin ambigüedad es lo
+único que el harness no podía cerrar solo, que **ningún menú quedara afuera de la norma** (ocho
+sitios y cuatro submenús). **CRG-75 acreditada en juego.**
+**#72:** *«El cinturon tambien bota, bota de 1 y todos del stack que estas botando; Traer al
+inventario despues de botar esta bien, recargando la municion despues de botar otro stack esta bien.
+No he visto ningun problema»*. **Cuatro filas cerraron POR GESTO y el autor las nombró una por
+una** — las dos cantidades distintas (AG3/AG5), el control negativo de `BeltClear` (AG7) y
+⭐ **AG4, la que justifica la entrada**: es la **única fila del bloque que no se mira en pantalla**,
+porque el defecto deja el inventario impecable y las balas en la reserva. Que haya **recargado
+después de botar** y el arma tomara de la reserva correcta es lo que convierte el `AmmoPool.Push` de
+una línea escrita en una línea **medida**. Las otras seis se acreditan por **cobertura** (*«no he
+visto ningún problema»*) y no por un gesto anotado — *un verde por cobertura y uno por gesto no son
+lo mismo*.
+**LO QUE ABRIÓ LA PASADA:** el menú de **«how much»** (el `amount…` del trade y del loot) sigue con
+el gris de Derma — pedido del autor en el mismo mensaje. Es la **#75**.)
 
 Contexto previo: **LA GRAMÁTICA DEL MOUSE** — roadmap **#69**, CRG-74,
 sede §15.6. **`M1` selecciona · `M3` deselecciona · `M2` es el menú contextual**, y es una **norma

@@ -7038,7 +7038,7 @@ CHANGELOG **72 `[APLICADO 2026-08-20]`**. Planilla **AE** cerrada 14/14.
 
 ---
 
-## 73. El menú contextual toma el tema, y pasa a haber una sola puerta (roadmap #74) `[PENDIENTE]`
+## 73. El menú contextual toma el tema, y pasa a haber una sola puerta (roadmap #74) `[APLICADO 2026-08-20]`
 
 **Pedido del autor (en juego, 2026-08-19, al llenar la planilla AD del #68), textual:**
 
@@ -7143,14 +7143,28 @@ con control de apertura y de cierre en verde. Y se re-corrieron `sabotaje_cargo_
 (**12/12, 16/16, 19/19**) porque la tanda tocó `ui/trade/transfer`: un ancla rota no revienta,
 imprime `ANCLA x0` y desarma una verificación vieja en silencio.
 
-**Planilla AF — SIN CORRER.** Lo que el harness **no** puede contestar y la planilla sí: que con
-DGL4 montado el menú **cambie de color junto con el HUD**, y que sin DGL4 **no reviente ni salga
-ilegible**. Sin la primera fila esto sólo dice que el menú es oscuro; sin la segunda, que anda en la
-máquina del autor.
+**Planilla AF.** Lo que el harness **no** puede contestar y la planilla sí: que con DGL4 montado el
+menú **cambie de color junto con el HUD**, y que sin DGL4 **no reviente ni salga ilegible**. Sin la
+primera fila esto sólo dice que el menú es oscuro; sin la segunda, que anda en la máquina del autor.
+
+### Pasada en juego (2026-08-20) — OK
+
+> *«Si esta bien el menu contextual ya revise todas y funciona como corresponde»*
+
+**Cómo se acredita, dicho en vez de dejarlo entender:** el autor declaró la planilla **como
+barrido** —revisó los menús y ninguno salió gris ni ilegible— y **no** fila por fila con nota
+individual. Las ocho quedan en **PASA por declaración del autor**, que es una acreditación
+válida y **no es lo mismo** que ocho gestos anotados: se dice porque *un verde por cobertura y uno
+por gesto no son lo mismo, y confundirlos deja deuda fantasma* (precedente AE10-AE14). Lo que la
+declaración **sí** cubre sin ambigüedad es lo que la entrada prometía: **ningún menú
+quedó afuera de la norma**, que era el riesgo —ocho sitios y cuatro submenús— y era el
+único que el harness no podía cerrar solo.
+
+CHANGELOG **73 `[APLICADO 2026-08-20]`**. **CRG-75 acreditada en juego.**
 
 ---
 
-## 74. El cinturón puede botar al mundo (roadmap #72) `[PENDIENTE]`
+## 74. El cinturón puede botar al mundo (roadmap #72) `[APLICADO 2026-08-20]`
 
 **Pedido del autor (en juego, 2026-08-19, al llenar la planilla AD del #68), textual:**
 
@@ -7235,5 +7249,30 @@ espejo**).
 entre ellos ⭐ **sacarle el `AmmoPool.Push` al drop nuevo**: si ése saliera verde, el check estrella
 no mediría y la entrada entera se caería.
 
-**Planilla AG — SIN CORRER.** Su fila decisiva es **recargar después de botar**: el defecto del
-espejo no se ve en el inventario.
+**Planilla AG.** Su fila decisiva es **recargar después de botar**: el defecto del espejo no se
+ve en el inventario.
+
+### Pasada en juego (2026-08-20) — OK, y la fila estrella cerró
+
+> *«El cinturon tambien bota, bota de 1 y todos del stack que estas botando; Traer al inventario
+> despues de botar esta bien, recargando la municion despues de botar otro stack esta bien. No he
+> visto ningun problema»*
+
+**Cuatro filas cerraron POR GESTO y el autor las nombró una por una:**
+
+| Fila | Qué confirmó |
+|---|---|
+| **AG3 / AG5** | las dos opciones existen y botan **cantidades distintas** — *«bota de 1 y todos del stack»* |
+| **AG7** | *«Traer al inventario después de botar está bien»* — el control negativo: la puerta nueva **no** se comió a `BeltClear` |
+| ⭐ **AG4** | *«recargando la munición después de botar otro stack está bien»* — **la que justifica la entrada** |
+
+**AG4 es la que importa y hay que decir por qué:** es la única fila del bloque que **no se mira
+en pantalla**. El defecto que esta entrada existe para evitar deja el inventario **impecable** y las
+balas en la reserva, y sólo se manifiesta al recargar. Que el autor haya **recargado después de
+botar** y el arma haya tomado de la reserva correcta es lo que convierte el `AmmoPool.Push` de una
+línea escrita en una línea **medida**.
+
+Las demás (AG1, AG2, AG6, AG8, AG9, AG10) se acreditan por **cobertura** — *«no he visto ningún
+problema»* — y no por un gesto anotado. Se declara la diferencia.
+
+CHANGELOG **74 `[APLICADO 2026-08-20]`**.

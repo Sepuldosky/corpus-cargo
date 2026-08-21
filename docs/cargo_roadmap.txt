@@ -2263,9 +2263,17 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     cambia, se cambia ahi y no en los dos lugares — mismo argumento que llevo el
     texto de condicion a Theme.ConditionShort en la #66.
 
-72. DROP DESDE EL CINTURON [Cargo ui/inventory] — ESCRITA el 2026-08-20 en
-    tanda con la #74. CHANGELOG 74 [PENDIENTE]: falta la pasada en juego
-    (planilla AG, dev/checks/cargo-belt-drop-r1.html).
+72. DROP DESDE EL CINTURON [Cargo ui/inventory] — CERRADA el 2026-08-20, en
+    tanda con la #74. PASADA EN JUEGO OK: planilla AG
+    (dev/checks/cargo-belt-drop-r1.html). CHANGELOG 74 [APLICADO].
+    CUATRO filas cerraron POR GESTO y el autor las nombro una por una: que
+    bota de a 1 y el stack entero (dos cantidades distintas), que Return to
+    inventory sigue andando despues de botar, y —la estrella— que RECARGAR
+    despues de botar toma de la reserva correcta. Esa ultima es la unica
+    fila del bloque que NO se mira en pantalla: es la que convierte el
+    AmmoPool.Push de una linea escrita en una linea medida. Las otras seis
+    se acreditan por cobertura («no he visto ningun problema») y se declara
+    la diferencia.
     QUE SE ESCRIBIO: CARGO.Inventory.BeltDrop(ply, slotN, count) + intent
     belt_drop, con la forma de la rama de stack de DropEquipped (#28) y no
     una ruta nueva; y el menu de M2 del slot pasa de UNA opcion a TRES
@@ -2331,10 +2339,14 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     NO es sólo un botón: es decidir si el merge automático deja de ser
     automático, y eso toca el #67 y el #70. Medir eso PRIMERO.
 
-74. EL MENU CONTEXTUAL ESTA SIN TEMATIZAR [Cargo ui] — ESCRITA el 2026-08-20
-    en tanda con la #72, acunada como CRG-75 con sede
-    Cargo_Architecture.md §15.7. CHANGELOG 73 [PENDIENTE]: falta la pasada
-    en juego (planilla AF, dev/checks/cargo-menu-tema-r1.html).
+74. EL MENU CONTEXTUAL ESTA SIN TEMATIZAR [Cargo ui] — CERRADA el 2026-08-20,
+    acunada como CRG-75 con sede Cargo_Architecture.md §15.7. PASADA EN
+    JUEGO OK: planilla AF (dev/checks/cargo-menu-tema-r1.html), declarada
+    como BARRIDO y no fila por fila («ya revise todas y funciona como
+    corresponde») — se dice porque un verde por cobertura y uno por gesto no
+    son lo mismo. Lo que la declaracion SI cubre sin ambiguedad es lo unico
+    que el harness no podia cerrar solo: que ningun menu quedara afuera de
+    la norma. CHANGELOG 73 [APLICADO].
     QUE SE ESCRIBIO: CARGO.Theme.Menu(), la PUERTA UNICA, y los OCHO sitios
     que abrian un DermaMenu() pelado pasan a llamarla (6 en ui.lua, 1 en
     trade.lua, 1 en transfer.lua). El tenido de DGL4 sale gratis: T.Colors
