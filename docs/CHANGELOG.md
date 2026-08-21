@@ -7359,3 +7359,245 @@ con control de apertura y de cierre en verde.
 haya jugado horas escribiendo cantidades es, para esa fila, mejor evidencia que un gesto único.
 
 CHANGELOG **75 `[APLICADO 2026-08-20]`**. **CRG-75 acreditada en juego en sus DOS puertas.**
+
+---
+
+## 76. Los favoritos, y las cinco puertas que ninguno puede cruzar (roadmap #43) `[PENDIENTE]`
+
+**Pedido viejo del autor (2026-07-23, en la nota de verificación de la entry #27), diseñado por él
+el 2026-08-20.** Textual, y es el alcance completo:
+
+> *«el ser favorito significa que no lo puedes vender ni dropear, cuando apretas en el al vender no
+> te lo permite y no te permite mandarlo al loot cuando pones "move all", no puedes mandarlo al loot
+> box sin quitarle el favorito, esta es una funcionalidad de STALKER GAMMA que existe para lo mismo,
+> que no pierdas los objetos que marcaste como favoritos, porque en el juego hay muchas armas que te
+> pueden confundir y en una de esas puedes terminar vendiendo la tuya que siempre usas.»*
+>
+> *«Cuidado con hacer favorito a la municion […] porque la data de la municion es muy cambiante y
+> dudosamente alguien haria favorito una caja de 120 balas de 9mm.»*
+
+**Esa última frase es el autor detectando, sin nombrarlo, el problema de identidad de la entrada** —
+y es lo que gobernó el diseño.
+
+### El valor de la entrada no es que el candado exista: es que NO FALTE NINGUNA PUERTA
+
+Él nombró tres cosas. En el árbol eran **cinco sitios**, más el clic del cliente:
+
+| # | Puerta | Dónde | Realm |
+|---|---|---|---|
+| 1 | vender (el commit) | `Trade.Confirm` → `ResolveSide`, lado sell | SERVER |
+| 1b | vender (el clic que *«no te lo permite»*) | `Trade.BasketAdd`, lado sell | CLIENTE |
+| 2 | «Move all» al contenedor | `NET_TAKEALL` con `dir == "put"` | SERVER |
+| 3 | transferencia individual | `TransferOne`, `dir == "put"` | SERVER |
+| 4 | botar desde el grid | `Inventory.DropEntry` | SERVER |
+| 5 | botar desde un slot de equipo | `Inventory.DropEquipped` | SERVER |
+
+Un candado que cubre **cuatro de cinco se ve exactamente igual** que uno que cubre las cinco, y la
+diferencia se descubre en el juego, perdiendo el arma. Por eso hay **una** función
+—`Inventory.IsFavorite(rec, entry)`— y el gate del harness **cuenta los sitios de llamada**, por
+archivo (lección 89): sabotear el helper pone la pasada entera en rojo, pero devolver **una** puerta
+a su código de antes la dejaría verde, porque las otras cuatro siguen midiendo.
+
+**Se acuña CRG-76** (`Cargo_Architecture.md` §7.4): *un favorito es un flag del **jugador** sobre un
+ítem, y ninguna puerta que saque algo del inventario puede ignorarlo.* Eso es lo que hace que la
+**sexta** puerta que alguien escriba tenga que venir a preguntar.
+
+### ⭐ La decisión más cara: por ÍTEM y no por celda (voto del autor, 2026-08-21)
+
+|  | Clave | Qué significa |
+|---|---|---|
+| `unique` | `u:<uid>` | **esa instancia** — dos AK-74 de la misma def, una favorita y la otra no |
+| `stackable` | `i:<id>` | **esa clase** — todos los vendajes, o ninguno |
+
+**Por qué no por celda**, que era la lectura granular: `AddStack` **fusiona sola** —mismo `id`, misma
+`condition`, lugar bajo `max_stack`—, así que un flag que viviera en la celda queda **indefinido** en
+cuanto se levanta otro del piso. O la entrada que entró no tiene flag, o cae en una celda no-favorita
+y el favorito se parte en dos mitades sin regla. **No hay error ni aviso en ninguno de los dos
+casos.** Volverlo bien definido obliga a tocar el merge, que es la **#73** y arrastra la #67 y la #70.
+Esta forma **no lo necesita**: no hay nada en la entrada que perder.
+
+El costo honesto, y se le dijo antes de que votara: **no se pueden tener 3 vendajes favoritos y 2 no.**
+
+**Excluir la munición no habría resuelto nada por sí solo**, y conviene decirlo: los vendajes y la
+comida también apilan. La exclusión es un voto del autor con su motivo; la forma de la clave es lo
+que cierra el defecto.
+
+### Dónde vive, y por qué la persistencia salió gratis
+
+`rec.fav`, un **set de claves del record**. El record entero se guarda y se carga (§12), así que un
+campo nuevo en él **se persiste solo**: no se tocó la capa de datos. El flag llega al cliente por
+`EntrySnapshot` —el único embudo donde se arman los campos de una celda— y **sólo cuando es `true`**:
+no se estrenó una segunda ruta de red, y el cliente nunca necesita el set, le pregunta a la entrada
+que dibujó. En los slots de **equipo** viaja igual, porque sin él el menú del slot ofrecería un
+`Drop` que el server refusa — el botón muerto que CRG-6 existe para evitar.
+
+**La poda, y su mitad que no se poda.** Un `uid` no se recicla jamás (`i<os.time()>_<contador>`:
+único por boot por el contador y entre boots por el reloj), así que una clave huérfana no puede
+adoptar otro ítem — pero se acumularía en el archivo, una por cada arma favorita destruida.
+`PruneFavorites` corre en el mismo embudo que `StampEntries`. **Las claves `i:` no se podan nunca**,
+y no es una omisión: gastar el último vendaje no puede olvidar que los vendajes son favoritos, o la
+marca se evaporaría exactamente cuando el stack se acaba y volvería sin marcar con el próximo
+pickup. Guardar el rifle favorito en una caja **conserva** la marca: el blob sigue en `_live`, se
+movió, no se destruyó.
+
+### El «Move all» SALTEA en vez de rechazar, y no es una copia de la puerta de al lado
+
+Cayendo por el rechazo de `TransferOne`, el bucle lo lee como `blocked` y anuncia *«the container ran
+out of capacity»* sobre una caja con lugar de sobra. Es el **mismo falso rojo** que el #67 ya pagó en
+ese receptor. Filtra al armar la lista de refs y avisa con su propia frase.
+
+### `BeltDrop` (#72) NO es una sexta puerta, y por construcción
+
+El cinturón sólo acepta `category == "ammo"` (lo rechaza `BeltSet`) y la munición está excluida, así
+que la cuarta puerta del espejo **no puede** ver un favorito. Va escrito —y con un control negativo
+en el harness— porque *«no aplica»* y *«se olvidaron»* se ven igual.
+
+### La UI: un toggle ★, y el ancho se MIDIÓ antes de preguntar
+
+El autor había ofrecido una novena tab (*«Debe existir la categoria Favorites»*). El set de tabs se
+cerró en el #23 **porque la fila hizo wrap**, así que antes de llevarle la decisión se midió contra la
+fuente real (`Roboto-Medium` a 12, leída de la `resource/fonts` de GMod):
+
+- las ocho tabs de hoy suman **454 px** contra los **424** que la barra recibe a **1280×720**, o sea
+  que **`Misc` ya cae a una segunda fila hoy** — el comentario del código que afirma que el set fijo
+  *«fits one row at every aspect we ship»* es **falso** en las dos resoluciones más chicas;
+- a **1600×900** una novena tab empuja el botón `Sort` de fila;
+- a **1920×1080** «Favorites» entera entra sin mover nada;
+- y **acortar el label a «Fav» no cambia el resultado en ninguna resolución**: lo que decide es la
+  **cantidad** de tabs, no el largo de un nombre.
+
+Con eso delante el autor eligió: *«puede ser el toggle pero solamente con la estrellita, igual se
+entiende al lado del Sort»*.
+
+**Es un segundo eje y tiene que serlo:** `Items.MatchesTab` recibe una **def**, y el favorito es de la
+entrada — no cabe en esa pregunta. **El estado vive en el controller del grid y no en el botón**,
+porque `BuildTabs` corre de nuevo en cada refresh: un flag guardado en el botón se reseteaba solo
+cada vez que cambiaba el inventario, en silencio y sólo mientras se estaba filtrando.
+
+### La estrella se DIBUJA y no se tipea, y eso es una medición
+
+**Roboto no tiene glifo para U+2605 BLACK STAR** (ni U+2606 ni U+272F) — verificado con `fontTools`
+sobre el `Roboto-Medium.ttf` que GMod trae en `resource/fonts`. Un `draw.SimpleText("★")` habría
+pintado el cuadrito de glifo faltante. `Theme.DrawStar` la arma con `DrawPoly` **abanicando desde el
+CENTRO**: una estrella es cóncava y `surface.DrawPoly` es un abanico desde el vértice uno, así que
+abanicando desde una punta varios triángulos caen fuera de la figura. Dibujada, además, la paleta la
+tiñe como a todo lo demás (CRG-29) — por eso el amarillo sale de `T.Colors.amber` y no de un literal.
+
+En el tooltip va **a la derecha del peso**, como se pidió, y **entra en el cálculo del reserve** de la
+fila del nombre. Es literalmente el defecto que ese mismo renglón pagó en la pasada del #66, con el
+agravante de que la estrella aparece sólo en **algunos** ítems: la forma de bug que se ve bien hasta
+el día que alguien hace favorito un rifle de nombre largo.
+
+### Verificación
+
+`python dev/glua_check.py corpus-cargo/lua` → **48/48**. `python dev/harness_cargo.py` → **exit 0**,
+**1192 checks** (61 FUENTES / 760 server / 370 cliente), selftest 100/107. Base al cerrar la #75:
+1107.
+
+**De esta entrada:** 32 checks en SERVER —las cinco puertas **una por una**, la forma de la clave en
+sus tres formas (incluido el uid pelado que guarda `rec.equip`), el check que **mide la decisión**
+(marcar, dejar que `AddStack` fusione y verificar que el resultado no queda ambiguo), el `fav` por
+`EntrySnapshot` con su round-trip de disco, la poda con su control negativo, y cuatro controles
+negativos: la munición no se marca, lo NO favorito se sigue vendiendo, el «Move all» **sí** se lleva
+la munición, y desmarcar **devuelve** las cinco— más 40 en CLIENT (la estrella por `DrawPoly`, el
+toggle por su **sitio de llamada sobre el frame vivo**, el menú contextual con su control negativo
+sobre munición, y el clic de vender con su control negativo del **lado**) y 5 en el gate de FUENTES,
+**cuatro de ellos por cuenta y por archivo separado**.
+
+**Un gate por cuenta cazó la tanda en su primera corrida**, que es exactamente para lo que existe:
+`ToggleFavorite` es la **sexta** llamada a `FindCell` y el control del #68 esperaba cinco. El número
+se subió a mano y con motivo escrito.
+
+**Verificación en negativo:** `dev/sabotaje_cargo_43_59.py`, **31/31 en rojo** (17 de esta entrada),
+con control de apertura y de cierre en verde. **Los cinco primeros sacan el gate de UNA SOLA puerta
+cada uno**: si alguno saliera verde, el control por cuenta no mide y la entrada se cae.
+Re-corridos `sabotaje_cargo_67/68/69/74_72` (12/12, 16/16, 19/19, 28/28) porque la tanda tocó
+`inventory`/`containers`/`trade`/`ui`/`grid` — y **dos anclas viejas habían quedado en `x0`** y se
+actualizaron: el dedupe de refs del #67 (se indentó un nivel al entrar el filtro del «Move all») y el
+cierre de `EntrySnapshot` del #68 (creció el campo `fav`). Un script de sabotaje con el ancla rota
+**no revienta**: desarma una verificación vieja en silencio.
+
+**Planilla AI** (`dev/checks/cargo-favoritos-r1.html`, 13 filas). Lo que el harness no puede
+contestar: que el jugador **realmente no pueda** — una fila por cada puerta, intentándolas de verdad;
+la del **merge**, que necesita levantar cosas del piso; la de la **estrella** sobre un nombre largo;
+y las tres de control negativo.
+
+---
+
+## 77. La barra que estaba llena y muda (roadmap #59) `[PENDIENTE]`
+
+**Pedido por Craving** (no por el autor), abierto el 2026-08-08. El diseño **cerró el mismo día** en
+`Cargo_Architecture.md` §11.1 como **CRG-68**; esta entrada es su bajada a código y **no acuña nada**.
+
+**El defecto era de una línea y estaba medido.** `client/corpus_cargo_statuspanel.lua:81` hacía
+`math.Clamp(tonumber(v) or 0, 0, 100)` al pollear, así que un valor de **138 no desbordaba la barra:
+la dejaba LLENA Y MUDA**. El jugador veía exactamente lo mismo con 100 que con 149 — y con 149 la
+próxima mordida lo hace vomitar casi seguro. **Es peor que un desborde: un desborde se ve.**
+
+### Qué entró, y son las cinco reglas de §11.1
+
+Tres campos opcionales en el spec de `RegisterBar` (`softMax`, `hardMax`, `overfillColor`); el
+relleno normal clampeado a `softMax` (la barra **nunca** crece más allá de su marco: alargarla
+mentiría sobre qué es «lleno»); el exceso pintado como **tramado sobre la barra ya llena**, recortado
+con `render.SetScissorRect` (**CRG-28**); la cifra **`+38`** junto al label, porque ninguna señal
+viaja sólo por color ni sólo por textura — hay daltonismo y hay barras de 9 px; y el clamp del poll
+corrido a `hardMax`, **que por default es `softMax`**.
+
+### Degrada en las dos direcciones, y por eso nunca bloqueó a Craving
+
+Un registrante viejo no declara ninguno de los tres y hereda `softMax = 100`, `hardMax = softMax`:
+su clamp sigue siendo `0..100` y **se pinta idéntico que ayer, al píxel** — es lo que vale para las
+cuatro barras que existen hoy. Un Cargo viejo recibe campos que no conoce, los ignora y pinta como
+siempre. **Ninguna mitad necesita saber la versión de la otra**, y eso va **medido** y no afirmado:
+son dos checks, uno por dirección.
+
+### Dos correcciones a lo que decía §11.1, y las dos salieron de leer el árbol
+
+1. **`overfillColor` defaultea a `T.Colors.orange`, no a `T.Colors.warn`.** La paleta viva **no
+   tiene** una clave `warn`. Su señal fija de advertencia es `orange` — uno de los tres colores
+   (`amber`/`orange`/`red`) que quedan clavados bajo cualquier teñido de DGL4, justamente para que
+   sigan leyéndose como advertencias cuando todo lo demás toma el tono del HUD.
+2. **La aritmética salió del `Paint` a tres funciones puras** (`BarFrac`, `OverFrac`, `OverLabel`).
+   Un `PaintOver` es una closure sin nombre y sin superficie que dibujar offline, así que lo único
+   que separa *«llena y muda»* de *«llena y hablando»* habría sido lo único que ningún check podía
+   alcanzar. Con las tres, **138 y 149 contestan distinto en un test**.
+
+**El tramado tiene una casa nueva, `Theme.DrawHatch`, y TOMA EL PANEL.** `render.SetScissorRect`
+trabaja en coordenadas de **pantalla** y `surface.DrawLine` dentro de un `Paint` en coordenadas de
+**panel**, así que el rect hay que convertirlo — y el panel es lo único que puede hacerlo. Las dos
+copias viejas del patrón (el quickslot bloqueado y el chip de luz del wheel) viven en `HUDPaint`,
+donde los dos espacios ya coinciden: **no se migraron a propósito**, un rojo del wheel se leería como
+un rojo de esta entrada.
+
+### CRG-68 es el límite y no se cruzó
+
+El panel dibuja **MAGNITUD, jamás significado**. `softMax` y `hardMax` son **data del registrante**:
+Cargo no sabe qué es un vómito, ni que exista. Es CRG-1 en la única superficie donde la tentación es
+real, porque acá el dato llega con una consecuencia pegada. **Va con dos controles negativos de
+fuentes** —que el panel no ramifique por la identidad de una barra y que el spec no crezca un campo
+que nombre una consecuencia ajena— y **uno por cuenta**: el panel resuelve **un** módulo, el propio.
+Ese último va por cuenta y no por lista de nombres prohibidos, porque una lista pegada a mano cubre
+los módulos que existían el día que se escribió.
+
+### Verificación
+
+**Esta entrada suma 12 checks al CLIENT** y 4 al gate de FUENTES. Los que la justifican: que **138 y
+149 se dibujen distinto** con la barra igual de llena en los dos, y la **degradación en las dos
+direcciones**. Más los controles de registrante roto —un `softMax` de 0 dividiría por cero, un
+`hardMax` por debajo del soft daría un exceso negativo— que caen a la forma sin sobrellenado en vez
+de tirar `error()`: una barra de estado que se niega a existir es peor respuesta que una que ignora
+un tope mal declarado.
+
+**Verificación en negativo:** los **14 sabotajes** de la #59 dentro de `dev/sabotaje_cargo_43_59.py`,
+todos en rojo. El que no podía faltar es devolver el clamp a `0, 100`.
+
+⚠ **Y uno de ellos salió VERDE la primera vez, con el hallazgo en el gate y no en el parche:** el
+gate de fuentes exigía la subcadena pelada `render.SetScissorRect`, que **la línea de cierre del par
+satisface igual**, así que borrar la **apertura** no bajaba la cuenta de nada. Se corrigió nombrando
+el rect completo, más una cuenta de **2** para el par — porque quitar sólo el cierre tampoco se ve
+como un tramado mal recortado, sino como que **todo lo que se dibuje después** queda recortado a un
+rect de 9 px, lejos del renglón que lo causó.
+
+**Planilla AJ** (`dev/checks/cargo-sobrellenado-r1.html`, 7 filas). Lo único que ninguna cuenta puede
+ver: que **se vea**. La fila 02 son **dos números y no uno**, y su criterio es que se vean
+**distinto**.

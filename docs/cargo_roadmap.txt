@@ -622,15 +622,41 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     como att normal, y si el default loadout del SWEP lo instala por fuera de
     los hooks de inventario.
 
-43. ÍTEMS/ARMAS FAVORITOS [Cargo UI] — ABIERTO (pedido del autor 2026-07-23,
-    nota de la verificación de la entry #27).
-    Marcar un ítem/arma como favorito desde el CLIC DERECHO del grid, con una
-    ESTRELLITA en una esquina de la celda, del color del UI (T.Colors del theme
-    activo). SIN DISEÑAR — decidir: persistencia (¿flag en el record del
-    inventario o en el blob de la instancia?), alcance (¿solo display, u ordena /
-    protege del drop rápido?) y el render (overlay por esquina estilo PaintOver
-    del grid, no CSS). Toca corpus_cargo_grid.lua (overlay) + corpus_cargo_ui.lua
-    (menú contextual) + persistencia (inventory).
+43. ÍTEMS/ARMAS FAVORITOS [Cargo UI] — ESCRITO 2026-08-21, entry 76 [PENDIENTE],
+    planilla AI SIN CORRER. Pedido del autor 2026-07-23 (nota de la verificación
+    de la entry #27), DISEÑADO POR ÉL el 2026-08-20 y con sus cuatro decisiones
+    votadas el 2026-08-21.
+    QUÉ PEDÍA, textual: «el ser favorito significa que no lo puedes vender ni
+    dropear […] no puedes mandarlo al loot box sin quitarle el favorito […] que
+    no pierdas los objetos que marcaste como favoritos, porque en el juego hay
+    muchas armas que te pueden confundir y en una de esas puedes terminar
+    vendiendo la tuya que siempre usas».
+    EL VALOR DE LA ENTRADA NO ES QUE EL CANDADO EXISTA: ES QUE NO FALTE NINGUNA
+    PUERTA. Él nombró tres cosas; en el árbol eran CINCO sitios más el clic del
+    cliente — vender (commit + clic), «Move all», transferencia individual, drop
+    del grid y drop de EQUIPO. Una sola casa (Inventory.IsFavorite) y un gate que
+    cuenta los SITIOS DE LLAMADA por archivo: sabotear el helper pone todo rojo,
+    pero devolver UNA puerta a su código de antes dejaría la pasada verde.
+    Acuñó CRG-76, sede Cargo_Architecture.md §7.4.
+    LA DECISIÓN MÁS CARA, y es del autor: un favorito de algo que APILA es POR
+    ÍTEM y no por celda (unique -> uid, stackable -> id). AddStack MERGEA SOLA,
+    así que un flag por celda queda INDEFINIDO en cuanto levantas otro del piso,
+    sin un solo error — y arreglarlo obliga a tocar el merge, que es la #73.
+    Costo declarado: no se pueden tener 3 vendajes favoritos y 2 no.
+    LA MUNICIÓN EXCLUIDA es voto suyo con su motivo («la data de la municion es
+    muy cambiante»), y por eso BeltDrop (#72) NO puede ser una sexta puerta.
+    LA UI SALIÓ TOGGLE Y NO NOVENA TAB, con el ancho MEDIDO antes de preguntar:
+    las ocho tabs de hoy suman 454 px contra los 424 de la barra a 1280x720, o
+    sea que `Misc` YA wrapea — y acortar el label a «Fav» no cambia el resultado
+    en NINGUNA resolución. Lo que decide es la cantidad de tabs, no el largo del
+    nombre. El comentario del código que afirma que el set fijo entra en una fila
+    «at every aspect we ship» es FALSO en las dos resoluciones más chicas.
+    LA ESTRELLA SE DIBUJA Y NO SE TIPEA, y es una medición: Roboto no tiene
+    glifo para U+2605 (verificado con fontTools sobre el .ttf de GMod), así que
+    un draw.SimpleText pintaría el cuadrito de glifo faltante. Va con DrawPoly
+    abanicando desde el CENTRO — una estrella es cóncava y el abanico sale del
+    vértice uno.
+    PENDIENTE: la pasada en juego (planilla AI, 13 filas).
 
 44. OVERLAY DE MÁSCARA DE GAS (EXTRA DEL BANCO DE SONIDOS) [Cargo UI/equip] —
     ABIERTO (pedido del autor 2026-07-24, al ordenar el banco de sonidos).
@@ -1529,9 +1555,11 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     el snapshot o el cliente tendria que recalcularlo, que es exactamente la
     clase de segunda verdad que CRG-56/57 evitan.
 
-59. LA MARCA DE SOBRELLENADO EN EL STATUSPANEL [Cargo ui] — ABIERTO, CHICO.
-    Diseño CERRADO el 2026-08-08 en Cargo_Architecture.md §11.1 (CRG-68);
-    falta la bajada a codigo. Pedido POR CRAVING, cuya enmienda del mismo dia
+59. LA MARCA DE SOBRELLENADO EN EL STATUSPANEL [Cargo ui] — ESCRITO 2026-08-21,
+    entry 77 [PENDIENTE], planilla AJ SIN CORRER.
+    Diseño CERRADO el 2026-08-08 en Cargo_Architecture.md §11.1 (CRG-68); la
+    bajada a codigo es la entry 77 y NO acuña nada nuevo. Pedido POR CRAVING,
+    cuya enmienda del mismo dia
     le da stats que pasan de 100 y llegan a 150 (comer de mas es posible y
     tiene riesgo de vomito, su §2.1).
     EL DEFECTO ESTA MEDIDO, NO SUPUESTO: el poll de StatusPanel.Build clampea
@@ -1552,6 +1580,16 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     hardMax son data del registrante — Cargo no sabe que es un vomito, ni que
     exista. Es CRG-1 en la unica superficie donde la tentacion es real, porque
     aca el dato llega con una consecuencia pegada.
+    DOS CORRECCIONES QUE SALIERON DE LA BAJADA, y las dos de leer el arbol:
+    (a) overfillColor defaultea a T.Colors.orange y NO a T.Colors.warn — la
+    paleta viva no tiene esa clave; su señal fija de advertencia es `orange`, que
+    queda clavada bajo cualquier teñido de DGL4. (b) La aritmetica salio del
+    Paint a TRES funciones puras (BarFrac / OverFrac / OverLabel): un PaintOver
+    es una closure sin nombre y sin superficie que dibujar offline, asi que lo
+    unico que separa «llena y muda» de «llena y hablando» habria sido lo unico
+    que ningun check podia alcanzar.
+    PENDIENTE: la pasada en juego (planilla AJ, 7 filas; su fila 02 son DOS
+    numeros —138 contra 149— y el criterio es que se vean DISTINTO).
 60. CONTAR Y CONSUMIR CONTRA CONTENEDORES CERCANOS [Cargo containers] — PEDIDO
     DE COAGULANT, SIN RATIFICAR POR CARGO. Abierto 2026-08-09.
     QUIEN PIDE Y POR QUE: Coagulant vota su "area hospital" (COA-50, su §17). La

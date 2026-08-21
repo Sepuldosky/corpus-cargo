@@ -5,7 +5,57 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-20 (**tanda doble: EL MENÚ TOMA EL TEMA + EL CINTURÓN PUEDE
+**Última actualización:** 2026-08-21 (**tanda doble: LOS FAVORITOS + LA MARCA DE SOBRELLENADO** —
+roadmap **#43** y **#59**, CHANGELOG **76** y **77**, las dos `[PENDIENTE]`, planillas **AI** y **AJ**
+**SIN CORRER**. Van juntas porque **tocan superficies DISJUNTAS** —la #43 son las puertas del
+inventario, la #59 vive en **un solo archivo** de cliente que la #43 no toca— así que un rojo de una
+no se puede confundir con un rojo de la otra, y cada una tiene su entry, su letra y su bloque de
+sabotaje para poder cerrar sola.
+
+**#43 — LOS FAVORITOS, y el entregable es una NORMA: `CRG-76`, sede §7.4.** *Un favorito es un flag
+del **jugador** sobre un ítem, y ninguna puerta que saque algo del inventario puede ignorarlo.*
+**El valor de la entrada no es que el candado exista: es que NO FALTE NINGUNA PUERTA.** El autor
+nombró tres cosas (*«no lo puedes vender ni dropear»*, *«move all»*, *«no puedes mandarlo al loot
+box»*); en el árbol eran **cinco sitios** más el clic del cliente — vender (commit + clic), «Move
+all», transferencia individual, drop del grid y **drop de EQUIPO**. Una sola casa
+(`Inventory.IsFavorite`) y un gate que **cuenta los sitios de llamada por archivo** (lección 89):
+sabotear el helper pone todo rojo, pero **devolver UNA puerta a su código de antes dejaría la pasada
+verde**, porque las otras cuatro siguen midiendo.
+**⭐ LA DECISIÓN MÁS CARA, votada por el autor:** un favorito de algo que **apila** es **por ÍTEM** y
+no por celda (`unique` → uid, `stackable` → id). `AddStack` **fusiona sola**, así que un flag por
+celda queda **indefinido** en cuanto se levanta otro del piso — sin error y sin aviso — y arreglarlo
+obliga a tocar el merge, que es la **#73**. Costo declarado antes del voto: no se pueden tener 3
+vendajes favoritos y 2 no. **La munición está excluida** (voto suyo, con su motivo), y por eso
+`BeltDrop` (#72) **no puede** ser una sexta puerta.
+**LA UI SALIÓ TOGGLE ★ Y NO NOVENA TAB, con el ancho MEDIDO antes de preguntar:** las ocho tabs de
+hoy suman **454 px** contra los **424** de la barra a 1280×720 — o sea que **`Misc` ya wrapea hoy**,
+y el comentario del código que afirma lo contrario es **falso** en las dos resoluciones más chicas —
+y **acortar el label a «Fav» no cambia el resultado en ninguna resolución**: lo que decide es la
+**cantidad** de tabs. **La estrella se DIBUJA y no se tipea, y es una medición:** Roboto **no tiene
+glifo** para U+2605 (verificado con `fontTools` sobre el `.ttf` de GMod), así que un
+`draw.SimpleText` habría pintado el cuadrito de glifo faltante.
+
+**#59 — LA MARCA DE SOBRELLENADO: el diseño ya estaba cerrado (CRG-68, §11.1) y esto es su bajada,
+así que NO acuña nada.** El defecto era de **una línea** y estaba medido: el poll clampeaba a 100, y
+un valor de 138 **no desbordaba la barra — la dejaba LLENA Y MUDA**. El jugador veía lo mismo con
+100 que con 149. **Es peor que un desborde: un desborde se ve.** Entraron `softMax`/`hardMax`/
+`overfillColor`, el exceso **tramado ENCIMA** (nunca alargando la barra, que mentiría sobre qué es
+«lleno») recortado con `SetScissorRect` (**CRG-28**), y la cifra `+38` junto al label. **Degrada en
+las dos direcciones y va MEDIDO, no afirmado.** Dos correcciones a lo que decía §11.1, las dos de
+leer el árbol: `overfillColor` defaultea a `T.Colors.orange` porque **`warn` no existe** en la
+paleta, y la aritmética **salió del `Paint` a tres funciones puras** — sin eso, lo único que separa
+«llena y muda» de «llena y hablando» habría sido lo único que ningún check podía alcanzar.
+
+**Harness 1107 → 1192** (61 FUENTES / 760 server / 370 cliente), selftest 100/107.
+**`dev/sabotaje_cargo_43_59.py`: 31/31 en rojo**, con apertura y cierre en verde; re-corridos
+`sabotaje_cargo_67/68/69/74_72` (12/12, 16/16, 19/19, 28/28) — y **dos anclas viejas habían quedado
+en `x0`** y se actualizaron. **⚠ Un sabotaje salió VERDE la primera vez y el hallazgo fue del GATE:**
+exigía la subcadena pelada `render.SetScissorRect`, que **la línea de cierre del par satisface
+igual**, así que borrar la apertura no bajaba la cuenta de nada.
+
+**PENDIENTE: las dos pasadas en juego** (AI, 13 filas; AJ, 7).)
+
+Contexto previo: 2026-08-20 (**tanda doble: EL MENÚ TOMA EL TEMA + EL CINTURÓN PUEDE
 BOTAR** — roadmap **#74** y **#72**, CHANGELOG **73** y **74**, las dos `[PENDIENTE]`. Van juntas
 porque **tocan superficies DISJUNTAS** —la #74 es pintado de cliente, la #72 es semántica de
 munición en server— así que un rojo de una no se puede confundir con un rojo de la otra, y cada una
@@ -97,7 +147,7 @@ olvide de `DrawTextEntryText` deja **una caja donde se puede tipear y no se ve n
 fuente **antes** de escribir, y con sabotaje propio. Harness **1089 → 1107**, y la tanda entera queda
 en **28/28 sabotajes en rojo**. **PASADA EN JUEGO ✓ 2026-08-20 — OK** (*«Si los colores del menu contextual y de los StringRequest estan perfectos, nada mas que probar, del tiempo que he jugado, varias horas, no he detectado errores»*): las filas de **color** por declaración directa, y las **dos de conducta** —que el campo muestre lo tipeado y que aceptar transfiera— por **uso extendido**, que para la primera es *mejor* evidencia que un gesto único, porque si faltara el dibujo del texto el número llegaría igual al server y lo único visible sería la caja vacía. CHANGELOG **75 `[APLICADO]`**, y **CRG-75 acreditada en juego en sus DOS puertas**.)
 
-**LAS TRES ENTRADAS DE LA TANDA ESTÁN CERRADAS EN JUEGO** (#74, #72 y #75). El módulo no tiene deuda de verificación abierta: lo pendiente es rumbo, no cierre.)
+**LAS TRES ENTRADAS DE ESA TANDA ESTÁN CERRADAS EN JUEGO** (#74, #72 y #75). *(Al escribirse, esa línea seguía con «el módulo no tiene deuda de verificación abierta»; hoy la deuda son las dos planillas de arriba, AI y AJ.)*)
 
 Contexto previo: **LA GRAMÁTICA DEL MOUSE** — roadmap **#69**, CRG-74,
 sede §15.6. **`M1` selecciona · `M3` deselecciona · `M2` es el menú contextual**, y es una **norma
@@ -840,6 +890,17 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
+- **PLANILLA AI — los favoritos (roadmap #43, CRG-76), `dev/checks/cargo-favoritos-r1.html`, 13
+  filas, SIN CORRER.** Lo que el harness no puede contestar: que el jugador **realmente no pueda**.
+  Una fila **por cada una de las cinco puertas**, intentándolas de verdad; la del **merge**, que
+  necesita levantar cosas del piso para que el inventario las funda; la de la **estrella** sobre un
+  nombre largo; y tres de **control negativo** — que lo no-favorito siga vendiéndose, botándose y
+  transfiriéndose; que la munición no se pueda marcar; y que **desmarcar devuelva las cinco**.
+- **PLANILLA AJ — la marca de sobrellenado (roadmap #59, CRG-68),
+  `dev/checks/cargo-sobrellenado-r1.html`, 7 filas, SIN CORRER.** Su fila estrella son **DOS
+  números** —138 contra 149— y el criterio es que se vean **DISTINTO**, no que «se vea el exceso».
+  Necesita registrar una barra de prueba desde consola, y **la última línea de esa fila la
+  desmonta**: una barra registrada se queda puesta el resto de la sesión.
 - **Detalle de las rondas 2-4, para referencia. El bloqueante de la ronda 2 quedó RESUELTO** (el
   espejo volvió por su cuenta y el instrumento que lo lee quedó escrito para la próxima vez).
   Entonces: **el ESPEJO DE MUNICIÓN NO ESTABA CORRIENDO**, y los dos rojos son ese único hecho. La captura

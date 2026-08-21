@@ -541,6 +541,111 @@ la #66, el frasco más gastado— y sin el `cid` la elección se calculaba y se 
 SteamID en las 40 apariciones que tiene el módulo, cuatro de ellas en `GetRecord` — la función
 vecina de la que hospeda el campo.
 
+### 7.4 Los favoritos (roadmap #43)
+
+**De dónde sale, en las palabras del autor** (diseño del 2026-08-20): *«el ser favorito significa que
+no lo puedes vender ni dropear […] esta es una funcionalidad de STALKER GAMMA que existe para lo
+mismo, que no pierdas los objetos que marcaste como favoritos, porque en el juego hay muchas armas
+que te pueden confundir y en una de esas puedes terminar vendiendo la tuya que siempre usas»*.
+
+**CRG-76 — Un favorito es un flag del JUGADOR sobre un ítem, y ninguna puerta que saque algo del
+inventario puede ignorarlo.** El flag no es de la **def** —dos AK-74 de la misma def tienen que
+poder diferir, que es literalmente el caso de uso— ni de la **celda** (ver abajo). Vive en
+`rec.fav`, un **set de claves** del record, así que la persistencia sale gratis: el record entero se
+guarda y se carga (§12). El predicado tiene **una casa** —`Inventory.IsFavorite(rec, entry)`— y las
+puertas la llaman; ninguna re-lee el set. Eso es lo que hace que la **sexta** puerta que alguien
+escriba tenga que venir acá a preguntar.
+
+**La forma de la clave es el diseño** (voto del autor, 2026-08-21):
+
+| Clase | Clave | Qué significa |
+|---|---|---|
+| `unique` | `u:<uid>` | **esa instancia** — dos AK-74 de la misma def, una favorita y la otra no |
+| `stackable` | `i:<id>` | **esa clase** — todos los vendajes, o ninguno |
+
+**Por qué NO por celda**, que era la lectura granular y estuvo sobre la mesa: `AddStack` **fusiona
+sola** —mismo `id`, misma `condition`, lugar bajo `max_stack`—, así que un flag que viviera en la
+celda queda **indefinido** en cuanto levantás otro del piso. O la entrada que entró no tiene flag, o
+cae en una celda no-favorita y el favorito se parte en dos mitades sin regla. **No hay error ni
+aviso en ninguno de los dos casos.** Volverlo bien definido obliga a tocar el merge, que es la **#73**
+y arrastra la #67 y la #70. Esta forma **no lo necesita**: no hay nada en la entrada que perder.
+El costo honesto, y se le dijo al autor antes de que votara: no vas a poder tener 3 vendajes
+favoritos y 2 no.
+
+**La munición está excluida**, por decisión del autor y con su motivo: *«la data de la municion es
+muy cambiante y dudosamente alguien haria favorito una caja de 120 balas de 9mm»*. Se pregunta por
+`Items.CanFavorite` (**shared**), y por `Items.TabOf` y no comparando `category` contra `"ammo"`:
+`TabOf` es la casa única de esa agrupación, así que una segunda categoría de munición que un módulo
+hermano registre queda excluida sola, sin una lista que mantener en paso.
+
+**Las CINCO puertas, y el valor de la entrada es que no falte ninguna:**
+
+| # | Puerta | Dónde | Realm |
+|---|---|---|---|
+| 1 | vender (commit) | `Trade.Confirm` → `ResolveSide`, lado sell | SERVER |
+| 1b | vender (el clic) | `Trade.BasketAdd`, lado sell | CLIENTE |
+| 2 | «Move all» al contenedor | `NET_TAKEALL` con `dir == "put"` | SERVER |
+| 3 | transferencia individual | `TransferOne`, `dir == "put"` | SERVER |
+| 4 | botar desde el grid | `Inventory.DropEntry` | SERVER |
+| 5 | botar desde un slot de equipo | `Inventory.DropEquipped` | SERVER |
+
+**El cliente es feedback, el server es la regla** (CRG-6), y por eso vender está en los dos: rechazar
+sólo en el cliente deja pasar un intent hecho a mano; rechazar sólo en el server deja al jugador
+apretando una celda que no hace nada sin saber por qué.
+
+**El «Move all» SALTEA en vez de rechazar**, y no es una copia de la puerta 3: cayendo por el
+rechazo, el bucle lo lee como `blocked` y anuncia *«the container ran out of capacity»* sobre una
+caja que tiene lugar de sobra — el mismo falso rojo que el #67 ya pagó en ese receptor.
+
+**`BeltDrop` (#72) NO es una sexta puerta, y por construcción:** el cinturón sólo acepta
+`category == "ammo"` (lo rechaza `BeltSet`) y la munición está excluida, así que la cuarta puerta del
+espejo **no puede** ver un favorito. Va dicho porque *«no aplica»* y *«se olvidaron»* se ven igual.
+
+**El drop de equipo entra**, y el autor lo votó aparte porque es el único de los cinco que agrega
+fricción a un gesto que hoy es instantáneo: el caso de uso es *no perder tu arma*, y tu arma está
+equipada la mayor parte del tiempo — un candado que se apaga justo cuando el ítem está en uso
+protege el momento equivocado.
+
+**Cómo llega al cliente:** el campo `fav` viaja en `EntrySnapshot`, el único embudo donde se arman
+los campos de una celda, y **sólo cuando es `true`**. No se estrenó una segunda ruta de red y el
+cliente nunca necesita el set: le pregunta a la entrada que dibujó.
+
+**La poda.** Un `uid` no se recicla jamás (`i<os.time()>_<contador>`: único por boot por el contador
+y entre boots por el reloj), así que una clave huérfana no puede adoptar otro ítem — pero se
+acumularía en el archivo, una por cada arma favorita destruida. `PruneFavorites` corre en el mismo
+embudo que `StampEntries` y saca las claves `u:` cuya instancia ya no existe en ningún lado.
+**Las claves `i:` no se podan nunca**, y no es una omisión: gastar el último vendaje no puede
+olvidar que los vendajes son favoritos, o la marca se evaporaría justo cuando el stack se acaba.
+Guardar tu rifle favorito en una caja **conserva** la marca: el blob sigue en `_live`, lo moviste,
+no lo destruiste.
+
+**La UI: un toggle ★, no una novena tab** (voto del autor, 2026-08-21, con el ancho **medido**
+delante). El set de tabs se cerró en el #23 porque la fila hizo *wrap*, así que antes de preguntar se
+midió contra la fuente real (`Roboto-Medium` a 12, leída de la `resource/fonts` de GMod): las ocho
+tabs de hoy suman **454 px** contra los **424** que la barra recibe a 1280×720, o sea que **`Misc` ya
+cae a una segunda fila hoy**; a 1600×900 una novena tab empuja el botón `Sort` de fila; y **acortar el
+label a «Fav» no cambia el resultado en ninguna resolución** — lo que decide es la **cantidad** de
+tabs, no el largo de un nombre. El autor eligió el toggle: *«puede ser el toggle pero solamente con
+la estrellita, igual se entiende al lado del Sort»*.
+
+Es un **segundo eje** y tiene que serlo: `Items.MatchesTab` recibe una **def**, y el favorito es de la
+entrada — no cabe en esa pregunta. El estado vive en el **controller del grid** y no en el botón,
+porque `BuildTabs` corre de nuevo en cada refresh: un flag guardado en el botón se reseteaba solo
+cada vez que cambiaba el inventario, en silencio y sólo mientras estabas filtrando.
+
+**La estrella se DIBUJA y no se tipea**, y eso es una medición y no una preferencia: **Roboto no tiene
+glifo para U+2605** (ni U+2606 ni U+272F), así que un `draw.SimpleText("★")` pintaría el cuadrito de
+glifo faltante. `Theme.DrawStar` la arma con `DrawPoly` **abanicando desde el CENTRO** — una estrella
+es cóncava, y `surface.DrawPoly` es un abanico desde el vértice uno: abanicando desde una punta,
+varios triángulos caen fuera de la figura. Dibujada, además, la paleta la tiñe como a todo lo demás
+(CRG-29), que es por lo que el amarillo sale de `T.Colors.amber` y no de un literal.
+
+En el tooltip va **a la derecha del peso**, como lo pidió el autor, y **entra en el cálculo del
+reserve** de la fila del nombre: es la tercera cosa que se dibuja ahí, y sin eso un nombre largo la
+pisa o la empuja fuera del panel. Es literalmente el defecto que ese mismo renglón pagó en la pasada
+del #66 — con el agravante de que la estrella aparece sólo en **algunos** ítems, que es la forma de
+bug que se ve bien hasta el día que alguien hace favorito un rifle de nombre largo.
+
 ---
 
 ## 8. Contenedores en mundo
@@ -655,9 +760,28 @@ Cargo.StatusPanel.RegisterBar(module, {
 
 **CRG-44 —** Si el módulo dueño de una barra no está montado, la barra simplemente no se registra — degradación honesta, mismo principio que gobierna todo soft-dep del ecosistema.
 
-### 11.1 Sobrellenado — la marca (enmienda 2026-08-08)
+### 11.1 Sobrellenado — la marca (enmienda 2026-08-08; **BAJADA A CÓDIGO el 2026-08-21**, roadmap #59)
 
 Pedida por Craving, que con la enmienda de su §2.1 tiene stats que pasan de 100 y llegan a 150 (comer de más es posible y tiene riesgo de vómito). **El panel no puede seguir clampeando en silencio.**
+
+> **Estado: implementada.** Las cinco reglas de abajo están en
+> `client/corpus_cargo_statuspanel.lua`. Dos notas de la bajada, y las dos son
+> correcciones a lo que este bloque decía:
+>
+> - **`overfillColor` defaultea a `T.Colors.orange`, no a `T.Colors.warn`.** La paleta viva **no
+>   tiene** una clave `warn`; su señal fija de advertencia es `orange` — uno de los tres colores
+>   (`amber`/`orange`/`red`) que quedan clavados bajo cualquier teñido de DGL4, justamente para que
+>   sigan leyéndose como advertencias cuando todo lo demás toma el tono del HUD.
+> - **La aritmética salió del `Paint` a tres funciones puras** (`BarFrac`, `OverFrac`, `OverLabel`).
+>   Un `PaintOver` es una closure sin nombre y sin superficie que dibujar offline, así que lo único
+>   que separa *«llena y muda»* de *«llena y hablando»* habría sido lo único que ningún check podía
+>   alcanzar. Con las tres funciones, **138 y 149 contestan distinto en un test**.
+>
+> El tramado vive en `Theme.DrawHatch`, que **toma el panel**: `render.SetScissorRect` trabaja en
+> coordenadas de **pantalla** y `surface.DrawLine` dentro de un `Paint` en coordenadas de **panel**,
+> así que el rect hay que convertirlo (las dos copias viejas del patrón —el quickslot bloqueado y el
+> chip de luz del wheel— viven en `HUDPaint`, donde los dos espacios ya coinciden; **no se migraron**
+> a propósito, un rojo del wheel se leería como un rojo de esta entrada).
 
 *El defecto que arregla, medido y no supuesto:* hoy `Build` hace `math.Clamp(tonumber(v) or 0, 0, 100)` al pollear, así que un valor de 138 **no desborda la barra — la deja llena y muda**. El jugador ve exactamente lo mismo con 100 que con 149, y con 149 la próxima mordida lo hace vomitar casi seguro. Es un modo de falla peor que un desborde: un desborde se ve.
 
