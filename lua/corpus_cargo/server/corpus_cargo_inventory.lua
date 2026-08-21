@@ -74,6 +74,7 @@ local NET_BELT_MOVE  = Corpus.Net.Register("cargo", "belt_move")
 local NET_BELT_DROP  = Corpus.Net.Register("cargo", "belt_drop")
 local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
 local NET_SORT       = Corpus.Net.Register("cargo", "sort")
+local NET_FAVORITE   = Corpus.Net.Register("cargo", "favorite")
 
 -- Lifecycle convars (server, archived):
 --   cargo_lose_on_death — death wipes the whole inventory + money (roadmap
@@ -354,6 +355,97 @@ local function StampEntries(rec)
     StampCid(rec)
 end
 
+-- ------------------------------------------------------------------
+-- FAVORITES (roadmap #43, CRG-76)
+--
+-- A favorite is a flag OF THE PLAYER over an item. Not of the def — two AK-74
+-- of the same def, one favorite and the other not, is precisely the case the
+-- author named ("la tuya que siempre usas") — and not of the CELL either.
+-- It lives in `rec.fav`, a set of keys on the record, which is why persistence
+-- costs nothing: the whole record is saved and loaded (§12), so a new field on
+-- it round-trips by itself.
+--
+-- ⭐ THE SHAPE OF THE KEY IS THE DESIGN, and it is the author's vote of
+-- 2026-08-21:
+--     unique     -> the uid       (that instance, exactly)
+--     stackable  -> the id        (all bandages, or none)
+--
+-- WHY NOT PER CELL, which is the granular reading and was on the table:
+-- `AddStack` MERGES on its own — same id, same condition, room under
+-- `max_stack` — so a flag living on a cell is UNDEFINED the moment you pick
+-- another one off the floor. Either the entry that walked in has no flag, or it
+-- lands in a non-favorite cell and the favorite splits into two halves with no
+-- rule governing them. There is no error and no warning in either case. Making
+-- it well-defined means touching the merge, which is roadmap #73 and drags #67
+-- and #70 with it. THIS SHAPE DOES NOT NEED TO: there is nothing on the entry
+-- to lose, because the flag was never on the entry.
+-- The honest cost, and the author was told it before he voted: you cannot have
+-- 3 favorite bandages and 2 not.
+--
+-- The eligibility rule (no ammunition) lives in Items.CanFavorite, SHARED, so
+-- the client's menu and this server's refusal cannot drift apart.
+-- ------------------------------------------------------------------
+
+-- Accepts the two shapes an "item the player holds" comes in: a grid entry (or
+-- a stack slot) as a table, and a bare uid string, which is what `rec.equip`
+-- stores for a unique. Taking both is what lets the five gates — three of which
+-- only ever see one shape — call the same function.
+function CARGO.Inventory.FavoriteKey(entry)
+    if isstring(entry) then
+        return entry ~= "" and ("u:" .. entry) or nil
+    end
+    if not istable(entry) then return nil end
+    if entry.uid ~= nil then return "u:" .. tostring(entry.uid) end
+    if not isstring(entry.id) or entry.id == "" then return nil end
+    return "i:" .. entry.id
+end
+
+-- ⭐ THE single house. The gates call THIS; not one of them re-reads `rec.fav`.
+-- The whole value of the entry is that no route out of the inventory can ignore
+-- a favorite, and that is a property of there being ONE predicate: the sixth
+-- gate somebody writes has to come here and ask.
+function CARGO.Inventory.IsFavorite(rec, entry)
+    if not istable(rec) or not istable(rec.fav) then return false end
+    local key = CARGO.Inventory.FavoriteKey(entry)
+    return key ~= nil and rec.fav[key] == true
+end
+
+-- The def behind either shape, so eligibility can be asked about a uid too.
+local function DefOfHeld(entry)
+    if isstring(entry) then
+        local blob = CARGO.Instances.Get(entry)
+        return blob and CARGO.Items.Get(blob.id) or nil
+    end
+    if not istable(entry) then return nil end
+    return CARGO.Items.Get(entry.id)
+end
+
+-- Drops `u:` keys whose instance no longer exists anywhere. A uid is never
+-- recycled (`i<os.time()>_<counter>`: unique within a boot by the counter and
+-- across boots by the clock), so a stale key cannot silently adopt another
+-- item — but it would accumulate in the file forever, one per favorite weapon
+-- ever destroyed.
+--
+-- `i:` KEYS ARE NEVER PRUNED, and that is not an omission: an id key names a
+-- CLASS of item. Spending your last bandage must not forget that bandages are
+-- favorites, or the mark would evaporate exactly when the stack runs out and
+-- come back unmarked with the next pickup.
+-- An instance held by a container or lying on the floor is still in `_live`, so
+-- storing your favorite rifle in a crate keeps the mark — you moved it, you did
+-- not destroy it.
+function CARGO.Inventory.PruneFavorites(rec)
+    if not istable(rec) or not istable(rec.fav) then return 0 end
+    local dropped = 0
+    for key in pairs(rec.fav) do
+        local uid = isstring(key) and string.match(key, "^u:(.+)$") or nil
+        if uid ~= nil and CARGO.Instances.Get(uid) == nil then
+            rec.fav[key] = nil
+            dropped = dropped + 1
+        end
+    end
+    return dropped
+end
+
 -- Re-sorts the grid with the SHARED criterion, on the player's say-so. The
 -- only thing in the module that rewrites an `ord` that already exists.
 function CARGO.Inventory.SortGrid(ply)
@@ -515,6 +607,40 @@ local function FindCell(ply, rec, ref)
         CARGO.Inventory.Notice(ply, "That stack is no longer in that cell.")
     end
     return nil, nil, stale
+end
+
+-- The intent, and it is a TOGGLE with no payload beyond the ref: a client that
+-- sent "make it true" could disagree with a record that already says true, and
+-- the two would drift with nothing to reconcile them. `ref.slot` names an
+-- equipment slot; anything else resolves against the grid.
+function CARGO.Inventory.ToggleFavorite(ply, ref)
+    local rec = CARGO.Inventory.GetRecord(ply)
+    if not istable(ref) then return false end
+
+    local held
+    if isstring(ref.slot) and ref.slot ~= "" then
+        held = rec.equip[ref.slot]
+        if held == nil then return false end
+    else
+        local _, entry = FindCell(ply, rec, ref)
+        if entry == nil then return false end
+        held = entry
+    end
+
+    if not CARGO.Items.CanFavorite(DefOfHeld(held)) then
+        CARGO.Inventory.Notice(ply, "Ammunition can't be marked as a favorite.")
+        return false
+    end
+
+    local key = CARGO.Inventory.FavoriteKey(held)
+    if key == nil then return false end
+
+    rec.fav = rec.fav or {}
+    -- `nil` and not `false` when turning it off: the set stays clean across the
+    -- JSON round-trip, and IsFavorite compares against true either way.
+    rec.fav[key] = (rec.fav[key] ~= true) or nil
+    CARGO.Inventory.Touch(ply)
+    return true
 end
 
 -- Inserts an existing entry (from a container, drop pickup or ejection).
@@ -760,35 +886,52 @@ function CARGO.Inventory.NotifyPickup(ply, id, count)
     net.Send(ply)
 end
 
-local function EntrySnapshot(entry)
+-- `fav` rides HERE and nowhere else (roadmap #43). This is the single funnel
+-- the fields of a grid cell are built in, so the flag reaches the client the
+-- same way `cid` and `ord` do: no second net route was minted for it, and the
+-- client never needs the `rec.fav` set — it only ever asks the entry it drew.
+-- Only `true` is written, never `false`: the blob stays the size it was for
+-- every player who has no favorites at all.
+local function EntrySnapshot(rec, entry)
+    local fav = CARGO.Inventory.IsFavorite(rec, entry) or nil
     if entry.uid then
         return { id = entry.id, uid = entry.uid, ord = entry.ord, cid = entry.cid,
-            blob = CARGO.Instances.Get(entry.uid) }
+            fav = fav, blob = CARGO.Instances.Get(entry.uid) }
     end
     -- `cid` rides so the client can name back the cell it drew (#68). It rides
     -- on the unique too, even though its ref is the uid: #70 addresses a DRAG
     -- by cell, and a field only some cells carry would be a second rule.
     return { id = entry.id, count = entry.count or 1, condition = entry.condition,
-        ord = entry.ord, cid = entry.cid }
+        ord = entry.ord, cid = entry.cid, fav = fav }
 end
 
 function CARGO.Inventory.BuildSnapshot(ply)
     local rec = CARGO.Inventory.GetRecord(ply)
     StampEntries(rec) -- the wire funnel (see StampEntries): a cell without an `ord`
                     -- would fall back to the auto-sort and drift from the rest
+    -- same funnel, same reason: the favorites of instances that no longer exist
+    -- anywhere would pile up in the record file forever (see PruneFavorites)
+    CARGO.Inventory.PruneFavorites(rec)
     local snap = { items = {}, equip = {}, quick = rec.quick, belt = rec.belt }
 
     for _, entry in ipairs(rec.items) do
-        snap.items[#snap.items + 1] = EntrySnapshot(entry)
+        snap.items[#snap.items + 1] = EntrySnapshot(rec, entry)
     end
     for slotId, val in pairs(rec.equip) do
+        -- the flag rides on the equipment slots too, and it is not decoration:
+        -- the author's case is "your weapon", and your weapon is EQUIPPED most
+        -- of the time. Without it the slot menu would offer a Drop the server
+        -- then refuses — the dead button CRG-6 exists to prevent.
+        local fav = CARGO.Inventory.IsFavorite(rec, val) or nil
         if istable(val) then
             -- stack slot (throwable): count rides for the ×N badge; no blob
             snap.equip[slotId] = { id = val.id, count = val.count or 1,
-                condition = val.condition }
+                condition = val.condition, fav = fav }
         else
             local blob = CARGO.Instances.Get(val)
-            if blob then snap.equip[slotId] = { id = blob.id, uid = val, blob = blob } end
+            if blob then
+                snap.equip[slotId] = { id = blob.id, uid = val, blob = blob, fav = fav }
+            end
         end
     end
 
@@ -1293,6 +1436,12 @@ function CARGO.Inventory.DropEntry(ply, ref, count)
     local idx, entry = FindCell(ply, rec, ref)
     if entry == nil then return false end
 
+    -- GATE 4 of 5 (roadmap #43, CRG-76): drop from the grid
+    if CARGO.Inventory.IsFavorite(rec, entry) then
+        CARGO.Inventory.Notice(ply, "That's a favorite: unmark it before dropping it.")
+        return false
+    end
+
     local dropped
     if entry.uid then
         table.remove(rec.items, idx)
@@ -1331,6 +1480,21 @@ function CARGO.Inventory.DropEquipped(ply, slotId)
     local rec = CARGO.Inventory.GetRecord(ply)
     local val = rec.equip[slotId]
     if val == nil then return false end
+
+    -- GATE 5 of 5 (roadmap #43, CRG-76): drop straight from an equipment slot.
+    -- Author's vote 2026-08-21, and it was put to him because it is the one of
+    -- the five that adds friction to a gesture that is instant today: the case
+    -- of use is "don't lose your rifle", and your rifle is equipped most of the
+    -- time — a lock that switches off exactly while the item is in use protects
+    -- the wrong moment. It goes BEFORE the three shapes below on purpose: two
+    -- of them hand the item to the world through machinery that does its own
+    -- bookkeeping (ply:DropWeapon and the reconciler), so a gate placed after
+    -- the branch would have to be written three times.
+    if CARGO.Inventory.IsFavorite(rec, val) then
+        CARGO.Inventory.Notice(ply, "That's a favorite: unmark it before dropping it.")
+        return false
+    end
+
     local dropPos = ply:EyePos() + ply:GetAimVector() * 32
 
     local function spawnItemEnt(entry)
@@ -1807,6 +1971,11 @@ net.Receive(NET_SORT, function(_, ply)
     if (ply.cargoNextSort or 0) > CurTime() then return end
     ply.cargoNextSort = CurTime() + 0.25
     CARGO.Inventory.SortGrid(ply)
+end)
+
+net.Receive(NET_FAVORITE, function(_, ply)
+    local ref = CARGO.Util.ReadBlob()
+    if ref then CARGO.Inventory.ToggleFavorite(ply, ref) end
 end)
 
 net.Receive(NET_QUICKBIND, function(_, ply)

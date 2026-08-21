@@ -133,6 +133,69 @@ function T.DrawSegBar(x, y, w, h, frac, col)
     end
 end
 
+-- 45 degree hatching over the LEFT `frac` of its own rect, in PANEL space.
+--
+-- WHY IT TAKES THE PANEL. The diagonals run past the rect by construction —
+-- that is what makes them read as a texture instead of as ticks — so they have
+-- to be clipped or they bleed onto the row below. The engine's scissor works in
+-- SCREEN space while `surface.DrawLine` inside a Paint works in PANEL space, so
+-- the rect has to be converted, and the panel is the only thing that can do it.
+-- This is CRG-28, and the clip is not belt-and-braces: the stripes of a
+-- quickslot bleeding out of their cell are what paid for that norm.
+-- (The prose says "the engine's scissor" and not the call by name on purpose:
+-- the source gate counts the CALLS, and a name written in a comment would pad
+-- the count with something that draws nothing.)
+--
+-- The module has two older copies of this pattern (the locked quick chip in
+-- corpus_cargo_ui.lua and the overridden light chip in corpus_cargo_wheel.lua).
+-- They are NOT migrated here on purpose: both live in HUDPaint, where the two
+-- coordinate spaces already coincide, and a red from the wheel would read as a
+-- red from the status panel in the pass that ships this.
+function T.DrawHatch(panel, x, y, w, h, frac, col, step)
+    frac = math.Clamp(frac or 1, 0, 1)
+    if frac <= 0 or w <= 0 or h <= 0 then return end
+    local fw = math.floor(w * frac + 0.5)
+    if fw <= 0 then return end
+
+    local sx, sy = panel:LocalToScreen(x, y)
+    sx, sy = tonumber(sx) or 0, tonumber(sy) or 0
+
+    surface.SetDrawColor(col)
+    render.SetScissorRect(sx, sy, sx + fw, sy + h, true)
+    step = math.max(4, step or 6)
+    for off = -h, fw, step do
+        surface.DrawLine(x + off, y + h, x + off + h, y)
+    end
+    render.SetScissorRect(0, 0, 0, 0, false)
+end
+
+-- Five-pointed star, filled, centered on cx/cy with outer radius r.
+--
+-- IT IS DRAWN AND NOT TYPED, and that is a MEASUREMENT and not a preference:
+-- the module's font is Roboto (Roboto-Medium.ttf, read off disk in GMod's own
+-- resource/fonts), and Roboto has NO glyph for U+2605 BLACK STAR, U+2606 WHITE
+-- STAR or U+272F. A draw.SimpleText("*") would paint the missing-glyph box.
+-- Drawing it also means the palette tints it like every other shape here —
+-- same reason PaintMenuArrow does not use the stock Derma arrow texture.
+--
+-- THE FIRST VERTEX IS THE CENTER, and that is the whole trick: surface.DrawPoly
+-- is a triangle FAN from vertex one, and a star is CONCAVE — fanning from a
+-- point would put triangles outside the shape. Fanning from the center gives
+-- ten triangles that are each entirely inside it. The contour runs clockwise
+-- (increasing angle, screen Y down), the same winding T.DrawCircle above uses.
+function T.DrawStar(cx, cy, r, col)
+    local inner = r * 0.382 -- the regular 5-point ratio (1/phi^2)
+    local pts = { { x = cx, y = cy } }
+    for i = 0, 10 do -- 10 and not 9: the contour closes back on its first point
+        local a = math.rad(-90 + (i % 10) * 36)
+        local rad = (i % 2 == 0) and r or inner
+        pts[#pts + 1] = { x = cx + math.cos(a) * rad, y = cy + math.sin(a) * rad }
+    end
+    draw.NoTexture()
+    surface.SetDrawColor(col)
+    surface.DrawPoly(pts)
+end
+
 -- standard panel look: flat box + hairline border
 function T.PaintPanel(w, h, bgCol, borderCol)
     draw.RoundedBox(4, 0, 0, w, h, bgCol or T.Colors.panel)

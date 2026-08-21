@@ -130,6 +130,31 @@ function CARGO.Items.MatchesTab(def, tabId)
 end
 
 -- ------------------------------------------------------------------
+-- Can this def be marked as a favorite? (roadmap #43, CRG-76)
+--
+-- SHARED, and that is the point of it being here rather than an `if` in each
+-- realm: the server is the rule and the client is the feedback (CRG-6), so the
+-- two of them have to agree on WHICH items are eligible or the context menu
+-- offers an option the server then refuses — which is exactly the dead button
+-- CRG-6 exists to prevent.
+--
+-- AMMUNITION IS EXCLUDED, by the author's call and with his reason: "la data de
+-- la municion es muy cambiante y dudosamente alguien haria favorito una caja de
+-- 120 balas de 9mm". Asked through TabOf and NOT by comparing `category` to the
+-- string "ammo": TabOf is the one house of that grouping, so a sibling module
+-- registering a second ammo-ish category that folds into the Ammo tab is
+-- excluded too, with no second list to keep in step (the list-pasted-by-hand
+-- failure mode: it covers the cases that existed the day it was written).
+--
+-- An entry whose def never registered is NOT eligible: the favorite is a
+-- promise that five gates will refuse to move the thing, and a promise made
+-- about an item nobody can describe is one the gates cannot keep.
+function CARGO.Items.CanFavorite(def)
+    if not istable(def) then return false end
+    return CARGO.Items.TabOf(def.category) ~= "ammo"
+end
+
+-- ------------------------------------------------------------------
 -- Stack ceiling and auto-sort criterion (roadmap #67).
 --
 -- Both live HERE, shared, for the same reason: each is read from the two

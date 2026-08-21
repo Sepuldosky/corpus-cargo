@@ -36,7 +36,14 @@ local function AddRow(parent, tall, paint)
     return tall + 4
 end
 
-local function AddTitle(parent, def, condPct)
+-- The star of a favorite is 9 px wide (its outer diameter) plus 6 of gap. It
+-- is a constant and not a text measurement because it is DRAWN and not typed:
+-- Roboto — the module's font, read off GMod's own resource/fonts — has no glyph
+-- for U+2605, so a draw.SimpleText would paint the missing-glyph box (see
+-- T.DrawStar). Keep the two numbers in step with the call below.
+local STAR_R, STAR_GAP = 4.5, 6
+
+local function AddTitle(parent, def, condPct, fav)
     return AddRow(parent, 24, function(_, w)
         -- name must never collide with the condition text on the right. The
         -- reserve used to be a flat 150 px, which was tuned against
@@ -48,10 +55,19 @@ local function AddTitle(parent, def, condPct)
         -- it: the flat 150 covered the weight by accident, and measuring only
         -- the label would have pushed the kg off the panel on a long name with
         -- no condition at all, a case that worked before this pass.
+        --
+        -- THE STAR (roadmap #43) IS THE THIRD THING TO THE RIGHT OF THE NAME,
+        -- and it enters the reserve for exactly the reason above: the author
+        -- asked for it "al lado derecho del peso", so a name long enough would
+        -- either be painted over by it or push it off the panel. That is
+        -- literally the defect this same line paid for in the #66 pass — and
+        -- the star only appears on SOME items, which is the shape of bug that
+        -- looks fine until the day someone favorites a long-named rifle.
         local label = condPct ~= nil and T.ConditionLong(def, condPct) or nil
         local kg = T.FormatKg(def.weight)
         surface.SetFont("CargoSmall")
         local reserve = surface.GetTextSize(kg) + 8
+        if fav then reserve = reserve + STAR_R * 2 + STAR_GAP end
         if label ~= nil then
             surface.SetFont("CargoText")
             reserve = reserve + surface.GetTextSize(label) + 12
@@ -61,6 +77,15 @@ local function AddTitle(parent, def, condPct)
         surface.SetFont("CargoHeading")
         local nameW = surface.GetTextSize(name)
         draw.SimpleText(kg, "CargoSmall", nameW + 8, 6, T.Colors.textDim)
+        if fav then
+            -- amber comes from the PALETTE and is not a hand-written yellow:
+            -- it re-tints with the rest of the UI under DGL4 (CRG-29), where
+            -- amber is one of the fixed signal colors, so the star stays yellow
+            -- whatever hue the HUD takes.
+            surface.SetFont("CargoSmall")
+            local kgW = surface.GetTextSize(kg)
+            T.DrawStar(nameW + 8 + kgW + STAR_GAP + STAR_R, 11, STAR_R, T.Colors.amber)
+        end
         if label ~= nil then
             -- "Condition 67%" / "Broken", or "2/3 uses · 67%" when the def
             -- declared `uses` (roadmap #66). The percent stays next to the uses
@@ -185,7 +210,7 @@ function CARGO.Tooltip.Show(cell, entry)
     end
 
     local y = 10
-    y = y + AddTitle(tip, def, T.ConditionOf(entry))
+    y = y + AddTitle(tip, def, T.ConditionOf(entry), entry.fav == true)
 
     -- icon zoom (Cargo_ItemImages §6/§10): the 64 px/cell renders hold up at
     -- tooltip size; painted from Icons.Get each frame so it hot-swaps in

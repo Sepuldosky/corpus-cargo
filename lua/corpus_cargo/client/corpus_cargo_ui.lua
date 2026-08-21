@@ -35,6 +35,7 @@ local NET_BELT_DROP = Corpus.Net.Register("cargo", "belt_drop")
 local NET_UNLOAD    = Corpus.Net.Register("cargo", "unload")
 local NET_EQUIP_DROP = Corpus.Net.Register("cargo", "equip_drop")
 local NET_SORT      = Corpus.Net.Register("cargo", "sort")
+local NET_FAVORITE  = Corpus.Net.Register("cargo", "favorite")
 
 local cvKey = CreateClientConVar("cargo_key_inventory", tostring(KEY_I), true, false,
     "Key (KEY_* enum) that opens the Cargo inventory")
@@ -107,6 +108,13 @@ end
 local function SendEquipDrop(slotId)
     net.Start(NET_EQUIP_DROP) net.WriteString(slotId) net.SendToServer()
     CARGO.Sounds.Play("drop")
+end
+-- A TOGGLE and not a "set to X" (roadmap #43): the client would be asserting a
+-- state it read one sync ago, and a disagreement with the record would have
+-- nothing to reconcile it. The ref is the module's usual one, plus `slot` for
+-- something worn — the server resolves both shapes.
+local function SendFavorite(ref)
+    net.Start(NET_FAVORITE) CARGO.Util.WriteBlob(ref) net.SendToServer()
 end
 local function SendSort()
     net.Start(NET_SORT) net.SendToServer()
@@ -316,6 +324,16 @@ local function OpenItemMenu(entry)
         end)
     end
 
+    -- Favorites (roadmap #43). The eligibility question is Items.CanFavorite,
+    -- SHARED with the server, so this menu can never offer an option the server
+    -- then refuses. Ammunition simply has no row — a greyed-out one would be a
+    -- worse answer, because "you can't favorite this" is not news the player
+    -- needs every time he right-clicks a magazine.
+    if CARGO.Items.CanFavorite(def) then
+        menu:AddOption(entry.fav and "Remove from favorites" or "Mark as favorite",
+            function() SendFavorite(ref) end)
+    end
+
     menu:AddOption("Drop", function() SendDrop(ref, 1) end)
     if (entry.count or 1) > 1 then
         menu:AddOption("Drop all (x" .. entry.count .. ")", function()
@@ -369,6 +387,14 @@ local function OpenSlotMenu(slotId)
                 end
             end
         end
+    end
+
+    -- Favorites from the slot too (roadmap #43): "la tuya que siempre usas" is
+    -- a weapon that lives EQUIPPED, so a mark you can only place while the item
+    -- sits in the bag would be a mark you place on the wrong thing.
+    if CARGO.Items.CanFavorite(def) then
+        menu:AddOption(slotEntry.fav and "Remove from favorites" or "Mark as favorite",
+            function() SendFavorite({ slot = slotId }) end)
     end
 
     -- drop straight from the slot (roadmap #28): weapons leave as the real
@@ -884,13 +910,57 @@ local function BuildTabs(bar)
     -- must never be something a refresh does behind him. Right-aligned on the
     -- last row, dropping to a row of its own if the tabs already reach that
     -- far (the tiny-resolution wrap the loop above guards for).
+    --
+    -- THE FAVORITES TOGGLE RIDES BESIDE IT, and it is a toggle and NOT a ninth
+    -- tab (roadmap #43). The set of tabs was closed in #23 because the row
+    -- wrapped once "Backpacks" was registered, so the width was MEASURED before
+    -- the author voted, against the real font (Roboto-Medium at 12, off GMod's
+    -- own resource/fonts): the eight tabs already sum 454 px against the 424
+    -- this bar gets at 1280x720, so `Misc` ALREADY wraps there today — and
+    -- shortening the label to "Fav" changes the outcome at no resolution at
+    -- all. What decides is the COUNT of tabs, not the length of a name. So the
+    -- ninth one was never the cheap option it looked like, and the author chose
+    -- the toggle: "puede ser el toggle pero solamente con la estrellita, igual
+    -- se entiende al lado del Sort".
+    -- Star only, no text, by that same call — and drawn, not typed: Roboto has
+    -- no U+2605 glyph (see T.DrawStar).
     surface.SetFont("CargoSmall")
     local sortW = surface.GetTextSize("Sort") + 22
-    local sortX = math.max(barW - sortW, 0)
-    if x > sortX then rowY = rowY + 26 end
+    local favW = 24
+    local rightW = favW + 6 + sortW
+    local rightX = math.max(barW - rightW, 0)
+    if x > rightX then rowY = rowY + 26 end
+
+    local favBtn = vgui.Create("DButton", bar)
+    favBtn:SetText("")
+    favBtn:SetPos(rightX, rowY)
+    favBtn:SetSize(favW, 24)
+    favBtn:SetTooltip("Show only favorites")
+    favBtn.Paint = function(self, w, h)
+        -- the state lives on the GRID and not on this button: BuildTabs runs
+        -- again on every refresh, so a flag kept here would reset itself every
+        -- time the inventory changed, silently and only while filtered.
+        local on = grid ~= nil and grid.favOnly == true
+        surface.SetDrawColor(on and T.Colors.accentDim or T.Colors.borderHi)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+        if on then
+            surface.SetDrawColor(T.Colors.accent.r, T.Colors.accent.g,
+                T.Colors.accent.b, 16)
+            surface.DrawRect(1, 1, w - 2, h - 2)
+        end
+        local col = T.Colors.amber
+        if not (on or self:IsHovered()) then
+            col = Color(col.r, col.g, col.b, 120)
+        end
+        T.DrawStar(w / 2, h / 2, 6, col)
+    end
+    favBtn.DoClick = function()
+        if grid then grid.SetFavOnly(not grid.favOnly) end
+    end
+
     local sortBtn = vgui.Create("DButton", bar)
     sortBtn:SetText("")
-    sortBtn:SetPos(sortX, rowY)
+    sortBtn:SetPos(rightX + favW + 6, rowY)
     sortBtn:SetSize(sortW, 24)
     sortBtn.Paint = function(self, w, h)
         surface.SetDrawColor(T.Colors.borderHi)

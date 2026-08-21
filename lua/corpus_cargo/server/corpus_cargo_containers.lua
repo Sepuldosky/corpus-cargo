@@ -454,6 +454,16 @@ local function TransferOne(ply, cont, dir, ref, count)
     end
     if entry == nil then return false end
 
+    -- GATE 3 of 5 (roadmap #43, CRG-76): the INDIVIDUAL transfer into the
+    -- container. Author's vote 2026-08-21, and the reason is his own wording —
+    -- "no puedes mandarlo al loot box sin quitarle el favorito" is only true if
+    -- EVERY route is closed. Blocking the mass move and letting the drag
+    -- through would make the lock depend on which gesture you touched it with,
+    -- which is the exact incoherence roadmap #69 closed.
+    if CARGO.Inventory.IsFavorite(rec, entry) then
+        return false, "that's a favorite: unmark it before storing it"
+    end
+
     if entry.uid then
         count = 1
     else
@@ -514,14 +524,26 @@ net.Receive(NET_TAKEALL, function(_, ply)
     -- #67 (the player's grid always split), and #67 makes the container split
     -- too, so it would have reached Take all as well.
     local refs, seen = {}, {}
-    local source = dir == "take" and cont.items or CARGO.Inventory.GetRecord(ply).items
+    local rec = CARGO.Inventory.GetRecord(ply)
+    local source = dir == "take" and cont.items or rec.items
+    local heldBack = false
     for _, entry in ipairs(source) do
-        local ref = entry.uid and { uid = entry.uid }
-            or { id = entry.id, condition = entry.condition }
-        local key = CARGO.Trade.RefKey(ref)
-        if not seen[key] then
-            seen[key] = true
-            refs[#refs + 1] = ref
+        -- GATE 2 of 5 (roadmap #43, CRG-76): "Move all". It SKIPS favorites
+        -- instead of letting TransferOne refuse them, and that is not a second
+        -- copy of the rule — it is the difference between moving everything you
+        -- can and reporting a failure that did not happen. Falling through to
+        -- the gate below would set `blocked` and print "the container ran out
+        -- of capacity", which is a lie about a container that has room.
+        if dir == "put" and CARGO.Inventory.IsFavorite(rec, entry) then
+            heldBack = true
+        else
+            local ref = entry.uid and { uid = entry.uid }
+                or { id = entry.id, condition = entry.condition }
+            local key = CARGO.Trade.RefKey(ref)
+            if not seen[key] then
+                seen[key] = true
+                refs[#refs + 1] = ref
+            end
         end
     end
 
@@ -534,6 +556,9 @@ net.Receive(NET_TAKEALL, function(_, ply)
         CARGO.Inventory.Notice(ply, dir == "take"
             and "Couldn't take everything: you ran out of carry weight."
             or "Couldn't move everything: the container ran out of capacity.")
+    end
+    if heldBack then
+        CARGO.Inventory.Notice(ply, "Your favorites stayed in your pack.")
     end
     AfterTransfer(ply, cont)
 end)

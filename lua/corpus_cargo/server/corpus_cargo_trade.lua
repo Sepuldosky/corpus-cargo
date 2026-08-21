@@ -360,7 +360,12 @@ end
 -- Resolves one side of the basket into concrete, priced, weighed lines.
 -- Returns lines, total, weight or nil, error — the error is the player-facing
 -- reason (voice of interface, §3: "the trader no longer has that", not "nil").
-local function ResolveSide(lines, listOf, source, mult)
+--
+-- `favRec` is the player's record, and ONLY the sell side passes it (roadmap
+-- #43): buying a favorite is not a thing — the trader's stock has no owner to
+-- have marked it. Passing it explicitly instead of sniffing the type of
+-- `source` is what keeps the gate readable as belonging to one side.
+local function ResolveSide(lines, listOf, source, mult, favRec)
     local out, total, weight = {}, 0, 0
     local seen = {}
     local list = listOf(source)
@@ -377,6 +382,16 @@ local function ResolveSide(lines, listOf, source, mult)
         if #entries == 0 then return nil, "An item in the basket is gone." end
 
         local first = entries[1]
+
+        -- GATE 1 of 5 (roadmap #43, CRG-76): selling, THE COMMIT. This is the
+        -- rule; the refusal the player sees when he clicks lives on the client
+        -- (CRG-6), and it is here that a hand-made intent stops.
+        if favRec ~= nil and CARGO.Inventory.IsFavorite(favRec, first) then
+            local fdef = CARGO.Items.Get(first.id)
+            return nil, (fdef and fdef.name or first.id)
+                .. " is a favorite: unmark it before selling it."
+        end
+
         local def = CARGO.Items.Get(first.id)
         local unit = CARGO.Trade.IsTradeable(def) and CARGO.Trade.UnitPrice(def,
             CARGO.Trade.ConditionOfEntry(Priceable(first)), mult) or nil
@@ -421,7 +436,7 @@ function CARGO.Trade.Confirm(ply, trader, basket)
 
     -- SELL: what the player hands over, priced with the trader's buy_mult
     local sells, gain = ResolveSide(basket.sell,
-        function(r) return r.items end, rec, trader.buyMult)
+        function(r) return r.items end, rec, trader.buyMult, rec)
     if sells == nil then return false, gain end
 
     if #buys == 0 and #sells == 0 then return false, "The basket is empty." end

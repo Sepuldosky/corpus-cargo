@@ -187,6 +187,18 @@ function CARGO.Grid.Create(parent, opts)
         controller.Refresh()
     end
 
+    -- Favorites are a SECOND axis and not a ninth tab (roadmap #43, author's
+    -- call 2026-08-21 with the tab row measured in front of him). It has to be
+    -- separate from `filter` because a favorite is not a property of the def:
+    -- Items.MatchesTab takes a DEF, and two AK-74 of the same def can differ.
+    -- Resolving it here, alongside the tab test rather than inside it, is what
+    -- keeps MatchesTab answering the one question it can answer.
+    controller.favOnly = false
+    function controller.SetFavOnly(on)
+        controller.favOnly = on == true
+        controller.Refresh()
+    end
+
     function controller.Refresh()
         CARGO.Tooltip.Hide()
         layout:Clear()
@@ -225,6 +237,7 @@ function CARGO.Grid.Create(parent, opts)
             -- the filter is a DISPLAY tab, not an internal category (#23):
             -- one tab groups several categories, unmapped ones fall to Misc
             local visible = CARGO.Items.MatchesTab(def, controller.filter)
+                and (not controller.favOnly or entry.fav == true)
             if visible then
                 local cell = layout:Add("DButton")
                 -- tiered tile: footprint w×h cells, gaps included so tile

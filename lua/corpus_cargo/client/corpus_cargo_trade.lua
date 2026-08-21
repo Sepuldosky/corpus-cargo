@@ -103,6 +103,20 @@ function CARGO.Trade.BasketAdd(side, entry, count)
         return
     end
 
+    -- GATE 1 of 5 seen from the CLIENT (roadmap #43, CRG-76). The rule is the
+    -- server's and it stands there too (Trade.Confirm -> ResolveSide): this is
+    -- the half the author asked for by name — "cuando apretas en el al vender
+    -- no te lo permite". Refusing only here would leave a hand-made intent
+    -- through; refusing only on the server would leave the player clicking a
+    -- cell that does nothing with no idea why. Both, and the server governs.
+    -- It reads `entry.fav` off the snapshot, so there is no second source of
+    -- truth on this side to drift from the record.
+    if side == "sell" and entry.fav then
+        chat.AddText(T.Colors.amber, "[Cargo] ", T.Colors.text,
+            (def and def.name or entry.id) .. " is a favorite: unmark it before selling it.")
+        return
+    end
+
     local lines = Side(side)
     local key = CARGO.Trade.RefKey(entry)
     local line = lines[key]
