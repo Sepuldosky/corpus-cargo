@@ -1730,6 +1730,13 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
 60. CONTAR Y CONSUMIR CONTRA CONTENEDORES CERCANOS [Cargo containers] —
     RATIFICADA POR CARGO Y ESCRITA el 2026-08-22, en tanda con la #65.
     CHANGELOG 80 [PENDIENTE].
+    ⚠ SU PASADA EN JUEGO QUEDA DIFERIDA HASTA QUE EXISTA EL AREA HOSPITAL de
+    Coagulant (decision del autor, 2026-08-22), que es su UNICO consumidor y
+    todavia no bajo a codigo. NO es deuda olvidada: una planilla sobre un
+    llamador que no existe vuelve a medir el harness y no el juego — habria
+    que inventarle un andamio, y un andamio no es el sitio de llamada
+    (leccion 89). Lo que importa hoy es que la superficie ESTA ESCRITA y
+    acreditada offline, asi que Coagulant puede escribir contra ella.
     ⚠ SON CUATRO Y ESTA ENTRADA PEDIA TRES, y la diferencia es MEDICION y no
     preferencia: el camino de tratamiento de Coagulant usa CUATRO — gatea con
     HasItem y consume con TakeUnique si es unique o con TakeItem si es stack
@@ -1993,7 +2000,13 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Cerro en la misma corrida el #63. CHANGELOG 67 y 68 [APLICADO].
 
 65. CERRAR LA PANTALLA DE TRADE DESDE EL SERVER [Cargo trade] — ESCRITA el
-    2026-08-22, en tanda con la #60. CHANGELOG 80 [PENDIENTE].
+    2026-08-22, en tanda con la #60. CHANGELOG 80 [PENDIENTE]; planilla AM
+    (6 filas), que cubre SOLO esta entrada.
+    LA FILA ESTRELLA NO USA LA CONSOLA Y ESE ES EL PUNTO: se spawnea al
+    Sidorovich, se le abre el comercio y SE LO MATA con la pantalla abierta
+    — la deuda textual de su header. Ejercita al consumidor REAL por su
+    propio camino, no a un andamio. `CloseFor` si va por consola porque
+    todavia no tiene llamador en juego, y se dice.
     QUE ENTRO: `Trade.CloseFor(ply, trader)` y `ClearViewers` PASO A CERRAR DE
     VERDAD. El net `trade_close` viaja ahora en las dos direcciones.
     LOS DOS SUB-VOTOS LOS CONTESTO EL ARBOL Y NO UNA PREFERENCIA:

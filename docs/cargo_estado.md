@@ -19,6 +19,10 @@ cazó DOS cosas escritas y no medidas, las dos del lado cliente**: un **lazo de 
 con 1272 checks encima, y un **guard inalcanzable** que se **borró** en vez de escribirle una prueba
 que no lo podía tocar. Y el `DistToSqr` del harness **devolvía 0 siempre**, así que el radio era una
 dimensión inejercitable hasta arreglarlo.
+**Las pasadas en juego van SEPARADAS y es decisión del autor**: planilla **AM** (6 filas) cubre sólo
+la **#65**, y la **#60** queda escrita con su pasada **diferida hasta que exista el área hospital de
+Coagulant** — su único consumidor no bajó a código, y una planilla sobre un llamador que no existe
+vuelve a medir el harness y no el juego. Lo que importa hoy es que la superficie **está escrita**.
 
 Antes, el mismo día: **tanda triple CERRADA EN JUEGO: #58 + #77 + #78**, CHANGELOG
 **79** `[APLICADO 2026-08-22]`, planilla **AL 8/8 en UNA ronda** — **cuarta sección seguida que

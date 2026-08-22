@@ -8090,3 +8090,24 @@ y otra que exige que **sí** entre al agrandar el radio.
    trader. *Un guardia cuya propia prueba no puede alcanzarlo no es protección, es una línea que se LEE
    como protección* (lección 110, la misma que pagó el rango del cinturón en el #72). La precondición
    vive en el receptor, y **ahí sí se mide**.
+
+### Las pasadas en juego van SEPARADAS, y es decisión del autor
+
+**Planilla AM** (`dev/checks/cargo-trade-close-r1.html`, 6 filas) cubre **sólo la #65**.
+
+**La #60 queda ESCRITA y con su pasada en juego DIFERIDA hasta que exista el área hospital de
+Coagulant**, que es su único consumidor y todavía no bajó a código. No es deuda olvidada: es que una
+planilla sobre un llamador que no existe **vuelve a medir el harness y no el juego** — habría que
+inventarle un andamio, y un andamio no es el sitio de llamada (lección 89). Lo que importa hoy es que
+la superficie **está escrita y acreditada offline**: `AreaHas` / `AreaCount` / `AreaTake` /
+`AreaTakeUnique`, con sus 17 checks y 8 sabotajes en rojo. Coagulant puede escribir contra ella.
+
+**⭐ La fila estrella de la AM no usa la consola, y ése es el punto.** Se spawnea al **Sidorovich**,
+se le abre el comercio y **se lo mata con la pantalla abierta** — que es textualmente la deuda que su
+header declara desde hace meses (*«queda huérfana y el jugador la cierra a mano»*). Ejercita al
+**consumidor real**, por su propio camino y a través del helper perezoso `TradeAPI("ClearViewers")`,
+en vez de un andamio.
+
+**`CloseFor` sí va por consola y se dice por qué**: es superficie nueva y **todavía no tiene llamador
+en juego** — corpus-stalker expulsa a todos con `ClearViewers`, no de a uno. Su comando se **midió**
+en 134 caracteres, bien debajo del corte de 255 que la consola de Source aplica **en silencio**.
