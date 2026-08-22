@@ -7868,3 +7868,92 @@ está rota — **no es un hallazgo, y forzarlo a serlo sería fabricar una entra
 
 CHANGELOG **78 `[APLICADO 2026-08-21]`**. La **#76** queda **CERRADA EN JUEGO**, y con ella la tanda
 de tres del día.
+
+---
+
+## 79. El peso pelado del def, la afirmación falsa de las tabs, y el círculo que no dejaba desmarcar (roadmap #58, #77, #78) `[PENDIENTE]`
+
+**Tanda triple, y van juntas porque las superficies son DISJUNTAS**: el peso vive en el snapshot y
+el tooltip, la fila de tabs es un comentario en `shared`, y el círculo es un menú de `ui.lua`. Un
+rojo de una no se puede confundir con un rojo de otra, y cada una tiene su bloque de sabotaje para
+poder cerrar sola.
+
+### #58 — el tooltip mostraba el peso de la CLASE
+
+`tooltip.lua` pintaba `def.weight`: un RPG cargado sumaba **9 kg** al total y mostraba **6** en su
+propia ficha. Pedido explícito del autor (planilla AC, nota de AC3). **No era nuevo** —un chaleco con
+dos placas se comportaba así desde el Block 1, porque `WeightOf` recursa y el tooltip no— pero el #56
+lo volvió visible, porque ahora el número cambia **solo**, sin que el jugador monte nada.
+
+**⭐ LO QUE LO VOLVIÓ UN BLOQUE Y NO UNA LÍNEA: son CUATRO sitios de wire, y se midieron.** Arreglar
+sólo el grid habría hecho que el **mismo** rifle diga 9 kg en la mochila y 6 al mirarlo en la caja —
+**un defecto peor que el original**, porque el número pasaría a depender de qué ventana abriste. Es la
+#76 con otro sombrero. Los cuatro: el grid (`EntrySnapshot`), los slots de equipo, la columna del
+contenedor y el stock del trader.
+
+**Son cuatro y no cinco, y se dice porque se midió y no se asumió.** La pantalla de trade tiene dos
+grids, pero el propio **lee el snapshot del inventario** (sitio 1) — sólo el stock es suyo. Y
+`Priceable`, en el server del trade, **tiene la misma forma y el mismo blob**: no es sitio de wire,
+alimenta el precio y nunca sale del server, así que un peso ahí sería un campo que nadie lee.
+
+Una casa: **`Instances.SnapWeight(blob)`**, al lado del `WeightOf` que suma. **Viaja sólo cuando
+DIFIERE**, igual que el `fav` del #43 — el campo ausente significa *«el peso de la clase ES la
+verdad»* y no *«nadie lo calculó»*, que es lo que deja al cliente caer a `def.weight` sin recalcular
+nada. La comparación va contra un **epsilon** y no `~=`: los dos lados son floats sumados, y una
+instancia que no lleva nada puede caer un pelo de su propio def y mandaría un peso «distinto» que se
+dibuja idéntico.
+
+### #77 — un comentario que prometía lo que el código no cumple
+
+`shared/corpus_cargo_items.lua` afirmaba que la fila fija de tabs *«can no longer grow a second
+line»*. **Es falso y está medido** (`dev/medir_fila_de_tabs.py`): las ocho suman 454 px contra una
+barra de 424 a 1280×720 y 453 a 1366×768, así que `Misc` cae a la segunda fila en las dos. Congelar
+el **set** impidió que la fila crezca con el **catálogo**; no hizo que las ocho entren.
+
+**El layout se deja como está, y es decisión**: el wrap ya existe como red, la barra crece
+(`bar:SetTall(rowY + 26)`), la segunda fila se ve y no hay nada recortado. Dos filas a 720p está
+bien. Lo que no estaba bien era la línea. **No aporta ninguna fila de planilla** — no tiene superficie
+en juego y se acredita por lectura.
+
+### #78 — el círculo de herramienta te mostraba la marca y no te dejaba sacarla
+
+**Salió de un CENSO, no de un rojo**, y el censo lo sugirió la #76: de los **ocho** menús contextuales
+del módulo, cinco quedaban fuera de la unificación. **Cuatro estaban bien y se midieron uno por uno**
+— el de la caja no es tuyo, el de la celda quick apunta a un **id** y no a una instancia, el del
+cinturón sólo lleva munición (su gate es `category ~= "ammo"`, o sea que no hay nada favoritable ahí),
+y el del drop de attachment no es un menú de ítem.
+
+**El quinto no.** Un círculo de herramienta **es** un slot de equipo (`Slots.List`, filter
+`"category:weapons"`), así que su ítem **sí** es favoritable; su `Drop` **ya** lo rechazaba la quinta
+puerta del #43 (*«That's a favorite: unmark it before dropping it»*); y su tooltip de hover **ya**
+dibujaba la estrella. **La pantalla te mostraba la marca, te decía que la sacaras, y no te daba
+dónde** — la #76 en su forma más pura, y un paso **peor** que el caso del loot, donde al menos ninguna
+pantalla afirmaba nada. El menú cambiaba según qué **widget** apretaste y no según qué era el objeto.
+
+### Verificación
+
+`glua_check` 48/48. Harness **1246** (era 1222) = **73** FUENTES / **770** server / **403** cliente,
+selftest 100/107 sin moverse. **`dev/sabotaje_cargo_58.py`, 10/10 en rojo**; las seis suites vecinas
+—76, 43/59, 67, 68, 69, 74/72— re-corridas enteras.
+
+**Los cuatro sitios de wire se ejercen DE VERDAD y no por lectura**: los dos del inventario por
+`BuildSnapshot`, y los dos de afuera **interceptando `Util.WriteBlob`**, que es el embudo por el que
+sale cualquier snapshot — el `net.Send` del harness se queda con el nombre y tira el payload, así que
+medir por ahí no vería el campo.
+
+**⚠ Y ese instrumento dio DOS ROJOS FALSOS antes de medir**, los dos por defecto propio y no del
+código. El primero: se quedaba con el **último** blob, y `Containers.OpenFor` manda el snapshot de la
+caja y **acto seguido** llama a `Inventory.Sync`, que manda el del jugador por el mismo embudo — así
+que juzgaba el inventario creyendo que era la caja. Ahora junta todos y **elige por el campo que
+busca**. El segundo: `Trade.StockOf` devuelve **la lista** de ítems y no un contenedor, así que
+sembrarle un `.items` encima compilaba, corría y no sembraba nada. **Salió barato porque el rojo era
+falso; al revés habría acreditado.**
+
+**Tres gates de cuenta nuevos**, todos por archivo: `SnapWeight` en sus cuatro sitios + la casa, y
+`CanFavorite` en `ui.lua` que **pasa de 2 a 3** — y esa subida tiene motivo escrito, que es la
+diferencia entre un número auditado y uno subido al bulto. Más un **PROHIBIDO** sobre la afirmación
+falsa de la #77: es la única pieza de la tanda sin superficie en juego, así que si el gate no la caza,
+no la caza nadie.
+
+**Planilla AL**. Lo que ninguna cuenta puede ver: que el número **se vea igual en las cuatro
+pantallas**.

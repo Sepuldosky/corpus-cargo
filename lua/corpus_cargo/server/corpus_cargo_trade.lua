@@ -216,7 +216,12 @@ end
 
 local function StockEntrySnapshot(entry)
     if entry.uid then
-        return { id = entry.id, uid = entry.uid, blob = CARGO.Instances.Get(entry.uid) }
+        -- site 4 of four (#58): the trader's stock draws the same tooltip. Note
+        -- this is the ONLY wire site the trade owns — the player's own column
+        -- on that screen reads the inventory snapshot, not this one.
+        local blob = CARGO.Instances.Get(entry.uid)
+        return { id = entry.id, uid = entry.uid,
+            w = CARGO.Instances.SnapWeight(blob), blob = blob }
     end
     return { id = entry.id, count = entry.count or 1, condition = entry.condition }
 end

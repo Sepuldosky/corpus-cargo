@@ -1565,7 +1565,33 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     "arc9_cod2019_nade_rock", que no). §16.6 midio que ningun ammo-att de EFT lo
     hace y es cierto; lo que no se puede es generalizarlo a los otros packs.
 
-58. EL TOOLTIP MUESTRA EL PESO PELADO DEL DEF [Cargo ui] — ABIERTO, CHICO.
+58. EL TOOLTIP MUESTRA EL PESO PELADO DEL DEF [Cargo ui] — ESCRITA el
+    2026-08-22, en tanda con la #77 y la #78. CHANGELOG 79 [PENDIENTE];
+    planilla AL. Voto del autor: la ficha muestra el peso EFECTIVO solo (no
+    «def + extra al lado»), porque el tooltip es la ficha de ESA instancia y
+    porque esa fila ya esta apretada — su reserve mide nombre + condicion +
+    peso + estrella, y ya pago un defecto de espacio en el #66 y otro al
+    entrar la estrella en el #43.
+    NO ERA UNA LINEA: SON CUATRO SITIOS DE WIRE, y se midieron. Arreglar solo
+    el grid habria hecho que el MISMO rifle diga 9 kg en la mochila y 6 al
+    mirarlo en la caja — un defecto PEOR que el original, porque el numero
+    pasaria a depender de que ventana abriste. Es la #76 con otro sombrero.
+    Los cuatro: el grid (EntrySnapshot), los slots de equipo, la columna del
+    contenedor y el stock del trader.
+    SON CUATRO Y NO CINCO, y se dice porque se midio y no se asumio: la
+    pantalla de trade tiene DOS grids pero el propio lee el snapshot del
+    INVENTARIO (sitio 1), asi que el trade aporta uno. Y `Priceable`, en el
+    server del trade, tiene la MISMA forma y el mismo blob — no es sitio de
+    wire: alimenta el precio y nunca sale del server.
+    UNA CASA: `Instances.SnapWeight(blob)`, al lado del WeightOf que suma.
+    VIAJA SOLO CUANDO DIFIERE, igual que el `fav` del #43 — el campo ausente
+    significa «el peso de la clase ES la verdad» y no «nadie lo calculo», que
+    es lo que deja al cliente caer a `def.weight` sin recalcular nada (una
+    segunda copia del calculo aca es la verdad que deriva que CRG-56/57 existen
+    para evitar). La comparacion va contra un EPSILON y no `~=`: los dos lados
+    son floats sumados.
+    --- el texto original, para leer de que salio ---
+    ABIERTO, CHICO.
     Anotado al cerrar el #56. corpus_cargo_tooltip.lua pinta def.weight, o sea
     el peso de la def sin nada de lo que la instancia lleve encima: un RPG
     cargado suma 9 kg al total y muestra 6 en su ficha.
@@ -2609,8 +2635,28 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     a un lugar del que hay que ir a buscarlo. El menú del grid del inventario
     no tiene ese problema porque ahí «Move» no existe.
 
-77. LA FILA DE TABS SE PARTE EN DOS A 1280x720 Y 1366x768 [Cargo ui] — MEDIDO
-    el 2026-08-21, SIN ESCRIBIR. PRIORIDAD BAJA, y el motivo es que el autor
+77. LA FILA DE TABS SE PARTE EN DOS A 1280x720 Y 1366x768 [Cargo ui] —
+    CERRADA el 2026-08-22 POR DECISION, en tanda con la #58 y la #78
+    (CHANGELOG 79). EL LAYOUT NO SE TOCA y eso es el cierre, no una postergacion:
+    el wrap ya existe como red, la barra crece (`bar:SetTall(rowY + 26)`), la
+    segunda fila SE VE y no hay nada recortado ni perdido. Dos filas a 720p esta
+    bien, y el autor juega a 1080p donde sobran 190 px.
+    LO QUE SI SE ARREGLO ES LA LINEA FALSA, que era la mitad no opcional: el
+    comentario de shared/corpus_cargo_items.lua afirmaba que la fila fija «can
+    no longer grow a second line». Congelar el SET impidio que la fila crezca
+    con el CATALOGO; no hizo que las ocho entren. Ahora el comentario dice lo
+    que el codigo hace, trae los numeros medidos y dice que el layout se deja
+    a proposito. Un comentario que promete lo que el codigo no cumple es peor
+    que ninguno: el proximo que agregue una tab lo cree.
+    HAY GATE: un PROHIBIDO de FUENTES sobre la afirmacion vieja. Es la unica
+    pieza de su tanda SIN superficie en juego, asi que si el gate no la caza,
+    no la caza nadie — y por eso no aporta ninguna fila de planilla.
+    ⚠ OJO AL LEER LO DE ABAJO: el texto original cita la afirmacion como «at
+    every aspect we ship», y esa frase NUNCA estuvo en el archivo — la real era
+    la de arriba. Una cita de memoria en un roadmap manda al proximo a grepear
+    algo que no existe.
+    --- el texto original, para leer de que salio ---
+    MEDIDO el 2026-08-21, SIN ESCRIBIR. PRIORIDAD BAJA, y el motivo es que el autor
     NO LA VE: juega a 1920x1080 nativo (borderless, aspecto Any/All, o sea
     16:9), donde la fila entra con 190 px DE SOBRA. Es un defecto de las
     resoluciones chicas, y el destino es Workshop.
@@ -2640,3 +2686,30 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     fila SE VE — no hay nada recortado ni perdido. O sea que esto es de
     prolijidad, no de función, y perfectamente puede cerrarse decidiendo que
     dos filas a 720p está bien y arreglando sólo el comentario.
+
+78. AL CIRCULO DE HERRAMIENTA LE FALTA EL FAVORITO [Cargo ui] — ESCRITA el
+    2026-08-22, en tanda con la #58 y la #77 (CHANGELOG 79); planilla AL.
+    NACIO DE UN CENSO Y NO DE UN ROJO, y el censo lo sugirio la #76 al cerrar:
+    de los OCHO menus contextuales del modulo, cinco quedaban fuera de la
+    unificacion. CUATRO ESTABAN BIEN y se midieron uno por uno — el de la caja
+    no es tuyo (el ref de `favorite`/`drop` nombra una celda de TU record), el
+    de la celda quick apunta a un ID y no a una instancia, el del cinturon solo
+    lleva municion (su gate es `category ~= "ammo"`, o sea que no hay nada
+    favoriteable ahi) y el del drop de attachment no es un menu de item.
+    EL QUINTO NO, Y NO ERA COSMETICO. Un circulo de herramienta ES un slot de
+    equipo (Slots.List, filter "category:weapons"), asi que su item SI es
+    favoriteable; su Drop YA lo rechazaba la quinta puerta del #43 («That's a
+    favorite: unmark it before dropping it»); y su tooltip de hover YA dibujaba
+    la estrella. LA PANTALLA TE MOSTRABA LA MARCA, TE DECIA QUE LA SACARAS, Y
+    NO TE DABA DONDE — la #76 en su forma mas pura, y un paso PEOR que el caso
+    del loot, donde al menos ninguna pantalla afirmaba nada. El menu cambiaba
+    segun que WIDGET apretaste y no segun que era el objeto.
+    QUE ENTRO: las mismas cuatro lineas que ya tenia OpenSlotMenu, entre
+    Unequip y Drop — el destructivo sigue ultimo, que es la gramatica que la
+    #76 le dio al menu del grid. La cuenta de FUENTES de `CanFavorite` en
+    ui.lua pasa de 2 a 3, A MANO Y CON MOTIVO ESCRITO.
+    LA LECCION QUE DEJA, y vale mas que la entrada: el censo de menus costo
+    cinco minutos y encontro un defecto vivo que ningun check tenia forma de
+    ver, porque no habia nada roto — habia algo AUSENTE en una sola de varias
+    superficies hermanas. Conviene repetirlo cada vez que una entrada unifique
+    algo: lo que se unifica dice cuales son las hermanas.

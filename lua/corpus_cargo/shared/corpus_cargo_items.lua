@@ -67,8 +67,27 @@ end
 -- The CATEGORY set above stays OPEN and untouched: the "category:a,b"
 -- filter grammar of equipment slots and sub-slots (contract #3) leans on
 -- it. What is CLOSED is the DISPLAY layer on top of it — a FIXED row of
--- tabs the UI never populates dynamically, so it can no longer grow a
--- second line (the tab row wrapped once "Backpacks" was registered).
+-- tabs the UI never populates dynamically, so registering a category can no
+-- longer add one (the tab row wrapped once "Backpacks" was registered).
+--
+-- ⚠ THIS COMMENT USED TO CLAIM THE ROW "CAN NO LONGER GROW A SECOND LINE"
+-- AND THAT WAS FALSE — measured, roadmap #77, instrument saved as
+-- dev/medir_fila_de_tabs.py. Freezing the SET stopped it from growing with
+-- the catalog; it did not make the eight fit. They sum 454 px (412 of
+-- buttons plus seven 6 px gaps) against a bar of `colR - 16`, which scales
+-- with ScrH: 424 at 720p, 453 at 768p, 644 at 1080p. So "Misc" DOES fall to
+-- a second row at 1280x720 (by 30 px) and at 1366x768 (by ONE pixel).
+--
+-- What decides it is the COUNT of tabs and never the length of a name:
+-- T.UIScale leaves the fonts fixed on purpose (VGUI fonts cannot be resized
+-- per frame), so the tabs measure the SAME at every resolution and only the
+-- bar moves. Shortening "Misc" or "Weapons" fixes nothing anywhere.
+--
+-- Left as it is BY DECISION and not by omission: the wrap already exists as
+-- a safety net and the bar grows with it (`bar:SetTall(rowY + 26)`), so the
+-- second row is visible and nothing is clipped or lost. Two rows at 720p is
+-- fine. What was NOT fine was a comment promising what the code does not
+-- do — the next person to add a tab would have believed it.
 --
 -- Grouping only, never renaming: several internal categories fold into one
 -- tab, and a category NOT mapped here (a sibling module registering, say,

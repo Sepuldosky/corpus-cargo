@@ -284,7 +284,12 @@ local function Snapshot(cont)
     }
     for _, entry in ipairs(cont.items) do
         if entry.uid then
-            snap.items[#snap.items + 1] = { id = entry.id, uid = entry.uid, blob = CARGO.Instances.Get(entry.uid) }
+            -- site 3 of five (#58): the crate column draws the same tooltip, so
+            -- the weight has to ride here too or the SAME rifle reads 9 kg in
+            -- the bag and 6 kg in the crate
+            local blob = CARGO.Instances.Get(entry.uid)
+            snap.items[#snap.items + 1] = { id = entry.id, uid = entry.uid,
+                w = CARGO.Instances.SnapWeight(blob), blob = blob }
         else
             snap.items[#snap.items + 1] = { id = entry.id, count = entry.count or 1, condition = entry.condition }
         end

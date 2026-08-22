@@ -880,9 +880,28 @@ local function MakeToolCircle(parent, tool)
     cell.DoClick = function() CARGO.UI.SelectTool(tool) end
 
     cell.DoRightClick = function()
-        if SlotEntryOf(tool.slotId) == nil then return end
+        local entry = SlotEntryOf(tool.slotId)
+        if entry == nil then return end
         local menu = CARGO.Theme.Menu()
         menu:AddOption("Unequip", function() SendUnequip(tool.slotId) end)
+
+        -- The favorite belongs here for the same reason it belongs on the
+        -- rectangular slot menu, and the census that found this hole is the
+        -- one the #76 taught us to run: a tool circle IS an equipment slot
+        -- (Slots.List, filter "category:weapons"), so its item is favoritable
+        -- and its Drop below is ALREADY refused by the fifth gate of #43
+        -- ("That's a favorite: unmark it before dropping it"). Worse, the
+        -- hover tooltip on this very cell ALREADY DRAWS THE STAR. Without
+        -- this row the circle showed you the mark, told you to remove it, and
+        -- gave you nowhere to do it — the #76 round-trip in its purest form,
+        -- and one step worse than the loot case, where at least no screen
+        -- claimed anything. The menu differed by which WIDGET you right
+        -- clicked and not by what the object was.
+        if CARGO.Items.CanFavorite(CARGO.Items.Get(entry.id)) then
+            menu:AddOption(entry.fav and "Remove from favorites" or "Mark as favorite",
+                function() SendFavorite({ slot = tool.slotId }) end)
+        end
+
         menu:AddOption("Drop", function() SendEquipDrop(tool.slotId) end)
         menu:Open()
     end

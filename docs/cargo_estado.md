@@ -5,7 +5,26 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-21 (**TRES ENTRADAS CERRADAS EN JUEGO EL MISMO DÍA, las tres en UNA
+**Última actualización:** 2026-08-22 (**tanda triple ESCRITA: #58 + #77 + #78**, CHANGELOG **79**
+`[PENDIENTE]`, planilla **AL** de 8 filas. Van juntas porque las superficies son **disjuntas** — el
+peso vive en el snapshot y el tooltip, la fila de tabs es un comentario en `shared`, y el círculo es
+un menú de `ui.lua`.
+**#58 no era una línea: son CUATRO sitios de wire**, y arreglar sólo el grid habría hecho que el
+*mismo* rifle diga 9 kg en la mochila y 6 en la caja — peor que el defecto original, porque el número
+pasaría a depender de qué ventana abriste. Una casa, `Instances.SnapWeight`, y **viaja sólo cuando
+difiere**, igual que el `fav` del #43.
+**#77 cerró POR DECISIÓN**: el layout no se toca (el wrap ya es red y la segunda fila se ve); lo que
+se arregló es la **línea falsa** del comentario, que prometía que la fila no puede partirse en dos.
+**#78 salió de un CENSO y no de un rojo** — el de los ocho menús contextuales, que la #76 sugirió: al
+círculo de herramienta le faltaba el favorito, y no era cosmético (su tooltip ya dibujaba la estrella
+y su Drop ya lo rechazaba la quinta puerta del #43, así que **te mostraba la marca, te decía que la
+sacaras y no te daba dónde**).
+Harness **1246** (era 1222) = 73 / 770 / 403; `sabotaje_cargo_58.py` **10/10**; las seis suites
+vecinas re-corridas. ⚠ El instrumento nuevo **dio dos rojos falsos antes de medir**, los dos por
+defecto propio: se quedaba con el último blob —y `OpenFor` manda dos— y sembraba el stock del trader
+escribiendo un campo que nadie lee. Salió barato porque el rojo era falso; al revés habría acreditado.
+
+Antes: **TRES ENTRADAS CERRADAS EN JUEGO EL MISMO DÍA (2026-08-21), las tres en UNA
 SOLA RONDA y sin un rojo: #43, #59 y #76** — CHANGELOG **76**, **77** y **78** los tres
 `[APLICADO 2026-08-21]`, planillas **AI 13/13**, **AJ 7/7** y **AK 10/10**. La #76 se pidió, se
 diseñó, se escribió y se cerró **el mismo día en que la nota de AI5 la abrió**. Las dos primeras van
@@ -940,6 +959,12 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
+- **La tanda del 2026-08-22 (#58 + #77 + #78) — planilla AL, 8 filas, SIN CORRER.** Es lo único
+  pendiente. **La fila que no se puede reemplazar por harness es la 04**: mirar el *mismo* rifle
+  cargado en las **cuatro** pantallas y confirmar que las cuatro dicen lo mismo. El harness ya mide
+  que el peso salga de los cuatro sitios de wire; lo que no puede ver es la pantalla. **Las 06 y 07
+  son el círculo de herramienta.** La **#77 no aporta filas y se dice**: es sólo un comentario, sin
+  superficie en juego, y se acredita por lectura.
 - **Nada de la tanda del 2026-08-21.** Las planillas **AI** (13 filas), **AJ** (7) y **AK** (10)
   **cerraron el mismo día, en una ronda cada una y sin un rojo**; la barra de prueba de la AJ quedó
   **desmontada** (fila AJ7), así que no hay una *AJ Test* fantasma esperando en una ronda futura.

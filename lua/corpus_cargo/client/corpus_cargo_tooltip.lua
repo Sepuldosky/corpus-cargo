@@ -43,7 +43,14 @@ end
 -- T.DrawStar). Keep the two numbers in step with the call below.
 local STAR_R, STAR_GAP = 4.5, 6
 
-local function AddTitle(parent, def, condPct, fav)
+-- `wEff` is the instance's EFFECTIVE weight (roadmap #58) and is nil whenever
+-- there is nothing extra to say — an empty rifle, or any stackable, which has
+-- no blob to carry anything. Falling back to `def.weight` is what makes the
+-- absent field mean "the class weight IS the truth" instead of "it did not
+-- arrive": the client never recomputes it, because the sum lives in
+-- Instances.WeightOf on the server and a second copy here is exactly the
+-- drifting second truth CRG-56/57 exist to prevent.
+local function AddTitle(parent, def, condPct, fav, wEff)
     return AddRow(parent, 24, function(_, w)
         -- name must never collide with the condition text on the right. The
         -- reserve used to be a flat 150 px, which was tuned against
@@ -64,7 +71,7 @@ local function AddTitle(parent, def, condPct, fav)
         -- the star only appears on SOME items, which is the shape of bug that
         -- looks fine until the day someone favorites a long-named rifle.
         local label = condPct ~= nil and T.ConditionLong(def, condPct) or nil
-        local kg = T.FormatKg(def.weight)
+        local kg = T.FormatKg(wEff or def.weight)
         surface.SetFont("CargoSmall")
         local reserve = surface.GetTextSize(kg) + 8
         if fav then reserve = reserve + STAR_R * 2 + STAR_GAP end
@@ -210,7 +217,7 @@ function CARGO.Tooltip.Show(cell, entry)
     end
 
     local y = 10
-    y = y + AddTitle(tip, def, T.ConditionOf(entry), entry.fav == true)
+    y = y + AddTitle(tip, def, T.ConditionOf(entry), entry.fav == true, entry.w)
 
     -- icon zoom (Cargo_ItemImages §6/§10): the 64 px/cell renders hold up at
     -- tooltip size; painted from Icons.Get each frame so it hot-swaps in

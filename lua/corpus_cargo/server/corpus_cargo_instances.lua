@@ -317,3 +317,49 @@ function CARGO.Instances.WeightOf(uidOrBlob)
 
     return total
 end
+
+-- ------------------------------------------------------------------
+-- What an instance weighs ON THE WIRE (roadmap #58), and nil when there is
+-- nothing to say.
+--
+-- The tooltip painted `def.weight` — the weight of the CLASS. A loaded RPG
+-- added 9 kg to the total and showed 6 on its own card. It is NOT new (a vest
+-- with two plates behaved the same since Block 1, because WeightOf recurses and
+-- the tooltip did not), but the #56 made it visible: now the number changes on
+-- its own, without the player mounting anything. Author's ask, planilla AC,
+-- note of AC3: "el tooltip deberia reflejar el peso que tiene el arma por
+-- efectos de la municion en el cargador".
+--
+-- IT RIDES ONLY WHEN IT DIFFERS, exactly like the `fav` of #43: an empty rifle
+-- weighs its def and there is no second number worth sending. The client falls
+-- back to `def.weight`, so an absent field means "the class weight IS the
+-- truth" and not "nobody computed it".
+--
+-- ⚠ AND IT HAS TO RIDE FROM EVERY WIRE SITE, which is the whole reason this is
+-- a function and not a line. FOUR places build an entry carrying a blob that a
+-- client will draw: the grid, the equipment slots, the container column and the
+-- trader's STOCK. The tooltip draws on all four. Sending it from one would make
+-- the SAME rifle read 9 kg in the bag and 6 kg in the crate: a worse defect
+-- than the one being fixed, because the number would depend on which window the
+-- player happened to open. That is the #76 defect wearing a different hat, and
+-- it is caught here by a per-file call-site count and not by good intentions
+-- (lesson 89: a helper nobody calls from all four sites measures nothing).
+--
+-- IT IS FOUR AND NOT FIVE, and the difference is worth writing down because it
+-- was measured and not assumed: the trade screen has two grids, but the
+-- player's own column reads the INVENTORY snapshot (site 1) — only the stock is
+-- its own. And `Priceable` in the trade server LOOKS like a fifth: same shape,
+-- same blob. It is not a wire site — it feeds ConditionOfEntry for the price
+-- and never leaves the server, so a weight on it would be a field nobody reads.
+--
+-- The comparison is against an EPSILON and not `~=`: both sides are floats
+-- built by summing, so an instance carrying nothing can land a hair off its own
+-- def and would ride a "different" weight that renders identical.
+function CARGO.Instances.SnapWeight(blob)
+    if not istable(blob) then return nil end
+    local def = CARGO.Items.Get(blob.id)
+    if not istable(def) then return nil end
+    local w = CARGO.Instances.WeightOf(blob)
+    if math.abs(w - (def.weight or 0)) < 0.001 then return nil end
+    return w
+end

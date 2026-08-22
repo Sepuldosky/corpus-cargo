@@ -895,8 +895,11 @@ end
 local function EntrySnapshot(rec, entry)
     local fav = CARGO.Inventory.IsFavorite(rec, entry) or nil
     if entry.uid then
+        -- `w` is the EFFECTIVE weight and rides only when it differs from the
+        -- def's (roadmap #58) — site 1 of the five that carry a blob
+        local blob = CARGO.Instances.Get(entry.uid)
         return { id = entry.id, uid = entry.uid, ord = entry.ord, cid = entry.cid,
-            fav = fav, blob = CARGO.Instances.Get(entry.uid) }
+            fav = fav, w = CARGO.Instances.SnapWeight(blob), blob = blob }
     end
     -- `cid` rides so the client can name back the cell it drew (#68). It rides
     -- on the unique too, even though its ref is the uid: #70 addresses a DRAG
@@ -930,7 +933,10 @@ function CARGO.Inventory.BuildSnapshot(ply)
         else
             local blob = CARGO.Instances.Get(val)
             if blob then
-                snap.equip[slotId] = { id = blob.id, uid = val, blob = blob, fav = fav }
+                -- site 2 of five (#58): the equipped weapon is precisely the one
+                -- whose loaded rounds the author was reading off the card
+                snap.equip[slotId] = { id = blob.id, uid = val, blob = blob,
+                    fav = fav, w = CARGO.Instances.SnapWeight(blob) }
             end
         end
     end
