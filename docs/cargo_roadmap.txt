@@ -203,7 +203,22 @@ Estado de diseño de este bloque tras la sesión 2026-07-11:
     en el blob vía Inventory.StoreClip.
   - #20 -> SIN diseñar.
 
-16. PICKUP POR MIRAR + USE, no por contacto [Cargo]. Hoy, sin el mod L4D, un arma
+16. PICKUP POR MIRAR + USE, no por contacto [Cargo] — HECHO / APLICADO el
+    2026-07-11, CHANGELOG 7 («Armas de mundo: sin auto-pickup, WALK+USE toma,
+    USE agarra; drops = SWEP real»), junto con la mitad del #17. Vive en
+    server/corpus_cargo_capture.lua + DropEntry, con convar maestro
+    `cargo_weapon_world_pickup` (default 1; en 0 vuelve todo al comportamiento
+    anterior). El world gate veta PlayerCanPickupWeapon SOLO para armas en
+    reposo en el mundo (edad > 0,5 s o spawneadas por nuestro drop), que es lo
+    que deja la ruta de `give` intacta para mods de pickup.
+    ⚠ ESTA ENTRADA SE LEYO COMO ABIERTA DURANTE MAS DE UN MES: el CHANGELOG
+    decia «baja a codigo el roadmap #16» desde el dia que se aplico, y el
+    roadmap nunca se entero. Salio de un censo del 2026-08-22 que cruzo las 21
+    entradas sin cerrar contra el CHANGELOG. Una entrada que se lee abierta y
+    no lo esta es trabajo que alguien puede rehacer, y no hay ningun control
+    que lo cace: el unico que existe es este cruce, y conviene repetirlo.
+    --- el texto original, para leer de que salio ---
+    Hoy, sin el mod L4D, un arma
     generada por toolgun se recoge SOLA al pasarle por encima (AllowPlayerPickup
     quedó abierto). Objetivo: que NO se recoja por contacto; recogerla requiere
     MIRARLA + USE. Ideal del autor: recoger arma/objeto = combinación walk + use
