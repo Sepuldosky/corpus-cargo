@@ -7871,7 +7871,7 @@ de tres del día.
 
 ---
 
-## 79. El peso pelado del def, la afirmación falsa de las tabs, y el círculo que no dejaba desmarcar (roadmap #58, #77, #78) `[PENDIENTE]`
+## 79. El peso pelado del def, la afirmación falsa de las tabs, y el círculo que no dejaba desmarcar (roadmap #58, #77, #78) `[APLICADO 2026-08-22]`
 
 **Tanda triple, y van juntas porque las superficies son DISJUNTAS**: el peso vive en el snapshot y
 el tooltip, la fila de tabs es un comentario en `shared`, y el círculo es un menú de `ui.lua`. Un
@@ -7957,3 +7957,57 @@ no la caza nadie.
 
 **Planilla AL**. Lo que ninguna cuenta puede ver: que el número **se vea igual en las cuatro
 pantallas**.
+
+### Pasada en juego (2026-08-22) — OK, 8/8
+
+**Planilla AL, ronda 1: PASA 8 · FALLA 0 · SIN CORRER 0.** Conteo verificado contra su propia línea
+`(de 8)`. **Cuarta sección seguida que cierra en una sola ronda y sin un rojo** (AI 13/13, AJ 7/7,
+AK 10/10, AL 8/8).
+
+**⭐ AL4, la fila que justificaba el bloque, cerró con el número repetido cuatro veces:** *«sí, todos
+tienen 9,3 kg»*. Ése era el punto entero de tratar la #58 como cuatro sitios de wire y no como una
+línea — el defecto que se evitó no era «falta un número» sino «el número depende de qué ventana
+abriste».
+
+**⭐ AL7 acredita el círculo con el mensaje pegado**, y **AL6 lo acredita MÁS ANCHO de lo que la fila
+pedía**: la fila nombraba la physgun y el autor contestó *«sip, toolgun y physgun»* — los dos
+círculos, o sea que la fila entró donde se declara el menú y no en un caso.
+
+### ⚠ AL3 PASÓ, PERO NO CON EL SUJETO QUE LA PLANILLA NOMBRABA, y el error era del instrumento
+
+La fila mandaba usar el **RPG de HL2** *«porque su cohete pesa 3 kg y la diferencia salta a la
+vista»*. El autor midió que ese sujeto **no puede mostrar nada**:
+
+> *«Los RPG de HL2 no consumen los cohetes en un cargador, los usan directo del belt, probablemente
+> es mejor medirlo en otro ítem. RPG de ARC9 sí lo hace, pesa 6,3 → pasó a 9,3.»*
+
+**Sustituyó el sujeto y cerró la fila igual**, y el número que trajo es la confirmación más fina de
+todo el bloque: **+3,0 kg exactos**, que es lo que pesa `cargo_ammo_rpg_round` en su def. El mecanismo
+quedó medido al decimal.
+
+**Esto NO es un hueco de la #58 y conviene decir por qué**, para que el próximo no salga a arreglar
+algo que funciona: un arma alimentada desde el pool **no lleva cargador**, así que sus cohetes pesan
+donde viven — en el **cinturón**, que ya entra en el total. No hay peso perdido ni contado dos veces;
+hay dos rutas de munición y cada una pesa en su lugar. `ClipWeight` sólo tiene algo que sumar cuando
+el arma de verdad guarda balas adentro.
+
+**De dónde salió el error, que es la parte que vale:** la fila heredó su sujeto del **fixture del
+harness** — `t56_rpg`, una def sintética con `weapon_class = "weapon_rpg"` a la que el test le escribe
+`clip1 = 1` **a mano**. Plantar estado es legítimo y es justo lo que la lección 110 recomienda para
+alcanzar un guardia; lo que un fixture plantado **no** puede decir es **qué ítems reales llegan a ese
+estado**. La planilla leyó «el RPG tiene clip1» de un lugar donde ese campo lo había puesto el propio
+test.
+
+**La planilla NO se reescribe** (`dev/PLANTILLA_CHECKS.md`): es el registro de la corrida con la que
+se midió, y corregirle el enunciado a posteriori falsificaría el instrumento. La corrección vive acá
+y en el roadmap.
+
+**Evidencia, dicha como es:** **seis filas llegaron con nota concreta** (AL1, AL2, AL3, AL4, AL6,
+AL7), **AL8 se acredita por COBERTURA** y lo declara (*«no veo nada raro»*, que es la forma correcta
+para un control de alcance), y **AL5 pasó sin nota**.
+
+**La #77 se acredita por LECTURA y no por pantalla, como estaba declarado**: no tiene superficie en
+juego — es un comentario que prometía lo que el código no cumple, y su guardia es el PROHIBIDO de
+FUENTES.
+
+CHANGELOG **79 `[APLICADO 2026-08-22]`**. Las **#58**, **#77** y **#78** quedan **CERRADAS**.

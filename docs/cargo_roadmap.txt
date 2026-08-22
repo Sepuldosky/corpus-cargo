@@ -1565,8 +1565,27 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     "arc9_cod2019_nade_rock", que no). §16.6 midio que ningun ammo-att de EFT lo
     hace y es cierto; lo que no se puede es generalizarlo a los otros packs.
 
-58. EL TOOLTIP MUESTRA EL PESO PELADO DEL DEF [Cargo ui] — ESCRITA el
-    2026-08-22, en tanda con la #77 y la #78. CHANGELOG 79 [PENDIENTE];
+58. EL TOOLTIP MUESTRA EL PESO PELADO DEL DEF [Cargo ui] — HECHO / CERRADA
+    EN JUEGO el 2026-08-22, en tanda con la #77 y la #78. CHANGELOG 79
+    APLICADO; planilla AL 8/8 en UNA ronda (cuarta seguida que cierra asi).
+    AL4, la fila que justificaba el bloque, cerro con el numero repetido las
+    CUATRO veces: «todos tienen 9,3 kg».
+    ⚠ AL3 PASO PERO NO CON EL SUJETO QUE LA PLANILLA NOMBRABA, y el error era
+    del instrumento: mandaba usar el RPG DE HL2, y el autor midio que ese no
+    sirve — «los RPG de HL2 no consumen los cohetes en un cargador, los usan
+    directo del belt». Sustituyo por el RPG de ARC9 y cerro igual, con el
+    numero mas fino del bloque: 6,3 -> 9,3, o sea +3,0 EXACTOS, que es lo que
+    pesa cargo_ammo_rpg_round en su def.
+    NO ES UN HUECO DE LA #58 Y SE DICE PARA QUE NADIE SALGA A ARREGLARLO: un
+    arma alimentada desde el POOL no lleva cargador, asi que sus cohetes pesan
+    donde viven — en el CINTURON, que ya entra en el total. Hay dos rutas de
+    municion y cada una pesa en su lugar; ClipWeight solo tiene algo que sumar
+    cuando el arma de verdad guarda balas adentro.
+    DE DONDE SALIO EL ERROR, que es lo que vale para la proxima: la fila heredo
+    su sujeto del FIXTURE del harness — `t56_rpg`, una def sintetica a la que
+    el test le escribe `clip1 = 1` A MANO. Plantar estado es legitimo (leccion
+    110); lo que un fixture plantado NO puede decir es QUE ITEMS REALES llegan
+    a ese estado. Al elegir sujeto para una fila en juego, eso se mira aparte.
     planilla AL. Voto del autor: la ficha muestra el peso EFECTIVO solo (no
     «def + extra al lado»), porque el tooltip es la ficha de ESA instancia y
     porque esa fila ya esta apretada — su reserve mide nombre + condicion +
@@ -2636,7 +2655,10 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     no tiene ese problema porque ahí «Move» no existe.
 
 77. LA FILA DE TABS SE PARTE EN DOS A 1280x720 Y 1366x768 [Cargo ui] —
-    CERRADA el 2026-08-22 POR DECISION, en tanda con la #58 y la #78
+    HECHO / CERRADA el 2026-08-22 POR DECISION (CHANGELOG 79 APLICADO). SE
+    ACREDITA POR LECTURA Y NO POR PANTALLA, y estaba declarado antes de correr
+    la planilla: no tiene superficie en juego — es un comentario, y su guardia
+    es el PROHIBIDO de FUENTES, en tanda con la #58 y la #78
     (CHANGELOG 79). EL LAYOUT NO SE TOCA y eso es el cierre, no una postergacion:
     el wrap ya existe como red, la barra crece (`bar:SetTall(rowY + 26)`), la
     segunda fila SE VE y no hay nada recortado ni perdido. Dos filas a 720p esta
@@ -2687,8 +2709,13 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     prolijidad, no de función, y perfectamente puede cerrarse decidiendo que
     dos filas a 720p está bien y arreglando sólo el comentario.
 
-78. AL CIRCULO DE HERRAMIENTA LE FALTA EL FAVORITO [Cargo ui] — ESCRITA el
-    2026-08-22, en tanda con la #58 y la #77 (CHANGELOG 79); planilla AL.
+78. AL CIRCULO DE HERRAMIENTA LE FALTA EL FAVORITO [Cargo ui] — HECHO /
+    CERRADA EN JUEGO el 2026-08-22, en tanda con la #58 y la #77 (CHANGELOG 79
+    APLICADO); planilla AL 8/8.
+    AL6 LO ACREDITO MAS ANCHO DE LO QUE LA FILA PEDIA: nombraba la physgun y el
+    autor contesto «sip, toolgun y physgun» — los dos circulos, o sea que la
+    fila entro donde se DECLARA el menu y no en un caso. AL7 trajo el mensaje
+    de rechazo pegado, y despues de desmarcar ahi mismo el drop salio.
     NACIO DE UN CENSO Y NO DE UN ROJO, y el censo lo sugirio la #76 al cerrar:
     de los OCHO menus contextuales del modulo, cinco quedaban fuera de la
     unificacion. CUATRO ESTABAN BIEN y se midieron uno por uno — el de la caja

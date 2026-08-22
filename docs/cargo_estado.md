@@ -5,8 +5,9 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-22 (**tanda triple ESCRITA: #58 + #77 + #78**, CHANGELOG **79**
-`[PENDIENTE]`, planilla **AL** de 8 filas. Van juntas porque las superficies son **disjuntas** — el
+**Última actualización:** 2026-08-22 (**tanda triple CERRADA EN JUEGO: #58 + #77 + #78**, CHANGELOG
+**79** `[APLICADO 2026-08-22]`, planilla **AL 8/8 en UNA ronda** — **cuarta sección seguida que
+cierra así** (AI 13/13, AJ 7/7, AK 10/10, AL 8/8). Van juntas porque las superficies son **disjuntas** — el
 peso vive en el snapshot y el tooltip, la fila de tabs es un comentario en `shared`, y el círculo es
 un menú de `ui.lua`.
 **#58 no era una línea: son CUATRO sitios de wire**, y arreglar sólo el grid habría hecho que el
@@ -959,12 +960,12 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **La tanda del 2026-08-22 (#58 + #77 + #78) — planilla AL, 8 filas, SIN CORRER.** Es lo único
-  pendiente. **La fila que no se puede reemplazar por harness es la 04**: mirar el *mismo* rifle
-  cargado en las **cuatro** pantallas y confirmar que las cuatro dicen lo mismo. El harness ya mide
-  que el peso salga de los cuatro sitios de wire; lo que no puede ver es la pantalla. **Las 06 y 07
-  son el círculo de herramienta.** La **#77 no aporta filas y se dice**: es sólo un comentario, sin
-  superficie en juego, y se acredita por lectura.
+- **Nada de la tanda del 2026-08-22 tampoco.** La **AL** cerró 8/8 en una ronda. ⚠ **AL3 pasó con
+  un sujeto SUSTITUIDO y la corrección vale para la próxima**: la fila mandaba el RPG de HL2, que
+  no lleva cargador — se alimenta del pool, o sea que sus cohetes pesan en el **cinturón**, que ya
+  entra en el total. No es hueco. El sujeto salió de un **fixture del harness** que escribe `clip1`
+  a mano, y un fixture plantado no dice **qué ítems reales** llegan a ese estado. **AL5 pasó sin
+  nota y AL8 por cobertura**, declarado.
 - **Nada de la tanda del 2026-08-21.** Las planillas **AI** (13 filas), **AJ** (7) y **AK** (10)
   **cerraron el mismo día, en una ronda cada una y sin un rojo**; la barra de prueba de la AJ quedó
   **desmontada** (fila AJ7), así que no hay una *AJ Test* fantasma esperando en una ronda futura.
