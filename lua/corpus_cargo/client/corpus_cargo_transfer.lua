@@ -69,9 +69,17 @@ function CARGO.Transfer.TakeAll(dir)
     net.SendToServer()
 end
 
--- transfer amount menu (right click on either grid while looting)
-function CARGO.Transfer.Menu(dir, entry)
-    local menu = CARGO.Theme.Menu()
+-- The transfer verbs ALONE, as rows on a menu somebody else owns (roadmap
+-- #76). The player's grid inside the loot no longer opens a menu of its own:
+-- it opens THE item menu (CARGO.UI.ItemMenu) and this is the section that menu
+-- asks for, so "Move" keeps living in the file that owns the transfer wire
+-- while the favorite and the drop keep living in the one that owns them.
+--
+-- The verb is the AUTHOR'S RULE and not a per-window label (2026-08-21):
+-- «"drop" es siempre tirar al piso, al contenedor es "mover"». The two verbs
+-- share the loot menu without ambiguity because they name different
+-- DESTINATIONS, not the same action in two contexts.
+function CARGO.Transfer.AddVerbs(menu, dir, entry)
     local verb = dir == "take" and "Take" or "Move"
     menu:AddOption(verb .. " 1", function()
         CARGO.Transfer.Send(dir, CARGO.Grid.RefOf(entry), 1)
@@ -93,6 +101,15 @@ function CARGO.Transfer.Menu(dir, entry)
             CARGO.Transfer.Send(dir, CARGO.Grid.RefOf(entry), entry.count)
         end)
     end
+end
+
+-- The CONTAINER column's menu (right click on the loot side). It stays a menu
+-- of its own and stays transfer-only on purpose: what is in the crate is not
+-- yours yet, so there is nothing there to favorite and nothing to drop — the
+-- ref those two intents take names a cell of YOUR record.
+function CARGO.Transfer.Menu(dir, entry)
+    local menu = CARGO.Theme.Menu()
+    CARGO.Transfer.AddVerbs(menu, dir, entry)
     menu:Open()
 end
 

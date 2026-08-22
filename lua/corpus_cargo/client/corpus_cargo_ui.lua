@@ -235,15 +235,65 @@ local function AddExtractOptions(menu, hostEntry)
     end
 end
 
-local function OpenItemMenu(entry)
+-- ------------------------------------------------------------------
+-- THE item context menu of the module (roadmap #76)
+--
+-- ONE constructor, and WHAT EACH SCREEN OFFERS declared right here, per
+-- screen. It is CRG-24 applied to the UI, and the same argument that produced
+-- Theme.Menu() in #74 and Items.AutoSortLess in #67: the alternative is two
+-- menus that drift, which is not a hypothesis — it is what BUILT this entry.
+-- The loot menu was born with fewer rows long before favorites existed, and
+-- when the inventory menu grew one in #43 the loot one silently did not, so a
+-- favorite could only be unmarked by closing the loot, opening the inventory,
+-- unmarking, and coming back (author's report, 2026-08-21).
+--
+-- THE CONSTRUCTOR IS UNIFIED, THE CONTENT IS NOT. Dragging all of `solo` into
+-- loot and trade would put "Equip on...", "Quick bind..." and "Attach to..."
+-- on a twelve-row menu over a crate; the author asked for "las funcionalidades
+-- basicas", so each screen names its own sections and adding a row tomorrow is
+-- ONE place instead of three.
+--
+-- `transfer` is the screen's OWN verbs and lives here too, as a call into the
+-- file that owns that wire — the loot's Move and the trade's Sell are the only
+-- thing about these menus that is not shared, so this table is the whole
+-- per-screen criterion in one readable block.
+local MENU_SECTIONS = {
+    solo = {
+        equip = true, use = true, insert = true, extract = true,
+        attach = true, quick = true, ammogroup = true,
+        favorite = true, drop = true,
+    },
+    loot = {
+        transfer = function(menu, entry) CARGO.Transfer.AddVerbs(menu, "put", entry) end,
+        favorite = true, drop = true,
+    },
+    trade = {
+        transfer = function(menu, entry) CARGO.Trade.AddVerbs(menu, "sell", entry) end,
+        favorite = true, drop = true,
+    },
+}
+
+-- `screen` is the frame's state: "solo" | "loot" | "trade". An unknown one
+-- falls back to the full menu, which is the safe direction: a missing row is a
+-- feature the player cannot reach, an extra one is a row the server arbitrates.
+function CARGO.UI.ItemMenu(entry, screen)
     local def = CARGO.Items.Get(entry.id)
     if def == nil then return end
+    local sections = MENU_SECTIONS[screen] or MENU_SECTIONS.solo
     local ref = CARGO.Grid.RefOf(entry)
     local menu = CARGO.Theme.Menu()
 
+    -- the screen's transfer verbs go FIRST and in their own block: they are
+    -- what the player came to this screen to do, and they are the ones he
+    -- already knows are there
+    if sections.transfer then
+        sections.transfer(menu, entry)
+        menu:AddSpacer()
+    end
+
     -- equip targets: uniques into regular slots, stackables into stack
     -- slots (throwable) — CanEquip arbitrates both sides
-    if (def.class == "unique" and entry.uid) or def.class == "stackable" then
+    if sections.equip and ((def.class == "unique" and entry.uid) or def.class == "stackable") then
         local targets = {}
         for _, slot in ipairs(CARGO.Slots.List) do
             if CARGO.Slots.CanEquip(def, slot.id) then targets[#targets + 1] = slot end
@@ -256,12 +306,12 @@ local function OpenItemMenu(entry)
         end
     end
 
-    if isfunction(def.onUse) then
+    if sections.use and isfunction(def.onUse) then
         menu:AddOption("Use", function() SendUse(ref) end)
     end
 
     -- mount into a sub-slot of an owned host (generic primitive, §4)
-    do
+    if sections.insert then
         local options = {}
         for _, host in ipairs(OwnedHosts()) do
             if host.uid ~= entry.uid then
@@ -284,10 +334,10 @@ local function OpenItemMenu(entry)
     end
 
     -- and the way back out, with the host still in the bag
-    AddExtractOptions(menu, entry)
+    if sections.extract then AddExtractOptions(menu, entry) end
 
     -- ARC9 attach flow (§10.2 route 1: context menu). Targets: held weapons.
-    if def.category == "attachments" and CARGO.ARC9.Available() then
+    if sections.attach and def.category == "attachments" and CARGO.ARC9.Available() then
         local targets = CARGO.ARC9.CompatibleTargets(entry.id)
         if #targets > 0 then
             local sub = menu:AddSubMenu("Attach to...")
@@ -309,14 +359,14 @@ local function OpenItemMenu(entry)
     -- had it, so a unique could already be bound by dragging it and the key
     -- then failed forever. The server resolves the id to an instance on each
     -- press (QuickTarget), so both routes now lead to the same place.
-    if isfunction(def.onUse) then
+    if sections.quick and isfunction(def.onUse) then
         local sub = menu:AddSubMenu("Quick bind...")
         for n = 1, CARGO.Slots.QUICK_COUNT do
             sub:AddOption("F" .. n, function() SendQuickBind(n, entry.id) end)
         end
     end
 
-    if entry.uid and entry.blob and entry.blob.ammo_group ~= nil then
+    if sections.ammogroup and entry.uid and entry.blob and entry.blob.ammo_group ~= nil then
         local now = entry.blob.ammo_group
         local nxt = now == "A" and "B" or "A"
         menu:AddOption("Ammo group: " .. now .. " → " .. nxt, function()
@@ -329,16 +379,30 @@ local function OpenItemMenu(entry)
     -- then refuses. Ammunition simply has no row — a greyed-out one would be a
     -- worse answer, because "you can't favorite this" is not news the player
     -- needs every time he right-clicks a magazine.
-    if CARGO.Items.CanFavorite(def) then
+    local wroteFav = false
+    if sections.favorite and CARGO.Items.CanFavorite(def) then
         menu:AddOption(entry.fav and "Remove from favorites" or "Mark as favorite",
             function() SendFavorite(ref) end)
+        wroteFav = true
     end
 
-    menu:AddOption("Drop", function() SendDrop(ref, 1) end)
-    if (entry.count or 1) > 1 then
-        menu:AddOption("Drop all (x" .. entry.count .. ")", function()
-            SendDrop(ref, entry.count)
-        end)
+    -- ⚠ THE SEPARATION IS NOT TIDINESS, and it only exists on the screens that
+    -- carry transfer verbs: this is the ONLY menu of the module where "Move"
+    -- and "Drop" sit over the same cell, so a click too far sends the item to a
+    -- place you have to go look for. The inventory menu never had the problem
+    -- because "Move" does not exist there.
+    -- The spacer is CONDITIONAL on the favorite row so the two never stack: on
+    -- ammunition there is no favorite row (it cannot be favorited, #43), and
+    -- two separators over the gap where it would have been reads as a menu that
+    -- failed to build rather than one with nothing to separate.
+    if sections.drop then
+        if sections.transfer and wroteFav then menu:AddSpacer() end
+        menu:AddOption("Drop", function() SendDrop(ref, 1) end)
+        if (entry.count or 1) > 1 then
+            menu:AddOption("Drop all (x" .. entry.count .. ")", function()
+                SendDrop(ref, entry.count)
+            end)
+        end
     end
 
     menu:Open()
@@ -1410,14 +1474,14 @@ function BuildFrame(state)
             CARGO.Trade.BasketTake("sell", CARGO.Trade.RefKey(entry),
                 CARGO.Trade.ClickAmount("sell", entry))
         end or nil,
+        -- ONE menu for the three states (roadmap #76): the state names which
+        -- sections it offers, and the transfer verbs of loot and trade are one
+        -- of those sections instead of a whole separate menu. Before this, the
+        -- state picked between THREE constructors and only the `solo` one had
+        -- the favorite and the drop — so the same cell answered differently
+        -- depending on which window happened to be open over it.
         onRightClick = function(entry)
-            if state == "loot" then
-                CARGO.Transfer.Menu("put", entry)
-            elseif state == "trade" then
-                CARGO.Trade.AmountMenu("sell", entry)
-            else
-                OpenItemMenu(entry)
-            end
+            CARGO.UI.ItemMenu(entry, state)
         end,
         -- dropping an equipment slot cell here unequips it; a belt cell
         -- returns its stack; a container cell (loot) is taken

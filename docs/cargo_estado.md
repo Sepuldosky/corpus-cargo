@@ -5,13 +5,36 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-21 (**tanda doble CERRADA EN JUEGO EL MISMO DÍA: LOS FAVORITOS + LA
-MARCA DE SOBRELLENADO** — roadmap **#43** y **#59** en **HECHO**, CHANGELOG **76** y **77** las dos
-`[APLICADO 2026-08-21]`, planillas **AI 13/13** y **AJ 7/7** en **una sola ronda cada una**, sin un
-rojo y sin una fila sin correr. Van juntas porque **tocan superficies DISJUNTAS** —la #43 son las
-puertas del inventario, la #59 vive en **un solo archivo** de cliente que la #43 no toca— así que un
-rojo de una no se puede confundir con un rojo de la otra, y cada una tiene su entry, su letra y su
-bloque de sabotaje para poder cerrar sola.
+**Última actualización:** 2026-08-21 (**la #76 ESCRITA en el mismo día, sobre la tanda doble ya
+cerrada en juego**. Antes: **LOS FAVORITOS + LA MARCA DE SOBRELLENADO** — roadmap **#43** y **#59** en
+**HECHO**, CHANGELOG **76** y **77** las dos `[APLICADO 2026-08-21]`, planillas **AI 13/13** y
+**AJ 7/7** en **una sola ronda cada una**, sin un rojo y sin una fila sin correr. Van juntas porque
+**tocan superficies DISJUNTAS** —la #43 son las puertas del inventario, la #59 vive en **un solo
+archivo** de cliente que la #43 no toca— así que un rojo de una no se puede confundir con un rojo de
+la otra, y cada una tiene su entry, su letra y su bloque de sabotaje para poder cerrar sola.
+
+**#76 — EL MENÚ DEL LOOT (Y EL DEL TRADE): ESCRITA, PENDIENTE LA PASADA EN JUEGO** (CHANGELOG **78**
+`[PENDIENTE]`, planilla **AK**, 10 filas). Nació de la **nota de AI5, un check que PASÓ**. Los dos
+huecos que el autor reportó eran **uno solo y estaba en un `if`**: el `onRightClick` del grid del
+jugador ramificaba por estado y **sólo la rama `solo` abría el menú completo**.
+**⭐ EL ALCANCE REAL FUE MÁS ANCHO QUE EL REPORTE, y el caso PEOR era el trader.** Ahí no faltaba una
+fila: **no había menú donde ponerla** — `AmountMenu` abría con `if avail <= 1 then BasketAdd(…) return
+end`, y un `unique` agrega **siempre 1**, o sea que sobre **toda arma** el click derecho no abría
+nada y, siendo favorita, iba derecho al rechazo de la #43 (*«unmark it before selling it»*). **La
+ventana que emitía la instrucción era la única que no la podía cumplir.** El autor lo pegó sobre el
+loot porque ahí lo vio primero.
+**Los dos votos suyos:** alcance **loot Y trade**, y **constructor unificado con la lista de verbos
+declarada por pantalla** — o sea `CARGO.UI.ItemMenu(entry, screen)` más una tabla `MENU_SECTIONS`.
+**Se unificó el CONSTRUCTOR y no el CONTENIDO**: `Equip on…`, `Use`, `Quick bind…` y `Attach to…` no
+bajan a esas pantallas. **La columna del contenedor tampoco se unificó** —lo que está en la caja no
+es tuyo, y el ref de `favorite`/`drop` nombra una celda de **tu** record— y **el atajo se quedó del
+lado BUY**, donde no hay nada más que ofrecer.
+**El server no necesitó una línea, y está acreditado por check y no afirmado.** Harness **1222**
+(era 1192) = 66 / 760 / 396, **`sabotaje_cargo_76.py` 12/12**, las cinco suites vecinas re-corridas.
+Los 26 checks nuevos corren **sobre el frame vivo y en el estado que miden** (lección 110) y buscan
+las filas por **igualdad exacta** (lección 114: `Drop all` satisface `Drop`).
+**⚠ Dos anclas de `sabotaje_cargo_43_59.py` se rompieron al mover la fila del favorito** — `ANCLA x0`,
+que **no revienta**. Re-apuntadas.
 
 **#43 — LOS FAVORITOS, y el entregable es una NORMA: `CRG-76`, sede §7.4.** *Un favorito es un flag
 del **jugador** sobre un ítem, y ninguna puerta que saque algo del inventario puede ignorarlo.*
@@ -916,7 +939,12 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **Nada de la tanda del 2026-08-21.** Las planillas **AI** (13 filas) y **AJ** (7) **cerraron el
+- **La #76 (menú del loot y del trade) — planilla AK, 10 filas, SIN CORRER.** Es lo único pendiente
+  del 2026-08-21. **La fila que no se puede reemplazar por harness es la 03**: apretar `Drop` dentro
+  del loot y **mirar el piso**. Un «Drop» cableado al destino equivocado se ve idéntico en el menú,
+  corre sin un error, y el ítem aparece en la caja. **Las filas 07 y 08 son las del trader**, que es
+  el caso que el reporte no nombraba.
+- **Nada más de la tanda del 2026-08-21.** Las planillas **AI** (13 filas) y **AJ** (7) **cerraron el
   mismo día, en una ronda cada una y sin un rojo**; la barra de prueba de la AJ quedó **desmontada**
   (fila AJ7), así que no hay una *AJ Test* fantasma esperando en una ronda futura.
 - **Detalle de las rondas 2-4, para referencia. El bloqueante de la ronda 2 quedó RESUELTO** (el

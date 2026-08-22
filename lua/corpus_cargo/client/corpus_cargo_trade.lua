@@ -482,16 +482,25 @@ function CARGO.Trade.RefreshStrips(left)
     end
 end
 
--- right-click on a stack: how many units into the basket
-function CARGO.Trade.AmountMenu(side, entry)
+-- The basket verbs ALONE, as rows on a menu somebody else owns (roadmap #76) —
+-- the same shape and the same reason as CARGO.Transfer.AddVerbs: the player's
+-- grid while trading opens THE item menu, and this is the section it asks for.
+--
+-- THE AMOUNT ROWS ARE CONDITIONAL AND THE FIRST ONE IS NOT. With one unit
+-- available there is nothing to ask "how many" about, but there is still
+-- something to sell.
+--
+-- A FAVORITE KEEPS ITS "Sell 1" ROW, and that is the opposite call from the
+-- favorite row on ammunition (#43) for a reason that is not symmetry: ammo can
+-- NEVER be favorited, so a row would be noise; a favorite CAN be sold, right
+-- after unmarking it — and the refusal names that fix out loud ("unmark it
+-- before selling it"). Hiding the row would leave the player guessing why the
+-- item he can see a price for has no way to sell it.
+function CARGO.Trade.AddVerbs(menu, side, entry)
     local avail = Available(side, entry) - CARGO.Trade.BasketCount(side, entry)
-    if avail <= 1 then
-        CARGO.Trade.BasketAdd(side, entry, 1)
-        return
-    end
     local verb = side == "buy" and "Buy" or "Sell"
-    local menu = CARGO.Theme.Menu()
     menu:AddOption(verb .. " 1", function() CARGO.Trade.BasketAdd(side, entry, 1) end)
+    if avail <= 1 then return end
     menu:AddOption(verb .. " amount...", function()
         CARGO.Theme.Prompt(verb .. " how many?", "1 - " .. avail, "", function(txt)
             local n = math.floor(tonumber(txt) or 0)
@@ -501,6 +510,31 @@ function CARGO.Trade.AmountMenu(side, entry)
     menu:AddOption(verb .. " all (x" .. avail .. ")", function()
         CARGO.Trade.BasketAdd(side, entry, avail)
     end)
+end
+
+-- The STOCK column's menu (right click on the trader's side). Buy-only now
+-- that the sell side goes through the item menu, and it keeps the shortcut
+-- below for the reason the shortcut existed: with one unit available its menu
+-- would hold a single row.
+--
+-- ⚠ THE ASYMMETRY IS THE POINT AND IT IS WHY THE SELL SIDE HAD TO LOSE IT.
+-- Measured while writing #76: a `unique` always aggregates to 1, so on the
+-- player's side this shortcut meant M2 on a rifle NEVER opened a menu — it
+-- went straight into the basket, and on a FAVORITE rifle straight into the
+-- refusal. That is the author's own round-trip in the screen that emits the
+-- message telling him to go do it: there was no menu to hang "Remove from
+-- favorites" on. Here there is nothing else to offer — the trader's stock has
+-- no owner who marked it and is not in your bag to drop — so one row stays a
+-- click, which is also what CRG-74 grammar reads as on a column where M1
+-- already selects.
+function CARGO.Trade.AmountMenu(side, entry)
+    local avail = Available(side, entry) - CARGO.Trade.BasketCount(side, entry)
+    if avail <= 1 then
+        CARGO.Trade.BasketAdd(side, entry, 1)
+        return
+    end
+    local menu = CARGO.Theme.Menu()
+    CARGO.Trade.AddVerbs(menu, side, entry)
     menu:Open()
 end
 

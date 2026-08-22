@@ -2515,7 +2515,46 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     `Items.AutoSortLess` en el #67.
 
 76. EL GRID DEL JUGADOR DENTRO DEL LOOT NO TIENE LAS ACCIONES BÁSICAS
-    [Cargo ui] — PEDIDO DEL AUTOR el 2026-08-21, SIN VOTAR, SIN ESCRIBIR.
+    [Cargo ui] — CERRADA EN CÓDIGO el 2026-08-21 (CHANGELOG 78, PENDIENTE la
+    pasada en juego: planilla AK, 10 filas). Pedido del autor ese mismo día y
+    con sus DOS votos: (1) alcance LOOT **Y TRADE**, (2) constructor UNIFICADO
+    con la lista de verbos declarada POR PANTALLA.
+    ⚠ EL ALCANCE REAL FUE MÁS ANCHO QUE EL REPORTADO, Y ESO ES INFORMACIÓN PARA
+    EL PRÓXIMO: el mismo hueco existía en la pantalla del TRADE, y ahí era peor.
+    No faltaba una fila: NO HABÍA MENÚ donde ponerla. `Trade.AmountMenu` abría
+    con un atajo `if avail <= 1 then BasketAdd(...) return end`, y un `unique`
+    agrega SIEMPRE 1 — o sea que sobre TODA arma el click derecho no abría nada,
+    y siendo favorita iba derecho al rechazo de la #43 («unmark it before
+    selling it»). LA VENTANA QUE EMITÍA LA INSTRUCCIÓN ERA LA ÚNICA QUE NO LA
+    PODÍA CUMPLIR. El autor lo pegó sobre el loot porque ahí lo vio primero.
+    QUÉ ENTRÓ: `OpenItemMenu` (local) pasó a `CARGO.UI.ItemMenu(entry, screen)`
+    con una tabla `MENU_SECTIONS` que declara qué ofrece cada pantalla; los
+    verbos de transferencia son una sección más (`Transfer.AddVerbs` /
+    `Trade.AddVerbs`, que siguen en el archivo dueño de su cable). Se unificó el
+    CONSTRUCTOR y no el CONTENIDO — `Equip on…`, `Use`, `Quick bind…` y
+    `Attach to…` no bajan al loot ni al trade, que es lo que el voto 2 decidió.
+    DOS COSAS QUE NO SE UNIFICARON, con motivo escrito: la columna del
+    CONTENEDOR (lo que está en la caja no es tuyo — el ref de `favorite`/`drop`
+    nombra una celda de TU record) y el atajo del lado BUY (en el stock del
+    trader no hay nada más que ofrecer, así que su menú tendría una sola fila).
+    EL SERVER NO NECESITÓ UNA LÍNEA, y está acreditado por check y no afirmado:
+    los receptores de `drop` y `favorite` no tienen gate de pantalla, y
+    `RefreshAll` ya repintaba el grid propio también mientras se lootea.
+    VERIFICACIÓN: harness 1222 (era 1192) = 66 FUENTES / 760 server / 396
+    cliente; `dev/sabotaje_cargo_76.py` 12/12 en rojo; las cinco suites vecinas
+    re-corridas enteras. Los 26 checks nuevos corren SOBRE EL FRAME VIVO y en el
+    estado que miden (lección 110) y buscan las filas por igualdad exacta y
+    nunca por subcadena (lección 114: «Drop all» satisface «Drop»).
+    ⚠ LO QUE VOLVIÓ A PASAR: dos anclas de `dev/sabotaje_cargo_43_59.py` se
+    rompieron al mover la fila del favorito. NO REVIENTAN — imprimen `ANCLA x0`
+    y desarman una verificación en negativo vieja EN SILENCIO. Re-apuntadas.
+    LO ADYACENTE QUE NO SE HIZO Y NO ESTÁ VOTADO: la celda del grid NO dibuja la
+    estrella (la única lectura de `fav` en `grid.lua` es el filtro del toggle ★;
+    la estrella vive sólo en el tooltip), así que un favorito es invisible hasta
+    que le pasas el mouse por encima. Parte de la fricción que el autor describe
+    es no ver cuál celda está marcada — pero es OTRA entrada, no ésta.
+    --- lo de abajo es el registro de cómo nació, y se conserva ---
+    PEDIDO DEL AUTOR el 2026-08-21, SIN VOTAR, SIN ESCRIBIR.
     NACIÓ DE LA NOTA DE AI5, un check que PASÓ (octava vez en el arco).
     QUÉ DIJO, textual: «falta como QoL, que puedas quitarle o ponerle favorito
     en la ventana de loot, porque lo actual hace que el jugador deba salir,

@@ -7736,3 +7736,101 @@ cuyo diseño había cerrado trece días antes y cuya bajada no tenía que decidi
 
 CHANGELOG **77 `[APLICADO 2026-08-21]`**. **CRG-68 acreditada en juego**: el panel dibuja magnitud y
 el jugador ahora ve la diferencia entre 138 y 149.
+
+---
+
+## 78. El menú del loot (y el del trade) no tenía las acciones básicas (roadmap #76) `[PENDIENTE]`
+
+**Pedido del autor el 2026-08-21**, y salió de la **nota de AI5, un check que PASÓ** — la octava vez
+en el arco de Cargo que el hallazgo sale del campo de notas de un verde y no de un rojo.
+
+Textual: *«falta como QoL, que puedas quitarle o ponerle favorito en la ventana de loot, porque lo
+actual hace que el jugador deba salir, entrar al inventario y ahí quitarle el favorito […] también,
+falta que se pueda dropear un ítem de tu grid mientras estás en la pantalla del loot, porque hasta
+ahora con el botón contextual sólo puedes mover»*.
+
+**Los dos huecos que reportó eran UNO SOLO y estaba en un `if`.** El `onRightClick` del grid del
+jugador ramificaba por estado y **sólo la rama `solo` abría el menú completo**: loot llamaba a
+`Transfer.Menu` (tres verbos de transferencia) y trade a `Trade.AmountMenu` (tres verbos de canasta).
+**No fue un defecto de la #43**: el menú del loot nació con menos filas mucho antes de que los
+favoritos existieran; lo que la #43 hizo fue volverlo visible.
+
+### ⭐ El alcance real era más ancho que el reporte, y la pantalla del trader era el caso PEOR
+
+El mismo hueco estaba en el trade, y ahí no faltaba una fila: **no había menú donde ponerla.**
+`AmountMenu` abría con un atajo — `if avail <= 1 then BasketAdd(...) return end` — y **un `unique`
+agrega siempre 1**, o sea que sobre **toda arma** el click derecho no abría nada. Siendo favorita,
+iba derecho al rechazo de la #43: *«X is a favorite: unmark it before selling it»*.
+
+**La ventana que emitía la instrucción era la única que no la podía cumplir**, y es exactamente la
+queja del autor en la pantalla donde el mensaje que la provoca se emite. Él la reportó sobre el loot
+porque ahí la vio primero.
+
+### Qué entró — un constructor, y el contenido declarado POR PANTALLA
+
+`OpenItemMenu` (local, `client/corpus_cargo_ui.lua`) pasó a ser **`CARGO.UI.ItemMenu(entry, screen)`**,
+y arriba suyo vive **`MENU_SECTIONS`**: una tabla con una entrada por pantalla que dice qué secciones
+ofrece cada una. Los verbos de transferencia son una sección más — `Transfer.AddVerbs` y
+`Trade.AddVerbs`, extraídas de los dos menús viejos, que siguen viviendo en el archivo dueño de su
+cable. Es el mismo argumento de `Theme.Menu()` en el #74 y de `Items.AutoSortLess` en el #67:
+**una casa**.
+
+**Se unificó el CONSTRUCTOR y no el CONTENIDO**, y es una decisión: arrastrar todo `OpenItemMenu` a
+esas pantallas pondría `Equip on…`, `Use`, `Quick bind…` y `Attach to…` sobre una caja — doce filas
+donde el autor pidió «las funcionalidades básicas». Agregar una fila mañana es **un** lugar, y qué
+pantalla la muestra es **un renglón** de la tabla.
+
+**El verbo lo fijó el autor como REGLA y no como caso** (2026-08-21): *«"drop" es siempre tirar al
+piso, al contenedor es "mover"»*. Los dos conviven en la misma pantalla sin ambigüedad porque nombran
+**destinos distintos**.
+
+**La columna del contenedor NO se unificó, y también es una decisión.** Lo que está en la caja no es
+tuyo todavía: el ref que toman `favorite` y `drop` nombra una celda de **tu** record.
+
+**El atajo del `avail <= 1` se fue del lado SELL y se quedó del lado BUY.** La asimetría tiene motivo
+escrito: en el stock del trader no hay nada más que ofrecer —no tiene dueño que lo haya marcado ni
+está en tu mochila para botarlo— así que su menú tendría una sola fila.
+
+### La separación no es prolijidad
+
+Es el **único menú del módulo donde «Move» y «Drop» caen sobre la misma celda**, o sea dos destinos a
+un pixel de distancia; un click de más manda el ítem a un lugar del que hay que ir a buscarlo. Van
+dos `AddSpacer()` —que `Theme.Menu()` ya tematizaba desde el #74— con el favorito de colchón en el
+medio. **El segundo es condicional**: sobre munición no hay fila de favorito, y dos rayas pegadas
+sobre ese hueco se leen como un menú que falló al construirse.
+
+### El server no necesitó una línea
+
+Medido antes de escribir: los receptores de `NET_DROP` y `NET_FAVORITE` **no tienen gate de pantalla**
+—no preguntan qué frame está abierto—, y `CARGO.UI.RefreshAll()` ya repintaba el grid propio con cada
+snapshot **también mientras se lootea**. **La entrada es 100 % de cliente**, y las tres cosas están
+acreditadas por check en vez de afirmadas.
+
+### Verificación
+
+`glua_check` 48/48. Harness **1222** (era 1192) = **66** FUENTES / 760 server / **396** cliente,
+selftest 100/107 sin moverse. **`dev/sabotaje_cargo_76.py`, 12/12 en rojo**; las suites vecinas
+—43/59, 67, 68, 69, 74/72— re-corridas en 31/31, 12/12, 16/16, 19/19 y 28/28.
+
+**Los 26 checks nuevos corren SOBRE EL FRAME VIVO y en el estado que miden** (lección 110 del
+catálogo): un menú armado a mano llamando a `ItemMenu(entry, "loot")` mediría la función, y lo que la
+entrada arregla es **qué menú abre el M2 de esa pantalla** — a eso sólo lo contesta la celda. Y las
+filas se buscan por **igualdad exacta y nunca por subcadena** (lección 114): `"Drop all (x80)"`
+satisface `"Drop"`, así que un gate por «contiene» daría verde con la fila borrada.
+
+**Dos gates que no se movieron, y se dice porque es información.** La cuenta de `Theme.Menu()` de
+`ui.lua` sigue en **seis** y la de `CanFavorite` en **dos**: la unificación cayó sobre un sitio de
+llamada **que ya existía** en vez de estrenar uno. Subir un número «porque cambió algo» es
+exactamente lo que ese gate existe para impedir. Los tres gates nuevos son otros: la forma exigida
+(`CARGO.UI.ItemMenu(entry, state)`), las dos casas viejas **prohibidas con su argumento pegado** —el
+nombre pelado lo satisface la columna del contenedor, que sigue llamando a `Transfer.Menu("take")`—
+y la cuenta de `AddSpacer()` en **dos**.
+
+**⚠ Y volvió a pasar lo que el prompt anunciaba:** dos anclas de `dev/sabotaje_cargo_43_59.py` se
+rompieron al mover la fila del favorito adentro del `if sections.favorite`. **No revientan**: imprimen
+`ANCLA x0` y desarman una verificación en negativo vieja en silencio. Re-apuntadas y anotadas en el
+archivo.
+
+**Planilla AK** (`dev/checks/cargo-menu-loot-r1.html`, 10 filas). Lo que ninguna cuenta offline puede
+ver: **dónde cae el ítem**. La fila 03 aprieta `Drop` dentro del loot y manda a **mirar el piso** — un
+«Drop» cableado al destino equivocado se ve idéntico en el menú y no da un solo error.
