@@ -5,16 +5,17 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-21 (**la #76 ESCRITA en el mismo día, sobre la tanda doble ya
-cerrada en juego**. Antes: **LOS FAVORITOS + LA MARCA DE SOBRELLENADO** — roadmap **#43** y **#59** en
-**HECHO**, CHANGELOG **76** y **77** las dos `[APLICADO 2026-08-21]`, planillas **AI 13/13** y
-**AJ 7/7** en **una sola ronda cada una**, sin un rojo y sin una fila sin correr. Van juntas porque
+**Última actualización:** 2026-08-21 (**TRES ENTRADAS CERRADAS EN JUEGO EL MISMO DÍA, las tres en UNA
+SOLA RONDA y sin un rojo: #43, #59 y #76** — CHANGELOG **76**, **77** y **78** los tres
+`[APLICADO 2026-08-21]`, planillas **AI 13/13**, **AJ 7/7** y **AK 10/10**. La #76 se pidió, se
+diseñó, se escribió y se cerró **el mismo día en que la nota de AI5 la abrió**. Las dos primeras van
+juntas porque
 **tocan superficies DISJUNTAS** —la #43 son las puertas del inventario, la #59 vive en **un solo
 archivo** de cliente que la #43 no toca— así que un rojo de una no se puede confundir con un rojo de
 la otra, y cada una tiene su entry, su letra y su bloque de sabotaje para poder cerrar sola.
 
-**#76 — EL MENÚ DEL LOOT (Y EL DEL TRADE): ESCRITA, PENDIENTE LA PASADA EN JUEGO** (CHANGELOG **78**
-`[PENDIENTE]`, planilla **AK**, 10 filas). Nació de la **nota de AI5, un check que PASÓ**. Los dos
+**#76 — EL MENÚ DEL LOOT (Y EL DEL TRADE): CERRADA EN JUEGO, AK 10/10** (CHANGELOG **78**
+`[APLICADO 2026-08-21]`). Nació de la **nota de AI5, un check que PASÓ**. Los dos
 huecos que el autor reportó eran **uno solo y estaba en un `if`**: el `onRightClick` del grid del
 jugador ramificaba por estado y **sólo la rama `solo` abría el menú completo**.
 **⭐ EL ALCANCE REAL FUE MÁS ANCHO QUE EL REPORTE, y el caso PEOR era el trader.** Ahí no faltaba una
@@ -939,14 +940,12 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **La #76 (menú del loot y del trade) — planilla AK, 10 filas, SIN CORRER.** Es lo único pendiente
-  del 2026-08-21. **La fila que no se puede reemplazar por harness es la 03**: apretar `Drop` dentro
-  del loot y **mirar el piso**. Un «Drop» cableado al destino equivocado se ve idéntico en el menú,
-  corre sin un error, y el ítem aparece en la caja. **Las filas 07 y 08 son las del trader**, que es
-  el caso que el reporte no nombraba.
-- **Nada más de la tanda del 2026-08-21.** Las planillas **AI** (13 filas) y **AJ** (7) **cerraron el
-  mismo día, en una ronda cada una y sin un rojo**; la barra de prueba de la AJ quedó **desmontada**
-  (fila AJ7), así que no hay una *AJ Test* fantasma esperando en una ronda futura.
+- **Nada de la tanda del 2026-08-21.** Las planillas **AI** (13 filas), **AJ** (7) y **AK** (10)
+  **cerraron el mismo día, en una ronda cada una y sin un rojo**; la barra de prueba de la AJ quedó
+  **desmontada** (fila AJ7), así que no hay una *AJ Test* fantasma esperando en una ronda futura.
+  **De la AK, cuatro filas pasaron sin evidencia escrita** (AK4, AK6, AK8, AK9) y AK8 se acredita por
+  cobertura — no es deuda abierta, pero es la diferencia entre diez acreditaciones equivalentes y las
+  seis que llegaron con nota.
 - **Detalle de las rondas 2-4, para referencia. El bloqueante de la ronda 2 quedó RESUELTO** (el
   espejo volvió por su cuenta y el instrumento que lo lee quedó escrito para la próxima vez).
   Entonces: **el ESPEJO DE MUNICIÓN NO ESTABA CORRIENDO**, y los dos rojos son ese único hecho. La captura

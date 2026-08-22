@@ -2515,8 +2515,16 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     `Items.AutoSortLess` en el #67.
 
 76. EL GRID DEL JUGADOR DENTRO DEL LOOT NO TIENE LAS ACCIONES BÁSICAS
-    [Cargo ui] — CERRADA EN CÓDIGO el 2026-08-21 (CHANGELOG 78, PENDIENTE la
-    pasada en juego: planilla AK, 10 filas). Pedido del autor ese mismo día y
+    [Cargo ui] — **HECHO / CERRADA EN JUEGO el 2026-08-21** (CHANGELOG 78
+    APLICADO; planilla AK **10/10 en una sola ronda**, sin un rojo y sin una
+    fila sin correr — la tercera del día que cierra así, tras AI 13/13 y AJ
+    7/7). AK3 cerró por su criterio propio, que era el único que ningún check
+    offline podía dar: el ítem cae AL PISO y no a la caja. AK7 acreditó el
+    hallazgo que no estaba en el reporte, con las dos acciones nombradas —
+    «desde el trader se puede cambiar el favorito y dropear». SEIS de las diez
+    llegaron con nota y CUATRO pasaron sin evidencia escrita (AK4, AK6, AK8,
+    AK9); AK8 se acredita por cobertura y se dice. NINGUNA NOTA ABRIÓ NADA.
+    Pedido del autor ese mismo día y
     con sus DOS votos: (1) alcance LOOT **Y TRADE**, (2) constructor UNIFICADO
     con la lista de verbos declarada POR PANTALLA.
     ⚠ EL ALCANCE REAL FUE MÁS ANCHO QUE EL REPORTADO, Y ESO ES INFORMACIÓN PARA

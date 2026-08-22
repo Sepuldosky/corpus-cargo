@@ -7739,7 +7739,7 @@ el jugador ahora ve la diferencia entre 138 y 149.
 
 ---
 
-## 78. El menú del loot (y el del trade) no tenía las acciones básicas (roadmap #76) `[PENDIENTE]`
+## 78. El menú del loot (y el del trade) no tenía las acciones básicas (roadmap #76) `[APLICADO 2026-08-21]`
 
 **Pedido del autor el 2026-08-21**, y salió de la **nota de AI5, un check que PASÓ** — la octava vez
 en el arco de Cargo que el hallazgo sale del campo de notas de un verde y no de un rojo.
@@ -7834,3 +7834,37 @@ archivo.
 **Planilla AK** (`dev/checks/cargo-menu-loot-r1.html`, 10 filas). Lo que ninguna cuenta offline puede
 ver: **dónde cae el ítem**. La fila 03 aprieta `Drop` dentro del loot y manda a **mirar el piso** — un
 «Drop» cableado al destino equivocado se ve idéntico en el menú y no da un solo error.
+
+### Pasada en juego (2026-08-21) — OK, 10/10
+
+**Planilla AK, ronda 1: PASA 10 · FALLA 0 · SIN CORRER 0.** Conteo verificado contra su propia línea
+`(de 10)`. **Tercera sección seguida que cierra en una sola ronda y sin un rojo** (AI 13/13, AJ 7/7,
+AK 10/10), y las tres el mismo día.
+
+**⭐ AK3, la fila que ninguna cuenta offline podía reemplazar, cerró por su criterio.** No preguntaba
+si el menú tenía la fila —eso lo mide el harness— sino **dónde cae el ítem**: un «Drop» cableado al
+destino equivocado se ve idéntico en el menú, corre sin un error, y el ítem aparece en la caja. El
+autor cerró las dos mitades del criterio: *«Así es»* sobre el suelo, y la caja sin él.
+
+**⭐ AK7 acredita el hallazgo que no estaba en el reporte, y con las dos acciones nombradas:**
+*«Sí, desde el trader se puede cambiar el favorito y dropear»*. Es la pantalla donde el mensaje de la
+#43 le dice al jugador que vaya a desmarcar el favorito, y hasta esta entrada **era la única que no
+podía cumplir esa instrucción** — el atajo `avail <= 1` no abría menú ninguno sobre un `unique`.
+
+**AK5 cerró el control negativo de alcance con la evidencia exacta que pedía:** *«Sí, sólo tiene
+take»*. La columna del contenedor no se unificó, y ésa es la fila que lo prueba en pantalla.
+
+**Honestidad sobre la evidencia, porque es lo que distingue una AI de una AH:** **seis de las diez
+llegaron con nota** (AK1, AK2, AK3, AK5, AK7, AK10) y **cuatro pasaron sin evidencia escrita** (AK4,
+AK6, AK8, AK9). De esas cuatro, **AK8 es la que más se apoya en otra fila**: su primera mitad
+—desmarcar desde el trader— está acreditada por la nota de AK7, y la segunda —vender ahí mismo, sin
+salir de la pantalla— se acredita **por cobertura y no por gesto**. Se dice en vez de contarlo como
+diez acreditaciones equivalentes.
+
+**Ninguna nota abrió nada.** La única que dice algo más allá del criterio es **AK10**, y es sobre un
+hábito del autor y no sobre el módulo: *«generalmente lo cerraba con Escape, no me acordaba de usar I
+para cerrar, pero sí, todo funciona como corresponde»*. Las dos rutas de cierre existen y ninguna
+está rota — **no es un hallazgo, y forzarlo a serlo sería fabricar una entrada.**
+
+CHANGELOG **78 `[APLICADO 2026-08-21]`**. La **#76** queda **CERRADA EN JUEGO**, y con ella la tanda
+de tres del día.
