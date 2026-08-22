@@ -622,8 +622,35 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     como att normal, y si el default loadout del SWEP lo instala por fuera de
     los hooks de inventario.
 
-43. ÍTEMS/ARMAS FAVORITOS [Cargo UI] — ESCRITO 2026-08-21, entry 76 [PENDIENTE],
-    planilla AI SIN CORRER. Pedido del autor 2026-07-23 (nota de la verificación
+43. ÍTEMS/ARMAS FAVORITOS [Cargo UI] — CERRADA el 2026-08-21, el mismo día que
+    se escribió. Acuña CRG-76, sede Cargo_Architecture.md §7.4.
+    PASADA EN JUEGO OK, 13/13 EN UNA RONDA: planilla AI
+    (dev/checks/cargo-favoritos-r1.html), PASA 13 · FALLA 0 · SIN CORRER 0.
+    CHANGELOG 76 [APLICADO 2026-08-21].
+    SE ACREDITA GESTO POR GESTO Y NO POR COBERTURA, y es lo que la distingue de
+    la #75: nueve de las trece filas traen la evidencia concreta en la nota. Las
+    CINCO puertas se ejercieron una por una, y el rechazo de vender salió POR
+    ÍTEM y con el nombre adentro («Backpack is a favorite: unmark it before
+    selling it», ídem «Large Backpack» y «RSh-12») — o sea que el gate resuelve
+    la ENTRADA y no la sesión.
+    ⭐ EL MERGE CERRÓ CON LA ARITMÉTICA A LA VISTA, y era la fila que decidía
+    más que las otras doce: «tengo 4 vendas en favorito, una en el suelo; al
+    tomar tengo 5, o sea se stackeó y no se puede botar ahora porque las 5 están
+    en favorito». 4+1=5 y las cinco marcadas — que es exactamente lo que la
+    clave por clase promete y lo que un flag por celda no podía dar sin
+    partirse en dos mitades sin regla. La decisión del autor quedó medida EN
+    JUEGO y no sólo sobre el record.
+    EL FALSO ROJO QUE SE HABÍA PREDICHO NO OCURRIÓ, y la respuesta fue de
+    lectura de código y no de otra ronda: la nota del «Move all» trae los dos
+    avisos juntos —capacidad y favoritos— pero el gate vive ANTES del loop que
+    prende `blocked`, así que un favorito no puede alcanzar esa bandera; el de
+    capacidad reportó un bloqueo real sobre ítems NO favoritos. Queda anotado
+    porque el próximo que vea esos dos renglones juntos va a sospechar del
+    candado.
+    Y SU HALLAZGO SALIÓ DE LA NOTA DE UN CHECK QUE PASÓ (AI5), octava vez en el
+    arco: dentro de la ventana de loot el grid del jugador no ofrece ni marcar
+    favorito ni botar. Es el #76 y NO un defecto de esta entrada.
+    Pedido del autor 2026-07-23 (nota de la verificación
     de la entry #27), DISEÑADO POR ÉL el 2026-08-20 y con sus cuatro decisiones
     votadas el 2026-08-21.
     QUÉ PEDÍA, textual: «el ser favorito significa que no lo puedes vender ni
@@ -1555,8 +1582,26 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     el snapshot o el cliente tendria que recalcularlo, que es exactamente la
     clase de segunda verdad que CRG-56/57 evitan.
 
-59. LA MARCA DE SOBRELLENADO EN EL STATUSPANEL [Cargo ui] — ESCRITO 2026-08-21,
-    entry 77 [PENDIENTE], planilla AJ SIN CORRER.
+59. LA MARCA DE SOBRELLENADO EN EL STATUSPANEL [Cargo ui] — CERRADA el
+    2026-08-21, el mismo día que se escribió. Baja CRG-68 a código y NO acuña
+    nada nuevo.
+    PASADA EN JUEGO OK, 7/7 EN UNA RONDA: planilla AJ
+    (dev/checks/cargo-sobrellenado-r1.html), PASA 7 · FALLA 0 · SIN CORRER 0.
+    CHANGELOG 77 [APLICADO 2026-08-21].
+    ⭐ LA FILA ESTRELLA CERRÓ POR SU CRITERIO Y NO POR EL QUE SE LE PARECE: no
+    era «se ve el exceso» sino que 138 y 149 se vieran DISTINTO, que es el
+    defecto exacto que la entrada cierra. La nota del autor trajo LOS DOS
+    números —«sí, se ve el rayado en rojo y +38; también el +49 en AJTEST»—, o
+    sea que la cifra discrimina y el tramado acompaña. No hizo falta
+    repreguntar por la mitad que se advertía que suele faltar.
+    LA DEGRADACIÓN TAMBIÉN EN VERDE, y es lo que desbloquea a Craving sin
+    acoplarlo: las cuatro barras que ya existían pintan exactamente igual que
+    antes. Y la fila de alcance confirma que la barra de prueba quedó
+    DESMONTADA — no hay una «AJ Test» fantasma esperando en una ronda futura.
+    NINGUNA NOTA ABRIÓ NADA, que es lo esperable de una entrada cuyo diseño
+    había cerrado trece días antes y cuya bajada no tenía que decidir nada.
+    CRG-68 deja de ser INTENCION en ids.yaml: pasa a tener harness, código,
+    verificación en negativo y planilla.
     Diseño CERRADO el 2026-08-08 en Cargo_Architecture.md §11.1 (CRG-68); la
     bajada a codigo es la entry 77 y NO acuña nada nuevo. Pedido POR CRAVING,
     cuya enmienda del mismo dia
@@ -2468,3 +2513,43 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     en vez de repetir el pintado; mismo argumento que llevó el texto de
     condición a `Theme.ConditionShort` en la #66 y el criterio de orden a
     `Items.AutoSortLess` en el #67.
+
+76. EL GRID DEL JUGADOR DENTRO DEL LOOT NO TIENE LAS ACCIONES BÁSICAS
+    [Cargo ui] — PEDIDO DEL AUTOR el 2026-08-21, SIN VOTAR, SIN ESCRIBIR.
+    NACIÓ DE LA NOTA DE AI5, un check que PASÓ (octava vez en el arco).
+    QUÉ DIJO, textual: «falta como QoL, que puedas quitarle o ponerle favorito
+    en la ventana de loot, porque lo actual hace que el jugador deba salir,
+    entrar al inventario y ahí quitarle el favorito (el arma que está equipada
+    ya puede hacer eso pero no el grid del inventario). También, falta que se
+    pueda dropear un ítem de tu grid mientras estás en la pantalla del loot,
+    porque hasta ahora con el botón contextual sólo puedes mover; por eso
+    faltan las funcionalidades básicas que existen en el grid del inventario
+    normal».
+    LOS DOS HUECOS SON UNO SOLO Y ESTÁ VERIFICADO EN EL ÁRBOL: el grid del
+    jugador dentro del loot abre `CARGO.Transfer.Menu`
+    (client/corpus_cargo_transfer.lua), que construye SÓLO los verbos de
+    transferencia —Move 1 / Move amount… / Move whole stack—, mientras que el
+    menú del grid del inventario (client/corpus_cargo_ui.lua) trae «Mark as
+    favorite» Y «Drop»/«Drop all», y el del slot de equipo también. Eso último
+    es exactamente por qué el autor observó que «el arma que está equipada ya
+    puede hacer eso»: el slot de equipo usa el menú completo y el grid del
+    loot no.
+    NO ES UN DEFECTO DE LA #43: el menú del loot nació con menos filas mucho
+    antes de que los favoritos existieran, y la #43 no lo tocó. Lo que la #43
+    hizo fue volverlo VISIBLE — antes nadie necesitaba desmarcar nada desde
+    ahí, y ahora un favorito obliga a cerrar el loot, abrir el inventario,
+    desmarcar, y volver.
+    LO QUE HAY QUE DECIDIR ANTES DE ESCRIBIR, y es lo que la vuelve una
+    entrada y no un parche de tres líneas: si los dos menús se UNIFICAN (un
+    solo constructor que reciba qué verbos ofrecer, con el de transferencia
+    como el extra del contexto de loot) o si el del loot simplemente CRECE dos
+    filas. La primera es el mismo argumento del helper único que llevó a
+    `Theme.Menu()` en el #74 y a `Theme.ConditionShort` en el #66; la segunda
+    es más barata hoy y deja dos casas que se van a desincronizar la próxima
+    vez que el menú del inventario gane una fila — que es literalmente lo que
+    acaba de pasar.
+    ⚠ Y HAY UNA PREGUNTA DE ALCANCE QUE NO ES OBVIA: si «Drop» aparece en el
+    loot, ¿bota al piso o al contenedor? Son dos gestos distintos con el mismo
+    rótulo y la ventana está mostrando los dos destinos a la vez. El autor
+    pidió «dropear», o sea el piso, pero conviene que lo confirme antes de
+    escribirlo: un botón que hace lo otro se descubre perdiendo el ítem.

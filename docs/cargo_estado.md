@@ -5,12 +5,13 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-21 (**tanda doble: LOS FAVORITOS + LA MARCA DE SOBRELLENADO** —
-roadmap **#43** y **#59**, CHANGELOG **76** y **77**, las dos `[PENDIENTE]`, planillas **AI** y **AJ**
-**SIN CORRER**. Van juntas porque **tocan superficies DISJUNTAS** —la #43 son las puertas del
-inventario, la #59 vive en **un solo archivo** de cliente que la #43 no toca— así que un rojo de una
-no se puede confundir con un rojo de la otra, y cada una tiene su entry, su letra y su bloque de
-sabotaje para poder cerrar sola.
+**Última actualización:** 2026-08-21 (**tanda doble CERRADA EN JUEGO EL MISMO DÍA: LOS FAVORITOS + LA
+MARCA DE SOBRELLENADO** — roadmap **#43** y **#59** en **HECHO**, CHANGELOG **76** y **77** las dos
+`[APLICADO 2026-08-21]`, planillas **AI 13/13** y **AJ 7/7** en **una sola ronda cada una**, sin un
+rojo y sin una fila sin correr. Van juntas porque **tocan superficies DISJUNTAS** —la #43 son las
+puertas del inventario, la #59 vive en **un solo archivo** de cliente que la #43 no toca— así que un
+rojo de una no se puede confundir con un rojo de la otra, y cada una tiene su entry, su letra y su
+bloque de sabotaje para poder cerrar sola.
 
 **#43 — LOS FAVORITOS, y el entregable es una NORMA: `CRG-76`, sede §7.4.** *Un favorito es un flag
 del **jugador** sobre un ítem, y ninguna puerta que saque algo del inventario puede ignorarlo.*
@@ -46,14 +47,28 @@ leer el árbol: `overfillColor` defaultea a `T.Colors.orange` porque **`warn` no
 paleta, y la aritmética **salió del `Paint` a tres funciones puras** — sin eso, lo único que separa
 «llena y muda» de «llena y hablando» habría sido lo único que ningún check podía alcanzar.
 
-**Harness 1107 → 1192** (61 FUENTES / 760 server / 370 cliente), selftest 100/107.
+**Harness 1107 → 1192** (62 FUENTES / 760 server / 370 cliente), selftest 100/107.
 **`dev/sabotaje_cargo_43_59.py`: 31/31 en rojo**, con apertura y cierre en verde; re-corridos
 `sabotaje_cargo_67/68/69/74_72` (12/12, 16/16, 19/19, 28/28) — y **dos anclas viejas habían quedado
 en `x0`** y se actualizaron. **⚠ Un sabotaje salió VERDE la primera vez y el hallazgo fue del GATE:**
 exigía la subcadena pelada `render.SetScissorRect`, que **la línea de cierre del par satisface
 igual**, así que borrar la apertura no bajaba la cuenta de nada.
 
-**PENDIENTE: las dos pasadas en juego** (AI, 13 filas; AJ, 7).)
+**LAS DOS PASADAS EN JUEGO, OK.** La **AI** se acredita **gesto por gesto y no por cobertura** —nueve
+de trece con la evidencia en la nota—, y su fila estrella, el **merge**, cerró con la aritmética a la
+vista: *«tengo 4 vendas en favorito, una en el suelo; al tomar tengo 5 … y no se puede botar ahora
+porque las 5 están en favorito»*. **El falso rojo que se había predicho para el «Move all» no
+ocurrió**, y se resolvió leyendo el código en vez de gastar una ronda: el gate vive **antes** del loop
+que prende `blocked`, así que el aviso de capacidad que salió al lado del de favoritos era un bloqueo
+real sobre ítems **no** favoritos. La **AJ** cerró **por su criterio y no por el que se le parece**:
+la nota trajo **los dos números** (*«se ve el rayado en rojo y +38; también el +49»*), que era la
+mitad que suele faltar. **CRG-68 deja de ser `INTENCION`** en `ids.yaml` y pasa a tener harness,
+código, verificación en negativo y planilla — la métrica de intenciones baja de 72 a **71 de 252**.
+**Lo único que la tanda dejó abierto es el roadmap #76**, y salió de la **nota de un check que
+PASÓ** (AI5, octava vez en el arco): dentro de la ventana de loot el grid del jugador **no ofrece ni
+marcar favorito ni botar**, porque abre `Transfer.Menu` —sólo los verbos de transferencia— y no el
+menú del grid del inventario. **No es un defecto de la #43**: ese menú nació con menos filas mucho
+antes, y lo que la #43 hizo fue volverlo visible.)
 
 Contexto previo: 2026-08-20 (**tanda doble: EL MENÚ TOMA EL TEMA + EL CINTURÓN PUEDE
 BOTAR** — roadmap **#74** y **#72**, CHANGELOG **73** y **74**, las dos `[PENDIENTE]`. Van juntas
@@ -890,17 +905,9 @@ mochilas genéricas + `Items.SetModel`), ambas `[APLICADO]` y confirmadas.)
 
 ## Pendiente de verificar
 
-- **PLANILLA AI — los favoritos (roadmap #43, CRG-76), `dev/checks/cargo-favoritos-r1.html`, 13
-  filas, SIN CORRER.** Lo que el harness no puede contestar: que el jugador **realmente no pueda**.
-  Una fila **por cada una de las cinco puertas**, intentándolas de verdad; la del **merge**, que
-  necesita levantar cosas del piso para que el inventario las funda; la de la **estrella** sobre un
-  nombre largo; y tres de **control negativo** — que lo no-favorito siga vendiéndose, botándose y
-  transfiriéndose; que la munición no se pueda marcar; y que **desmarcar devuelva las cinco**.
-- **PLANILLA AJ — la marca de sobrellenado (roadmap #59, CRG-68),
-  `dev/checks/cargo-sobrellenado-r1.html`, 7 filas, SIN CORRER.** Su fila estrella son **DOS
-  números** —138 contra 149— y el criterio es que se vean **DISTINTO**, no que «se vea el exceso».
-  Necesita registrar una barra de prueba desde consola, y **la última línea de esa fila la
-  desmonta**: una barra registrada se queda puesta el resto de la sesión.
+- **Nada de la tanda del 2026-08-21.** Las planillas **AI** (13 filas) y **AJ** (7) **cerraron el
+  mismo día, en una ronda cada una y sin un rojo**; la barra de prueba de la AJ quedó **desmontada**
+  (fila AJ7), así que no hay una *AJ Test* fantasma esperando en una ronda futura.
 - **Detalle de las rondas 2-4, para referencia. El bloqueante de la ronda 2 quedó RESUELTO** (el
   espejo volvió por su cuenta y el instrumento que lo lee quedó escrito para la próxima vez).
   Entonces: **el ESPEJO DE MUNICIÓN NO ESTABA CORRIENDO**, y los dos rojos son ese único hecho. La captura

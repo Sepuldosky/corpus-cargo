@@ -7362,7 +7362,7 @@ CHANGELOG **75 `[APLICADO 2026-08-20]`**. **CRG-75 acreditada en juego en sus DO
 
 ---
 
-## 76. Los favoritos, y las cinco puertas que ninguno puede cruzar (roadmap #43) `[PENDIENTE]`
+## 76. Los favoritos, y las cinco puertas que ninguno puede cruzar (roadmap #43) `[APLICADO 2026-08-21]`
 
 **Pedido viejo del autor (2026-07-23, en la nota de verificación de la entry #27), diseñado por él
 el 2026-08-20.** Textual, y es el alcance completo:
@@ -7491,7 +7491,7 @@ el día que alguien hace favorito un rifle de nombre largo.
 ### Verificación
 
 `python dev/glua_check.py corpus-cargo/lua` → **48/48**. `python dev/harness_cargo.py` → **exit 0**,
-**1192 checks** (61 FUENTES / 760 server / 370 cliente), selftest 100/107. Base al cerrar la #75:
+**1192 checks** (62 FUENTES / 760 server / 370 cliente), selftest 100/107. Base al cerrar la #75:
 1107.
 
 **De esta entrada:** 32 checks en SERVER —las cinco puertas **una por una**, la forma de la clave en
@@ -7522,9 +7522,88 @@ contestar: que el jugador **realmente no pueda** — una fila por cada puerta, i
 la del **merge**, que necesita levantar cosas del piso; la de la **estrella** sobre un nombre largo;
 y las tres de control negativo.
 
+### Pasada en juego (2026-08-21) — OK, 13/13
+
+**Planilla AI, ronda 1: PASA 13 · FALLA 0 · SIN CORRER 0.** El conteo de filas del reporte se
+verificó contra su propia línea `(de 13)` antes de leerlo, porque un reporte truncado se lee igual
+que uno completo.
+
+**Se acredita GESTO POR GESTO y no por cobertura**, y eso es lo que la distingue de la #75: **nueve
+de las trece traen nota con la evidencia concreta del gesto** —las líneas de consola que devolvió el
+rechazo, los conteos del merge, el `retry` de la persistencia—, no una declaración en bloque.
+
+**Las cinco puertas se ejercieron una por una**, que es lo único que esta entrada valía:
+
+- **AI3 (vender)** — el rechazo salió **por ítem y con el nombre adentro**, tres veces: `Backpack is
+  a favorite: unmark it before selling it.`, ídem `Large Backpack` y `RSh-12`. Que sean tres nombres
+  distintos y no un aviso genérico es, de paso, la prueba de que el gate resuelve **la entrada** y no
+  la sesión.
+- **AI4 («Move all»)**, **AI5 (arrastre)**, **AI6 (drop del grid)** y **AI7 (drop del EQUIPO, con el
+  arma en la mano)** — las cuatro en verde. La quinta era la que el autor no había nombrado en su
+  pedido y era la que faltaba en el árbol.
+
+**⭐ AI8, el merge, cerró con la aritmética a la vista** y es la fila que decidía más que las otras
+doce: *«Tengo 4 vendas en favorito, una en el suelo. Al tomar tengo 5, o sea se stackeó y no se puede
+botar ahora porque las 5 están en favorito.»* **4 + 1 = 5 y las cinco quedaron marcadas** — que es
+exactamente lo que la clave por clase (`i:<id>`) promete y lo que un flag por celda no podía dar sin
+partirse en dos mitades sin regla. **La decisión del autor quedó medida en juego, no sólo sobre el
+record.**
+
+**AI13, la persistencia, se midió con `retry`** —marcar una pistola, recargar el mapa— y volvió con
+las dos mitades: la conducta **y** la estrella dibujada. Un `rec.fav` que persistiera sin llegar al
+snapshot habría dado un candado invisible.
+
+**AI12 no sólo pasó: se usó.** *«Sí, he usado mucho esa estrellita, muy bueno.»* El toggle era la
+decisión de UI que se tomó **sobre** una novena tab con el ancho medido delante, y el uso repetido es
+mejor evidencia que un gesto único de que el estado no se apaga solo en cada refresh.
+
+#### ⚠ El falso rojo que el handoff predijo NO ocurrió, y conviene dejar dicho por qué
+
+La nota de **AI4** trae los **dos** avisos juntos: `Couldn't move everything: the container ran out of
+capacity.` **y** `Your favorites stayed in your pack.` El handoff advertía que el primero, junto a un
+favorito, sería el tell de que la puerta 2 dejó caer el favorito por el rechazo de `TransferOne` en
+vez de saltearlo al armar la lista de refs — el falso mensaje que el #67 ya pagó en ese receptor.
+
+**No es el caso, y no hace falta el juego para saberlo:** el gate vive **antes** del loop que prende
+`blocked` (`server/corpus_cargo_containers.lua`, la rama `dir == "put"` que setea `heldBack`), así que
+un favorito **no puede** alcanzar esa bandera. Los dos avisos son independientes por construcción: el
+de capacidad reportó un bloqueo real de la caja sobre ítems **no** favoritos —consistente con la nota,
+*«sí quedaron los ítems y se movió el ammo»*—, y el de favoritos reportó lo suyo. **Queda anotado
+porque la próxima vez que alguien vea esos dos renglones juntos va a sospechar del candado**, y la
+respuesta es de lectura de código y no de otra ronda.
+
+#### Lo que salió de la nota de un check que PASÓ
+
+**AI5 pasó, y su nota abrió una entrada.** Es la octava vez en el arco que el hallazgo sale del campo
+de notas de un verde y no de un rojo. El autor:
+
+> *«Falta como QoL, que puedas quitarle o ponerle favorito en la ventana de loot, porque lo actual
+> hace que el jugador deba salir, entrar al inventario y ahí quitarle el favorito (el arma que está
+> equipada ya puede hacer eso pero no el grid del inventario). También, falta que se pueda dropear un
+> ítem de tu grid mientras estás en la pantalla del loot, porque hasta ahora con el botón contextual
+> sólo puedes mover; por eso faltan las funcionalidades básicas que existen en el grid del inventario
+> normal.»*
+
+**Los dos huecos son UNO y está verificado en el árbol**: el grid del jugador **dentro del loot** abre
+`CARGO.Transfer.Menu` (`client/corpus_cargo_transfer.lua`), que sólo construye los verbos de
+transferencia —`Move 1` / `Move amount…` / `Move whole stack`—, mientras que el menú del grid del
+inventario (`client/corpus_cargo_ui.lua`) trae `Mark as favorite` **y** `Drop`/`Drop all`, y el del
+slot de equipo también — que es exactamente por qué el autor observó que *«el arma que está equipada
+ya puede hacer eso»*. **No es un defecto de esta entrada**: el menú del loot nació con menos filas
+mucho antes de que los favoritos existieran, y la #43 no lo tocó. **Es el roadmap #76**, abierto con
+esta nota como origen. La #43 lo empeoró en visibilidad, no en conducta: antes nadie necesitaba
+desmarcar nada desde ahí.
+
+**Lo que NO apareció, y se dice porque su ausencia es información:** ninguna nota mencionó la fila de
+tabs partida en dos a 1280×720 o 1366×768 —el hallazgo medido offline— ni el nombre cortado en el
+tooltip. Ninguno de los dos queda descartado por eso: no se preguntó por la resolución.
+
+CHANGELOG **76 `[APLICADO 2026-08-21]`**. **CRG-76 acreditada en juego en sus CINCO puertas**, más el
+merge, la persistencia y los tres controles negativos.
+
 ---
 
-## 77. La barra que estaba llena y muda (roadmap #59) `[PENDIENTE]`
+## 77. La barra que estaba llena y muda (roadmap #59) `[APLICADO 2026-08-21]`
 
 **Pedido por Craving** (no por el autor), abierto el 2026-08-08. El diseño **cerró el mismo día** en
 `Cargo_Architecture.md` §11.1 como **CRG-68**; esta entrada es su bajada a código y **no acuña nada**.
@@ -7601,3 +7680,42 @@ rect de 9 px, lejos del renglón que lo causó.
 **Planilla AJ** (`dev/checks/cargo-sobrellenado-r1.html`, 7 filas). Lo único que ninguna cuenta puede
 ver: que **se vea**. La fila 02 son **dos números y no uno**, y su criterio es que se vean
 **distinto**.
+
+### Pasada en juego (2026-08-21) — OK, 7/7
+
+**Planilla AJ, ronda 1: PASA 7 · FALLA 0 · SIN CORRER 0.** Conteo verificado contra su propia línea
+`(de 7)`.
+
+**⭐ AJ2 cerró por el criterio que la fila tenía, y no por el que se le parece.** El criterio no era
+*«se ve el exceso»* sino que **138 y 149 se vieran DISTINTO** — es el defecto exacto que la entrada
+cierra, porque el clamp viejo los dibujaba iguales. La nota del autor contesta la fila entera **con
+los dos números**:
+
+> *«Sí, se ve el rayado en rojo y +38; también el +49 en AJTEST.»*
+
+**`+38` y `+49` son dos lecturas distintas del mismo dibujo**, o sea que la cifra discrimina y el
+tramado acompaña. No hizo falta repreguntar: la nota trajo la mitad que el handoff advertía que suele
+faltar.
+
+**AJ3, el control negativo de la norma, pasó por su forma exacta**: el exceso va **rayado encima** de
+la barra llena y **la barra no se alarga**. Una barra que creciera más allá de su marco mentiría sobre
+qué es «lleno», y ése era el único otro final posible del diseño.
+
+**⭐ AJ5, la degradación, es lo que desbloquea a Craving y pasó:** las cuatro barras que ya existían
+pintan **exactamente igual que antes**. Ninguna declara los campos nuevos, así que heredan
+`softMax = 100` y `hardMax = softMax` — y la fila confirma en pantalla lo que los dos checks de
+dirección miden offline.
+
+**AJ6** dejó el tope duro donde estaba (por encima de 150 no sigue creciendo) y **AJ7** cerró el
+control de alcance: el resto del panel de Status intacto **y la barra de prueba desmontada** — o sea
+que no queda una barra fantasma *AJ Test* esperando a aparecer en una ronda futura.
+
+**AJ1 se acredita del reporte hermano y se dice**: la precondición es la misma corrida de selftests
+que abrió la planilla AI (100 server / 107 cliente), en la misma sesión y sobre el mismo árbol. No es
+una fila sin correr: es la misma medición, contada una vez.
+
+**Ninguna nota abrió nada.** La #59 entró, se vio, y no dejó cola — que es lo esperable de una entrada
+cuyo diseño había cerrado trece días antes y cuya bajada no tenía que decidir nada.
+
+CHANGELOG **77 `[APLICADO 2026-08-21]`**. **CRG-68 acreditada en juego**: el panel dibuja magnitud y
+el jugador ahora ve la diferencia entre 138 y 149.
