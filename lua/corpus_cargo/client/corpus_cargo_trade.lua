@@ -231,6 +231,29 @@ function CARGO.Trade.NotifyClosed()
     CARGO.Trade.BasketClear()
 end
 
+-- The SERVER closing the screen (roadmap #65). The same message now travels
+-- both ways: from here it means "I closed it", from there "you are done".
+--
+-- ⚠ THE ORDER OF THESE THREE LINES IS THE WHOLE TRICK, and getting it wrong is
+-- a net loop and a double event, not a visual glitch. Closing the frame fires
+-- its `OnClose`, which calls `NotifyClosed`, which would send this very message
+-- straight back — and the server would fire the entity's `OnTradeClosed` a
+-- second time for a player it already evicted. Dropping `tradeState` FIRST
+-- makes `NotifyClosed` hit its own early return, so the frame closes silently.
+--
+-- The basket is intent and holds nothing (Cargo_Trade §3), so dropping it costs
+-- the player nothing that was not already his.
+net.Receive(NET_TRADE_CLOSE, function()
+    local traderId = net.ReadUInt(16)
+    -- Not trading, or trading with somebody ELSE: nothing of ours to close.
+    -- Without this the message would shut whatever frame happened to be open,
+    -- including the plain inventory.
+    if tradeState == nil or tradeState.traderId ~= traderId then return end
+    tradeState = nil
+    CARGO.Trade.BasketClear()
+    CARGO.UI.CloseIfOpen()
+end)
+
 -- The basket points at entries that may have moved (bought, sold, dropped by
 -- another flow). After every sync, re-resolve each line against the live
 -- lists; whatever is gone leaves the basket instead of lingering as a ghost

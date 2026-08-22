@@ -83,9 +83,55 @@ end
 -- Drops every open session. For an entity that dies with screens open: the
 -- clients keep a stale panel and degrade honestly on the next action (the
 -- server re-validates every intent against the live state — CRG-6).
+-- Close ONE player's trade screen from the server (roadmap #65).
+--
+-- Until this existed the `trade_close` net was CLIENT -> SERVER ONLY, so
+-- nobody could close a screen from here. The functional half already worked —
+-- drop the player from `viewers` and `ViewedTrader` returns nil, so the server
+-- answers "The trader is out of reach." to anything he clicks — but his panel
+-- stayed DRAWN until he closed it by hand. That is the debt the Sidorovich
+-- header has carried for months for the trader that DIES with screens open,
+-- and the same one his restock eviction hits.
+--
+-- WHY IT DOES NOT CARRY A REASON, and it is a measurement and not a preference:
+-- the only caller that evicts anybody (`SidorAvisarRestock`) already collects
+-- the viewers through `HasViewer` BEFORE clearing and sends each of them its
+-- own line, plus a voice cue. A reason string riding this net would be a second
+-- channel for a message that already has one, and the two would drift.
+function CARGO.Trade.CloseFor(ply, trader)
+    local live = Live(trader)
+    if live == nil or not IsValid(ply) then return false end
+    live.viewers[ply] = nil
+    net.Start(NET_TRADE_CLOSE)
+    net.WriteUInt(trader.contId or 0, 16)
+    net.Send(ply)
+    return true
+end
+
+-- ⚠ THIS NOW CLOSES FOR REAL, and it used to only empty the table.
+--
+-- The change is deliberate and its only consumer ASKED FOR IT IN WRITING:
+-- `corpus_stalker_sidorovich.lua` calls it through a lazy `TradeAPI` helper
+-- with the comment *"si la entrada #65 de Cargo termina cambiando esta
+-- funcion, este archivo no toca una linea"*, and it captures its viewer list
+-- through `HasViewer` BEFORE calling, so its own notice still reaches everyone.
+-- Nothing inside this file uses it (`SyncViewers` prunes invalid players
+-- inline), so there is no internal caller to surprise.
+--
+-- The roadmap deferred this vote until after the trader's in-game pass, to see
+-- "si el panel muerto molesta y de que forma". The answer was already committed
+-- in the consumer's source, which is cheaper to read than a round is to run.
 function CARGO.Trade.ClearViewers(trader)
     local live = Live(trader)
-    if live then live.viewers = {} end
+    if live == nil then return end
+    for ply in pairs(live.viewers) do
+        if IsValid(ply) then
+            net.Start(NET_TRADE_CLOSE)
+            net.WriteUInt(trader.contId or 0, 16)
+            net.Send(ply)
+        end
+    end
+    live.viewers = {}
 end
 
 -- ------------------------------------------------------------------

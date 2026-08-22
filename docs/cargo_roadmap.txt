@@ -1695,8 +1695,28 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     que ningun check podia alcanzar.
     PENDIENTE: la pasada en juego (planilla AJ, 7 filas; su fila 02 son DOS
     numeros —138 contra 149— y el criterio es que se vean DISTINTO).
-60. CONTAR Y CONSUMIR CONTRA CONTENEDORES CERCANOS [Cargo containers] — PEDIDO
-    DE COAGULANT, SIN RATIFICAR POR CARGO. Abierto 2026-08-09.
+60. CONTAR Y CONSUMIR CONTRA CONTENEDORES CERCANOS [Cargo containers] —
+    RATIFICADA POR CARGO Y ESCRITA el 2026-08-22, en tanda con la #65.
+    CHANGELOG 80 [PENDIENTE].
+    ⚠ SON CUATRO Y ESTA ENTRADA PEDIA TRES, y la diferencia es MEDICION y no
+    preferencia: el camino de tratamiento de Coagulant usa CUATRO — gatea con
+    HasItem y consume con TakeUnique si es unique o con TakeItem si es stack
+    (corpus_coagulant_treatment.lua:163 y :170; el torniquete es un unique).
+    Con solo las tres, el area VERIA un torniquete en un mueble y no tendria
+    con que consumirlo: el defecto G4 que esta misma entrada invoca, movido
+    del lado de la presencia al del TAKE. Entregar tres habria reproducido en
+    el area el bug que la entrada se escribio para evitar.
+    FORMA: AreaHas / AreaCount / AreaTake / AreaTakeUnique, espejo nombre por
+    nombre de las del inventario. AreaTake es TODO O NADA (valida el total
+    antes de mover) y drena ENTRE contenedores — dos vendas en un estante y
+    tres en el siguiente son cinco, que es el pedido entero. Cada contenedor
+    tocado se guarda por Containers.Save y se re-sincroniza con sus viewers.
+    ⚠ EL DistToSqr DEL HARNESS DEVOLVIA 0 SIEMPRE y hubo que arreglarlo antes
+    de poder medir nada: un radio contra un 0 constante es una dimension que
+    ningun check puede ejercer, o sea un parametro acreditado sin haberse
+    ejecutado nunca.
+    --- el texto original, para leer de que salio ---
+    PEDIDO DE COAGULANT, SIN RATIFICAR POR CARGO. Abierto 2026-08-09.
     QUIEN PIDE Y POR QUE: Coagulant vota su "area hospital" (COA-50, su §17). La
     medicina de hospital no asume una mochila, asume una farmacia: el can() de
     una accion tiene que poder mirar los contenedores dentro de un radio, no
@@ -1940,8 +1960,32 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     harness offline habia predicho — que es lo unico que acredita al harness.
     Cerro en la misma corrida el #63. CHANGELOG 67 y 68 [APLICADO].
 
-65. CERRAR LA PANTALLA DE TRADE DESDE EL SERVER [Cargo trade] — RATIFICADA el
-    2026-08-18, SIN ESCRIBIR.
+65. CERRAR LA PANTALLA DE TRADE DESDE EL SERVER [Cargo trade] — ESCRITA el
+    2026-08-22, en tanda con la #60. CHANGELOG 80 [PENDIENTE].
+    QUE ENTRO: `Trade.CloseFor(ply, trader)` y `ClearViewers` PASO A CERRAR DE
+    VERDAD. El net `trade_close` viaja ahora en las dos direcciones.
+    LOS DOS SUB-VOTOS LOS CONTESTO EL ARBOL Y NO UNA PREFERENCIA:
+      (a) ClearViewers cambia de comportamiento. Su UNICO consumidor lo pidio
+          POR ESCRITO — corpus_stalker_sidorovich.lua lo llama por un helper
+          perezoso con el comentario «si la entrada #65 de Cargo termina
+          cambiando esta funcion, este archivo no toca una linea», y captura
+          su lista de viewers con HasViewer ANTES de llamar, asi que su aviso
+          sigue llegando. Nada adentro de Cargo lo usa.
+      (b) El cierre NO lleva motivo: el que expulsa ya manda su linea a cada
+          uno, mas una de voz. Un motivo en el net seria un segundo canal.
+    ⚠ LA ENTRADA DIFERIA EL VOTO (a) HASTA DESPUES DE LA PASADA DEL TRADER
+    para ver «si el panel muerto molesta y de que forma». La respuesta ya
+    estaba commiteada en el fuente del consumidor, que es mas barato de leer
+    que una ronda de correr. Vale para la proxima vez que un voto se difiera
+    esperando un dato: mirar si alguien ya lo escribio.
+    LO QUE LA VERIFICACION EN NEGATIVO CAZO, y las dos eran del lado CLIENTE:
+    el LAZO DE RED (cerrar el frame dispara OnClose -> NotifyClosed -> el
+    mismo mensaje de vuelta, y el server dispara OnTradeClosed dos veces)
+    salia VERDE con 1272 checks encima; y un GUARD INALCANZABLE en
+    CloseIfOpen que se BORRO en vez de escribirle una prueba que no lo podia
+    tocar (leccion 110).
+    --- el texto original, para leer de que salio ---
+    RATIFICADA el 2026-08-18, SIN ESCRIBIR.
     DE DONDE SALE: del diseño del re-sorteo del trader de corpus-stalker
     (§-2.H de su handoff). El autor voto que el trader, en los ultimos N
     segundos antes de re-sortear, EXPULSE al que este comerciando, avise en

@@ -1601,6 +1601,24 @@ function CARGO.UI.RefreshTrade()
     CARGO.Trade.RefreshStrips(tradeLeft)
 end
 
+-- Close the frame if it is open, and do NOTHING if it is not (roadmap #65).
+-- Toggle cannot serve this: on a closed frame it would OPEN one, which on a
+-- server-pushed close is the opposite of what was asked.
+--
+-- ⚠ IT TAKES NO "expected state", AND THAT IS A DECISION THE SABOTAGE FORCED.
+-- The first version guarded on `frame.cargoState == "trade"` so a stray close
+-- could not shut the plain inventory — and the sabotage that DELETED that guard
+-- came out GREEN, because nothing can reach it: the only caller is the trade
+-- receiver, which already returns early unless `tradeState` names the very
+-- trader being closed, and `tradeState` is dropped by `NotifyClosed` the moment
+-- the frame closes for any other reason. A guard whose own test cannot reach it
+-- is not protection, it is a line that READS like protection (leccion 110 —
+-- exactly the shape the #72 belt-range gate paid for). The precondition belongs
+-- to the caller and is measured there.
+function CARGO.UI.CloseIfOpen()
+    if IsValid(frame) then frame:Close() end
+end
+
 function CARGO.UI.Toggle()
     if IsValid(frame) then
         frame:Close()

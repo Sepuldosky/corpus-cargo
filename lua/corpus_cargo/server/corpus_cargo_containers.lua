@@ -579,3 +579,155 @@ hook.Add("PlayerDisconnected", "corpus_cargo_cont_viewers", function(ply)
         live.viewers[ply] = nil
     end
 end)
+
+-- ------------------------------------------------------------------
+-- CONTAINERS IN AN AREA (roadmap #60, asked by Coagulant for its hospital
+-- area, COA-50 §17)
+--
+-- Medicine in a hospital does not assume a backpack, it assumes a pharmacy:
+-- the `can()` of an action has to be able to look at the containers within a
+-- radius and not only at the medic's inventory.
+--
+-- ⚠ THEY MIRROR THE INVENTORY SET ON PURPOSE, name for name and semantics for
+-- semantics, so a consumer does not have to learn a second model. Whatever is
+-- true of `Inventory.HasItem` is true of `AreaHas`, and so on down the list.
+-- That mirroring is the contract; a "smarter" area function that answered
+-- differently from its inventory twin would be the worse outcome.
+--
+-- WHY IT LIVES HERE AND NOT IN COAGULANT: the public contract of Cargo exposes
+-- `Containers.Attach` and nothing about content — `_byId` and `Snapshot` are
+-- off-contract. Coagulant already carries one debt of that class (it counts
+-- its button items straight off `CARGO.ClientState.items`, with a written note
+-- that it breaks IN SILENCE if the snapshot changes). Signing a second one for
+-- convenience turns an accident into a method.
+--
+-- ⚠ THEY ARE FOUR AND THE ENTRY ASKED FOR THREE, and the difference is
+-- measured and not a preference. The entry says "el espejo EXACTO de las tres
+-- que Coagulant ya usa" — but the treatment path uses FOUR: it gates on
+-- `HasItem` and then consumes with `TakeUnique` for a `unique` and `TakeItem`
+-- for a stack (corpus_coagulant_treatment.lua:163 and :170 — the tourniquet is
+-- a unique). With only the three, the hospital area could SEE a tourniquet in a
+-- cabinet and have no way to consume it: the exact G4 defect the entry invokes
+-- — "la accion existe, el item esta, y el boton dice que no hay" — moved from
+-- the presence side to the take side. Shipping three would have reproduced, in
+-- the area, the bug the entry was written to avoid.
+--
+-- WHAT THIS DOES NOT ADD, so it is not read as more than it is: no permissions.
+-- That `OpenFor` does not check ownership (anyone within 160 u opens any
+-- container) is a fact of Cargo that the hospital area WIDENS — from 160 u to
+-- whatever the room measures — but does not create. It lives in the #12.
+-- ------------------------------------------------------------------
+
+-- Every live container whose entity is valid and within `radius` of `pos`.
+-- Distance is measured to the ENTITY and not to the flat state, because the
+-- flat state has no position: `cont` is what goes to disk (CRG-60) and the
+-- entity is the live half.
+local function ContainersNear(pos, radius)
+    local out = {}
+    if not isvector(pos) then return out end
+    local r = math.max(tonumber(radius) or 0, 0)
+    local r2 = r * r
+    for _, cont in pairs(CARGO.Containers._byId) do
+        local live = Live(cont)
+        if live ~= nil and IsValid(live.ent)
+            and live.ent:GetPos():DistToSqr(pos) <= r2 then
+            out[#out + 1] = cont
+        end
+    end
+    return out
+end
+
+CARGO.Containers.Near = ContainersNear -- the three below are its only callers today
+
+-- Presence across BOTH classes — the twin of Inventory.HasItem, and it exists
+-- for the same reason that one does: AreaCount below counts stack units only,
+-- so a `unique` (the tourniquet) is invisible to it. An AreaCount without its
+-- AreaHas reproduces the G4 defect in the area.
+function CARGO.Containers.AreaHas(pos, radius, id)
+    for _, cont in ipairs(ContainersNear(pos, radius)) do
+        for _, entry in ipairs(cont.items or {}) do
+            if entry.id == id then return true end
+        end
+    end
+    return false
+end
+
+-- Stack units only, exactly like Inventory.CountItem: its result is what feeds
+-- AreaTake's drain, and uniques are not drained by count.
+function CARGO.Containers.AreaCount(pos, radius, id)
+    local n = 0
+    for _, cont in ipairs(ContainersNear(pos, radius)) do
+        for _, entry in ipairs(cont.items or {}) do
+            if entry.uid == nil and entry.id == id then n = n + (entry.count or 1) end
+        end
+    end
+    return n
+end
+
+-- ALL OR NOTHING, like Inventory.TakeItem: it checks the total first and only
+-- then moves anything, so a `can()` that passed cannot be followed by a `do()`
+-- that half-consumed. A partial drain across a room would leave the caller with
+-- no way to know what it got.
+--
+-- It drains ACROSS containers on purpose — that is the whole point of a
+-- pharmacy: two bandages on one shelf and three on the next are five. Within
+-- each container, factory stacks drain before worn ones, which is the same pass
+-- order TakeItem uses and the same reason (CRG-7: no wear laundering — a worn
+-- stack is not interchangeable with a fresh one, so the fresh ones go first).
+--
+-- Every container it touches is SAVED and its open viewers re-synced. Neither
+-- is optional: `Containers.Save` is the single writer of `cont_<key>` (CRG-43),
+-- and a crate somebody is looking at while the medic drains it would otherwise
+-- keep drawing stock that is gone.
+function CARGO.Containers.AreaTake(pos, radius, id, count)
+    count = math.max(math.floor(tonumber(count) or 1), 1)
+    if CARGO.Containers.AreaCount(pos, radius, id) < count then return false end
+
+    local left = count
+    for _, cont in ipairs(ContainersNear(pos, radius)) do
+        local touched = false
+        for pass = 1, 2 do
+            for i = #(cont.items or {}), 1, -1 do
+                local entry = cont.items[i]
+                local worn = entry.condition ~= nil
+                if entry.uid == nil and entry.id == id
+                    and ((pass == 1 and not worn) or (pass == 2 and worn)) then
+                    local moved = math.min(entry.count or 1, left)
+                    entry.count = (entry.count or 1) - moved
+                    left = left - moved
+                    touched = true
+                    if entry.count <= 0 then table.remove(cont.items, i) end
+                    if left <= 0 then break end
+                end
+            end
+            if left <= 0 then break end
+        end
+        if touched then
+            CARGO.Containers.Save(cont)
+            SyncViewers(cont)
+        end
+        if left <= 0 then break end
+    end
+    return true
+end
+
+-- Remove ONE unique instance from the area and delete its blob — the twin of
+-- Inventory.TakeUnique, and the fourth function the measurement added. Without
+-- it a `unique` in a cabinet is visible to AreaHas and consumable by nothing.
+-- The blob dies with the entry for the same reason it does in the inventory:
+-- an instance nobody owns is a leak in data/ that no pass would ever notice.
+function CARGO.Containers.AreaTakeUnique(pos, radius, id)
+    for _, cont in ipairs(ContainersNear(pos, radius)) do
+        for i = #(cont.items or {}), 1, -1 do
+            local entry = cont.items[i]
+            if entry.uid ~= nil and entry.id == id then
+                table.remove(cont.items, i)
+                CARGO.Instances.Delete(entry.uid)
+                CARGO.Containers.Save(cont)
+                SyncViewers(cont)
+                return true
+            end
+        end
+    end
+    return false
+end

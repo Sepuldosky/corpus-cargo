@@ -8011,3 +8011,82 @@ juego — es un comentario que prometía lo que el código no cumple, y su guard
 FUENTES.
 
 CHANGELOG **79 `[APLICADO 2026-08-22]`**. Las **#58**, **#77** y **#78** quedan **CERRADAS**.
+
+---
+
+## 80. Cerrar la pantalla de trade desde el server, y contar contra los contenedores de la sala (roadmap #65, #60) `[PENDIENTE]`
+
+**Dos entradas ratificadas, superficies DISJUNTAS**: la #65 vive en el trade (server + cliente), la
+#60 en `containers.lua`. Cada una tiene su bloque de sabotaje para poder cerrar sola.
+
+### #65 — el net `trade_close` ahora viaja en las dos direcciones
+
+Era **cliente → server únicamente**, así que nadie podía cerrarle la pantalla a un jugador desde el
+server. La mitad **funcional** ya andaba —vaciado el set de viewers, `ViewedTrader` da nil y todo
+contesta *«out of reach»*— pero el panel quedaba **dibujado** hasta que el jugador lo cerrara a mano.
+Esa es la deuda que el header de Sidorovich arrastra **desde hace meses** para el trader que muere con
+pantallas abiertas, y la misma que su expulsión de restock choca.
+
+Entró `Trade.CloseFor(ply, trader)` y **`ClearViewers` pasó a cerrar de verdad**.
+
+**⭐ LOS DOS SUB-VOTOS QUE LA ENTRADA DEJABA ABIERTOS LOS CONTESTÓ EL ÁRBOL, no una preferencia:**
+
+- **(a) `ClearViewers` cambia de comportamiento.** Su único consumidor lo pidió **por escrito**:
+  `corpus_stalker_sidorovich.lua` lo llama por un helper perezoso con el comentario *«si la entrada
+  #65 de Cargo termina cambiando esta función, este archivo no toca una línea»*, y **captura su lista
+  de viewers con `HasViewer` ANTES de llamar**, así que su propio aviso sigue llegando. Nada dentro de
+  Cargo lo usa (`SyncViewers` poda los inválidos en línea), o sea que no hay llamador interno que
+  sorprender.
+- **(b) El cierre NO lleva motivo.** El único que expulsa ya manda su propia línea a cada uno, más una
+  de voz. Un motivo en el net sería un segundo canal para un mensaje que ya tiene uno.
+
+**La entrada difería este voto hasta después de la pasada en juego del trader, para ver «si el panel
+muerto molesta y de qué forma». La respuesta ya estaba commiteada en el fuente del consumidor**, que
+es más barato de leer que una ronda de correr.
+
+### #60 — contar y consumir contra los contenedores de un radio
+
+Pedido de Coagulant para su área hospital (COA-50 §17): *la medicina de hospital no asume una mochila,
+asume una farmacia*. Entraron `Containers.AreaHas / AreaCount / AreaTake / AreaTakeUnique`, espejo
+nombre por nombre de las del inventario para que no haya que aprender un modelo nuevo.
+
+**⭐ SON CUATRO Y LA ENTRADA PEDÍA TRES, y la diferencia es medición.** La entrada dice *«el espejo
+EXACTO de las tres que Coagulant ya usa»* — pero el camino de tratamiento usa **cuatro**: gatea con
+`HasItem` y consume con **`TakeUnique`** si es `unique` o con `TakeItem` si es stack
+(`corpus_coagulant_treatment.lua:163` y `:170` — **el torniquete es un unique**). Con sólo las tres,
+el área **vería** un torniquete en un mueble y no tendría con qué consumirlo: **el defecto G4 exacto
+que la entrada invoca** —*«la acción existe, el ítem está, y el botón dice que no hay»*— movido del
+lado de la presencia al del **take**. Enviar tres habría reproducido, en el área, el bug que la
+entrada se escribió para evitar.
+
+`AreaTake` es **todo o nada** (valida el total antes de mover, como `TakeItem`) y **drena entre
+contenedores** — dos vendas en un estante y tres en el siguiente son cinco, que es el pedido entero.
+Dentro de cada uno, los stacks de fábrica drenan antes que los gastados (CRG-7). Cada contenedor que
+toca se **guarda** (`Containers.Save`, escritor único de `cont_<key>`) y se **re-sincroniza** con sus
+espectadores, o una caja abierta seguiría dibujando stock que ya no está.
+
+### Verificación
+
+`glua_check` 48/48. Harness **1278** (era 1246) = 73 FUENTES / **796** server / **409** cliente.
+**`dev/sabotaje_cargo_65_60.py`, 13/13 en rojo**; las siete suites vecinas re-corridas enteras.
+
+**⚠ EL `DistToSqr` DEL HARNESS DEVOLVÍA 0 SIEMPRE, y hubo que arreglarlo antes de poder medir nada.**
+Alcanzaba mientras nadie midiera una distancia —los guards de `USE_RANGE` quedaban siempre dentro de
+rango, que es lo que las pruebas querían—, pero **un radio contra un 0 constante es una dimensión que
+ningún check puede ejercer**: el parámetro habría quedado acreditado sin haberse ejecutado nunca. Por
+eso el bloque siembra **tres** contenedores, uno a 900 u, y hay una fila que exige que ese **no** entre
+y otra que exige que **sí** entre al agrandar el radio.
+
+**⚠⚠ Y LA VERIFICACIÓN EN NEGATIVO CAZÓ DOS COSAS ESCRITAS Y NO MEDIDAS, las dos del lado cliente:**
+
+1. **El lazo de red.** Invertir tres líneas del receptor salía **VERDE** con 1272 checks encima —
+   cerrar el frame dispara su `OnClose`, que llama a `NotifyClosed`, que mandaría ese **mismo** mensaje
+   de vuelta y haría que el server disparase el `OnTradeClosed` de la entidad **dos veces** sobre
+   alguien que ya expulsó. El panel cierra igual, así que no se ve. Ahora hay un bloque cliente entero
+   que lo mide.
+2. **Un guard INALCANZABLE, y se BORRÓ en vez de escribirle una prueba.** `CloseIfOpen` recibía un
+   estado esperado para que un cierre suelto no matara el inventario, y el sabotaje que lo eliminaba
+   salió **verde**: el único llamador ya devuelve temprano salvo que `tradeState` nombre a **ese**
+   trader. *Un guardia cuya propia prueba no puede alcanzarlo no es protección, es una línea que se LEE
+   como protección* (lección 110, la misma que pagó el rango del cinturón en el #72). La precondición
+   vive en el receptor, y **ahí sí se mide**.

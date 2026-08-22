@@ -5,7 +5,22 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-22 (**tanda triple CERRADA EN JUEGO: #58 + #77 + #78**, CHANGELOG
+**Última actualización:** 2026-08-22 (**#65 y #60 ESCRITAS**, CHANGELOG **80** `[PENDIENTE]`, sin
+planilla todavía. **#65** — el net `trade_close` viaja ahora en las dos direcciones: entró
+`Trade.CloseFor` y **`ClearViewers` cierra de verdad**. Sus dos sub-votos **los contestó el árbol**:
+su único consumidor pidió el cambio *por escrito* en un comentario, y el que expulsa ya manda su
+propio aviso. La entrada difería ese voto hasta después de la pasada del trader — **la respuesta ya
+estaba commiteada en el fuente del consumidor**. **#60** — el área hospital de Coagulant:
+`AreaHas / AreaCount / AreaTake / AreaTakeUnique`. **Son CUATRO y la entrada pedía TRES**, y es
+medición: el tratamiento de Coagulant consume el torniquete con `TakeUnique`, así que con tres el
+área lo vería y no lo podría consumir — el G4 movido al lado del *take*.
+Harness **1278** (era 1246); `sabotaje_cargo_65_60.py` **13/13**. ⚠ **La verificación en negativo
+cazó DOS cosas escritas y no medidas, las dos del lado cliente**: un **lazo de red** que salía verde
+con 1272 checks encima, y un **guard inalcanzable** que se **borró** en vez de escribirle una prueba
+que no lo podía tocar. Y el `DistToSqr` del harness **devolvía 0 siempre**, así que el radio era una
+dimensión inejercitable hasta arreglarlo.
+
+Antes, el mismo día: **tanda triple CERRADA EN JUEGO: #58 + #77 + #78**, CHANGELOG
 **79** `[APLICADO 2026-08-22]`, planilla **AL 8/8 en UNA ronda** — **cuarta sección seguida que
 cierra así** (AI 13/13, AJ 7/7, AK 10/10, AL 8/8). Van juntas porque las superficies son **disjuntas** — el
 peso vive en el snapshot y el tooltip, la fila de tabs es un comentario en `shared`, y el círculo es
