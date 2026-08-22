@@ -7596,7 +7596,24 @@ desmarcar nada desde ahí.
 
 **Lo que NO apareció, y se dice porque su ausencia es información:** ninguna nota mencionó la fila de
 tabs partida en dos a 1280×720 o 1366×768 —el hallazgo medido offline— ni el nombre cortado en el
-tooltip. Ninguno de los dos queda descartado por eso: no se preguntó por la resolución.
+tooltip.
+
+**Y la primera tiene explicación, preguntada y contestada el mismo día: el autor juega a 1920×1080
+nativo** (borderless, aspecto *Any/All*, o sea 16:9). **A esa resolución la fila entra con 190 px de
+sobra** —454 px de tabs contra los 644 que la barra recibe—, así que **nunca la vio ni la va a ver**.
+El hallazgo **no queda refutado, queda ACOTADO**: es real y sólo muerde a 720p (por 30 px) y a 768p
+(por uno). Se abre como **roadmap #77** con prioridad baja, porque el destino es Workshop y ahí sí hay
+gente en esas resoluciones. **La ausencia del nombre cortado en el tooltip sigue sin explicación y no
+queda descartada.**
+
+**⚠ Y la medición se re-auditó al cerrar, con un resultado que vale más que el número:** el `454`
+estaba bien, pero **su instrumento no se había guardado**, así que hubo que rehacerlo — y la
+re-derivación **dio 412 por omitir los siete gaps de 6 px** entre tabs. Con 412 el hallazgo se
+**refutaba solo** (412 entra en los 424 de 720p) y el comentario falso del código habría pasado a
+verdadero. **Una medición sin su instrumento sobrevive como una cifra que hay que creer o rehacer, y
+rehacerla es exactamente donde se cuela el error.** Queda `dev/medir_fila_de_tabs.py`, que además
+anota la trampa fina: medir con `CargoText` (14) da **452**, tan parecido a 454 que pasa por correcto
+**por la razón equivocada** — la fila usa `CargoSmall` (12).
 
 CHANGELOG **76 `[APLICADO 2026-08-21]`**. **CRG-76 acreditada en juego en sus CINCO puertas**, más el
 merge, la persistencia y los tres controles negativos.

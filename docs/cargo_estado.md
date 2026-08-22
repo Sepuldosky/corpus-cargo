@@ -64,11 +64,22 @@ real sobre ítems **no** favoritos. La **AJ** cerró **por su criterio y no por 
 la nota trajo **los dos números** (*«se ve el rayado en rojo y +38; también el +49»*), que era la
 mitad que suele faltar. **CRG-68 deja de ser `INTENCION`** en `ids.yaml` y pasa a tener harness,
 código, verificación en negativo y planilla — la métrica de intenciones baja de 72 a **71 de 252**.
-**Lo único que la tanda dejó abierto es el roadmap #76**, y salió de la **nota de un check que
-PASÓ** (AI5, octava vez en el arco): dentro de la ventana de loot el grid del jugador **no ofrece ni
-marcar favorito ni botar**, porque abre `Transfer.Menu` —sólo los verbos de transferencia— y no el
-menú del grid del inventario. **No es un defecto de la #43**: ese menú nació con menos filas mucho
-antes, y lo que la #43 hizo fue volverlo visible.)
+**La tanda dejó abiertas DOS.** El **roadmap #76** salió de la **nota de un check que PASÓ** (AI5,
+octava vez en el arco): dentro de la ventana de loot el grid del jugador **no ofrece ni marcar
+favorito ni botar**, porque abre `Transfer.Menu` —sólo los verbos de transferencia— y no el menú del
+grid del inventario. **No es un defecto de la #43**: ese menú nació con menos filas mucho antes, y lo
+que la #43 hizo fue volverlo visible. **Su pregunta de alcance ya está contestada, y el autor la
+cerró como REGLA de vocabulario y no como caso:** *«"drop" es siempre tirar al piso, al contenedor es
+"mover"»*.
+
+El **roadmap #77** es la fila de tabs, y **la resolución del autor la acota en vez de refutarla**:
+juega a **1920×1080 nativo** (borderless, *Any/All*, 16:9), donde los 454 px de tabs entran en 644 con
+**190 de sobra** — **nunca la vio**. El defecto es real sólo a 720p (por 30 px) y 768p (**por uno**),
+o sea de las resoluciones chicas, y el destino es Workshop. **Prioridad baja: el wrap ya existe como
+red y la barra crece, así que la segunda fila SE VE** — es prolijidad, no función. **⚠ La medición se
+re-auditó y el hallazgo fue del método:** el `454` estaba bien pero **su instrumento no se había
+guardado**, y rehacerlo dio **412** por omitir los siete gaps de 6 px — con 412 el defecto **se
+refutaba solo**. Queda `dev/medir_fila_de_tabs.py`.)
 
 Contexto previo: 2026-08-20 (**tanda doble: EL MENÚ TOMA EL TEMA + EL CINTURÓN PUEDE
 BOTAR** — roadmap **#74** y **#72**, CHANGELOG **73** y **74**, las dos `[PENDIENTE]`. Van juntas

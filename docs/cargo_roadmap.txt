@@ -2548,8 +2548,48 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     es más barata hoy y deja dos casas que se van a desincronizar la próxima
     vez que el menú del inventario gane una fila — que es literalmente lo que
     acaba de pasar.
-    ⚠ Y HAY UNA PREGUNTA DE ALCANCE QUE NO ES OBVIA: si «Drop» aparece en el
-    loot, ¿bota al piso o al contenedor? Son dos gestos distintos con el mismo
-    rótulo y la ventana está mostrando los dos destinos a la vez. El autor
-    pidió «dropear», o sea el piso, pero conviene que lo confirme antes de
-    escribirlo: un botón que hace lo otro se descubre perdiendo el ítem.
+    LA PREGUNTA DE ALCANCE YA ESTA CONTESTADA, y el autor la cerró como una
+    REGLA DE VOCABULARIO y no como un caso: «"drop" es siempre tirar al piso,
+    al contenedor es "mover"» (2026-08-21). O sea que el rótulo no depende de
+    la ventana: dentro del loot «Drop» bota al PISO igual que en el inventario,
+    y mandar al contenedor sigue siendo «Move», que es lo que ese menú ya hace.
+    Los dos verbos conviven en la misma pantalla sin ambigüedad porque nombran
+    DESTINOS distintos y no la misma acción en dos contextos.
+    ⚠ LO QUE ESA REGLA DEJA COMO CONSECUENCIA, y hay que mirarlo al escribir:
+    el menú del loot va a ofrecer «Move» y «Drop» uno al lado del otro sobre la
+    misma celda, así que el orden y la separación importan más que de
+    costumbre — es el único menú del módulo donde un clic de más manda el ítem
+    a un lugar del que hay que ir a buscarlo. El menú del grid del inventario
+    no tiene ese problema porque ahí «Move» no existe.
+
+77. LA FILA DE TABS SE PARTE EN DOS A 1280x720 Y 1366x768 [Cargo ui] — MEDIDO
+    el 2026-08-21, SIN ESCRIBIR. PRIORIDAD BAJA, y el motivo es que el autor
+    NO LA VE: juega a 1920x1080 nativo (borderless, aspecto Any/All, o sea
+    16:9), donde la fila entra con 190 px DE SOBRA. Es un defecto de las
+    resoluciones chicas, y el destino es Workshop.
+    QUE ESTA MEDIDO, y ahora con instrumento guardado: dev/medir_fila_de_tabs.py.
+    Las ocho tabs suman 454 px —412 de botones (bw = tw + 22) más SIETE gaps de
+    6— contra el ancho que la barra recibe, que es `colR - 16` y escala con
+    ScrH: 424 a 720p, 453 a 768p, 644 a 1080p. Así que `Misc` cae a la segunda
+    fila a 1280x720 (por 30 px) y a 1366x768 (POR UN PIXEL).
+    LO QUE LO CAUSA NO ES EL LARGO DE UN NOMBRE SINO QUE LAS FUENTES NO ESCALAN:
+    T.UIScale deja las fuentes fijas a propósito —las de VGUI no se pueden
+    redimensionar por frame y está escrito— así que las tabs miden LO MISMO en
+    toda resolución y lo único que se mueve es la barra. Por eso acortar «Misc»
+    o «Weapons» no arregla nada en ninguna resolución: lo que decide es la
+    CANTIDAD de tabs. Esto ya había decidido la UI del #43 — el toggle ★ se
+    eligió sobre una novena tab justamente por esto.
+    EL COMENTARIO DEL CODIGO AFIRMA LO CONTRARIO Y ES FALSO:
+    shared/corpus_cargo_items.lua dice que el set fijo entra en una fila «at
+    every aspect we ship». Aunque no se arregle el layout, ESA LINEA hay que
+    corregirla — un comentario que promete lo que el código no cumple es peor
+    que ninguno, porque el próximo que agregue una tab lo va a creer.
+    ⚠ EL CASO DE 1366x768 NO SE CIERRA OFFLINE: da por UN pixel, y PIL rasteriza
+    con su motor y GMod con el de Windows. A 1280x720 el margen es de 30 px y
+    ahí la conclusión aguanta. Si alguna vez se toca, la fila de 768 se mira en
+    juego o no se afirma.
+    LA SALIDA NO ES OBVIA Y NO ESTA VOTADA: el wrap YA existe como red de
+    seguridad y la barra crece (`bar:SetTall(rowY + 26)`), así que la segunda
+    fila SE VE — no hay nada recortado ni perdido. O sea que esto es de
+    prolijidad, no de función, y perfectamente puede cerrarse decidiendo que
+    dos filas a 720p está bien y arreglando sólo el comentario.
