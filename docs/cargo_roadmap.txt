@@ -488,7 +488,26 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Move shared (corpus_cargo_movecompat.lua) que escala el MaxSpeed del
     move data con el mult publicado por NW2Float; gated por sv_bm_enabled y
     cargo_movement_compat; vanilla intacto sin el mod. Arquitectura → §5.]
-35. FOOTSTEPS MUDOS AL TOGGLEAR EL MOD DE MOVIMIENTO [COMPAT, lado mod] —
+35. FOOTSTEPS MUDOS AL TOGGLEAR EL MOD DE MOVIMIENTO [COMPAT] — SIN
+    ARREGLAR, PERO SU HIPOTESIS ESTA REFUTADA (2026-08-22) y sus dos premisas
+    de metodo estan MUERTAS. Hay que re-probarla en juego antes de tocar nada.
+    (1) LA SOSPECHA DEL math.huge ES FALSA, y era refutable sin el juego: el
+        mod ORIGINAL —el que esta en dev/other/ desde siempre, sh_bm_main.lua
+        linea 492— abre el hook con `if not bm_vars.enabled:GetBool() or not
+        bm_vars.slow_footsteps:GetBool() then return end`. Con sv_bm_enabled 0
+        ese hook DEVUELVE NIL, o sea que NO mata las pisadas del engine. La
+        entrada pedia «investigar CON EL MOD VIVO en juego» y la respuesta era
+        un grep de diez segundos sobre una copia que ya estaba en disco.
+    (2) «JAMAS FORKEARLO» YA NO APLICA: se forkeo el 2026-08-21 a
+        dev/Corpus_Better_Movement/ (el autor se desuscribio del original) por
+        el defecto de VOLUMEN de pisada, que es otro arco y ya cerro en juego.
+    (3) EL SOSPECHOSO NUEVO, y sale de ese mismo arco: «CoD: Ghosts -
+        Footsteps Replacer» (ID 3655179926) intercepta CADA pisada —hooked=1
+        en 51/51— y conoce DOS estados nada mas. Es un tercero que puede
+        callar pisadas, y estaba montado.
+    O SEA: el sintoma puede estar arreglado de rebote y nadie lo volvio a
+    mirar. Re-probar primero, y si sigue, empezar por el replacer y no por bm.
+    --- el texto original, para leer de que salio ---
     SIN ARREGLAR. Reporte del autor (2026-07-13, pasada del entry 16): con
     sv_bm_enabled 0 los pasos quedan en silencio, y el remedio hipotetizado
     (sv_bm_slow_footsteps 0) NO funcionó — la sospecha del math.huge en
@@ -625,8 +644,21 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     taxonomía de throwables que ya cubre frag/SLAM de HL2).
     Cuando se accione, el gancho ya está: una línea en KIND_SLOTS.
 
-42. LANZAGRANADAS CAPTURADO SIN ATTACHMENT DE MUNICIÓN [Cargo arc9, bug]
-    — ABIERTO. Reporte del autor (check 4 de la entry 24, 2026-07-14): el
+42. LANZAGRANADAS CAPTURADO SIN ATTACHMENT DE MUNICIÓN [Cargo arc9] —
+    CERRADA el 2026-08-22: NO ERA UN BUG. El autor lo refuto con la causa
+    nombrada: no era que el arma naciera sin su attachment, era que NO SE
+    TRAIAN los attachments guardados del arma ARC9 — y eso lo cerro la #53
+    («la configuracion ARC9 no sobrevive a nada»). HOY LOS ATTACHMENTS TIENEN
+    PERSISTENCIA, asi que el M32A1 vuelve con los suyos.
+    ⚠ LA SOSPECHA ESCRITA APUNTABA AL LUGAR EQUIVOCADO y por eso se conserva
+    abajo: culpaba al takeover de `arc9_free_atts 0`, o sea a un arma que
+    NACE sin att. El defecto real era de PERSISTENCIA y no de nacimiento, y
+    una entrada de bug que sobrevive un mes con la hipotesis equivocada
+    escrita adentro manda al proximo a mirar donde no es.
+    LO QUE DEJO ABIERTO EN SU LUGAR, y es idea nueva del autor (2026-08-22):
+    ver la #79.
+    --- el texto original, para leer de que salio ---
+    ABIERTO. Reporte del autor (check 4 de la entry 24, 2026-07-14): el
     M32A1 se equipa bien en Primary pero NO puede disparar; "el attachment de
     ammo del arma se perdió". Dejado como anotación, no como bloqueo.
     Sospecha: el puente ARC9 (§10). Cargo es el almacén de attachments y
@@ -2799,3 +2831,26 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     ver, porque no habia nada roto — habia algo AUSENTE en una sola de varias
     superficies hermanas. Conviene repetirlo cada vez que una entrada unifique
     algo: lo que se unifica dice cuales son las hermanas.
+
+79. LAS ARMAS ARC9 DEBERIAN SPAWNEAR CON UN PRESET DE ARC9 [Cargo capture/arc9]
+    — PEDIDO DEL AUTOR el 2026-08-22, SIN DISENAR, SIN VOTAR.
+    DE DONDE SALE: de cerrar la #42. Textual: «no mas creo yo que las armas ARC9
+    deberian usar los presets de ARC9 para spawnear o ser vendidas del stock
+    autogenerado del trader».
+    QUE PIDE, y son DOS superficies que conviene no confundir: (a) el arma que
+    NACE en el mundo (spawn por toolgun, dev, loot) y (b) el arma que el trader
+    vende de su stock AUTOGENERADO. Hoy las dos salen desnudas, y ARC9 ya tiene
+    presets propios — o sea que la data existe y lo que falta es la ruta.
+    POR QUE NO ES LO MISMO QUE LA #53: esa hizo que la configuracion VIAJE con
+    el arma (persistencia, y esta cerrada). Esta es de donde sale la
+    configuracion INICIAL de un arma que nunca tuvo dueno. Una guarda la que
+    hay; la otra decide cual hay al principio.
+    SIN DISENAR — lo que hay que medir antes de votar: que expone ARC9 como
+    preset (formato, donde viven, si son por clase o por jugador), y si el
+    preset se aplica al SWEP o si hay que traducirlo al blob de Cargo (CRG-1:
+    Cargo transporta blobs sin interpretarlos, asi que un preset que haya que
+    interpretar cambia de dueno). Verificar contra dev/other/ y NUNCA de
+    memoria (CRG-24).
+    OJO CON EL PESO: si un preset trae attachments, choca con la #55 («que
+    attachments pesan»), que esta ABIERTA y sin disenar. Un arma que nace con
+    doce atts y no pesa ninguno es una decision que hoy no esta tomada.
