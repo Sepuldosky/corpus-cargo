@@ -80,9 +80,6 @@ function CARGO.Trade.HasViewer(trader, ply)
     return live ~= nil and live.viewers[ply] == true
 end
 
--- Drops every open session. For an entity that dies with screens open: the
--- clients keep a stale panel and degrade honestly on the next action (the
--- server re-validates every intent against the live state — CRG-6).
 -- Close ONE player's trade screen from the server (roadmap #65).
 --
 -- Until this existed the `trade_close` net was CLIENT -> SERVER ONLY, so
@@ -124,12 +121,20 @@ end
 function CARGO.Trade.ClearViewers(trader)
     local live = Live(trader)
     if live == nil then return end
+    -- ONE house for the send, and it is not tidiness: written twice, the day
+    -- somebody adds a field to this message only one of the two learns it.
+    -- It also buys the thing AM3 could not: `CloseFor` has no caller in game
+    -- —corpus-stalker evicts everybody with this function, not one by one— so
+    -- its in-game credit had nowhere to come from. Routed through here, the
+    -- next trader that DIES with a screen open exercises both.
+    --
+    -- Clearing a key during `pairs` is defined behaviour in Lua (assigning nil
+    -- to an EXISTING field is explicitly allowed mid-traversal; what is
+    -- undefined is creating one), which is exactly what CloseFor does to
+    -- `live.viewers[ply]`. The final assignment stays: an invalid player never
+    -- reaches CloseFor, so his stale key would survive the loop.
     for ply in pairs(live.viewers) do
-        if IsValid(ply) then
-            net.Start(NET_TRADE_CLOSE)
-            net.WriteUInt(trader.contId or 0, 16)
-            net.Send(ply)
-        end
+        CARGO.Trade.CloseFor(ply, trader)
     end
     live.viewers = {}
 end

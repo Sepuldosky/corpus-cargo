@@ -8162,3 +8162,25 @@ corrido la ruta escrita.
 
 CHANGELOG **80 `[APLICADO 2026-08-22]`**. La **#65** queda **CERRADA EN JUEGO**; la **#60**, escrita y
 con su pasada diferida.
+
+### Addendum (2026-08-22, POSTERIOR a la pasada) — una casa para el envío
+
+`ClearViewers` pasó a llamar a `CloseFor` en vez de repetir sus tres líneas. **Es cambio de forma y
+no de conducta** — el mismo net, en el mismo orden, a los mismos jugadores — y va **declarado como
+posterior** a la AM para que la evidencia de esa planilla quede pegada al árbol con el que se midió.
+
+**Paga dos cosas.** Una casa para el mensaje: escrito dos veces, el día que alguien le agregue un
+campo sólo una de las dos se entera. Y **el crédito en juego que AM3 no pudo dar**: `CloseFor` no
+tenía llamador en juego, y ruteado por acá **la próxima muerte de un trader lo ejercita**.
+
+**Borrar una clave durante `pairs` es comportamiento DEFINIDO en Lua** — asignar nil a un campo que
+YA existe está explícitamente permitido mid-traversal; lo indefinido es *crear* uno — que es
+exactamente lo que `CloseFor` le hace a `live.viewers[ply]`. La asignación final se queda: un
+jugador inválido nunca llega a `CloseFor`, así que su clave muerta sobreviviría al loop.
+
+**Y de paso se borró un comentario que había quedado huérfano afirmando lo contrario de lo que el
+código hace**: decía que los clientes *«keep a stale panel and degrade honestly»*, que era cierto
+hasta esta misma entrada. Es el defecto de la #77 recién cerrada, cometido dos entradas después.
+
+Harness **1278** sin moverse; `sabotaje_cargo_65_60.py` **13/13**, con **un ancla re-apuntada** — la
+que copiaba las tres líneas del envío quedó en `ANCLA x0` **el mismo día en que se escribió**.
