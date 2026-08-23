@@ -5,8 +5,18 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-23 (**SLICE 2 del comercio ESCRITA** — el **dinero como
-entidad**, CHANGELOG **82** `[PENDIENTE]`, planilla **AO** de 10 filas esperando la pasada).
+**Última actualización:** 2026-08-23 (**SLICE 2 del comercio CERRADA EN JUEGO** — el **dinero como
+entidad**, planilla **AO 10/10**, CHANGELOG **82** `[APLICADO]`. **Sexta sección seguida que cierra
+sin un rojo**).
+⚠ **Las cuatro filas del TRADE estuvieron a punto de cerrarse SIN CORRER**: el primer reporte cubría
+sólo el drop y venía con un «creo que cierra». Se señaló el hueco —la línea de solo-dinero **es** lo
+que el P2P del slice 3 reusa— y se corrieron.
+⚠ **Los dos arreglos de la ronda salieron de la NOTA de una fila que PASÓ**: el campo de la oferta
+pre-cargaba un `0` que se le pegaba adelante a lo tipeado (`0250` ofrecía 250, o sea que **el trato
+salía bien y el campo se veía roto** — invisible para cualquier check de comportamiento), y el prompt
+con basura se quedaba mudo, incoherente con la propia regla del módulo. De paso quedó escrito que el
+`0` significa cosas **opuestas** en las dos ramas del botón: en Solo se rechaza, en Trade limpia la
+oferta.
 
 **El botón `$` dejó de ser una promesa.** Estaba en el header desde julio contestando *«arrives with
 the next trade slice»*; ahora hace **dos cosas según el estado**: en **Solo** bota efectivo al mundo,

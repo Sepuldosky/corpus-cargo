@@ -267,12 +267,40 @@ end
 -- wallet without asking is expensive to undo, and money is the one thing where
 -- an exact number is the normal ask.
 -- ------------------------------------------------------------------
+local function CashSay(msg)
+    chat.AddText(T.Colors.amber, "[Cargo] ", T.Colors.text, msg)
+end
+
+-- Text -> whole number, or nil if it was not a number at all. The nil case and
+-- the zero case are kept APART on purpose: they mean different things in the
+-- two branches below, and collapsing them is what made typing garbage silently
+-- do nothing (in-game pass 2026-08-23).
+local function CashNumber(text)
+    local n = tonumber(text)
+    if n == nil then return nil end
+    return math.floor(n)
+end
+
 function CARGO.Trade.MoneyButton(state)
     if state == "trade" then
         if tradeState == nil then return end
+        local cur = CARGO.Trade.BasketMoney()
+        -- EMPTY when there is no offer yet, and not the string "0" (in-game
+        -- report 2026-08-23): a pre-filled "0" does not get replaced by what
+        -- you type, it gets PREPENDED to it — "0250" still offers 250 because
+        -- tonumber eats the zero, so the deal was right and the field looked
+        -- broken. With a live offer the number IS worth showing: you are
+        -- editing it, not starting one.
         T.Prompt("Offer money", "How much do you put in?",
-            tostring(CARGO.Trade.BasketMoney()), function(text)
-                CARGO.Trade.SetBasketMoney(tonumber(text))
+            cur > 0 and tostring(cur) or "", function(text)
+                local n = CashNumber(text)
+                -- Here a ZERO is a legitimate value — it clears the offer, the
+                -- same as the `x` on the line. Only garbage is refused.
+                if n == nil then
+                    CashSay("That's not an amount.")
+                    return
+                end
+                CARGO.Trade.SetBasketMoney(n)
             end)
         return
     end
@@ -284,13 +312,24 @@ function CARGO.Trade.MoneyButton(state)
         "How much do you drop? (up to " .. CARGO.Trade.FormatMoney(cap)
             .. " in " .. CARGO.Trade.cvCashProps:GetInt() .. " bundles)",
         "", function(text)
-            local n = math.floor(tonumber(text) or 0)
+            local n = CashNumber(text)
+            -- Zero is NOT a value here — dropping nothing is not a state you
+            -- can be in — so both it and garbage get the same refusal.
+            --
+            -- AND IT SAYS SO. Staying silent was the first shape and it was
+            -- inconsistent with this module's own rule: the quota refusal
+            -- explains itself because a limit the player cannot see is
+            -- indistinguishable from a bug — and so is a button that answers
+            -- nothing.
+            if n == nil or n <= 0 then
+                CashSay("Enter an amount above zero.")
+                return
+            end
             -- The client refuses the obvious nothing and lets the SERVER refuse
             -- everything else (CRG-6). It does not pre-check the wallet or the
             -- quota: both can change between typing and sending, and a client
             -- that guesses would say "no" to a drop the server would have
             -- allowed — the exact mirror of the estafa it is meant to prevent.
-            if n <= 0 then return end
             net.Start(NET_CASH_DROP)
             net.WriteUInt(math.min(n, 4294967295), 32)
             net.SendToServer()

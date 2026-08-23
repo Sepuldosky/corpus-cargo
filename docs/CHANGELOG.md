@@ -8368,7 +8368,7 @@ criterios ahora sería falsificar el instrumento. Las tres correcciones viven ac
 
 ---
 
-## 82. El dinero como entidad — comercio, SLICE 2 (`Cargo_Trade` §7) `[PENDIENTE]`
+## 82. El dinero como entidad — comercio, SLICE 2 (`Cargo_Trade` §7) `[APLICADO 2026-08-23]`
 
 El botón `$` del header estaba en pantalla **desde julio** contestando *«dropping and offering cash
 arrives with the next trade slice»*: `corpus_cargo_ui.lua` llamaba a `CARGO.Trade.MoneyButton(state)`
@@ -8491,3 +8491,62 @@ mismo, con basket de solo-dinero de un lado.
 Y el **límite y la limpieza de props botados en general** no son de acá: hoy **no existe ninguno** —
 medido— y eso quedó abierto como **roadmap #80**. Esta slice no lo empeora, porque el efectivo nace
 con cuota; tampoco lo resuelve.
+
+### Pasada en juego (2026-08-23) — planilla AO **10/10**, y dos arreglos que salieron de las NOTAS
+
+**Sexta sección seguida que cierra sin un rojo** (AI 13/13, AJ 7/7, AK 10/10, AL 8/8, AN 10/10,
+AO 10/10). Lo confirmado, con las palabras del autor:
+
+- **El drop punta a punta**: *«se puede botar el dinero, efectivamente se toma con use + walk;
+  también genera cambios en el dinero que está en el inventario, los valores calzan, **el modelo de
+  money de css existe**»*.
+- **La cuota, por sus DOS mensajes distintos**, los dos pegados del log: *«That would be 12 bundles
+  and you have room for 10 ($10,000 at most)»* al pasarse de una, y *«You already have 10 cash
+  bundles lying around. Pick some up first»* al llenarla de a poco. Son dos ramas del mismo rechazo y
+  la corrida ejerció las dos.
+- **El reparto con restos**, visible en veinte líneas de `Picked up`: `$250`, `$150`, `$500`, `$55`,
+  `$255`. Botar 10.000 dio **10 bultos de 1.000**.
+- **La mitad del TRADE**: el `$` con la pantalla abierta *«le ofrecí al trader y se entregó 1000, no
+  botó nada»*; el trato de solo dinero *«se puede lograr perfectamente»* y su línea *«se puede
+  eliminar de la pantalla sell»*; y la propina, *«se cobra efectivamente junto a una compra, en UI te
+  dice exacto lo que vas a pagar incluyendo el dinero ofrecido»*.
+
+**⚠ Las cuatro filas del trade estuvieron a punto de cerrarse SIN CORRER.** El primer reporte cubría
+el drop entero y no decía nada de AO7-AO10, y venía con un *«creo que cierra efectivamente»*. Se
+señaló el hueco por su nombre —**la línea de solo-dinero es lo que el traspaso P2P del slice 3
+reusa**, así que ese slice habría arrancado sobre algo que nunca se vio andar— y el autor las corrió.
+Es el nº **de las filas declaradas en vez de acreditadas**, cazado esta vez **antes** de escribirse.
+
+### Los dos arreglos, y los dos salieron de una NOTA de una fila que PASÓ
+
+**1. El campo de la oferta pre-cargaba un `0` que no se reemplaza, se le PEGA adelante.** Textual:
+*«en el ask de offer money donde dice 0, hace que escribir un número sustituya ese 0 (…) porque si no
+tienes problemas como escribir 0250, igual se ofrecen los 250 usd pero queda feo el número en
+display»*. El diagnóstico es exacto: `tonumber("0250")` da 250, **así que el trato salía bien y el
+campo se veía roto** — un defecto que ningún check de comportamiento podía ver porque el
+comportamiento era correcto. Ahora el default va **vacío cuando no hay oferta**, y trae el número
+**cuando la hay** (ahí lo estás editando, no empezando). Las dos mitades tienen su fila.
+
+**2. El prompt que recibe basura ya no se queda mudo.** Era coherente por dentro —cae a 0 y el guard
+corta— e **incoherente con la regla que este mismo módulo aplica**: el rechazo de la cuota se explica
+porque *un límite que el jugador no puede ver es indistinguible de un bug*, y un botón que no
+contesta nada tampoco se distingue de uno roto. Ahora avisa.
+
+**Y los dos revelaron una asimetría real que quedó escrita**: el `0` significa **cosas opuestas** en
+las dos ramas del botón. En **Solo** no es un estado en el que se pueda estar (se rechaza junto con
+la basura); en **Trade** es un valor legítimo que **limpia la oferta**, igual que la `x` de la línea —
+así que ahí sólo se rechaza la basura, y hay un control negativo que exige que la basura **no** borre
+una oferta ya puesta.
+
+### Verificación tras los arreglos
+
+Harness **1352** (era 1346) = 83 / 835 / **434**. `dev/sabotaje_cargo_slice2.py` **21/21 en rojo**
+(eran 18: los tres nuevos son el default del campo, el aviso, y que la basura no limpie la oferta).
+Las nueve suites vecinas re-corridas enteras.
+
+**La SLICE 2 queda CERRADA EN JUEGO.** CHANGELOG **82 `[APLICADO 2026-08-23]`**.
+
+**Lo que sigue del bloque es el slice 3**, y su prerrequisito ya no es la línea de dinero —ésta la
+paga— sino el **lock del basket**, sobre el que hay una alternativa más barata anotada en el handoff:
+**versionar el basket** y que aceptar nombre la versión, en vez de congelar el ítem en las siete
+rutas que lo consumen.
