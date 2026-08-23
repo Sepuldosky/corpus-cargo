@@ -1950,8 +1950,16 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     ratificar y son independientes de esto: el 63 es leer el catalogo, no
     preciarlo ni filtrarlo.
 
-64. EL ITEM DE UNA CLASE DE ARMA [Cargo capture/items] — RATIFICADA Y ESCRITA
-    el 2026-08-18. Hermana del 63 y del mismo dia siguiente.
+64. EL ITEM DE UNA CLASE DE ARMA [Cargo capture/items] — HECHO / APLICADO el
+    2026-08-18, CHANGELOG 68, verificada en la MISMA corrida que la #63.
+    ⚠ SEGUNDA ENTRADA QUE SE LEIA COMO ABIERTA SIN ESTARLO, y la encontro el
+    mismo cruce roadmap<->CHANGELOG del 2026-08-22 que destapo la #16. Decia
+    «RATIFICADA Y ESCRITA» y nunca gano su marcador. DOS en un solo censo es
+    lo que lo vuelve un agujero de metodo y no un olvido: no hay ningun
+    control que cace esto — el unico que existe es correr el cruce, y no lo
+    corre nadie solo. Conviene repetirlo cada tantas tandas.
+    --- el texto original, para leer de que salio ---
+    RATIFICADA Y ESCRITA el 2026-08-18. Hermana del 63 y del mismo dia siguiente.
     DE DONDE SALE: de retomar el trader de corpus-stalker con el 63 ya escrito
     y chocar con el MISMO agujero en otra superficie. La regla por categoria ya
     se podia escribir, pero las ARMAS no estaban EN el catalogo: un arma
