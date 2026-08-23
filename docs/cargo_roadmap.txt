@@ -1794,8 +1794,26 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Que OpenFor no compruebe dueno (cualquiera a 160 u abre cualquier
     contenedor) es un hecho de Cargo que el area hospital ENSANCHA — de 160 u a
     lo que mida la sala — pero no crea. Vive en el #12, no aca.
-61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — RATIFICADA EN
-    RUMBO el 2026-08-18, SIN ESCRIBIR. Abierta 2026-08-17.
+61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — LISTA PARA
+    ESCRIBIR: rumbo ratificado el 2026-08-18 y los DOS votos que faltaban
+    resueltos el 2026-08-22. Abierta 2026-08-17.
+    PROMPT DE EJECUCION: dev/PROMPT_cargo_61_multiplicador_por_categoria.txt
+    (va a otro chat por falta de contexto en el que la voto).
+    VOTO (b): AFECTA LAS DOS PUNTAS. El mult entra sobre el `value`, asi que
+    comprar comida sale x10 Y venderle comida al trader tambien rinde x10.
+    Motivo: la brecha comprar/vender YA la maneja el spread del trader, asi
+    que un mult de una sola punta seria un SEGUNDO spread.
+    VOTO EXTRA: SI va la perilla global `cargo_value_mult` (default 1.0),
+    que compone multiplicativamente con la de categoria (food x10 + global
+    x2 = x20). No estaba en el pedido y por eso se pregunto.
+    ⚠ EL SUB-VOTO (a) DE MAS ABAJO ESTA CONTESTADO POR EL CODIGO, Y LA
+    PREMISA QUE ESTA ENTRADA ESCRIBIO PARA EL ES FALSA: dice que «UnitPrice
+    hace max(1, ...), asi que un 0 dejaria TODO a 1», y la funcion abre con
+    `if m <= 0 then return nil end` ANTES de ese max — o sea que un 0 YA
+    significa «no se vende», que es la lectura correcta. Componiendo el mult
+    de categoria en el mismo `m` sale gratis y hay UNA regla en vez de dos.
+    Se deja el texto viejo abajo para que se vea de que salio, pero NO se
+    vota: ya esta resuelto.
     RATIFICACION: el autor la voto en la ronda de diseño del trader de
     corpus-stalker, eligiendola sobre la 62 y sobre "ninguna de las dos". Lo
     ratificado es el RUMBO y la forma propuesta (que RegisterCategory cree
