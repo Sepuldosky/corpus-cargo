@@ -5,8 +5,17 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-22 (**#65 y #60 ESCRITAS**, CHANGELOG **80** `[PENDIENTE]`, sin
-planilla todavía. **#65** — el net `trade_close` viaja ahora en las dos direcciones: entró
+**Última actualización:** 2026-08-22 (**#65 CERRADA EN JUEGO** — planilla **AM 5/6**, CHANGELOG **80**
+`[APLICADO]`; la **#60** escrita y con su pasada **diferida**.
+⚠ **AM3 quedó SIN CORRER y la fila era imposible por construcción**: pedía la pantalla abierta *y*
+tipear en la consola, y `frame.Think` cierra el frame en cuanto la game UI aparece — decisión del
+propio autor del 2026-07-12, escrita a cinco líneas de donde ya se había leído. Pedía un estado que
+el acto de medirlo destruye.
+**Pendiente chico que paga solo:** `CloseFor` no tiene crédito en juego porque no tiene llamador en
+juego, y las tres líneas del envío están escritas **dos veces**. Con `ClearViewers` llamando a
+`CloseFor` hay una casa *y* la próxima muerte de un trader le da ese crédito.
+
+Antes, el mismo día: **#65 y #60 ESCRITAS**. **#65** — el net `trade_close` viaja ahora en las dos direcciones: entró
 `Trade.CloseFor` y **`ClearViewers` cierra de verdad**. Sus dos sub-votos **los contestó el árbol**:
 su único consumidor pidió el cambio *por escrito* en un comentario, y el que expulsa ya manda su
 propio aviso. La entrada difería ese voto hasta después de la pasada del trader — **la respuesta ya

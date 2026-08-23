@@ -8014,7 +8014,7 @@ CHANGELOG **79 `[APLICADO 2026-08-22]`**. Las **#58**, **#77** y **#78** quedan 
 
 ---
 
-## 80. Cerrar la pantalla de trade desde el server, y contar contra los contenedores de la sala (roadmap #65, #60) `[PENDIENTE]`
+## 80. Cerrar la pantalla de trade desde el server, y contar contra los contenedores de la sala (roadmap #65, #60) `[APLICADO 2026-08-22]`
 
 **Dos entradas ratificadas, superficies DISJUNTAS**: la #65 vive en el trade (server + cliente), la
 #60 en `containers.lua`. Cada una tiene su bloque de sabotaje para poder cerrar sola.
@@ -8111,3 +8111,54 @@ en vez de un andamio.
 **`CloseFor` sí va por consola y se dice por qué**: es superficie nueva y **todavía no tiene llamador
 en juego** — corpus-stalker expulsa a todos con `ClearViewers`, no de a uno. Su comando se **midió**
 en 134 caracteres, bien debajo del corte de 255 que la consola de Source aplica **en silencio**.
+
+### Pasada en juego (2026-08-22) — la #65 OK, 5/6 con UNA fila imposible
+
+**Planilla AM, ronda 1: PASA 5 · FALLA 0 · SIN CORRER 1.** Conteo verificado contra su propia línea
+`(de 6)`. La **#60** no tenía filas acá: su pasada sigue diferida al área hospital.
+
+**⭐ AM2, la deuda de meses, cerró con el gesto exacto:** *«sí, al morir se cierra (lo maté con una
+dinamita del toolgun)»*. El trader muere con la pantalla abierta y la pantalla **se cierra sola** —
+que es textualmente lo que el header de Sidorovich declaraba imposible desde hace meses. Y lo cerró
+por el **consumidor real**: su propio `OnKilled`, a través del helper perezoso `TradeAPI`.
+
+**AM4 acreditó el control negativo** (*«no le pasa nada al inventario»*), que es el que reemplaza a la
+guarda inalcanzable que se borró: la protección vive en el receptor y ahora está mirada en pantalla.
+
+### ⚠ AM3 QUEDÓ SIN CORRER, Y LA FILA ERA IMPOSIBLE POR CONSTRUCCIÓN
+
+El autor:
+
+> *«No lo puedo probar, puesto que al estar en la pantalla si quiero ir a la consola, se sale la
+> pantalla del trader.»*
+
+**Tiene razón, y el código lo dice a cinco líneas de donde ya se había leído.** `frame.Think`
+(`corpus_cargo_ui.lua:1235`) cierra el frame **en cuanto `gui.IsGameUIVisible()` es true** — es una
+decisión del propio autor del 2026-07-12, *«ESC cierra el inventario en vez de apilarle el menú
+encima»*, y la consola cuenta como game UI.
+
+**O sea que la fila pedía un estado que el acto de medirlo destruye.** No es que fuera difícil: era
+**inejecutable**, y con el mecanismo escrito en el archivo que se venía de leer. *Un instrumento que
+destruye su propia precondición no da un rojo ni un verde: no da nada* — y la única razón por la que
+no costó una ronda entera es que el autor lo diagnosticó al primer intento.
+
+**Lo que NO significa:** `CloseFor` no quedó sin verificar. Sus cuatro checks de harness y dos
+sabotajes lo cubren. Lo que le falta es **crédito EN JUEGO**, y hoy no hay ningún gesto que lo
+alcance porque **no tiene llamador en juego** — corpus-stalker expulsa a todos con `ClearViewers`.
+
+**Y de ahí sale un defecto de forma que esta misma entrada introdujo:** las tres líneas del envío
+están **escritas dos veces**, una en `CloseFor` y otra en `ClearViewers`. Con `ClearViewers`
+llamando a `CloseFor` hay **una sola casa** *y* la próxima muerte de un trader le da a `CloseFor` el
+crédito en juego que AM3 no pudo darle. Va **en un commit aparte y posterior a esta pasada**, para
+que la evidencia de la AM quede pegada al árbol con el que se midió.
+
+**AM5 cerró SUSTITUYENDO LA RUTA, y es la segunda planilla seguida en que pasa** (la AL3 fue la
+otra): la fila colgaba de la 03, que no se podía correr, así que el autor la ejerció *«matando un
+Sidorovich y abriendo el trader de otro»* — *«comprobado que funciona»*. Un check cuya ruta se
+sustituye y cierra igual mide lo que decía medir; lo que no se puede es contarlo como si hubiera
+corrido la ruta escrita.
+
+**Evidencia:** cinco de las seis con nota; **AM6 pasó sin nota** y es la de alcance.
+
+CHANGELOG **80 `[APLICADO 2026-08-22]`**. La **#65** queda **CERRADA EN JUEGO**; la **#60**, escrita y
+con su pasada diferida.

@@ -1737,6 +1737,14 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     que inventarle un andamio, y un andamio no es el sitio de llamada
     (leccion 89). Lo que importa hoy es que la superficie ESTA ESCRITA y
     acreditada offline, asi que Coagulant puede escribir contra ella.
+    LA SEGUNDA RUTA POSIBLE, idea del autor el 2026-08-22 y SIN VOTAR: «o
+    podriamos hacer un trader que haga uso de inventarios». Un trader que
+    venda contra los contenedores de su sala en vez de contra un stock
+    propio seria un consumidor de estas cuatro que vive EN Cargo, o sea
+    que la pasada en juego dejaria de depender de que Coagulant baje. No
+    esta disenado y no es gratis —hay que decidir que pasa con el wallet,
+    con el `persistKey` y con quien es el dueno de lo que se vende— pero
+    se anota para que la opcion no se pierda.
     ⚠ SON CUATRO Y ESTA ENTRADA PEDIA TRES, y la diferencia es MEDICION y no
     preferencia: el camino de tratamiento de Coagulant usa CUATRO — gatea con
     HasItem y consume con TakeUnique si es unique o con TakeItem si es stack
@@ -1999,9 +2007,28 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     harness offline habia predicho — que es lo unico que acredita al harness.
     Cerro en la misma corrida el #63. CHANGELOG 67 y 68 [APLICADO].
 
-65. CERRAR LA PANTALLA DE TRADE DESDE EL SERVER [Cargo trade] — ESCRITA el
-    2026-08-22, en tanda con la #60. CHANGELOG 80 [PENDIENTE]; planilla AM
-    (6 filas), que cubre SOLO esta entrada.
+65. CERRAR LA PANTALLA DE TRADE DESDE EL SERVER [Cargo trade] — HECHO /
+    CERRADA EN JUEGO el 2026-08-22. CHANGELOG 80 APLICADO; planilla AM
+    5 PASA / 0 FALLA / 1 SIN CORRER (de 6).
+    AM2, LA DEUDA DE MESES, CERRO CON EL GESTO EXACTO: «si, al morir se
+    cierra (lo mate con una dinamita del toolgun)». Por el consumidor REAL
+    —su propio OnKilled, via el helper perezoso TradeAPI— y no por un
+    andamio. AM4 acredito el control negativo del inventario solo.
+    ⚠ AM3 QUEDO SIN CORRER Y LA FILA ERA IMPOSIBLE POR CONSTRUCCION, y el
+    error fue del instrumento: pedia tener la pantalla abierta Y tipear en
+    la consola, y `frame.Think` (corpus_cargo_ui.lua:1235) cierra el frame
+    en cuanto `gui.IsGameUIVisible()` es true — decision del propio autor
+    del 2026-07-12, y escrita a cinco lineas de donde ya se habia leido. La
+    fila pedia un estado que el acto de medirlo destruye.
+    LO QUE DEJA PENDIENTE, y es chico: `CloseFor` esta cubierto por harness
+    y sabotaje pero NO tiene credito en juego, porque no tiene llamador en
+    juego. El arreglo es de forma y paga solo: las tres lineas del envio
+    estan escritas DOS VECES (CloseFor y ClearViewers), y con ClearViewers
+    llamando a CloseFor hay UNA casa y la proxima muerte de un trader le da
+    a CloseFor el credito que AM3 no pudo darle.
+    AM5 CERRO SUSTITUYENDO LA RUTA (segunda planilla seguida en que pasa,
+    la otra fue AL3): colgaba de la 03, asi que el autor la ejercio matando
+    un Sidorovich y abriendo el trader de otro.
     LA FILA ESTRELLA NO USA LA CONSOLA Y ESE ES EL PUNTO: se spawnea al
     Sidorovich, se le abre el comercio y SE LO MATA con la pantalla abierta
     — la deuda textual de su header. Ejercita al consumidor REAL por su
