@@ -1794,11 +1794,19 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Que OpenFor no compruebe dueno (cualquiera a 160 u abre cualquier
     contenedor) es un hecho de Cargo que el area hospital ENSANCHA — de 160 u a
     lo que mida la sala — pero no crea. Vive en el #12, no aca.
-61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — LISTA PARA
-    ESCRIBIR: rumbo ratificado el 2026-08-18 y los DOS votos que faltaban
-    resueltos el 2026-08-22. Abierta 2026-08-17.
-    PROMPT DE EJECUCION: dev/PROMPT_cargo_61_multiplicador_por_categoria.txt
-    (va a otro chat por falta de contexto en el que la voto).
+61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — ESCRITA Y
+    VERIFICADA OFFLINE el 2026-08-22; PASADA EN JUEGO PENDIENTE (planilla AN,
+    dev/checks/cargo-mult-precio-r1.html, 10 filas). CHANGELOG 81 [PENDIENTE].
+    Abierta 2026-08-17, rumbo ratificado el 2026-08-18, los DOS votos que
+    faltaban resueltos el 2026-08-22.
+    LO QUE QUEDO: `Items.RegisterCategory` crea `cargo_value_mult_<id>`
+    (default 1, ARCHIVE + REPLICATED) y guarda el objeto ConVar en el registro;
+    la global `cargo_value_mult` compone multiplicativamente; `Trade.ValueMult`
+    es la unica casa de la composicion y la llaman DOS lugares — `UnitPrice` (el
+    embudo de las dos puntas) y `AttsValue` (cada att paga la perilla de SU
+    categoria, o montar seria un lavadero). Harness 1307, sabotaje 12/12.
+    PROMPT DE EJECUCION (ya consumido):
+    dev/PROMPT_cargo_61_multiplicador_por_categoria.txt.
     VOTO (b): AFECTA LAS DOS PUNTAS. El mult entra sobre el `value`, asi que
     comprar comida sale x10 Y venderle comida al trader tambien rinde x10.
     Motivo: la brecha comprar/vender YA la maneja el spread del trader, asi
@@ -1866,12 +1874,20 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     que componga multiplicativamente con la de categoria. Da "toda la economia
     x2" en una perilla sin tocar diez, que es la mitad de lo que el autor
     describe ("manejar la economia general del server o mapa").
-    LO QUE HAY QUE VOTAR ANTES DE ESCRIBIR:
-      a) Que significa mult 0. Hoy UnitPrice hace max(1, ...), asi que un 0
-         dejaria TODO a 1 en vez de sacarlo de venta. Las dos lecturas son
-         defendibles y son opuestas: "gratis" contra "no se vende" — y esta
-         segunda ya tiene dueño en el repo (ausencia de value). Un 0 que caiga
-         en la lectura equivocada es un exploit, no un ajuste.
+    LO QUE HABIA QUE VOTAR ANTES DE ESCRIBIR (los tres, RESUELTOS):
+      a) RESUELTO POR EL CODIGO, Y LA PREMISA DE ABAJO ERA FALSA. El texto
+         original decia: «Hoy UnitPrice hace max(1, ...), asi que un 0 dejaria
+         TODO a 1 en vez de sacarlo de venta». NO ES ASI: la funcion abre con
+         `if m <= 0 then return nil end`, que corre ANTES de ese max — o sea que
+         un 0 YA significaba "no se vende", que es la lectura con dueño en este
+         repo (la ausencia de value, CRG-18). Componiendo la perilla dentro del
+         MISMO `m` que el spread, el 0 se comporta asi GRATIS y hay UNA regla en
+         vez de dos. Se deja escrito el error a proposito: una premisa falsa en
+         una entrada manda al proximo a resolver un problema que no existe, y
+         esta mando a votar algo que el arbol ya tenia contestado.
+         MEDIDO ADEMAS EL BORDE: un mult de 0,01 NO saca de venta — abarata
+         hasta el piso de 1 y ahi se queda. Solo el 0 exacto es "no esta a la
+         venta".
       b) Si el multiplicador afecta tambien lo que el trader PAGA (buy_mult) o
          solo lo que cobra. Componiendolo sobre el value afecta a los dos por
          construccion, que probablemente es lo que se quiere — pero conviene

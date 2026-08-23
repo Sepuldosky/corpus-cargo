@@ -19,15 +19,68 @@ CARGO.Items._modelOverrides = CARGO.Items._modelOverrides or {}
 -- always has a tab/label for them.
 -- ------------------------------------------------------------------
 
+-- Every category is born with its own price knob, `cargo_value_mult_<id>`
+-- (roadmap #61). It is created HERE, from the registration itself, and not
+-- from a list somewhere else: the category set is OPEN (any addon can call
+-- RegisterCategory, and Items.Register auto-registers an unknown one), so a
+-- fixed list of convars would cover exactly the categories that existed the
+-- day it was written. This way a category registered tomorrow gets its knob
+-- for free and nobody maintains a table.
+--
+-- ARCHIVE + REPLICATED, and the REPLICATED half is not optional: the client
+-- paints the price with the same pure function the server charges with
+-- (Cargo_Trade §4). A server-only convar would leave the cell showing one
+-- number and the Confirm charging another, and the player reads that as the
+-- trader stealing from him.
+--
+-- This side only BUILDS the knob and hands the object over; the reader is
+-- Trade.ValueMult, which is where the composition with the global one lives.
+-- Handing the ConVar over (instead of the name) keeps the convar name written
+-- in exactly ONE place — a second site rebuilding it by hand is how a reader
+-- and a writer drift apart without an error.
+local MULT_PREFIX = "cargo_value_mult_"
+
+local function MakeMultCvar(id)
+    -- A category id becomes part of a console command name. An id the console
+    -- cannot type would be a knob nobody can turn, so it gets none and its
+    -- category prices at x1 — said out loud, because a silent absence reads
+    -- like "the multiplier does not work".
+    if id:find("[^%w_]") ~= nil then
+        Corpus.Log("cargo", "Items.RegisterCategory: la categoria '" .. id
+            .. "' no puede tener perilla de precio (un nombre de convar solo admite"
+            .. " letras, numeros y guion bajo); esa categoria multiplica x1")
+        return nil
+    end
+    return CreateConVar(MULT_PREFIX .. id, "1",
+        bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED),
+        "Price multiplier for the '" .. id .. "' category (0 = not for sale)", 0)
+end
+
 function CARGO.Items.RegisterCategory(id, label, order)
     if not isstring(id) or id == "" then
         error("Cargo.Items.RegisterCategory: 'id' must be a non-empty string", 2)
     end
+    -- Re-registering (lua refresh, an addon relabelling one of ours) reuses
+    -- the ConVar object already built. No offline test can tell this branch
+    -- apart from calling CreateConVar again — and it is kept for exactly that
+    -- reason: it makes the outcome independent of what CreateConVar returns
+    -- for a name that already exists. The value an operator set has to
+    -- survive a refresh, and this way it does either way.
+    local prev = CARGO.Items._categories[id]
     CARGO.Items._categories[id] = {
         id = id,
         label = label or (id:sub(1, 1):upper() .. id:sub(2)),
         order = order or 100,
+        cvValueMult = prev and prev.cvValueMult or MakeMultCvar(id),
     }
+end
+
+-- The price knob of a category, as a ConVar — nil if the category was never
+-- registered, or if its id is not console-typeable. Only reader:
+-- Trade.ValueMult.
+function CARGO.Items.CategoryMultCvar(category)
+    local cat = isstring(category) and CARGO.Items._categories[category] or nil
+    return cat and cat.cvValueMult or nil
 end
 
 -- Base set matching the mockup tab row (InventarioCargo.png). Equipment

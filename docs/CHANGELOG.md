@@ -8184,3 +8184,123 @@ hasta esta misma entrada. Es el defecto de la #77 recién cerrada, cometido dos 
 
 Harness **1278** sin moverse; `sabotaje_cargo_65_60.py` **13/13**, con **un ancla re-apuntada** — la
 que copiaba las tres líneas del envío quedó en `ANCLA x0` **el mismo día en que se escribió**.
+
+---
+
+## 81. El multiplicador de precio por categoría (roadmap #61) `[PENDIENTE]`
+
+Pedido del autor, textual: *«agreguemos un factor de multiplicación con un cvar a cargo (…) algo así
+como `cargo_value_mult_food 10` (…) podríamos aplicar eso para toda categoría, así se multiplica la
+munición, armas, armaduras, misc, etc.»*. Nace de ponerle precio a los 15 comestibles de Craving: con
+precios reales en USD caen **todos** en la banda 2-6, contra munición de 8-900 y armas de miles. La
+comida quedaba **económicamente trivial** — nadie decide nada por 2 dólares.
+
+### La forma: la perilla la crea el REGISTRO, no una lista
+
+`Items.RegisterCategory` crea `cargo_value_mult_<id>` (default `1`, `ARCHIVE + REPLICATED`) y guarda
+el **objeto ConVar** en el registro de la categoría. Encima va una global `cargo_value_mult` que
+**compone multiplicativamente**: comida x10 con global x2 es **x20**.
+
+**Por qué del registro y no de una lista.** Las categorías son un **set abierto** — cualquier addon
+puede llamar a `RegisterCategory`, y `Items.Register` auto-registra una desconocida. Una tabla de
+convars escrita a mano cubre exactamente las categorías que existían el día que se escribió, y el
+hueco aparece el día que un addon registre la suya: lejos, y sin un solo error. Así **toda categoría,
+presente y futura, nace con su perilla y nadie mantiene una lista**.
+
+**Se entrega el objeto y no el nombre**, para que el string `"cargo_value_mult_"` se escriba en un
+solo archivo. Un segundo sitio que lo rearme a mano es como un lector y un escritor derivan sin
+error: `GetConVar` de un nombre que no existe devuelve `nil`, o sea `x1`, que en pantalla se lee
+**igual** que «la perilla no aplica».
+
+### Dónde entra: en el EMBUDO, y cada `value` paga la perilla de SU categoría
+
+`Trade.ValueMult(def)` es la única casa de la composición, y la llaman **dos** lugares:
+
+1. **`UnitPrice`**, el embudo por el que pasa todo precio del módulo — sus dos llamadores reales son
+   el `Confirm` del server y el `PriceOfEntry` que pinta el cliente, así que **las dos puntas lo
+   heredan y ninguna se puede olvidar** (lección 89 hecha bien: el funnel, no los sitios de llamada).
+2. **`AttsValue`**, el valor de los attachments montados. **No es decoración**: un att paga la perilla
+   de **su propia** categoría, así que con `cargo_value_mult_optics 10` una mira de $100 vale $1000
+   esté suelta en el grid o atornillada a un rifle. Cobrarle la categoría del **arma** convertiría el
+   montaje en un lavadero: encarecer las ópticas se esquivaría atornillándolas.
+
+### ⭐ El sub-voto (a) ya estaba contestado por el código, y su premisa era FALSA
+
+La entrada de roadmap mandaba votar *«qué significa mult 0»* sobre esta premisa: *«hoy UnitPrice hace
+`max(1, ...)`, así que un 0 dejaría TODO a 1 en vez de sacarlo de venta»*. **Es falso.** La función
+abre con `if m <= 0 then return nil end`, **antes** de ese `max`. O sea que un 0 **ya** significa «no
+se vende», que es la lectura con dueño en este repo (la ausencia de `value`, CRG-18).
+
+Componiendo la perilla dentro del **mismo `m`** que el spread, el 0 se comporta así **gratis** y hay
+**una** regla en vez de dos. **La premisa se corrigió en la entrada al cerrar**: una premisa falsa
+escrita en un roadmap manda al próximo a resolver un problema que no existe.
+
+Y el borde entre las dos lecturas queda medido: un mult de `0.01` **no** saca de venta — abarata hasta
+el piso de 1 y ahí se queda. Sólo el 0 exacto es «no está a la venta».
+
+### Los dos votos del autor (2026-08-22), y lo que implican
+
+- **(b) AFECTA LAS DOS PUNTAS.** El mult entra sobre el `value`, así que comprar comida sale x10 **y**
+  vendérsela al trader rinde x10. La brecha comprar/vender **ya** la maneja el spread
+  (`buy_mult`/`sell_mult`); una perilla de una sola punta sería un **segundo spread**, con dos dials
+  peleando por lo mismo.
+- **(GLOBAL) SÍ va la perilla maestra.** No estaba en el pedido y por eso se preguntó: es literalmente
+  la mitad de lo que el autor describe (*«manejar la economía general del server o mapa»*).
+
+Sobre el `value` y no sobre el precio final, para que el **spread siga operando sobre la magnitud
+escalada** — el margen del trader sigue siendo un porcentaje de lo que la cosa vale ahora.
+
+### La condición que no era opcional: REPLICATED
+
+El cliente pinta el precio con **la misma función pura** que el server cobra (Trade §4, y es lo que
+permite que el basket sea intent puro). Una convar de servidor sin `FCVAR_REPLICATED` deja al cliente
+multiplicando por su propio valor: **la celda diría un número y el Confirm cobraría otro, y el jugador
+lo leería como que el trader lo estafa**. Es la misma clase de defecto que CRG-18 evita, entrando por
+la puerta de atrás. Forma copiada del precedente verificado (`corpus-caliber`, seis convars así).
+
+### Verificación
+
+`glua_check` 48/48. Harness **1307** (era 1278) = **78** FUENTES / **814** server / **415** cliente.
+Selftest **100** / **107**, sin moverse. **`dev/sabotaje_cargo_61.py`, 12/12 en rojo**; las ocho suites
+vecinas re-corridas enteras y los harness de Coagulant y Craving también (los dos stubean
+`RegisterCategory` por su cuenta, así que no los alcanza).
+
+**⚠ EL FLAG `REPLICATED` ES INVISIBLE PARA LAS DOS PASADAS DE REALM.** El stub de convars del harness
+guarda nombre y valor y **no mira los flags**, así que sacarlo deja los 1307 checks verdes enteros y el
+defecto sale recién en juego. Por eso hay **dos gates de FUENTES por cuenta** sobre la expresión
+entera `bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED)` — sobre la expresión y no sobre el flag pelado,
+porque un `FCVAR_REPLICATED` suelto lo satisface un comentario que lo nombre, y pedir cada flag por
+separado lo satisfacen dos convars distintas con la mitad cada una.
+
+**⚠ Y HAY UN GATE POR CUENTA CON EL NÚMERO 3**, sobre `CARGO.Trade.ValueMult(`: la definición y sus
+**dos** lectores. Que sean tres y no dos es todo el punto — sin la de `AttsValue`, montar un att lava
+el multiplicador de su categoría y **el único check que se enteraría es el que mide justo eso**.
+
+**⚠ Y UN ANCLA DE SABOTAJE MURIÓ POR LOS FINALES DE LÍNEA, en el mismo script que la estrenaba.**
+`corpus_cargo_trade.lua` es **CRLF** y `corpus_cargo_items.lua` es **LF**; un ancla con un `\n`
+embebido casa en uno y da `ANCLA x0` en el otro. Ninguna ancla de `sabotaje_cargo_61.py` cruza un
+renglón por eso. (Los dos archivos **conservaron** sus finales de línea: el diff son 53 y 52 líneas
+agregadas, no el archivo entero — lección 98.)
+
+### La pasada en juego: planilla AN, y qué mide
+
+**Planilla AN** (`dev/checks/cargo-mult-precio-r1.html`, 10 filas). Casi todo lo de esta entrada ya
+está acreditado offline, así que las filas miden **sólo lo que ninguna cuenta ve**:
+
+- **⭐ La 02 es la estrella y la más barata**: consultar una convar sin argumento **imprime sus
+  flags**, así que es el único sitio donde el `replicated` se lee con los ojos.
+- **La 09 es check y DESMONTAJE a la vez**: las perillas son `ARCHIVE`, o sea que **quedan puestas** —
+  una olvidada le haría medir a la próxima ronda con la de ésta.
+- **Una fila declara lo que NO puede ver**: en un *listen server* el cliente y el server son el mismo
+  proceso, así que la fila del cobro **no distingue** una convar replicada de una que no lo está.
+
+**⚠ Ninguna fila pide tipear con la pantalla de trade abierta, y es a propósito**: la pantalla se
+cierra sola al aparecer la consola, que es lo que dejó **inejecutable** a la AM3 de la ronda anterior
+(lección 119). Acá la perilla se mueve **primero**, con todo cerrado, y la pantalla se abre después.
+
+### Lo que esta entrada NO trae
+
+Ningún cambio en cómo se declara `value` en una def, ni que Cargo conozca ninguna categoría en
+particular: **la perilla es ciega al significado** y no sabe que «food» es comida (CRG-1). El sub-voto
+(c) del roadmap —el default de 5 USD para comestibles sin precio propio— **no es de Cargo**: vive en
+quien arma el stock del trader, porque Cargo no inventa el `value` de una def ajena.

@@ -5,7 +5,32 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-22 (**#65 CERRADA EN JUEGO** — planilla **AM 5/6**, CHANGELOG **80**
+**Última actualización:** 2026-08-22 (**#61 ESCRITA y verificada offline** — el **multiplicador de
+precio por categoría**, CHANGELOG **81** `[PENDIENTE]`, planilla **AN** de 10 filas esperando la
+pasada en juego).
+
+**#61 — cada categoría nace con su perilla.** `Items.RegisterCategory` crea
+`cargo_value_mult_<id>` (default 1, **ARCHIVE + REPLICATED**) y guarda el **objeto ConVar** en el
+registro; encima va una global `cargo_value_mult` que **compone multiplicativamente** (comida x10 con
+global x2 es **x20**). Nace del registro y **no de una lista** porque las categorías son un **set
+abierto**: una tabla escrita a mano cubre las que existían el día que se escribió, y el hueco aparece
+el día que un addon registre la suya. Multiplica el **`value`**, así que mueve **las dos puntas** —
+comprar comida x10 **y** vendérsela al trader x10 (voto del autor: la brecha comprar/vender ya la
+maneja el spread, y una perilla de una punta sería un **segundo spread**).
+**`Trade.ValueMult` es la única casa y la llaman DOS lugares**: `UnitPrice` —el embudo por el que
+pasan las dos puntas— y `AttsValue`, porque **cada attachment paga la perilla de SU categoría**: si
+cobrara la del arma, montar sería un lavadero (encarecer las ópticas se esquivaría atornillándolas).
+⭐ **El sub-voto (a) ya estaba contestado por el código y su premisa era FALSA**: la entrada decía que
+`max(1, ...)` dejaría un mult 0 en 1, y `UnitPrice` abre con `if m <= 0 then return nil end`
+**antes** de ese max — o sea que el 0 ya significaba «no se vende». Componiéndola en el **mismo `m`**
+que el spread sale gratis y hay **una** regla en vez de dos; la premisa quedó corregida en el
+roadmap. Harness **1307** (era 1278) = 78 / 814 / 415; **`sabotaje_cargo_61.py` 12/12 en rojo**.
+⚠ **El flag `REPLICATED` es invisible para las dos pasadas de realm** —el stub de convars ignora los
+flags—, así que lo cuidan **dos gates de FUENTES** sobre la expresión entera, y en juego lo mira la
+fila 02 de la planilla, que es la más barata de todas: consultar una convar sin argumento **imprime
+sus flags**.
+
+Antes, el mismo día: (**#65 CERRADA EN JUEGO** — planilla **AM 5/6**, CHANGELOG **80**
 `[APLICADO]`; la **#60** escrita y con su pasada **diferida**.
 ⚠ **AM3 quedó SIN CORRER y la fila era imposible por construcción**: pedía la pantalla abierta *y*
 tipear en la consola, y `frame.Think` cierra el frame en cuanto la game UI aparece — decisión del

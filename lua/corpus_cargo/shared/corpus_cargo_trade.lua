@@ -32,11 +32,56 @@ function CARGO.Trade.IsTradeable(def)
     return istable(def) and isnumber(def.value) and def.value > 0
 end
 
+-- ------------------------------------------------------------------
+-- Roadmap #61 — the economy knobs. A GLOBAL `cargo_value_mult` plus one
+-- `cargo_value_mult_<category>` per category (built by Items.RegisterCategory,
+-- which is what makes the OPEN category set work — see the block there). They
+-- COMPOSE MULTIPLICATIVELY: food x10 with global x2 is x20, not x12.
+--
+-- They multiply the `value` and NOT the price, which in this repo are two
+-- different things. Consequences, both wanted (author call 2026-08-22):
+--
+--   · The spread keeps operating on the SCALED magnitude, so a trader's
+--     margin stays a percentage of what the thing is now worth.
+--   · The knob does NOT pick a side: raising food x10 makes buying food cost
+--     x10 AND selling food to the trader pay x10. The buy/sell gap is ALREADY
+--     the spread's job (buy_mult/sell_mult); a knob that moved one side would
+--     be a SECOND spread, with two dials fighting over the same thing.
+--
+-- REPLICATED is not optional, for the reason written in items.lua: the client
+-- paints with this very function and the server charges with it.
+-- ------------------------------------------------------------------
+local cvGlobal = CreateConVar("cargo_value_mult", "1",
+    bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED),
+    "Global price multiplier over every item value (composes with the per-category ones)", 0)
+
+-- The multiplier that applies to ONE def's `value`, by its category.
+--
+-- THE one house of the composition, and every `value` that enters a price
+-- goes through it: the base of the item AND each attachment bolted to it. That
+-- second half is not decoration — an att is priced by ITS OWN category, so a
+-- $100 scope is a $1000 scope with `cargo_value_mult_optics 10` whether it sits
+-- loose in the grid or mounted on a rifle. Scaling a mounted att by the GUN's
+-- category instead would let mounting launder the multiplier.
+function CARGO.Trade.ValueMult(def)
+    local m = cvGlobal:GetFloat()
+    local cv = istable(def) and CARGO.Items.CategoryMultCvar(def.category) or nil
+    if cv ~= nil then m = m * cv:GetFloat() end
+    return m
+end
+
 -- price of ONE unit, rounded to whole currency (never below 1: a rounding
 -- floor of 0 would turn cheap stacks into free money on the buy side)
+--
+-- The category knob composes into the SAME `m` as the spread on purpose: the
+-- `m <= 0` guard right below already means "not for sale" (it is the owner of
+-- that reading in this repo — see IsTradeable, absence of `value`), and it
+-- runs BEFORE the max(1, ...), so a category at 0 is taken off the market for
+-- free and there is ONE rule instead of two. A second rule for the same zero
+-- is what the roadmap entry asked for on a false premise (fixed there).
 function CARGO.Trade.UnitPrice(def, condition, mult)
     if not CARGO.Trade.IsTradeable(def) then return nil end
-    local m = isnumber(mult) and mult or 1
+    local m = (isnumber(mult) and mult or 1) * CARGO.Trade.ValueMult(def)
     if m <= 0 then return nil end
     local p = def.value * CARGO.Trade.ConditionMult(condition) * m
     return math.max(1, math.floor(p + 0.5))
@@ -72,7 +117,12 @@ function CARGO.Trade.AttsValue(atts)
             local def = CARGO.Items.Get(CARGO.ARC9.ItemId(node.att))
             -- an att with no value is not "free": ausencia = no está a la
             -- venta (CRG-18), so it simply adds nothing
-            if istable(def) and isnumber(def.value) then total = total + def.value end
+            -- Each att pays ITS OWN category knob (#61) — see Trade.ValueMult:
+            -- the sum this returns is already scaled, and the caller applies
+            -- only the spread on top.
+            if istable(def) and isnumber(def.value) then
+                total = total + def.value * CARGO.Trade.ValueMult(def)
+            end
             total = total + CARGO.Trade.AttsValue(node.sub)
         end
     end
