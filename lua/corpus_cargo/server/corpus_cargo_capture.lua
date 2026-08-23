@@ -996,7 +996,13 @@ end
 hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
     if not IsValid(ent) then return end
 
-    local isItem = ent:GetClass() == "corpus_cargo_item"
+    -- The cash bundle (§7, slice 2) rides the ITEM shape of this gate, not a
+    -- gate of its own: plain USE carries it like an HL2 prop, WALK+USE is the
+    -- deliberate take and the engine gets to reach its ENT:Use. Adding a fourth
+    -- shape here would have meant a second debounce and a second WALK rule, and
+    -- the header of this hook says why there is only ever one.
+    local cls = ent:GetClass()
+    local isItem = cls == "corpus_cargo_item" or cls == "corpus_cargo_cash"
     local ammoSpec, pickSpec
     if not isItem then
         ammoSpec = CARGO.AmmoPool and CARGO.AmmoPool.WorldAmmoSpec

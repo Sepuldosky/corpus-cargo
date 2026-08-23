@@ -2945,3 +2945,52 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     OJO CON EL PESO: si un preset trae attachments, choca con la #55 («que
     attachments pesan»), que esta ABIERTA y sin disenar. Un arma que nace con
     doce atts y no pesa ninguno es una decision que hoy no esta tomada.
+
+80. CUANTOS PROPS BOTADOS PUEDE HABER, Y QUIEN LOS LIMPIA [Cargo
+    inventory/containers] — PEDIDO DEL AUTOR el 2026-08-23, SIN DISENAR.
+    DE DONDE SALE: de votar el tope de bultos de efectivo de la SLICE 2 del
+    comercio. El autor, decidiendo ese tope, nombro el problema mas grande que
+    hay abajo: «falta un contador global para eliminar los props de cargo
+    tirados y olvidados; falta tambien un contador de props de cargo maximos en
+    el mundo de cada jugador (...) los items si quieren sobrevivir deberian
+    estar en un contenedor o como loot de algun muerto».
+    ⚠ MEDIDO AL ABRIRLA, Y ES PEOR DE LO QUE LA FRASE SUGIERE: hoy NO EXISTE
+    NINGUN limite ni NINGUNA limpieza de items botados. Cero. Un grep de
+    cleanup/despawn/lifetime/limite sobre `entities/corpus_cargo_item.lua` y
+    `server/corpus_cargo_capture.lua` no devuelve nada: lo unico que hay es un
+    rate-limit de 0,4 s del USE de mundo, que es otra cosa. O sea que un
+    jugador puede vaciar su inventario entero en el piso y esos props quedan
+    para siempre. No falta el contador del dinero: falta el de TODO.
+    LO QUE LA SLICE 2 YA RESUELVE, y por que NO alcanza: los bultos de efectivo
+    nacen con cuota (`cargo_cash_props_max`, 10 por jugador, liberada cuando el
+    bulto se recoge o se borra). Eso acota el dinero y NADA MAS — un item
+    botado sigue sin techo. La slice 2 no empeora el problema; tampoco lo
+    resuelve.
+    ⚠ Y LA LECCION DE LA SLICE 2 QUE ESTA ENTRADA TIENE QUE HEREDAR: el tope
+    tiene que contar PROPS y no VALOR. El autor propuso los dos numeros a la
+    vez («maximo 10.000 USD» y «no mas de 10 props») y con bultos de 1.000
+    coinciden — pero solo uno acota el mundo: contando valor, 10.000 bultos de
+    $1 son 10.000 props y cuestan la misma cuota. Cualquier tope de esta
+    entrada tiene el mismo filo: lo que hay que contar es la ENTIDAD.
+    LO QUE HAY QUE DECIDIR, y ninguna esta votada:
+      a) El techo: por jugador, global del server, o los dos. Y si la cuota se
+         libera al recoger (como la del efectivo) o si es un presupuesto que no
+         vuelve.
+      b) Que pasa al llegar al techo: se rechaza el drop con motivo (la forma
+         de la casa, `Confirm` valida todo y no mueve nada) o se borra el mas
+         viejo. Lo segundo destruye un item de un jugador sin avisarle.
+      c) Si hay limpieza por tiempo. ⚠ El autor YA voto que NO para el efectivo
+         (2026-08-23), y el motivo se traslada entero: un prop que se evapora
+         destruye algo del jugador EN SILENCIO, y la cuota es un limite honesto
+         porque dice por que. Si esta entrada la reintroduce para los items,
+         tiene que explicar por que ahi si.
+      d) La frase del autor «los items deberian sobrevivir solo en un
+         contenedor o como loot de un muerto» es un DISENO, no un limite: dice
+         que el suelo sea temporal por naturaleza. Eso choca de frente con (c)
+         y con el drop tal como existe hoy.
+    CRUZA CON: el #15 (loot on death, ABIERTO y sin disenar) — quien limpia un
+    cadaver ya looteado ya esta adjudicado a Cargo en Cortex_ContratosEntrantes
+    §3.2, por ser el dueno del primitivo inventario-en-entidad. Y con el #12
+    (permisos de admin), si el techo global lo puede mover alguien en vivo.
+    NO CONFUNDIR CON el GC de blobs: esa clase murio con CRG-56 (el blob viaja
+    embebido en el archivo de su dueno). Esto es de ENTIDADES del mundo.

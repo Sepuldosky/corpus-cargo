@@ -8365,3 +8365,129 @@ nadie compare 3 contra 180 dentro de seis meses y crea que algo se movió.
 criterios ahora sería falsificar el instrumento. Las tres correcciones viven acá y en el catálogo.
 
 **La #61 queda CERRADA EN JUEGO.** CHANGELOG **81 `[APLICADO 2026-08-22]`**.
+
+---
+
+## 82. El dinero como entidad — comercio, SLICE 2 (`Cargo_Trade` §7) `[PENDIENTE]`
+
+El botón `$` del header estaba en pantalla **desde julio** contestando *«dropping and offering cash
+arrives with the next trade slice»*: `corpus_cargo_ui.lua` llamaba a `CARGO.Trade.MoneyButton(state)`
+**si existía**, y no existía. Ahora existe, y hace **dos cosas según el estado** — en **Solo** bota
+efectivo al mundo, en **Trade** agrega una **línea de solo-dinero** al trato.
+
+### Por qué el efectivo tiene que ser una ENTIDAD
+
+Es una consecuencia de diseño que §7 ya declaraba: *«botar dinero exige que el efectivo exista como
+entidad del mundo»*, porque hasta acá el dinero era **sólo un número del provider**. Entró
+`corpus_cargo_cash`, la entidad más chica posible: **no tiene def, ni blob, ni instancia, ni
+persistencia**. No es un ítem de Cargo y no pasa por `Items.Register` — un ítem tiene def, peso y
+footprint, y el efectivo no tiene ninguno de los tres (peso cero en v1).
+
+**No estrena puerta de recogida.** Va por el gate de `PlayerUse` del roadmap #27, en la forma ÍTEM:
+USE pelado lo carga como un prop de HL2, WALK+USE lo toma. Ese hook ya decide «toma deliberada» para
+tres formas y ésta es la cuarta; una cuarta puerta habría sido un segundo debounce y una segunda
+regla de WALK.
+
+### ⭐ El modelo es de CS:SOURCE, y eso está MEDIDO, no supuesto
+
+El autor propuso `props/cs_assault/money.mdl` citando que *«GMod incluye los modelos de CS:S por
+defecto desde un update de mediados de 2025»*. Se midió parseando el índice de los dos VPK
+(2026-08-23), y el resultado se parte en dos:
+
+| | Medición |
+|---|---|
+| ¿Existe el modelo? | **Sí**, en `cstrike_pak_dir.vpk`, con su `.phy`, `.vvd`, `.vtx` y materiales. La ruta del autor era exacta |
+| ¿GMod lo trae? | **NO.** `garrysmod_dir.vpk` tiene **cero** modelos de `cs_assault` |
+| ¿Se monta? | **Sí en esta máquina**: el `console.log` del autor dice `Mounting game 'Counter-Strike: Source' (cstrike, 240)` |
+
+**Lo que GMod sí trae es el SPAWNICON del prop** (`fallbacks_dir.vpk`), y ésa es casi seguro la causa
+de la confusión: la baldosa del spawnmenu se ve, quien no tiene CS:S la abre y le sale un ERROR.
+El destino es Workshop, o sea que ese jugador existe — así que el modelo va con **gate
+`Items.ModelUsable`** y cae a la misma caja de cartón que un ítem sin modelo. Es la regla que el banco
+de sonidos y los íconos del wheel ya siguen (COR-17: nada puede ASUMIR un montaje).
+
+### ⭐ El tope cuenta PROPS y no dólares, y la corrección es del autor
+
+El autor votó *«máximo 1000 por bulto, y máximo 10.000 tirados para que no tires más de 10 props»*.
+**Los dos números son el mismo con bultos de 1000, pero sólo uno acota lo que le preocupaba**:
+contando VALOR, diez mil bultos de $1 son diez mil props por la misma cuota. Así que el que manda es
+`cargo_cash_props_max` (10), y `cargo_cash_bundle_max` (1000) es un tope de LEGIBILIDAD — botar 2500
+deja 1000/1000/500 y nunca 834/833/833.
+
+**La cuota no lleva contador: cuenta las entidades.** Un contador hay que decrementarlo en cada forma
+en que un bulto puede morir —recogido, borrado por un admin, limpiado por el mapa, comido por el
+duplicator— y el camino que nadie previó es cómo una cuota deriva hasta que un jugador no puede botar
+nunca más, sin nada a qué culpar. Recorrer la clase cuesta una pasada sobre una lista acotada por la
+propia cuota, una vez por gesto, y **no puede estar mal**.
+
+**El rechazo es atómico y dice el número**: *«That would be 5 bundles and you have room for 2 ($2,000
+at most)»*, y no se cobra ni se spawnea nada. Un drop que colocara dos y después descubriera que no
+hay lugar para el tercero habría cobrado por props que no existen.
+
+**⚠ SIN TIMER DE EXPIRACIÓN, y es un voto con motivo escrito** (autor, 2026-08-23): un bulto que se
+evapora **destruye plata del jugador en silencio**. La cuota acota el mundo igual de duro —10 props
+por jugador, techo duro— y además **puede explicarse**. Un límite honesto le gana a una pérdida muda.
+
+### La línea de solo-dinero
+
+`basket.money` es **un número al lado** de las tablas `buy`/`sell` y no una línea falsa dentro de
+ellas: esas están keyeadas por `RefKey` y todo lo que las recorre —`PruneBasket`, los strips, la
+gramática de clics— asume una entrada con def detrás. Una entrada trucha con `id = "money"` habría
+que haberla exceptuado en cada uno de esos recorridos.
+
+Va en **una sola dirección** (el jugador ofrece, el trader no): la contraoferta es la maquinaria de la
+slice 3 (§6), e inventar la mitad acá sería una segunda vía de mover dinero que nadie audita.
+
+Entra en el **mismo neto** que los ítems (`gain - cost - offer`), así que se cobra en **un solo
+movimiento** y las guardas que ya existían la cuidan sin una segunda regla: el «no quedar en rojo»
+la alcanza por construcción. Y **la guarda de basket vacío pasó a contar el dinero** — sin eso,
+entregar plata sin ningún objeto (el ejemplo textual de §7, y el traspaso P2P entero de la slice 3)
+era inalcanzable desde el botón.
+
+### Verificación
+
+`glua_check` **49/49** (el archivo nuevo es la entidad). Harness **1346** (era 1307) = **83** FUENTES
+/ **835** server / **428** cliente. Selftest **100** / **107**, sin moverse.
+**`dev/sabotaje_cargo_slice2.py`, 18/18 en rojo**; las nueve suites vecinas re-corridas.
+
+**⚠ EL ARCHIVO DE LA ENTIDAD NO LO CARGA NINGUNA DE LAS DOS PASADAS.** `lua/entities/` lo carga el
+sistema de `scripted_ents` del engine, no el manifest — así que leer su TEXTO es lo único auditable
+offline. De ahí tres gates de FUENTES sobre él: la ruta del modelo, el gate `ModelUsable`, y el
+`Money.Add(activator, amount)` del pickup. Ese último sabotaje —quitar el crédito— deja los 1346
+checks verdes enteros y en juego destruye el dinero al levantarlo.
+
+**⚠ EL HARNESS NO TENÍA `Angle` CON MÉTODOS**, y hubo que extenderlo: los bultos se colocan con
+`eye:Forward()` y se abanican con `eye:Right()`. Se extendió **explícitamente**, que es lo que el
+propio header de `FakePlayer` manda (*«un método que falta tiene que gritar para que el harness se
+extienda, no para que se no-opee solo»*), con la trigonometría de Source de verdad — y **declarando
+que `Right()` ignora el roll**, porque el módulo pone pitch y roll en cero antes de colocar nada.
+
+**⚠⚠ Y UN SABOTAJE VIEJO SE DESARMÓ SOLO, otra vez el nº 95.** El ancla de
+`sabotaje_cargo_61.py` para el `FCVAR_REPLICATED` de la perilla global era la línea pelada
+`bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED),`, **única el día que se escribió**. Las dos convars del
+efectivo usan la misma expresión, así que pasó a contar **3** y el sabotaje imprimió `ANCLA x3` sin
+que nada reventara. Lo cazó **correr las suites vecinas después de tocar un archivo compartido**, que
+es la única defensa que existe.
+**El arreglo NO fue deformar el código para que el ancla volviera a ser única** —eso es contorsionar
+el árbol para que le quede cómodo al medidor— sino darle al script un **ancla de CONTEXTO**: se dice
+después de qué línea sabotear. El gate de FUENTES, mientras tanto, se comportó al revés y bien: cazó
+el cambio de cuenta en la primera corrida y el número se subió **a mano, de 1 a 3, con motivo**.
+
+### La pasada en juego: planilla AO
+
+**Planilla AO** (`dev/checks/cargo-efectivo-r1.html`, 10 filas). Mide lo que ninguna cuenta ve: que el
+**modelo resuelva** (y su rama de falla separa *ERROR rojo* = el gate falló, de *caja de cartón* = el
+gate anduvo y el modelo no resolvió), que el bulto se pueda **levantar** por la puerta compartida, y
+que los números lleguen a la pantalla. **La 10 es control de alcance con motivo**: esta slice tocó el
+`Confirm` —por donde pasan todos los tratos— y esa misma puerta de recogida.
+
+### Lo que esta slice NO trae
+
+El **slice 3** (jugador-trader, doble confirm, §6) sigue pendiente, y **arranca con una deuda que ya
+estaba declarada**: el **lock del basket** no existe, y §12.bis dice textual que es *«aceptable contra
+un NPC, obligatorio en el slice 3»*. El traspaso P2P de dinero no necesita mecanismo nuevo — es este
+mismo, con basket de solo-dinero de un lado.
+
+Y el **límite y la limpieza de props botados en general** no son de acá: hoy **no existe ninguno** —
+medido— y eso quedó abierto como **roadmap #80**. Esta slice no lo empeora, porque el efectivo nace
+con cuota; tampoco lo resuelve.

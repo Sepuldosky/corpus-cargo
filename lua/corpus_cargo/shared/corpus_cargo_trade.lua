@@ -144,6 +144,63 @@ function CARGO.Trade.PriceOfEntry(entry, mult)
     return base + math.floor(extra + 0.5)
 end
 
+-- ------------------------------------------------------------------
+-- CASH (§7, slice 2) — the shared half.
+--
+-- "Dropping" money forces cash to EXIST as a world entity, because until now
+-- money was only a number in the provider. Two knobs bound what that costs the
+-- world, and they are NOT interchangeable (author call 2026-08-23):
+--
+--   · `cargo_cash_bundle_max` is a readability cap: one prop never carries
+--     more than this, so dropping 2500 leaves three bundles.
+--   · `cargo_cash_props_max` is THE limit, and it counts PROPS. The author
+--     first named the ceiling in dollars ("10.000 max, so no more than 10
+--     props") — with 1000-bundles the two numbers coincide, but only one of
+--     them bounds what he was worried about: counting VALUE, ten thousand
+--     $1 bundles are ten thousand props for the same quota.
+--
+-- No despawn timer, and that was a call too: a bundle that evaporates DESTROYS
+-- a player's money in silence. The quota bounds the world just as hard and it
+-- can say why it refused — see roadmap #80 for the general case (dropped items
+-- have no limit and no cleanup at all today, which is worse and is not ours to
+-- fix here).
+--
+-- REPLICATED for the same reason as the price knobs: the client's prompt tells
+-- the player what the cap is, and a cap it read from its own default would
+-- promise a drop the server then refuses.
+-- ------------------------------------------------------------------
+CARGO.Trade.cvCashBundle = CreateConVar("cargo_cash_bundle_max", "1000",
+    bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED),
+    "Largest amount a single dropped cash bundle carries", 1, 1000000)
+
+CARGO.Trade.cvCashProps = CreateConVar("cargo_cash_props_max", "10",
+    bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED),
+    "How many cash bundles one player may have lying in the world at once", 0, 100)
+
+-- How many bundles an amount needs. Pure, and shared on purpose: the client
+-- refuses early with the same arithmetic the server refuses with, so the
+-- player never gets told "sure" and then "no".
+function CARGO.Trade.CashBundles(amount)
+    local n = math.floor(tonumber(amount) or 0)
+    if n <= 0 then return 0 end
+    return math.ceil(n / math.max(CARGO.Trade.cvCashBundle:GetInt(), 1))
+end
+
+-- Split an amount into the actual bundle values, biggest first. The last one
+-- carries the remainder — 2500 is 1000/1000/500 and never 834/833/833: a bundle
+-- you can read as "a thousand" is the point of the cap.
+function CARGO.Trade.CashSplit(amount)
+    local left = math.floor(tonumber(amount) or 0)
+    local per = math.max(CARGO.Trade.cvCashBundle:GetInt(), 1)
+    local out = {}
+    while left > 0 do
+        local put = math.min(left, per)
+        out[#out + 1] = put
+        left = left - put
+    end
+    return out
+end
+
 -- Stable key of a ref/entry, so client and server agree on what "the same
 -- line" is: uniques are their uid; stacks are id + condition (the same
 -- identity the inventory uses to merge stacks — no laundering of wear).

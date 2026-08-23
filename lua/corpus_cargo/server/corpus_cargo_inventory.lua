@@ -93,10 +93,17 @@ local cvPersist = CreateConVar("cargo_persistence", "1", FCVAR_ARCHIVE,
 -- Records: load / save / normalize
 -- ------------------------------------------------------------------
 
-local function SteamKey(ply)
+-- The key that says "this is the same owner", and the ONE house of that
+-- question: the record file is named with it, and the cash quota (§7) counts
+-- bundles by it. Public because the cash entity lives outside the module's
+-- files and must not re-derive it — a second copy of this rule is how a
+-- player's bundles stop counting as his after a rewrite here.
+function CARGO.Inventory.OwnerKey(ply)
     -- bots have no SteamID64; they get a session-only, non-persistent key
     return ply:SteamID64() or ("bot" .. ply:EntIndex())
 end
+
+local SteamKey = CARGO.Inventory.OwnerKey
 
 -- Every uid an OWNER can REACH: grid entries, equipped uniques (a STACK slot
 -- holds a table, not a uid — §4 amendment) and, recursively, whatever hangs in

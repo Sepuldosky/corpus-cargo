@@ -5,7 +5,31 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-22 (**#61 CERRADA EN JUEGO** — el **multiplicador de precio por
+**Última actualización:** 2026-08-23 (**SLICE 2 del comercio ESCRITA** — el **dinero como
+entidad**, CHANGELOG **82** `[PENDIENTE]`, planilla **AO** de 10 filas esperando la pasada).
+
+**El botón `$` dejó de ser una promesa.** Estaba en el header desde julio contestando *«arrives with
+the next trade slice»*; ahora hace **dos cosas según el estado**: en **Solo** bota efectivo al mundo,
+en **Trade** agrega una **línea de solo-dinero** al trato. El efectivo existe como **entidad**
+(`corpus_cargo_cash`, sin def ni blob ni persistencia) porque «botar dinero» no se puede expresar de
+otra forma, y se recoge por la **misma puerta** que un ítem (el gate de `PlayerUse` del #27: USE
+pelado carga, WALK+USE toma).
+⭐ **El modelo es de CS:Source y está MEDIDO, no supuesto**: `props/cs_assault/money.mdl` existe en
+`cstrike_pak_dir.vpk` y el `console.log` dice que se monta — pero **GMod NO lo trae** (cero modelos de
+`cs_assault` en su VPK; lo único propio es el **spawnicon**, que es lo que hace creer lo contrario).
+Va con gate `ModelUsable` y cae a la caja de cartón.
+⭐ **El tope cuenta PROPS y no dólares**, y esa corrección es del autor: con bultos de 1000 los dos
+números coinciden, pero contando valor diez mil bultos de $1 son diez mil props. **Sin timer**, con
+motivo escrito: un bulto que se evapora destruye plata en silencio; la cuota acota igual y **puede
+explicarse**. La cuota **no lleva contador — cuenta las entidades**, que es lo único que no puede
+derivar.
+Harness **1346** (era 1307) = 83 / 835 / 428; **`sabotaje_cargo_slice2.py` 18/18 en rojo**.
+⚠ **Un sabotaje viejo se desarmó solo (nº 95 otra vez)**: el ancla del `FCVAR_REPLICATED` de la #61
+dejó de ser única cuando las convars del efectivo estrenaron la misma expresión. Lo cazó correr las
+suites vecinas; se arregló con un **ancla de contexto**, no deformando el código.
+⚠ **Abierta la #80**: hoy **no existe ningún límite ni ninguna limpieza de ítems botados** — medido.
+
+Antes, el 2026-08-22: (**#61 CERRADA EN JUEGO** — el **multiplicador de precio por
 categoría**, planilla **AN 10/10 en UNA ronda**, CHANGELOG **81** `[APLICADO]`. **Quinta sección
 seguida que cierra en una ronda**: AI 13/13, AJ 7/7, AK 10/10, AL 8/8, AN 10/10).
 ⚠ **Tres desvíos del INSTRUMENTO, ninguno cambia el veredicto** y los tres están en la entrada 81:

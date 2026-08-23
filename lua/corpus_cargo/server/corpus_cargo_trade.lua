@@ -41,6 +41,7 @@ local NET_TRADE_OPEN    = Corpus.Net.Register("cargo", "trade_open")
 local NET_TRADE_SYNC    = Corpus.Net.Register("cargo", "trade_sync")
 local NET_TRADE_CLOSE   = Corpus.Net.Register("cargo", "trade_close")
 local NET_TRADE_CONFIRM = Corpus.Net.Register("cargo", "trade_confirm")
+local NET_CASH_DROP     = Corpus.Net.Register("cargo", "cash_drop")
 
 local USE_RANGE = 160 -- same reach the container session uses
 
@@ -495,9 +496,25 @@ function CARGO.Trade.Confirm(ply, trader, basket)
         function(r) return r.items end, rec, trader.buyMult, rec)
     if sells == nil then return false, gain end
 
-    if #buys == 0 and #sells == 0 then return false, "The basket is empty." end
+    -- MONEY-ONLY LINE (§7, slice 2): what the player throws in on top. Handing
+    -- money over with no object, or squaring an uneven barter. It is ONE
+    -- direction on purpose — the player offers, the trader does not — because
+    -- the trader's side of a basket is the slice 3 machinery (§6) and inventing
+    -- half of it here would be a second way to move money that nobody audits.
+    local offer = math.floor(tonumber(basket.money) or 0)
+    if offer < 0 then offer = 0 end
 
-    local net_ = gain - cost
+    -- The basket is no longer "empty" if it carries money, or handing cash over
+    -- would be refused as an empty deal.
+    if #buys == 0 and #sells == 0 and offer == 0 then
+        return false, "The basket is empty."
+    end
+
+    -- The offer is money LEAVING, so it reduces the net exactly like a purchase
+    -- does. Folding it into `net_` instead of moving it separately is what keeps
+    -- ONE money movement at the end of this function: two movements is how a
+    -- half-executed deal becomes possible.
+    local net_ = gain - cost - offer
 
     -- money: the player never ends up in the red (§3)
     if net_ < 0 then
@@ -652,5 +669,95 @@ end)
 hook.Add("PlayerDisconnected", "corpus_cargo_trade_viewers", function(ply)
     for _, live in pairs(CARGO.Trade._live) do
         live.viewers[ply] = nil
+    end
+end)
+
+-- ------------------------------------------------------------------
+-- CASH (§7, slice 2) — dropping money into the world.
+-- ------------------------------------------------------------------
+
+-- How many bundles this player already has lying around.
+--
+-- ⚠ IT COUNTS THE ENTITIES, IT DOES NOT KEEP A COUNTER. A counter needs to be
+-- decremented on every way a bundle can die — picked up, removed by an admin,
+-- cleaned by the map, eaten by a duplicator — and the one path nobody thought
+-- of is how a quota drifts until a player can never drop again, with nothing
+-- to blame. Walking the class costs one pass over a list bounded by this very
+-- quota, once per drop gesture, and it CANNOT be wrong.
+function CARGO.Trade.CashPropsOf(ply)
+    if not IsValid(ply) then return 0 end
+    local key = CARGO.Inventory.OwnerKey(ply)
+    local n = 0
+    for _, ent in ipairs(ents.FindByClass("corpus_cargo_cash")) do
+        if IsValid(ent) and ent.CargoCashOwner == key then n = n + 1 end
+    end
+    return n
+end
+
+-- Drop `amount` in front of the player. Returns ok, message.
+--
+-- ATOMIC, like Confirm (CRG-18's spirit): everything is validated and only then
+-- does anything move. A drop that spawned five bundles and then discovered it
+-- had no room for the sixth would have taken money for props that do not
+-- exist — and the player would have no way to tell.
+function CARGO.Trade.DropCash(ply, amount)
+    if not IsValid(ply) then return false, "No player." end
+
+    local n = math.floor(tonumber(amount) or 0)
+    if n <= 0 then return false, "Enter an amount above zero." end
+
+    local have = CARGO.Money.Get(ply)
+    if have < n then
+        return false, "You only have " .. CARGO.Money.Format(have) .. "."
+    end
+
+    local want = CARGO.Trade.CashBundles(n)
+    local live = CARGO.Trade.CashPropsOf(ply)
+    local room = CARGO.Trade.cvCashProps:GetInt() - live
+    if want > room then
+        -- The refusal says the NUMBER, not just "too many": a limit the player
+        -- cannot see is indistinguishable from a bug. This is the whole reason
+        -- there is no despawn timer — the quota can explain itself.
+        if room <= 0 then
+            return false, "You already have " .. live
+                .. " cash bundles lying around. Pick some up first."
+        end
+        return false, "That would be " .. want .. " bundles and you have room for "
+            .. room .. " (" .. CARGO.Money.Format(room * CARGO.Trade.cvCashBundle:GetInt())
+            .. " at most)."
+    end
+
+    if not CARGO.Money.Take(ply, n) then
+        return false, "The money didn't move."
+    end
+
+    local key = CARGO.Inventory.OwnerKey(ply)
+    local eye = ply:EyeAngles()
+    eye.p, eye.r = 0, 0
+    local base = ply:GetPos() + eye:Forward() * 48 + Vector(0, 0, 24)
+
+    for i, chunk in ipairs(CARGO.Trade.CashSplit(n)) do
+        local ent = ents.Create("corpus_cargo_cash")
+        if IsValid(ent) then
+            -- fanned out so several bundles do not spawn inside each other and
+            -- get shoved across the map by the physics solver
+            ent:SetPos(base + eye:Right() * ((i - 1) * 10) + Vector(0, 0, (i - 1) * 2))
+            ent:SetAngles(Angle(0, eye.y, 0))
+            ent:Spawn()
+            ent:CargoSetCash(chunk, key)
+            local phys = ent:GetPhysicsObject()
+            if IsValid(phys) then phys:SetVelocity(eye:Forward() * 40) end
+        end
+    end
+
+    CARGO.Inventory.Touch(ply)
+    return true, CARGO.Money.Format(n)
+end
+
+net.Receive(NET_CASH_DROP, function(_, ply)
+    local amount = net.ReadUInt(32)
+    local ok, msg = CARGO.Trade.DropCash(ply, amount)
+    if not ok then
+        CARGO.Inventory.Notice(ply, msg)
     end
 end)

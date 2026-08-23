@@ -18,6 +18,7 @@ local NET_TRADE_OPEN    = Corpus.Net.Register("cargo", "trade_open")
 local NET_TRADE_SYNC    = Corpus.Net.Register("cargo", "trade_sync")
 local NET_TRADE_CLOSE   = Corpus.Net.Register("cargo", "trade_close")
 local NET_TRADE_CONFIRM = Corpus.Net.Register("cargo", "trade_confirm")
+local NET_CASH_DROP     = Corpus.Net.Register("cargo", "cash_drop")
 
 -- Height of the basket strip on BOTH sides: the trader's Buy panel and the
 -- player's Sell panel (which also carries the net + Cancel/Confirm row).
@@ -166,6 +167,27 @@ end
 
 function CARGO.Trade.BasketClear()
     basket.buy, basket.sell = {}, {}
+    basket.money = 0
+end
+
+-- ------------------------------------------------------------------
+-- The money-only line (§7, slice 2).
+--
+-- It is NOT a line of the buy/sell tables and that is deliberate: those are
+-- keyed by RefKey and every path that walks them —PruneBasket, the strips, the
+-- click grammar— assumes an entry with a def behind it. Money has no ref, no
+-- def and no count, so it rides beside them as a single number. A fake entry
+-- with id = "money" would have to be special-cased in every one of those walks.
+-- ------------------------------------------------------------------
+
+function CARGO.Trade.BasketMoney()
+    return basket.money or 0
+end
+
+function CARGO.Trade.SetBasketMoney(amount)
+    local n = math.floor(tonumber(amount) or 0)
+    basket.money = math.max(n, 0)
+    CARGO.UI.RefreshTrade()
 end
 
 -- Totals, computed with the SAME shared math the server will re-run (§4). The
@@ -183,6 +205,10 @@ function CARGO.Trade.Totals()
         local unit = CARGO.Trade.PriceOfEntry(line.entry, tradeState.buyMult) or 0
         gain = gain + unit * line.count
     end
+    -- The offer is money leaving, so it rides with the COST — the same side of
+    -- the net the server puts it on. Showing it anywhere else would make the
+    -- deal bar and the Confirm disagree about a number the player is reading.
+    cost = cost + (basket.money or 0)
     return gain - cost, cost, gain
 end
 
@@ -201,14 +227,17 @@ end
 
 function CARGO.Trade.SendConfirm()
     if tradeState == nil then return end
-    local payload = { traderId = tradeState.traderId, buy = {}, sell = {} }
+    local payload = { traderId = tradeState.traderId, buy = {}, sell = {},
+        money = basket.money or 0 }
     for _, line in pairs(basket.buy) do
         payload.buy[#payload.buy + 1] = { ref = line.ref, count = line.count }
     end
     for _, line in pairs(basket.sell) do
         payload.sell[#payload.sell + 1] = { ref = line.ref, count = line.count }
     end
-    if #payload.buy == 0 and #payload.sell == 0 then return end
+    -- a basket that is nothing but money IS a deal (§7: handing cash over), so
+    -- the emptiness test has to count it or Confirm becomes unreachable for it
+    if #payload.buy == 0 and #payload.sell == 0 and payload.money == 0 then return end
 
     net.Start(NET_TRADE_CONFIRM)
     CARGO.Util.WriteBlob(payload)
@@ -220,6 +249,52 @@ end
 function CARGO.Trade.Cancel()
     CARGO.Trade.BasketClear()
     CARGO.UI.RefreshTrade()
+end
+
+-- ------------------------------------------------------------------
+-- The `$` button of the header (§7). The hook has been cabled in
+-- corpus_cargo_ui.lua since the slice 1 header was built, waiting for this
+-- function to exist; until it did, the button said so in chat.
+--
+-- ONE button, TWO meanings, and the state decides which — that IS the design
+-- (§7): in Solo you drop cash into the world, in Trade you offer it across the
+-- deal. There is deliberately no way to DROP while the trade screen is open:
+-- the button is taken by the offer, and inventing a second gesture for it would
+-- be a route the design never described.
+--
+-- The amount always comes from a PROMPT and never from the click grammar of
+-- the grid (author call 2026-08-23). A click that drops a quarter of your
+-- wallet without asking is expensive to undo, and money is the one thing where
+-- an exact number is the normal ask.
+-- ------------------------------------------------------------------
+function CARGO.Trade.MoneyButton(state)
+    if state == "trade" then
+        if tradeState == nil then return end
+        T.Prompt("Offer money", "How much do you put in?",
+            tostring(CARGO.Trade.BasketMoney()), function(text)
+                CARGO.Trade.SetBasketMoney(tonumber(text))
+            end)
+        return
+    end
+
+    -- Solo (and Loot: the button lives in the shared header, and dropping cash
+    -- next to an open container is the same gesture as dropping it anywhere).
+    local cap = CARGO.Trade.cvCashBundle:GetInt() * CARGO.Trade.cvCashProps:GetInt()
+    T.Prompt("Drop money",
+        "How much do you drop? (up to " .. CARGO.Trade.FormatMoney(cap)
+            .. " in " .. CARGO.Trade.cvCashProps:GetInt() .. " bundles)",
+        "", function(text)
+            local n = math.floor(tonumber(text) or 0)
+            -- The client refuses the obvious nothing and lets the SERVER refuse
+            -- everything else (CRG-6). It does not pre-check the wallet or the
+            -- quota: both can change between typing and sending, and a client
+            -- that guesses would say "no" to a drop the server would have
+            -- allowed — the exact mirror of the estafa it is meant to prevent.
+            if n <= 0 then return end
+            net.Start(NET_CASH_DROP)
+            net.WriteUInt(math.min(n, 4294967295), 32)
+            net.SendToServer()
+        end)
 end
 
 function CARGO.Trade.NotifyClosed()
@@ -501,6 +576,34 @@ function CARGO.Trade.RefreshStrips(left)
         list:Clear()
         for key, line in SortedPairs(basket.sell) do
             StripLine(list, "sell", key, line, tradeState.buyMult)
+        end
+        -- The money line goes LAST and only when there is one. It has to be
+        -- visible and it has to be removable: an offer the player cannot see is
+        -- money he confirms away without reading, and one he cannot take back
+        -- would force him to cancel the whole basket to fix a typo.
+        local offer = CARGO.Trade.BasketMoney()
+        if offer > 0 then
+            local row = list:Add("DPanel")
+            row:Dock(TOP)
+            row:SetTall(24)
+            row:DockMargin(0, 2, 0, 0)
+            row.Paint = function(_, w, h)
+                draw.RoundedBox(4, 0, 0, w, h, T.Colors.panelAlt)
+                draw.SimpleText("Cash offered", "CargoSmall", 6, h / 2,
+                    T.Colors.amber, nil, TEXT_ALIGN_CENTER)
+                draw.SimpleText(CARGO.Trade.FormatMoney(offer), "CargoSmall",
+                    w - 24, h / 2, T.Colors.amber, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+            end
+            local clear = vgui.Create("DButton", row)
+            clear:Dock(RIGHT)
+            clear:SetWide(20)
+            clear:SetText("")
+            clear.Paint = function(self, w, h)
+                draw.SimpleText("x", "CargoSmall", w / 2, h / 2,
+                    self:IsHovered() and T.Colors.amber or T.Colors.textDim,
+                    TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            end
+            clear.DoClick = function() CARGO.Trade.SetBasketMoney(0) end
         end
     end
 end
