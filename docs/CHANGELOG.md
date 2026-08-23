@@ -8187,7 +8187,7 @@ que copiaba las tres líneas del envío quedó en `ANCLA x0` **el mismo día en 
 
 ---
 
-## 81. El multiplicador de precio por categoría (roadmap #61) `[PENDIENTE]`
+## 81. El multiplicador de precio por categoría (roadmap #61) `[APLICADO 2026-08-22]`
 
 Pedido del autor, textual: *«agreguemos un factor de multiplicación con un cvar a cargo (…) algo así
 como `cargo_value_mult_food 10` (…) podríamos aplicar eso para toda categoría, así se multiplica la
@@ -8304,3 +8304,64 @@ Ningún cambio en cómo se declara `value` en una def, ni que Cargo conozca ning
 particular: **la perilla es ciega al significado** y no sabe que «food» es comida (CRG-1). El sub-voto
 (c) del roadmap —el default de 5 USD para comestibles sin precio propio— **no es de Cargo**: vive en
 quien arma el stock del trader, porque Cargo no inventa el `value` de una def ajena.
+
+### Pasada en juego (2026-08-22) — planilla AN **10/10 en una ronda**, y sin un rojo
+
+**Quinta sección seguida que cierra así** (AI 13/13, AJ 7/7, AK 10/10, AL 8/8, AN 10/10). Lo medido,
+con las palabras del autor:
+
+- **AN4, el pedido textual**: *«un salame de stalker a 3 usd → ahora con el mult en 10 está a 30 usd»*.
+- **AN5, el control negativo**: la munición *«está en 4 usd porque ese es su valor real»* — no se movió.
+- **AN7, la composición**: con global 2 encima, *«el salame lo puedo vender a 60»*. **x20 exacto** —
+  no 36 (la lectura como suma) ni 30 (la global ignorada). Es la fila que separa el producto de sus
+  dos impostores, y salió con el número.
+- **AN8, el 0**: *«el salame ya no tiene precio marcado en la ui y no se puede vender»*. Y lo dice del
+  lado de **vender**, o sea que el voto (b) —las dos puntas— quedó ejercido de paso.
+- **AN9, el archive**: tras el reinicio, `"cargo_value_mult_food" = "0" ( def. "1" )`.
+
+### ⚠ TRES COSAS DEL REPORTE QUE NO COINCIDEN CON LO QUE LA PLANILLA PEDÍA, y las tres son del INSTRUMENTO
+
+Ninguna cambia el veredicto —las diez pasan— pero las tres quedan escritas, porque una fila verde con
+la evidencia al lado es donde aparece casi todo lo que se descubre tarde.
+
+**1. ⭐ AN2 PIDIÓ UNA PALABRA QUE LA CONSOLA NO IMPRIMIÓ, y la fila se marcó PASA igual.** El criterio
+decía *«en la lista de flags aparecen **archive** y **replicated**»*. Lo impreso fue:
+
+```
+"cargo_value_mult" = "1" min. 0.000000
+ game replicated lua_server
+```
+
+**`replicated` está —que es la mitad que importaba y la que motivó la fila— y `archive` NO.** O sea
+que **la mitad archive de esa fila no se midió ahí**: la midió la **AN9**, por comportamiento, que es
+más fuerte que el rótulo. Dos explicaciones siguen abiertas y no se elige ninguna de memoria
+(**CRG-24**): que GMod no imprima ese flag, o que el autor haya consultado la **copia replicada del
+cliente**, que no debería archivar nada porque el valor lo dicta el server. Se resuelve con **un
+renglón**: consultar `cargo_persistence`, que es `FCVAR_ARCHIVE` **sin** replicated. Si imprime
+`archive`, la ausencia en la nuestra es la copia del cliente; si no lo imprime, GMod no lo lista y el
+criterio era **insatisfacible por construcción** para esa mitad.
+
+*La lección es la de siempre y es una REPETICIÓN: **un criterio con dos condiciones se cumple a
+medias y se lee como cumplido***. Ya está en el catálogo con otro caso (2171 pedido, 1725 impreso,
+PASA, tres rondas) y volvió a pasar acá — con el agravante de que **la evidencia que lo desmiente
+estaba pegada en la propia nota de la fila**. El otro filo es primo del 119: **pedir una evidencia sin
+haber verificado que el instrumento pueda producirla**.
+
+**2. La base de AN3 salió 4 y no 8, y el número está explicado.** La planilla nombraba el **Trader
+demo** y sus precios de la columna del trader (Canned Food 180, 9x19 FMJ 8, con `sell_mult 1.0`). El
+autor reporta la munición en **4**, que es exactamente **8 × 0,5** — el `buy_mult`, o sea el lado
+**vender**. **La fila estaba escrita para sobrevivir a esto**: su rama de falla dice *«anótalos igual:
+no invalida la planilla, la re-basa»*, y como **cada fila posterior es una RAZÓN contra esa base**,
+ninguna queda tocada. Lo que faltó en la fila fue **decir qué lado de la celda leer** — el mismo ítem
+tiene dos precios en la misma pantalla, y el criterio nombró uno sin nombrarlo.
+
+**3. El sujeto se cambió: el arco corrió sobre un salame de corpus-stalker, no sobre la Canned Food
+(dev).** No es un defecto —es **mejor sujeto**, porque es el caso que motivó la entrada: la comida
+real que quedaba económicamente trivial— pero significa que **los números de las notas no son los que
+la planilla nombra**, y sólo se pueden leer como razones (3 → 30 → 60 → sin precio). Anotado para que
+nadie compare 3 contra 180 dentro de seis meses y crea que algo se movió.
+
+**La planilla NO se reescribe.** Es el registro de la corrida con la que se midió; corregir sus
+criterios ahora sería falsificar el instrumento. Las tres correcciones viven acá y en el catálogo.
+
+**La #61 queda CERRADA EN JUEGO.** CHANGELOG **81 `[APLICADO 2026-08-22]`**.

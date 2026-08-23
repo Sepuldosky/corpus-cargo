@@ -1794,9 +1794,18 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     Que OpenFor no compruebe dueno (cualquiera a 160 u abre cualquier
     contenedor) es un hecho de Cargo que el area hospital ENSANCHA — de 160 u a
     lo que mida la sala — pero no crea. Vive en el #12, no aca.
-61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — ESCRITA Y
-    VERIFICADA OFFLINE el 2026-08-22; PASADA EN JUEGO PENDIENTE (planilla AN,
-    dev/checks/cargo-mult-precio-r1.html, 10 filas). CHANGELOG 81 [PENDIENTE].
+61. MULTIPLICADOR DE PRECIO POR CATEGORIA [Cargo trade/items] — CERRADA EN
+    JUEGO el 2026-08-22, planilla AN 10/10 EN UNA RONDA
+    (dev/checks/cargo-mult-precio-r1.html). CHANGELOG 81 [APLICADO 2026-08-22].
+    ⚠ TRES DESVIOS DEL INSTRUMENTO, ninguno cambia el veredicto y los tres estan
+    escritos en la entrada 81 del CHANGELOG: (1) AN2 pidio que la consola
+    imprimiera el flag `archive` y NO lo imprimio —`replicated` si, que era la
+    mitad que importaba—, asi que esa mitad la midio la AN9 por comportamiento;
+    queda un renglon para resolverlo (consultar `cargo_persistence`, que es
+    ARCHIVE sin replicated). (2) La base de AN3 salio 4 y no 8: es el lado
+    VENDER (8 x 0,5 del buy_mult), y la fila estaba escrita para re-basarse.
+    (3) El arco corrio sobre un salame de corpus-stalker y no sobre la Canned
+    Food (dev), asi que los numeros de las notas se leen como RAZONES.
     Abierta 2026-08-17, rumbo ratificado el 2026-08-18, los DOS votos que
     faltaban resueltos el 2026-08-22.
     LO QUE QUEDO: `Items.RegisterCategory` crea `cargo_value_mult_<id>`

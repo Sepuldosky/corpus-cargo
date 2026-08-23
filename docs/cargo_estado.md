@@ -5,9 +5,16 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-22 (**#61 ESCRITA y verificada offline** — el **multiplicador de
-precio por categoría**, CHANGELOG **81** `[PENDIENTE]`, planilla **AN** de 10 filas esperando la
-pasada en juego).
+**Última actualización:** 2026-08-22 (**#61 CERRADA EN JUEGO** — el **multiplicador de precio por
+categoría**, planilla **AN 10/10 en UNA ronda**, CHANGELOG **81** `[APLICADO]`. **Quinta sección
+seguida que cierra en una ronda**: AI 13/13, AJ 7/7, AK 10/10, AL 8/8, AN 10/10).
+⚠ **Tres desvíos del INSTRUMENTO, ninguno cambia el veredicto** y los tres están en la entrada 81:
+**AN2 pidió que la consola imprimiera el flag `archive` y no lo imprimió** —`replicated` sí, que era
+la mitad que importaba—, así que esa mitad la midió la **AN9** por comportamiento; es la lección de
+*un criterio con dos condiciones se cumple a medias y se lee como cumplido*, **repetida**, y con la
+evidencia que la desmiente pegada en la nota de la propia fila. La base de **AN3** salió **4 y no 8**
+(es el lado **vender**: 8 × 0,5 del `buy_mult`), y el arco corrió sobre un **salame de
+corpus-stalker** y no sobre la Canned Food (dev) — los números de las notas se leen como **razones**.
 
 **#61 — cada categoría nace con su perilla.** `Items.RegisterCategory` crea
 `cargo_value_mult_<id>` (default 1, **ARCHIVE + REPLICATED**) y guarda el **objeto ConVar** en el
