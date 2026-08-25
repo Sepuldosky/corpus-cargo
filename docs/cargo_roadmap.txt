@@ -2996,6 +2996,72 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     embebido en el archivo de su dueno). Esto es de ENTIDADES del mundo.
 
 
+81. HANDS GOLPEA CUANDO NO CORRESPONDE [Cargo hands]
+    Reporte del autor en la r1 del CHANGELOG 83 (2026-08-25), desde la nota de
+    un check que PASO, y REFINADO por el autor el mismo dia. La entrada se
+    reescribio entera porque SU PREMISA ERA FALSA: no hay que implementar
+    lanzar. Ver el texto original al pie.
+
+    LO QUE EL AUTOR MIDIO EN JUEGO, y es lo que endereza la entrada:
+    «de todas maneras veo que se pueden lanzar los objetos como HL2 con un
+    poco de fuerza; el problema es que tirarlos con M1 hace que Hands golpee
+    y eso es lo que quiero frenar.»
+    O sea: el LANZAR ya funciona solo — `ply:PickupObject(ent)` del portero ES
+    el carry de HL2 y el engine ya le da el M1 que lanza. Lo que sobra es el
+    puñetazo encima. ⭐ LA ENTRADA NO ES «AGREGAR UNA ACCION», ES «SUPRIMIR
+    UNA QUE ESTORBA», y eso la vuelve mucho mas barata de lo que decia el
+    texto original.
+
+    Y EL AUTOR APORTO UN SEGUNDO CASO, QUE ES EL MISMO DEFECTO:
+    «Hands en el menu del inventario de Cargo con M1 suele golpear si tocas
+    mucho, por eso cuando tradeo con Sidorovich a veces le doy un puñetazo en
+    la cara.»
+    El frame hace `MakePopup()` (corpus_cargo_ui.lua:1222) y el cursor sale,
+    pero GMod SIGUE mandandole `+attack` al arma. Son dos contextos y un solo
+    defecto: **`SWEP:PrimaryAttack` no pregunta NADA antes de pegar**
+    (corpus_cargo_hands.lua:499 — entra derecho, sin una sola guarda).
+
+    ⭐⭐ EL REMEDIO YA EXISTE EN EL MODULO Y ESTA PROBADO EN JUEGO. No hay que
+    inventar el mecanismo: `corpus_cargo_holster.lua:193-199` ya scrubbea los
+    botones mientras corre la transicion de enfundado —
+        local LOCK_BUTTONS = bit.bor(IN_ATTACK, IN_ATTACK2, IN_RELOAD)
+        hook.Add("StartCommand", ..., function(ply, cmd)
+            if ply.CargoHolstering and ply:Alive() then
+                cmd:SetButtons(bit.band(cmd:GetButtons(), bit.bnot(LOCK_BUTTONS)))
+            end
+        end)
+    — y ese candado ya tiene UN disparador. Esta entrada le agrega el segundo
+    y el tercero. Es el mismo hallazgo del CHANGELOG 83 otra vez: lo pedido ya
+    estaba casi todo.
+
+    ⚠ EL UNICO PROBLEMA REAL ES DE REALM, Y ES EL DEL MENU. `StartCommand`
+    corre en el SERVER, y el server NO SABE que el cliente tiene un DFrame
+    abierto. Las dos salidas y su costo:
+      * publicar «tengo el menu abierto» (el patron que Cargo ya usa con
+        `cargo_torch`, ver el header de corpus_cargo_lights.lua) — una NW mas,
+        y llega un tick tarde;
+      * resolverlo del lado CLIENTE. `vgui.CursorVisible()` esta a mano y el
+        wheel ya lo usa (corpus_cargo_wheel.lua:724, 1332) — pero OJO: eso es
+        verdadero con CUALQUIER panel abierto, no solo el nuestro, y hay que
+        decidir si eso esta bien o es de mas.
+    El caso del OBJETO CARGADO no tiene este problema: `ply.CargoCarryEnt` ya
+    vive en el server (capture.lua:1130), que es justo donde corre el candado.
+
+    ALCANCE, VOTADO POR EL AUTOR (2026-08-25): **SOLO Hands.** Queda escrito
+    que el carry del portero funciona con cualquier arma en la mano, asi que
+    el sintoma «golpeo mientras cargo» podria existir con otras bases — pero
+    el arreglo se acota a Hands por decision, no por descuido.
+
+    ⚠ CONTROL NEGATIVO OBLIGATORIO, y es el que define la entrada: **sin nada
+    cargado y sin menu abierto, Hands TIENE que seguir golpeando.** Un candado
+    que se olvida de abrirse convierte el swep de melee en un adorno, y eso se
+    descubre en juego mucho despues. Ver el nº 42 del catalogo de controles.
+    El segundo: **con el menu abierto, el clic tiene que seguir sirviendo para
+    la UI** (mover items, apretar botones) — suprimir el ataque no puede
+    suprimir la interfaz.
+
+81. (texto original de la entrada, para leer de que salio)
+
 81. AL GOLPEAR CON UN OBJETO CARGADO, LANZARLO HACIA ADELANTE [Cargo hands/capture]
     Reporte del autor en la r1 del CHANGELOG 83 (2026-08-25), desde la nota de
     un check que PASO: «una cosa que me molesta de mi swep de hands de cargo es
