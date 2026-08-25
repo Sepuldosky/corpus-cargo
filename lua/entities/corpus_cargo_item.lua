@@ -120,6 +120,10 @@ if SERVER then
         end
         CARGO.Inventory.Touch(activator)
         CARGO.Inventory.NotifyPickup(activator, self.CargoEntry.id, self.CargoEntry.count or 1)
+        -- The world gate stepped aside for us (WALK+USE on an item drop), so
+        -- the pickup gesture is armed and this is its success path. A Use that
+        -- did NOT come through the gate never armed it and animates nothing.
+        if CARGO.PickupAnim then CARGO.PickupAnim.Play(activator) end
         self:Remove()
     end
 

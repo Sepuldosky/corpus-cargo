@@ -57,6 +57,29 @@ del workspace, con el censo completo de los packs, está en `dev/Creditos_Modelo
 
 ---
 
+## La animación de recoger — [GCAL] Improved Manual Pickup
+
+El gesto que hace el brazo al tomar algo del suelo con **WALK+USE** viene de ahí. Es **código y
+ajuste**, no un asset: Cargo **no copia ningún archivo** de esos dos addons.
+
+| Qué | Quién | WSID |
+|---|---|---|
+| **[GCAL] Improved Manual Pickup** — de él se recicló la **tabla de ajuste** del gesto (`lerp_peak` 0,7 · `lerp_speed_in` 1 · `lerp_speed_out` 0,8 · `lerp_curve` 2,5 · `speed` 1), que es el *"use"* de VManip ralentizado y suavizado hasta que se lee como *levantar algo del piso* en vez de *apretar un botón*. Ese ajuste es la parte del addon que costó gusto y no código | **Sin verificar** — el header del `.gma` trae el placeholder `Author Name` y el `.lua` no acredita a nadie. El pack se presenta como una reescritura de **VManip Manual Pickup** | [`3722869921`](https://steamcommunity.com/sharedfiles/filedetails/?id=3722869921) |
+| **GCAL — Garry's Mod Compliant Armature Layer** — la biblioteca que **reproduce** el gesto y de la que sale el modelo `c_vmanipinteract.mdl`. Se consume **por API** (`GCAL:RegisterAnim` / `GCAL:Play`) y el modelo se referencia **por ruta en runtime**: no viaja nada en el `.gma` de Cargo | **Midawek** — no del header del `.gma` (dice el placeholder `Author Name`) sino **del propio código**: `lua/autorun/gcal_init.lua:15` enlaza <https://github.com/Midawek/gcal>. GCAL a su vez acredita a *M4K0*, *Evgeny Akabenko*, *Nak* y *Chen* como contribuyentes | [`3727245204`](https://steamcommunity.com/sharedfiles/filedetails/?id=3727245204) |
+
+**Lo que NO se recicló**, y es casi todo el addon de origen: su sistema de pickup manual entero —el
+veto de `AllowPlayerPickup`, su tabla de clases `item_ammo_*`, el malabar con
+`m_bPreventWeaponPickup` y su timer de respaldo, el halo verde estilo NMRIH y el modelo del ítem
+colgado de la mano—. Cargo ya tenía todos esos trabajos hechos en su portero de `PlayerUse`
+(`corpus_cargo_capture.lua`), que es más viejo y más ancho. **Se recicló una sola cosa: la
+animación.**
+
+> **Si eres el autor de cualquiera de los dos y quieres que esto se retire, se retira** — misma regla
+> que arriba, sin condiciones. El acople es un archivo (`shared/corpus_cargo_pickupanim.lua`) y una
+> convar (`cargo_pickup_gesture 0`), así que sale sin tocar nada más.
+
+---
+
 ## Otros assets de terceros ya acreditados en su sitio
 
 No se repiten acá; el crédito vive donde se usa, que es donde alguien lo va a leer.

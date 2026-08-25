@@ -1583,6 +1583,59 @@ convar `cargo_weapon_world_pickup` sigue gateando **solo** la rama de armas, no 
 **Sin convars nuevas** en este bloque. Net nuevo: `belt_move`, `unload` (ambos vía
 `Corpus.Net.Register("cargo", …)`, como todo mensaje del módulo).
 
+#### El gesto de recoger (CHANGELOG 83)
+
+Pedido del autor el 2026-08-25: que tomar algo del piso **se vea**. Reciclado de *[GCAL] Improved
+Manual Pickup* (`3722869921`) sobre **GCAL** (`3727245204`); créditos en
+[`CREDITOS.md`](CREDITOS.md).
+
+**El acople es chico porque el gate ya era el sistema.** El addon de origen trae un pickup manual
+completo para ítems de HL2 —veta `AllowPlayerPickup`, tabla propia de clases, teletransporte de la
+entidad, malabares con `m_bPreventWeaponPickup`, halo verde— y Cargo ya hacía **las seis cosas**,
+sobre **cinco formas** en vez de una, con la regla WALK+USE ya escrita desde el roadmap #16. De 354
+líneas se reciclaron **12**: la tabla de ajuste del gesto.
+
+- **Quién arma:** `CARGO.PickupAnim.Arm(ply)`, llamado **sólo en la rama WALK del gate**. Eso es lo
+  que confina el gesto a una toma deliberada del piso: comprar, el loadout y mover una celda pasan
+  por las mismas funciones de `GiveItem`, y **ninguna es un jugador estirando la mano**.
+- **Quién dispara:** `CARGO.PickupAnim.Play(ply)` en los **seis** caminos de éxito (caja de
+  munición, pickup de tercero, arma duplicada, `PickupWeapon`, `ENT:Use` del drop, `ENT:Use` del
+  fajo). Nunca antes de saber que la toma entró — **una toma rechazada por peso no anima**.
+- **El sello es `CurTime()`**, no un booleano: deja pasar las dos tomas delegadas —llegan a su
+  `ENT:Use` en la misma llamada del engine— y deja afuera un flag viejo de otro frame.
+
+**Dependencia blanda**, como la NVG de Neosun: sin GCAL el global es `nil` y Cargo se comporta
+igual que antes. **No hay fallback a un VManip nativo** a propósito — GCAL es su reemplazo y avisa
+de instalaciones que conviven; un segundo camino sólo agregaría una manera de quedar a medio
+cablear.
+
+**Dos cosas medidas que gobiernan el archivo** y que no se pueden deducir de la documentación de
+GCAL:
+
+1. **GCAL elige la secuencia del modelo por el NOMBRE de la animación** (`gcal_core.lua:824-845`).
+   El pack de origen se salva por casualidad: `interactslower` contiene el token `interact`, que es
+   el nombre de la secuencia. Una anim con nombre propio cae al camino *pose-only* — **gesto
+   equivocado, sin un solo error**. Se declara `sequence = "interact"`, que es el candidato #2 y
+   explícito.
+2. **El `net` de `GCAL:Play` no dice de qué jugador** (`:2841-2860`): el receptor lo reproduce
+   **sobre sí mismo**, así que un broadcast le movería el brazo a todo el server. De ahí el
+   `recipients = ply`. La contracara honesta: **en multiplayer los demás no ven la toma**.
+
+**El freno sale de un número medido**: `c_vmanipinteract.mdl` corre `interact` en 46 frames a 55 fps
+= **0,818 s**, leído del `studiohdr`. El debounce del gate (0,4 s) se sube a cubrirlo
+(`cargo_pickup_gesture_time`, default 0,8) o una segunda toma reinicia la animación a mitad de
+camino. Los 0,4 s siguen siendo el piso de todo lo que no anima.
+
+**Perillas:** `cargo_pickup_gesture` (1) apaga el gesto sin tocar nada más;
+`cargo_pickup_gesture_time` (0.8) es el freno, y en `0` se vuelve al debounce de fábrica.
+**Instrumento:** `cargo_pickupanim_diag [play]` — un concommand propio y no un `lua_run_cl`, porque
+la consola de GMod parte el argumento en `( ) ' : { }`.
+
+**Lo que se descartó y no es un recorte:** el halo verde (el menú interactivo contesta mejor qué es
+un objeto, y Cargo ya lo había descartado en `corpus_cargo_pickup.lua:3-4`) y el modelo del ítem en
+la mano (el gesto se quiere por lo que cuesta y como señal de que la toma entró, no como un segundo
+informe de inventario).
+
 #### Botar desde el cinturón (#72 — entry 74)
 
 Reporte del autor, en juego el 2026-08-19: *«Falta drop desde el belt para expulsarlo del inventario

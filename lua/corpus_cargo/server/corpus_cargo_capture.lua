@@ -1034,6 +1034,12 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
     end
 
     if ply:KeyDown(IN_WALK) then
+        -- The pickup GESTURE is armed here and fired on each success path
+        -- below (corpus_cargo_pickupanim.lua). Arming in the WALK branch and
+        -- nowhere else is what confines it to a deliberate floor take: every
+        -- other way an item reaches the inventory — trader, loadout, grid
+        -- move — goes through the same give functions and is not a reach.
+        CARGO.PickupAnim.Arm(ply)
         if isItem then return end -- deliberate take: ENT:Use collects it
         if ammoSpec ~= nil then
             -- ammo box: the give is ours (no engine grant exists to convert).
@@ -1042,6 +1048,7 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
             if CARGO.Inventory.GiveItem(ply, ammoSpec.id, ammoSpec.count) then
                 ent.CargoAmmoTaken = true
                 CARGO.Inventory.NotifyPickup(ply, ammoSpec.id, ammoSpec.count)
+                CARGO.PickupAnim.Play(ply)
                 SafeRemoveEntityDelayed(ent, 0)
             else
                 -- too heavy: it stays on the floor, where he can come back for it
@@ -1059,6 +1066,7 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
             if okPick then
                 ent.CargoPickupTaken = true
                 CARGO.Inventory.NotifyPickup(ply, pickSpec.id, pickSpec.count or 1)
+                CARGO.PickupAnim.Play(ply)
                 SafeRemoveEntityDelayed(ent, 0)
             else
                 -- same rule as the ammo box: it stays on the floor
@@ -1104,6 +1112,7 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
                 -- it dies with the entity (roadmap #53 B3)
                 if isstring(newUid) then CARGO.Inventory.StoreFromEntity(newUid, ent) end
                 CARGO.Inventory.NotifyPickup(ply, id, 1)
+                CARGO.PickupAnim.Play(ply)
                 ent:Remove()
             else
                 CARGO.Inventory.Notice(ply, "You can't carry that.")
@@ -1114,6 +1123,8 @@ hook.Add("PlayerUse", "corpus_cargo_world_use", function(ply, ent)
         if not ply:PickupWeapon(ent) then
             ent.CargoUseTaken = nil
             CARGO.Inventory.Notice(ply, "You can't take that right now.")
+        else
+            CARGO.PickupAnim.Play(ply)
         end
     else
         ply.CargoCarryEnt = ent

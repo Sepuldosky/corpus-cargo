@@ -2994,3 +2994,32 @@ HALLAZGOS IN-GAME 2026-07-13 (2.ª pasada de los entries 13/14) — SEMILLA:
     (permisos de admin), si el techo global lo puede mover alguien en vivo.
     NO CONFUNDIR CON el GC de blobs: esa clase murio con CRG-56 (el blob viaja
     embebido en el archivo de su dueno). Esto es de ENTIDADES del mundo.
+
+
+81. AL GOLPEAR CON UN OBJETO CARGADO, LANZARLO HACIA ADELANTE [Cargo hands/capture]
+    Reporte del autor en la r1 del CHANGELOG 83 (2026-08-25), desde la nota de
+    un check que PASO: «una cosa que me molesta de mi swep de hands de cargo es
+    que al tener tomado algo y hacer clic, golpeo; deberia tirar el item hacia
+    el frente con un poco mas de fuerza, asi como se hace en HL2».
+    QUE ES: en HL2, con un objeto cargado (`+use`), el clic izquierdo NO golpea:
+    LANZA lo que llevas. Hoy en Cargo el carry lo da el portero de `PlayerUse`
+    (`ply.CargoCarryEnt` + `ply:PickupObject`, corpus_cargo_capture.lua) y el
+    `+attack` lo atiende el SWEP Hands, que no sabe que hay algo en las manos:
+    por eso golpea al aire mientras sostiene una caja.
+    ⚠ SON DOS SUJETOS QUE HOY NO SE HABLAN, y esa es toda la entrada: el estado
+    del carry vive en el portero (server) y el ataque vive en el SWEP. La
+    entrada NO es «agregarle fuerza a algo»: es decidir DONDE vive «tengo algo
+    cargado» de modo que el SWEP lo pueda preguntar. Lo mismo que necesitaria
+    el menu interactivo para tomar props.
+    ⚠ Y OJO CON EL ALCANCE: el carry del portero no es solo del SWEP Hands —
+    se puede cargar un prop con CUALQUIER arma en la mano. Un arreglo que viva
+    dentro de `corpus_cargo_hands.lua` deja el mismo sintoma vivo con las otras
+    armas. Medir eso ANTES de elegir donde va, o el arreglo tapa un caso de N.
+    LO QUE HAY QUE DECIDIR:
+      a) Si lanzar reemplaza al golpe SOLO en Hands o con cualquier arma.
+      b) De donde sale la fuerza: fija, o por peso del prop (Cargo ya sabe
+         pesar). Lo segundo es mas caro y mas coherente con el modulo.
+      c) Si el clic derecho suelta suave (HL2 lo hace), o si eso ya lo cubre el
+         «USE de nuevo suelta» que el portero ya tiene desde el roadmap #16.
+    NO CONFUNDIR CON el gesto del CHANGELOG 83: aquel es la animacion de TOMAR
+    y esta cerrado 12/12. Esto es el otro extremo, SOLTAR, y no toca ese codigo.

@@ -97,6 +97,9 @@ if SERVER then
         CARGO.Inventory.Notice(activator,
             "Picked up " .. CARGO.Money.Format(amount) .. ".")
         CARGO.Inventory.Touch(activator)
+        -- Same as the item drop: the cash bundle rides the ITEM shape of the
+        -- world gate, so a WALK+USE take reaches here with the gesture armed.
+        if CARGO.PickupAnim then CARGO.PickupAnim.Play(activator) end
         self:Remove()
     end
 

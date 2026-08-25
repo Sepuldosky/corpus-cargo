@@ -5,9 +5,37 @@
 > secciones ni historial). El historial vive en `git` + [`CHANGELOG.md`](CHANGELOG.md).
 > Si crece de una pantalla, está mal redactado: recortar.
 
-**Última actualización:** 2026-08-23 (**SLICE 2 del comercio CERRADA EN JUEGO** — el **dinero como
-entidad**, planilla **AO 10/10**, CHANGELOG **82** `[APLICADO]`. **Sexta sección seguida que cierra
-sin un rojo**).
+**Última actualización:** 2026-08-25 (**el GESTO DE RECOGER CERRADO EN JUEGO** — reciclado de *[GCAL]
+Improved Manual Pickup*, planilla **12/12 en UNA ronda**, CHANGELOG **83** `[APLICADO]`. **Séptima
+sección seguida que cierra sin un rojo**).
+
+**Tomar algo del piso ahora se ve.** WALK+USE dispara un gesto de brazo (GCAL) en las **cinco** formas
+del portero — armas, drops, cash, cajas de munición y pickups de terceros. Perillas
+`cargo_pickup_gesture` (1) y `cargo_pickup_gesture_time` (0.8); instrumento
+`cargo_pickupanim_diag [play]`. **Dependencia blanda**: sin GCAL montado, Cargo se comporta como
+antes.
+⭐ **El pedido era de dos mitades y una ya estaba hecha desde julio.** El autor pidió *«sólo la
+animación, y que sea con USE+WALK»* — y **WALK+USE toma / USE carga** ya estaba escrito palabra por
+palabra en el header del portero desde el roadmap #16. Del addon de origen se reciclaron **12 de 354
+líneas**: Cargo ya tenía su sistema entero, más ancho. **Leer el propio header antes de escribir fue
+lo que evitó re-implementarlo.**
+⚠ **El defecto que no da error, y por qué el verde se puede creer**: GCAL elige **qué secuencia del
+modelo tocar por el NOMBRE de la animación**; una anim con nombre propio cae a *pose-only* —gesto
+equivocado, consola muda—. Se declara `sequence = "interact"` explícito, y el check 03 lo midió
+**sobre el track vivo** (única forma de preguntarlo), no sobre el registro.
+⚠ **Cuatro de los doce checks son CONTROLES NEGATIVOS y son la mitad que sostiene al resto**: USE
+solo carga y no anima; un ítem que entra por otra vía no anima; una toma rechazada por peso no
+anima; y el mod original ya no estaba montado. Sin ellos, *«anima al tomar»* no se distingue de
+*«anima con cualquier USE»*.
+⚠ **Límite honesto declarado**: el `net` de GCAL no dice de qué jugador, así que el gesto va con
+`recipients = ply` y **en multiplayer los demás no ven la toma**.
+⚠ **Abierta la #81** desde la nota de un check que PASÓ: al golpear con un objeto cargado debería
+lanzarlo hacia adelante como en HL2. **Son dos sujetos que hoy no se hablan** (el carry vive en el
+portero, el `+attack` en el SWEP Hands) y el carry **no es sólo de Hands** — se puede cargar un prop
+con cualquier arma, así que un arreglo dentro de `corpus_cargo_hands.lua` taparía un caso de N.
+
+Antes, el 2026-08-23: (**SLICE 2 del comercio CERRADA EN JUEGO** — el **dinero como
+entidad**, planilla **AO 10/10**, CHANGELOG **82** `[APLICADO]`).
 ⚠ **Las cuatro filas del TRADE estuvieron a punto de cerrarse SIN CORRER**: el primer reporte cubría
 sólo el drop y venía con un «creo que cierra». Se señaló el hueco —la línea de solo-dinero **es** lo
 que el P2P del slice 3 reusa— y se corrieron.

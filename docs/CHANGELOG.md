@@ -8550,3 +8550,133 @@ Las nueve suites vecinas re-corridas enteras.
 paga— sino el **lock del basket**, sobre el que hay una alternativa más barata anotada en el handoff:
 **versionar el basket** y que aceptar nombre la versión, en vez de congelar el ítem en las siete
 rutas que lo consumen.
+
+---
+
+## 83. La animación de recoger — reciclada de [GCAL] Improved Manual Pickup `[APLICADO 2026-08-25]`
+
+**Pedido del autor (2026-08-25):** traer el mod *[GCAL] Improved Manual Pickup* (`3722869921`),
+adecuarlo a Cargo de modo que **sólo se efectúe la animación** al tomar un objeto, y que el gesto de
+tomar sea **WALK+USE**. Reciclarlo, acreditarlo, y desuscribirse del original.
+
+### Lo que había que hacer, medido: casi nada
+
+El addon son **354 líneas en tres archivos** y trae un sistema de pickup manual **completo** para
+ítems de HL2: veta `AllowPlayerPickup`, lleva su propia tabla de clases `item_ammo_*`,
+teletransporta la entidad al jugador, hace malabares con `m_bPreventWeaponPickup` más un timer de
+respaldo, y dibuja un halo verde estilo NMRIH sobre lo que mirás.
+
+**Cargo ya hacía las seis cosas.** El portero de `PlayerUse` de `corpus_cargo_capture.lua` (roadmap
+#16, julio) es ese mismo sistema, es más viejo, y es **más ancho**: gobierna cinco formas —armas del
+mundo, drops de Cargo, fajos de dinero, cajas de munición y pickups registrados por terceros— con
+un solo debounce y una sola regla. Y la regla que ya tenía escrita, palabra por palabra en su
+header, es **«WALK+USE takes, USE carries like an HL2 prop»** — o sea que la segunda mitad del
+pedido **ya estaba hecha desde julio**; lo único que le faltaba era el gesto.
+
+Así que de las 354 líneas **se reciclaron 12**: la tabla de ajuste del `vmanip/anims/pickup_anim.lua`
+(`lerp_peak` 0,7 · `lerp_speed_in` 1 · `lerp_speed_out` 0,8 · `lerp_curve` 2,5 · `speed` 1), que es
+el *"use"* de VManip ralentizado y suavizado hasta que se lee como **levantar algo del piso** en vez
+de **apretar un botón**. Es la parte del addon que costó gusto y no código.
+
+### Las dos cosas que el autor descartó, y por qué no son recortes
+
+- **El halo verde.** *"El menú interactivo a lo ACE3 ya deja ver la cualidad del ítem, incluso si es
+  un mero prop"* — un contorno al mirar contestaría peor una pregunta que el menú contesta mejor.
+  Es además la **misma decisión que Cargo ya había tomado** y dejado escrita en
+  `corpus_cargo_pickup.lua:3-4`: el feed *"replaces the look-at highlight that external pickup mods
+  used to give"*.
+- **El modelo del ítem colgado de la mano.** *"Está de más"*: el gesto se quiere por lo que **cuesta**
+  (*"evita que el jugador tome a gusto un montón de items"*) y como **señal de que la toma entró**,
+  no como un segundo informe de inventario.
+
+### Lo que se escribió
+
+1. **`shared/corpus_cargo_pickupanim.lua`** (nuevo): registra la anim `cargo_pickup` en GCAL del
+   lado cliente y expone `PickupAnim.Arm/Play` del lado server. Dependencia **blanda** como la NVG
+   de Neosun: sin GCAL el global es `nil`, no se registra nada, el portero no llama a nada y Cargo
+   se comporta exactamente como antes. **No hay fallback a un VManip nativo** a propósito — GCAL es
+   su reemplazo y avisa de instalaciones que conviven; un segundo camino sólo agregaría una manera
+   de quedar a medio cablear.
+2. **El portero arma, los caminos de éxito disparan.** `PickupAnim.Arm(ply)` se llama en **la rama
+   WALK y en ningún otro lado**, que es lo que confina el gesto a una toma deliberada del piso: toda
+   otra vía por la que un ítem entra al inventario —comprar, loadout, mover una celda— pasa por las
+   mismas funciones de `GiveItem` y **ninguna es un jugador estirando la mano**. Después se dispara
+   en los **seis** caminos de éxito (caja de munición, pickup de tercero, arma duplicada,
+   `PickupWeapon`, `ENT:Use` del drop, `ENT:Use` del fajo). El flag se sella con `CurTime()`, que es
+   lo que deja pasar las dos tomas delegadas —llegan a `ENT:Use` en la misma llamada del engine— y
+   deja afuera un flag viejo de otro frame.
+3. **Sólo si tomó** (decisión del autor): si el ítem no entra por peso y queda en el suelo, no hay
+   animación. Los seis enganches están en la rama de éxito, nunca antes de saberlo.
+
+### El defecto silencioso que costó leer el código de GCAL antes de escribir una línea
+
+GCAL resuelve **qué secuencia del modelo tocar a partir del NOMBRE de la animación**
+(`gcal_core.lua:824-845`, CRG-24). El pack de origen se salva **por casualidad**: su anim se llama
+`interactslower`, que contiene el token `interact`, que es el nombre de la secuencia dentro de
+`c_vmanipinteract.mdl`. Una anim con nombre propio —`cargo_pickup`— **no matchea ningún candidato y
+cae al camino surrogate/pose-only de GCAL: el gesto equivocado, sin un solo error en consola**. Se
+resuelve declarando `sequence = "interact"`, que es el candidato #2 y explícito, con lo que la
+resolución ya no puede irse con el nombre.
+
+### El freno del portero sale de un número medido, no estimado
+
+Leído del `.mdl` con un parser del `studiohdr` (2026-08-25): `c_vmanipinteract.mdl` trae **dos**
+secuencias, y `interact` corre **46 frames a 55 fps = 0,818 s**. A `speed = 1` ésa es la duración
+del gesto, así que el debounce del portero —0,4 s de fábrica— se sube a cubrirla
+(`cargo_pickup_gesture_time`, default **0,8**): si no, una segunda toma entra con el brazo todavía
+en movimiento y **reinicia la animación a mitad de camino**. Los 0,4 s siguen siendo el piso de todo
+lo que no anima.
+
+### El límite honesto: lo ve el que toma, y nadie más
+
+El `net` de `GCAL:Play` del server escribe **`name` y `trackID` y nada más** — no dice de qué
+jugador (`gcal_core.lua:2841-2860`, y el receptor de `:2822` lo reproduce **sobre sí mismo**). O sea
+que el mensaje quiere decir *"vos, tocá esto"*, nunca *"el jugador X hizo un gesto"*: **un broadcast
+haría que a todo el server se le mueva el brazo cada vez que alguien levanta algo**. De ahí el
+`recipients = ply` explícito. La contracara es el límite: en multiplayer los demás **no** ven la
+toma. Alcanza para lo que el gesto es acá, y un aviso en tercera persona sería otra feature sobre el
+TPIK de GCAL, no un parámetro de ésta.
+
+### Perillas
+
+| convar | default | qué hace |
+|---|---|---|
+| `cargo_pickup_gesture` | `1` | apaga el gesto sin tocar nada más |
+| `cargo_pickup_gesture_time` | `0.8` | segundos que el portero se aguanta mientras el gesto corre; `0` vuelve al debounce de 0,4 s |
+
+### Créditos y licencia
+
+Escritos en [`docs/CREDITOS.md`](CREDITOS.md). **No viaja un solo archivo** en el `.gma` de Cargo: lo
+reciclado es código y ajuste, y el modelo `c_vmanipinteract.mdl` es de GCAL y se referencia por ruta
+en runtime. Autor del pack **sin verificar** (el `.gma` trae el placeholder `Author Name` y ningún
+`.lua` acredita a nadie); autor de GCAL **verificado en el propio código**: `gcal_init.lua:15` enlaza
+<https://github.com/Midawek/gcal>. Crédito completo y **retiro a pedido** para los dos.
+
+### Verificación — **12/12 EN JUEGO, ronda 1, sin un rojo**
+
+Sintaxis 5/5 (`dev/glua_check.py`), harness **1352/1352**, y la planilla
+`dev/checks/cargo-pickupanim-r1.html` corrida entera el **2026-08-25**: **Pasa 12 · Falla 0 · Sin
+correr 0**. **Cerrado a la primera**, que es raro y conviene decir por qué se puede creer:
+
+- **El rojo silencioso no ocurrió.** El check 03 midió el track VIVO: `secuencia resuelta: interact`,
+  `poseOnly=false`. El `sequence = "interact"` explícito ganó, o sea que **el defecto existía y la
+  declaración lo tapó** — no que nunca hubiera estado.
+- **Los cuatro controles negativos pasaron, y son la mitad que sostiene al resto.** USE solo carga y
+  no anima (05); un ítem que entra por otra vía no anima —*«me di una bandage y no hizo
+  animación»*— (06); una toma rechazada por peso avisa y no anima (07); y el mod original ya no
+  estaba montado (02). Sin esos cuatro, el 04 en verde no distinguiría *«anima al tomar»* de
+  *«anima con cualquier USE»*.
+- **Las cinco formas del portero animan** (04, 08, 09), que es el alcance real del gate y no sólo el
+  caso del arma.
+
+Lo único que dejó el pase: el diag imprimía `cargo_pickup_gesture_time=0.80000001192093` (el float
+crudo del convar). Se pasó a `%.2f` — **cosmético del instrumento, no del acople**: el 0,8 es el
+default y estaba bien.
+
+### Lo que abrió, y NO entra acá
+
+Del check 05, observación del autor sobre el SWEP **Hands**: *«al tener tomado algo y hacer clic,
+golpeo; debería tirar el ítem hacia el frente con un poco más de fuerza, así como se hace en HL2»*.
+Es el `+attack` de HL2 sobre un objeto cargado con USE (lanzar en vez de soltar). **No es de este
+entry** —toca `corpus_cargo_hands.lua` y el carry del portero, no el gesto— y queda anotado en el
+roadmap.
